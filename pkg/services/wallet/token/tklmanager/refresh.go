@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/status-im/nim-token-lists/go/tkl"
+
 	"github.com/status-im/status-go/internal/panics"
 	"github.com/status-im/status-go/internal/pausable"
 )
@@ -108,6 +109,9 @@ func (m *Manager) startRefresh(ctx context.Context, auto bool) error {
 		}
 		return nil
 	}
+	if _, err := m.handle.SetNetworkAllowed(r.allowed); err != nil {
+		return err
+	}
 	if _, err := m.handle.SetAutoRefresh(auto, int64(r.options.RefreshInterval/time.Second), int64(r.options.CheckInterval/time.Second)); err != nil {
 		return err
 	}
@@ -187,11 +191,10 @@ func (m *Manager) SetNetworkAllowed(allowed bool) error {
 	if r == nil {
 		return ErrRefreshUnavailable
 	}
-	if !m.started {
-		return errors.New("catalogue is not started")
-	}
-	if _, err := m.handle.SetNetworkAllowed(allowed); err != nil {
-		return err
+	if m.loaded {
+		if _, err := m.handle.SetNetworkAllowed(allowed); err != nil {
+			return err
+		}
 	}
 	r.allowed = allowed
 	if !allowed && r.cancel != nil {

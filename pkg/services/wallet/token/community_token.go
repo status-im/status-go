@@ -42,16 +42,9 @@ func (tm *Manager) discoverTokenCommunityID(ctx context.Context, token *tokentyp
 		return
 	}
 
-	update, err := tm.walletDB.Prepare("UPDATE tokens SET community_id=? WHERE network_id=? AND address=?")
-	if err != nil {
-		logutils.ZapLogger().Error("Cannot prepare token update query", zap.Error(err))
-		return
-	}
-	defer update.Close()
-
 	if uri == "" {
 		// Update token community ID to prevent further checks
-		_, err := update.Exec("", token.ChainID, token.Address)
+		err := tm.setDiscoveredCommunityID(ctx, token.Token, "")
 		if err != nil {
 			logutils.ZapLogger().Error("Cannot update community id", zap.Error(err))
 		}
@@ -65,14 +58,23 @@ func (tm *Manager) discoverTokenCommunityID(ctx context.Context, token *tokentyp
 	}
 	communityID := cryptotypes.EncodeHex(communityIDHex)
 
-	token.CommunityData = &tokentypes.CommunityData{
-		ID: communityID,
-	}
-
-	_, err = update.Exec(communityID, token.ChainID, token.Address)
+	err = tm.setDiscoveredCommunityID(ctx, token.Token, communityID)
 	if err != nil {
 		logutils.ZapLogger().Error("Cannot update community id", zap.Error(err))
+		return
 	}
+	token.CommunityData = &tokentypes.CommunityData{ID: communityID}
+}
+
+func (tm *Manager) setDiscoveredCommunityID(ctx context.Context, token *types.Token, communityID string) error {
+	persist := func(ctx context.Context) error {
+		_, err := tm.walletDB.ExecContext(ctx, "UPDATE tokens SET community_id=? WHERE network_id=? AND address=?", communityID, token.ChainID, token.Address)
+		return err
+	}
+	if catalogue, ok := tm.tokensManager.(customCatalogue); ok && communityID != "" {
+		return catalogue.DeleteCustom(ctx, token.Key(), persist)
+	}
+	return persist(ctx)
 }
 
 func (tm *Manager) GetCommunityTokenType(chainID uint64, tokenContractAddress string) (protobuf.CommunityTokenType, error) {
@@ -204,6 +206,21 @@ func (tm *Manager) getCustomByChainAddress(onlyCommunityCustoms bool, chainID ui
 }
 
 func (tm *Manager) UpsertCustom(token tokentypes.Token) error {
+	if token.Token == nil {
+		return fmt.Errorf("custom token is nil")
+	}
+	if catalogue, ok := tm.tokensManager.(customCatalogue); ok {
+		if token.CommunityData != nil && token.CommunityData.ID != "" {
+			return catalogue.DeleteCustom(context.Background(), token.Key(), func(ctx context.Context) error {
+				_, err := tm.walletDB.ExecContext(ctx, "INSERT OR REPLACE INTO tokens (network_id,address,name,symbol,decimals,community_id) VALUES (?,?,?,?,?,?)", token.ChainID, token.Address, token.Name, token.Symbol, token.Decimals, token.CommunityData.ID)
+				return err
+			})
+		}
+		return catalogue.UpsertCustom(context.Background(), token.Token, func(ctx context.Context, row *types.Token) error {
+			_, err := tm.walletDB.ExecContext(ctx, "INSERT OR REPLACE INTO tokens (network_id,address,name,symbol,decimals) VALUES (?,?,?,?,?)", row.ChainID, row.Address, row.Name, row.Symbol, row.Decimals)
+			return err
+		})
+	}
 	insert, err := tm.walletDB.Prepare("INSERT OR REPLACE INTO TOKENS (network_id, address, name, symbol, decimals) VALUES (?, ?, ?, ?, ?)")
 	if err != nil {
 		return err
@@ -214,8 +231,20 @@ func (tm *Manager) UpsertCustom(token tokentypes.Token) error {
 }
 
 func (tm *Manager) DeleteCustom(chainID uint64, address common.Address) error {
+	if catalogue, ok := tm.tokensManager.(customCatalogue); ok {
+		return catalogue.DeleteCustom(context.Background(), types.TokenKey(chainID, address), func(ctx context.Context) error {
+			_, err := tm.walletDB.ExecContext(ctx, `DELETE FROM tokens WHERE address=? AND network_id=?`, address, chainID)
+			return err
+		})
+	}
 	_, err := tm.walletDB.Exec(`DELETE FROM TOKENS WHERE address = ? and network_id = ?`, address, chainID)
 	return err
+}
+
+// customCatalogue keeps optional C bindings out of ordinary builds.
+type customCatalogue interface {
+	UpsertCustom(context.Context, *types.Token, func(context.Context, *types.Token) error) error
+	DeleteCustom(context.Context, string, func(context.Context) error) error
 }
 
 func (tm *Manager) fillCommunityData(token *tokentypes.Token) error {

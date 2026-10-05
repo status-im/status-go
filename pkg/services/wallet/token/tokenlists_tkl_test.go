@@ -11,8 +11,9 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/go-wallet-sdk/pkg/tokens/autofetcher"
 	"github.com/status-im/go-wallet-sdk/pkg/tokens/types"
-	walletcommon "github.com/status-im/status-go/pkg/services/wallet/common"
 	"github.com/stretchr/testify/require"
+
+	walletcommon "github.com/status-im/status-go/pkg/services/wallet/common"
 )
 
 func TestTKLBootstrapExistingDatabase(t *testing.T) {
@@ -22,7 +23,7 @@ func TestTKLBootstrapExistingDatabase(t *testing.T) {
 	require.NoError(t, NewContentStore(manager.walletDB).Set(walletcommon.StatusTokenListID, autofetcher.Content{SourceURL: "https://prod.market.status.im/static/token-list.json", Data: []byte("broken")}))
 	facade, err := newTKLReadManager(manager, []uint64{1}, time.Time{})
 	require.NoError(t, err)
-	defer facade.Stop()
+	defer func() { _ = facade.Stop() }()
 	require.NoError(t, facade.Start(context.Background(), false, nil))
 	require.NotEmpty(t, facade.UniqueTokens())
 	token, ok := facade.GetTokenByChainAddress(1, common.Address{})
@@ -48,7 +49,7 @@ func TestTKLBootstrapInvalidAndCommunityCustoms(t *testing.T) {
 	require.NoError(t, err)
 	facade, err := newTKLReadManager(m, []uint64{1}, time.Time{})
 	require.NoError(t, err)
-	defer facade.Stop()
+	defer func() { _ = facade.Stop() }()
 	require.NoError(t, facade.Start(context.Background(), false, nil))
 	custom, ok := facade.GetTokenByChainAddress(1, common.HexToAddress("0x1"))
 	require.True(t, ok)
@@ -65,11 +66,11 @@ func TestTKLEmbeddedReadParity(t *testing.T) {
 	chains := walletcommon.AllChainIDsAsUint64()
 	facade, err := newTKLReadManager(manager, chains, time.Time{})
 	require.NoError(t, err)
-	defer facade.Stop()
+	defer func() { _ = facade.Stop() }()
 	old, err := setUpTokenListsManager(manager, manager.walletDB, chains, time.Time{}, time.Hour, time.Minute)
 	require.NoError(t, err)
 	require.NoError(t, old.Start(context.Background(), false, nil))
-	defer old.Stop()
+	defer func() { _ = old.Stop() }()
 	require.NoError(t, facade.Start(context.Background(), false, nil))
 	byKey := func(tokens []*types.Token) map[string]*types.Token {
 		result := make(map[string]*types.Token)

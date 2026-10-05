@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"math/big"
 	"slices"
+	"sync"
 	"time"
 
 	"go.uber.org/zap"
@@ -32,6 +33,7 @@ import (
 	"github.com/status-im/status-go/internal/db/multiaccounts/settings"
 	"github.com/status-im/status-go/internal/logutils"
 	"github.com/status-im/status-go/internal/panics"
+	"github.com/status-im/status-go/internal/pausable"
 	"github.com/status-im/status-go/internal/rpc"
 	"github.com/status-im/status-go/internal/signal"
 	"github.com/status-im/status-go/pkg/pubsub"
@@ -92,8 +94,20 @@ type Manager struct {
 
 	tokensManager manager.Manager
 
-	stopCh   chan struct{}
-	notifyCh chan struct{}
+	stopCh      chan struct{}
+	notifyCh    chan struct{}
+	lifecycleMu sync.Mutex
+	workers     sync.WaitGroup
+	stopped     bool // Stop is terminal; a new node/profile constructs a new Manager.
+}
+
+// ManagerOptions selects the optional C-backed catalogue. It remains off by default.
+type ManagerOptions struct{ UseNim bool }
+
+// CataloguePausable exposes the optional refresh scheduler to the node registry.
+func (tm *Manager) CataloguePausable() pausable.Pausable {
+	p, _ := tm.tokensManager.(pausable.Pausable)
+	return p
 }
 
 func NewTokenManager(
@@ -108,7 +122,12 @@ func NewTokenManager(
 	accountsDB *accounts.Database,
 	autoRefreshInterval time.Duration,
 	autoRefreshCheckInterval time.Duration,
+	options ...ManagerOptions,
 ) (*Manager, error) {
+	if len(options) > 1 {
+		return nil, errors.New("only one token manager configuration is allowed")
+	}
+	useNim := len(options) == 1 && options[0].UseNim
 	maker := contracts.NewContractMaker(ethClientGetter)
 
 	settings, err := settings.MakeNewDB(appDB)
@@ -141,8 +160,8 @@ func NewTokenManager(
 		return nil, err
 	}
 
-	tokensManager, err := setUpTokenListsManager(manager, walletDB, enabledChains, lastTokensUpdate, autoRefreshInterval,
-		autoRefreshCheckInterval)
+	tokensManager, err := selectTokenListsManager(manager, enabledChains, lastTokensUpdate, autoRefreshInterval,
+		autoRefreshCheckInterval, useNim)
 	if err != nil {
 		logutils.ZapLogger().Error("Failed to create token lists manager", zap.Error(err))
 		return nil, err
@@ -248,14 +267,24 @@ func setUpTokenListsManager(mng *Manager, walletDB *sql.DB, enabledChains []uint
 }
 
 func (tm *Manager) Start(ctx context.Context) error {
+	tm.lifecycleMu.Lock()
+	defer tm.lifecycleMu.Unlock()
+	if tm.stopped {
+		return errors.New("token manager is stopped")
+	}
+	if tm.stopCh != nil {
+		return nil
+	}
 	stopCh := make(chan struct{})
+	notifyCh := make(chan struct{}, 1)
+	if err := tm.startTokenListsNotifier(ctx, stopCh, notifyCh); err != nil {
+		return err
+	}
 	tm.stopCh = stopCh
+	tm.notifyCh = notifyCh
 	tm.startAccountsWatcher(stopCh)
 	tm.startNetworksWatcher(stopCh)
-
-	notifyCh := make(chan struct{}, 1)
-	tm.notifyCh = notifyCh
-	return tm.startTokenListsNotifier(ctx, stopCh, notifyCh)
+	return nil
 }
 
 func (tm *Manager) startTokenListsNotifier(ctx context.Context, stopCh <-chan struct{}, notifyCh chan struct{}) error {
@@ -271,6 +300,13 @@ func (tm *Manager) startTokenListsNotifier(ctx context.Context, stopCh <-chan st
 	}
 
 	autoRefresh := thirdpartyServicesEnabled && autoRefreshEnabled
+	if catalogue, ok := tm.tokensManager.(interface{ SetNetworkAllowed(bool) error }); ok {
+		if err := catalogue.SetNetworkAllowed(thirdpartyServicesEnabled); err != nil {
+			return err
+		}
+		// This path owns its success timestamps and notifications directly.
+		return tm.tokensManager.Start(ctx, autoRefresh, nil)
+	}
 
 	err = tm.tokensManager.Start(ctx, autoRefresh, notifyCh)
 	if err != nil {
@@ -278,15 +314,13 @@ func (tm *Manager) startTokenListsNotifier(ctx context.Context, stopCh <-chan st
 		return err
 	}
 
+	tm.workers.Add(1)
 	go func() {
 		defer panics.LogOnPanic()
+		defer tm.workers.Done()
 		for {
 			select {
 			case <-stopCh:
-				err := tm.tokensManager.Stop()
-				if err != nil {
-					logutils.ZapLogger().Error("failed to stop token lists notifier", zap.Error(err))
-				}
 				return
 			case <-notifyCh:
 				err := tm.setLastTokenListsRefreshTime(time.Now().UTC())
@@ -316,8 +350,10 @@ func (tm *Manager) startAccountsWatcher(stopCh <-chan struct{}) {
 	}
 
 	ch, unsubFn := pubsub.Subscribe[accountsevent.AccountsRemovedEvent](tm.accountsPublisher, 10)
+	tm.workers.Add(1)
 	go func() {
 		defer panics.LogOnPanic()
+		defer tm.workers.Done()
 		defer unsubFn()
 		for {
 			select {
@@ -340,8 +376,10 @@ func (tm *Manager) startNetworksWatcher(stopCh <-chan struct{}) {
 
 	ch, unsubFn := pubsub.Subscribe[networks.EventActiveNetworksChanged](tm.networkManager.GetPublisher(), 10)
 
+	tm.workers.Add(1)
 	go func() {
 		defer panics.LogOnPanic()
+		defer tm.workers.Done()
 		defer unsubFn()
 		for {
 			select {
@@ -371,10 +409,22 @@ func (tm *Manager) onActiveNetworksChanged() {
 }
 
 func (tm *Manager) Stop() {
+	tm.lifecycleMu.Lock()
+	defer tm.lifecycleMu.Unlock()
+	if tm.stopped {
+		return
+	}
+	tm.stopped = true
 	if tm.stopCh != nil {
 		close(tm.stopCh)
 		tm.stopCh = nil
 	}
+	if tm.tokensManager != nil {
+		if err := tm.tokensManager.Stop(); err != nil {
+			logutils.ZapLogger().Error("failed to stop token catalogue", zap.Error(err))
+		}
+	}
+	tm.workers.Wait()
 }
 
 func (tm *Manager) GetTokenByChainAddress(chainID uint64, address common.Address) (*tokentypes.Token, error) {

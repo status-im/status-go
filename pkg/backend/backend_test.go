@@ -1220,6 +1220,10 @@ func fakeToken() security.SensitiveString {
 }
 
 func TestWalletConfigOnLoginAccount(t *testing.T) {
+	testWalletConfigOnLoginAccount(t, false)
+}
+
+func testWalletConfigOnLoginAccount(t *testing.T, useNim bool) {
 	testContext := setupTestContext(t, testPassword, false, false, true)
 
 	poktToken := fakeToken()
@@ -1265,6 +1269,7 @@ func TestWalletConfigOnLoginAccount(t *testing.T) {
 			CoingeckoDemoAPIKey:  coingeckoDemoAPIKey,
 		},
 		WalletConfig: requests.WalletConfig{
+			TokenListsUseNim:       useNim,
 			EnableParaswapProvider: boolPtr(true),
 			EnableLiFiProvider:     boolPtr(false),
 			EnableRelayProvider:    boolPtr(true),
@@ -1282,6 +1287,10 @@ func TestWalletConfigOnLoginAccount(t *testing.T) {
 	}
 
 	walletConfig := testContext.backend.config.WalletConfig
+	require.Equal(t, useNim, walletConfig.TokenListsUseNim)
+	if useNim {
+		require.NotNil(t, testContext.backend.statusNode.TokenManager().CataloguePausable())
+	}
 	require.Equal(t, walletConfig.InfuraAPIKey, infuraToken)
 	require.Equal(t, walletConfig.AlchemyAPIKey, alchemyAPIKey)
 	require.Equal(t, walletConfig.RaribleMainnetAPIKey, raribleMainnetAPIKey)

@@ -9,12 +9,13 @@ import (
 	"time"
 
 	"github.com/status-im/nim-token-lists/go/tkl"
+	"go.uber.org/zap"
+
 	"github.com/status-im/status-go/internal/logutils"
 	"github.com/status-im/status-go/internal/panics"
 	"github.com/status-im/status-go/internal/signal"
 	"github.com/status-im/status-go/pkg/services/wallet/token/tklmanager"
 	"github.com/status-im/status-go/pkg/services/wallet/walletevent"
-	"go.uber.org/zap"
 )
 
 func putTKLBatch(ctx context.Context, db *sql.DB, writes []tkl.ListContent) error {
@@ -25,7 +26,7 @@ func putTKLBatch(ctx context.Context, db *sql.DB, writes []tkl.ListContent) erro
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 	for _, row := range writes {
 		var fetched interface{}
 		if row.FetchedAt != 0 {
@@ -47,8 +48,7 @@ func putTKLBatch(ctx context.Context, db *sql.DB, writes []tkl.ListContent) erro
 	return tx.Commit()
 }
 
-// newTKLRefreshManager is not selected by the application until the runtime
-// switch is wired. Its callbacks own success timestamps and update events;
+// newTKLRefreshManager's callbacks own success timestamps and update events;
 // callers must not route its notify channel through the legacy SDK notifier.
 func newTKLRefreshManager(mng *Manager, chains []uint64, lastSuccess time.Time, client *http.Client, refreshInterval, checkInterval time.Duration) (*tklmanager.Manager, error) {
 	return newTKLReadManager(mng, chains, lastSuccess, tklmanager.RefreshOptions{
