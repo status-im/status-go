@@ -20,6 +20,7 @@ func (m *Messenger) HandleSyncRawMessages(rawMessages []*protobuf.RawMessage) er
 	defer span.End()
 
 	state := m.buildMessageState()
+	var backedUpThreads []*protobuf.BackedUpThread
 	for _, rawMessage := range rawMessages {
 		switch rawMessage.GetMessageType() {
 		case protobuf.ApplicationMetadataMessage_CONTACT_UPDATE:
@@ -347,10 +348,17 @@ func (m *Messenger) HandleSyncRawMessages(rawMessages []*protobuf.RawMessage) er
 			if err != nil {
 				return err
 			}
+			if err := m.persistence.SaveBackedUpThreads(messageBatch.Threads); err != nil {
+				return err
+			}
+			backedUpThreads = append(backedUpThreads, messageBatch.Threads...)
 		}
 	}
 	response, err := m.saveDataAndPrepareResponse(state)
 	if err != nil {
+		return err
+	}
+	if err := m.addBackedUpThreadsToResponse(response, backedUpThreads); err != nil {
 		return err
 	}
 	m.PublishMessengerResponse(response)

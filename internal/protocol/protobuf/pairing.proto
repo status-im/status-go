@@ -502,10 +502,21 @@ message BackedUpMessage {
   string pinned_by = 15;
 
   repeated BackedUpEmojiReaction emoji_reactions = 16;
+
+  string thread_id = 17;
+}
+
+message BackedUpThread {
+  string thread_id = 1;
+  string chat_id = 2;
+  string parent_message_id = 3;
+  string name = 4;
+  uint64 read_messages_at_clock_value = 5;
 }
 
 message BackedUpMessageBatch {
   repeated BackedUpMessage messages = 1;
+  repeated BackedUpThread threads = 2;
 }
 
 message BackedUpEmojiReaction {

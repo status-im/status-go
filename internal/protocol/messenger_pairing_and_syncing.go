@@ -485,26 +485,38 @@ func (m *Messenger) syncMessages(ctx context.Context, rawMessageHandler RawMessa
 	for batch := range slices.Chunk(backupMessages, 100) {
 		batchMsg := &protobuf.BackedUpMessageBatch{Messages: batch}
 
-		encodedMessage, err := proto.Marshal(batchMsg)
-		if err != nil {
+		if err := m.syncBackedUpMessageBatch(ctx, rawMessageHandler, batchMsg); err != nil {
 			return err
 		}
+	}
 
-		_, chat := m.getLastClockWithRelatedChat()
-		rawMessage := common.RawMessage{
-			LocalChatID: chat.ID,
-			Payload:     encodedMessage,
-			MessageType: protobuf.ApplicationMetadataMessage_BACKED_UP_MESSAGE_BATCH,
-			ResendType:  common.ResendTypeDataSync,
-		}
-
-		_, err = rawMessageHandler(ctx, rawMessage)
-		if err != nil {
+	threads, err := m.persistence.AllThreadsForBackup()
+	if err != nil {
+		return err
+	}
+	for batch := range slices.Chunk(threads, 100) {
+		if err := m.syncBackedUpMessageBatch(ctx, rawMessageHandler, &protobuf.BackedUpMessageBatch{Threads: batch}); err != nil {
 			return err
 		}
 	}
 
 	return nil
+}
+
+func (m *Messenger) syncBackedUpMessageBatch(ctx context.Context, rawMessageHandler RawMessageHandler, batch *protobuf.BackedUpMessageBatch) error {
+	encodedMessage, err := proto.Marshal(batch)
+	if err != nil {
+		return err
+	}
+
+	_, chat := m.getLastClockWithRelatedChat()
+	_, err = rawMessageHandler(ctx, common.RawMessage{
+		LocalChatID: chat.ID,
+		Payload:     encodedMessage,
+		MessageType: protobuf.ApplicationMetadataMessage_BACKED_UP_MESSAGE_BATCH,
+		ResendType:  common.ResendTypeDataSync,
+	})
+	return err
 }
 
 func (m *Messenger) InitInstallations() error {
