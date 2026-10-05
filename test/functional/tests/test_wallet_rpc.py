@@ -91,8 +91,14 @@ class TestRpc:
 
     def test_get_crypto_on_ramps(self):
         result = self.rpc_client.wallet_service.get_crypto_on_ramps()
-        assert result[0].get("description") == "The new standard for fiat to crypto"
-        assert result[0].get("name") == "MoonPay"
+        moonpay = next(r for r in result if r.get("id") == "moonpay")
+        assert moonpay.get("name") == "MoonPay"
+        assert moonpay.get("hostname") == "moonpay.com"
+        assert moonpay.get("urlsNeedParameters") is False
+
+    def test_get_crypto_on_ramp_url(self):
+        url = self.rpc_client.wallet_service.get_crypto_on_ramp_url("moonpay", {"isRecurrent": False})
+        assert url.startswith("https://buy.moonpay.com/")
 
     def test_get_cached_currency_formats(self):
         result = self.rpc_client.wallet_service.get_cached_currency_formats()
