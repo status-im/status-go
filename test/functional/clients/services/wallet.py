@@ -65,6 +65,9 @@ class WalletService(Service):
     ):
         return self.rpc_request("getCryptoOnRamps")
 
+    def get_crypto_on_ramp_url(self, provider_id: str, parameters: dict):
+        return self.rpc_request("getCryptoOnRampURL", [provider_id, parameters])
+
     def get_cached_currency_formats(
         self,
     ):
