@@ -97,6 +97,9 @@ func (m *Messenger) CreateThread(chatID string, parentMessageID string) (*Messen
 	if parentMsg.LocalChatID != chatID {
 		return nil, errors.New("parent message not found")
 	}
+	if parentMsg.GetThreadId() != "" {
+		return nil, ErrThreadParentInThread
+	}
 
 	name := normalizeThreadName(parentMsg.Text)
 	if err := m.persistence.UpsertThread(parentMessageID, chatID, parentMessageID, name); err != nil {
