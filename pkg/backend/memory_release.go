@@ -4,6 +4,8 @@ import (
 	"runtime/debug"
 	"sync"
 	"time"
+
+	"github.com/status-im/status-go/internal/panics"
 )
 
 // memoryReleaser returns idle heap to the OS at the two moments it matters on a phone: once the
@@ -43,12 +45,21 @@ func (r *memoryReleaser) scheduleAfterLogin(delay time.Duration) {
 	if r.timer != nil {
 		r.timer.Stop()
 	}
-	r.timer = r.afterFn(delay, func() {
+	var t *time.Timer
+	t = r.afterFn(delay, func() {
+		defer panics.LogOnPanic()
 		r.mu.Lock()
+		// A timer replaced or stopped after it already fired must not release.
+		if r.timer != t {
+			r.mu.Unlock()
+			return
+		}
 		r.timer = nil
+		r.last = r.now()
 		r.mu.Unlock()
-		r.run(true)
+		r.release()
 	})
+	r.timer = t
 }
 
 // releaseNow releases unless the post-login release is still pending or a release ran within
@@ -56,17 +67,7 @@ func (r *memoryReleaser) scheduleAfterLogin(delay time.Duration) {
 // that follow.
 func (r *memoryReleaser) releaseNow() {
 	r.mu.Lock()
-	pending := r.timer != nil
-	r.mu.Unlock()
-	if pending {
-		return
-	}
-	r.run(false)
-}
-
-func (r *memoryReleaser) run(force bool) {
-	r.mu.Lock()
-	if !force && r.now().Sub(r.last) < r.minGap {
+	if r.timer != nil || r.now().Sub(r.last) < r.minGap {
 		r.mu.Unlock()
 		return
 	}

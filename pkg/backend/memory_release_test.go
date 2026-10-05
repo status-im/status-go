@@ -60,3 +60,23 @@ func TestMemoryReleaserStopCancelsPendingTimer(t *testing.T) {
 	require.Nil(t, r.timer)
 	r.stop() // idempotent
 }
+
+func TestMemoryReleaserStaleCallbackDoesNotRelease(t *testing.T) {
+	r, calls, _, pending := newTestReleaser(t)
+
+	r.scheduleAfterLogin(time.Minute)
+	stopped := *pending
+	r.stop()
+	stopped() // fired before stop() took the lock
+	require.Equal(t, 0, *calls)
+
+	r.scheduleAfterLogin(time.Minute)
+	replaced := *pending
+	r.scheduleAfterLogin(time.Minute)
+	replaced()
+	require.Equal(t, 0, *calls)
+	require.NotNil(t, r.timer, "the replacing timer stays armed")
+
+	(*pending)()
+	require.Equal(t, 1, *calls)
+}
