@@ -109,6 +109,24 @@ func (s *MessengerThreadsSuite) TestCreateThreadSucceedsWithExistingParent() {
 	s.Require().Equal("This is a test thread message", thread.Name)
 }
 
+func (s *MessengerThreadsSuite) TestCreateThreadRejectsParentAlreadyInThread() {
+	chat := CreateOneToOneChat("test-user", &s.m.identity.PublicKey, s.m.getTimesource())
+	s.Require().NoError(s.m.SaveChat(chat))
+
+	threadID := "existing-thread"
+	parentMsg := buildTestMessage(*chat)
+	parentMsg.ID = "thread-reply"
+	parentMsg.ChatMessage.ThreadId = &threadID
+	s.Require().NoError(s.m.SaveMessages([]*common.Message{parentMsg}))
+
+	_, err := s.m.CreateThread(chat.ID, parentMsg.ID)
+	s.Require().ErrorIs(err, ErrThreadParentInThread)
+
+	threads, err := s.m.ThreadsByChatID(chat.ID)
+	s.Require().NoError(err)
+	s.Require().Empty(threads)
+}
+
 func (s *MessengerThreadsSuite) TestStartThreadFromNewMessageWithExplicitName() {
 	chat := s.createJoinedOneToOneThreadChat()
 
