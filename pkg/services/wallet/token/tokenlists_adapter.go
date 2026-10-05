@@ -1,6 +1,7 @@
 package token
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 
@@ -58,7 +59,11 @@ func (c *contentStore) Set(id string, content autofetcher.Content) error {
 }
 
 func (c *contentStore) GetAll() (map[string]autofetcher.Content, error) {
-	rows, err := c.walletDb.Query("SELECT id, source, etag, fetched, tokens_json FROM token_lists")
+	return c.getAll(context.Background())
+}
+
+func (c *contentStore) getAll(ctx context.Context) (map[string]autofetcher.Content, error) {
+	rows, err := c.walletDb.QueryContext(ctx, "SELECT id, source, etag, fetched, tokens_json FROM token_lists")
 	if err != nil {
 		return nil, err
 	}
@@ -85,7 +90,7 @@ func (c *contentStore) GetAll() (map[string]autofetcher.Content, error) {
 		allContents[id] = content
 	}
 
-	return allContents, nil
+	return allContents, rows.Err()
 }
 
 // customTokenStore provides custom token store implementation for retrieving custom tokens from the database.

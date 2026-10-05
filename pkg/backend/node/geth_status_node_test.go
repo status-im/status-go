@@ -17,8 +17,32 @@ import (
 )
 
 func TestStatusNodeStart(t *testing.T) {
+	testStatusNodeStart(t, false)
+}
+
+func testStatusNodeStopAfterCatalogueSetupFailure(t *testing.T, useNim bool) {
 	config, err := params.NewNodeConfig("", walletcommon.EthereumSepolia)
 	require.NoError(t, err)
+	config.Networks = testutil.MinimalActiveNetworks()
+	config.WalletConfig.TokenListsUseNim = useNim
+	n := New(nil, nil, testutils.MustCreateTestLogger())
+	app, wallet, cleanup, err := setupTestDBs()
+	require.NoError(t, err)
+	defer func() { require.NoError(t, cleanup()) }()
+	n.appDB, n.walletDB = app, wallet
+	defer func() { require.NoError(t, n.StopMediaServer()) }()
+	require.ErrorContains(t, n.Start(config), "TokenListsUseNim requires a build with the tkl tag")
+	require.Nil(t, n.timeSourceSrvc)
+	require.NotPanics(t, func() { require.NoError(t, n.Stop()) })
+	require.False(t, n.IsRunning())
+	require.Nil(t, n.RPCClient())
+	require.Equal(t, ErrNoRunningNode, n.Stop())
+}
+
+func testStatusNodeStart(t *testing.T, useNim bool) {
+	config, err := params.NewNodeConfig("", walletcommon.EthereumSepolia)
+	require.NoError(t, err)
+	config.WalletConfig.TokenListsUseNim = useNim
 
 	// StatusNode startup creates TokenManager, which requires at least one active network.
 	config.Networks = testutil.MinimalActiveNetworks()
@@ -52,6 +76,10 @@ func TestStatusNodeStart(t *testing.T) {
 	nativeToken, err := n.TokenManager().GetTokenByChainAddress(walletcommon.EthereumMainnet, common.Address{})
 	require.NoError(t, err)
 	require.NotNil(t, nativeToken)
+	if useNim {
+		require.NoError(t, n.serviceRegistry.Pause("token-lists"))
+		require.NoError(t, n.serviceRegistry.Resume("token-lists"))
+	}
 
 	// try to start already started node
 	require.EqualError(t, n.Start(config), ErrNodeRunning.Error())
