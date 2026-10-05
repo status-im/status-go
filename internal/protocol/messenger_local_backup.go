@@ -256,17 +256,25 @@ func (m *Messenger) backupProfile(clock uint64) (*protobuf.Backup, error) {
 	return backupMessage, nil
 }
 
-func (m *Messenger) backupMessages() ([]*protobuf.BackedUpMessage, error) {
+func (m *Messenger) backupMessages() ([]*protobuf.BackedUpMessage, []*protobuf.BackedUpThread, error) {
 	messagesBackupEnabled, err := m.settings.MessagesBackupEnabled()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	if !messagesBackupEnabled {
-		return nil, nil
+		return nil, nil, nil
 	}
 
-	return m.persistence.AllMessagesForBackup()
+	messages, err := m.persistence.AllMessagesForBackup()
+	if err != nil {
+		return nil, nil, err
+	}
+	threads, err := m.persistence.AllThreadsForBackup()
+	if err != nil {
+		return nil, nil, err
+	}
+	return messages, threads, nil
 }
 
 func (m *Messenger) ExportBackup() ([]byte, error) {
@@ -295,11 +303,12 @@ func (m *Messenger) ExportBackup() ([]byte, error) {
 		backup.Chats = append(backup.Chats, d.Chats...)
 	}
 
-	backupMessages, err := m.backupMessages()
+	backupMessages, backupThreads, err := m.backupMessages()
 	if err != nil {
 		return nil, err
 	}
 	backup.Messages = backupMessages
+	backup.Threads = backupThreads
 
 	return proto.Marshal(backup)
 }
@@ -329,6 +338,9 @@ func (m *Messenger) ImportBackup(data []byte) error {
 	// Proceed to save data even if there were errors during handling because some data might have been handled successfully
 	response, err := m.saveDataAndPrepareResponse(&state)
 	if response != nil {
+		if threadErr := m.addBackedUpThreadsToResponse(response, backup.Threads); threadErr != nil {
+			errs = append(errs, threadErr)
+		}
 		// Send response even if there were errors as some data might have been saved successfully
 		signal.SendNewMessages(response)
 	}
