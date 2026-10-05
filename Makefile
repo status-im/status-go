@@ -609,8 +609,19 @@ lint:
 lint-fix: generate
 	golangci-lint --build-tags '$(BUILD_TAGS) lint' run --fix ./...
 
-clean: clean-storage ##@other Cleanup
+clean: clean-storage clean-libtkl ##@other Cleanup
 	rm -fr build/bin/*
+
+.PHONY: build-libtkl clean-libtkl test-libtkl
+build-libtkl: ##@build Prepare the pinned native token library
+	bash scripts/tkl_native.sh
+
+clean-libtkl: ##@other Remove the managed token-library checkout and build
+	bash scripts/tkl_native.sh clean
+
+test-libtkl: ##@test Check native dependency reuse and public ABI
+	python3 scripts/test_tkl_native.py
+	bash scripts/tkl_env.sh go test -tags tkl ./internal/tklbuild
 
 git-clean:
 	git clean -xf
