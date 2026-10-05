@@ -7,7 +7,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/big"
+	"net"
 	"net/http"
+	pprof "net/http/pprof"
 	"os"
 	"path/filepath"
 	"runtime/debug"
@@ -104,6 +106,8 @@ type StatusBackend struct {
 	transactor               *transactions.Transactor
 	LocalPairingStateManager *statecontrol.ProcessStateManager
 	prometheusMetrics        *metrics.Server
+	pprofServer              *http.Server
+	pprofListener            net.Listener
 	sentryDSN                string
 
 	logger            *zap.Logger
@@ -3010,4 +3014,53 @@ func (b *StatusBackend) wakuMetricsHandler() http.Handler {
 			}
 		}
 	})
+}
+
+// StartPprof serves net/http/pprof on addr for on-device profiling. A running server is replaced.
+func (b *StatusBackend) StartPprof(addr string) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	_ = b.closePprofLocked()
+	ln, err := net.Listen("tcp", addr)
+	if err != nil {
+		return err
+	}
+	mux := http.NewServeMux()
+	mux.HandleFunc("/debug/pprof/", pprof.Index)
+	mux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
+	mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
+	mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+	mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
+	srv := &http.Server{Handler: mux, ReadHeaderTimeout: 10 * time.Second}
+	b.pprofServer = srv
+	b.pprofListener = ln
+	go func() {
+		defer panics.LogOnPanic()
+		if err := srv.Serve(ln); err != nil && err != http.ErrServerClosed {
+			b.logger.Error("pprof server error", zap.Error(err))
+		}
+	}()
+	b.logger.Info("pprof server started", zap.String("addr", ln.Addr().String()))
+	return nil
+}
+
+// StopPprof shuts down the server started by StartPprof.
+func (b *StatusBackend) StopPprof() error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.closePprofLocked()
+}
+
+// closePprofLocked closes the listener too: Server.Close only tracks it once Serve has started.
+func (b *StatusBackend) closePprofLocked() error {
+	if b.pprofServer == nil {
+		return nil
+	}
+	err := b.pprofServer.Close()
+	if lnErr := b.pprofListener.Close(); lnErr != nil && err == nil && !errors.Is(lnErr, net.ErrClosed) {
+		err = lnErr
+	}
+	b.pprofServer = nil
+	b.pprofListener = nil
+	return err
 }
