@@ -11,9 +11,7 @@ import (
 // it keeps MADV_FREE, so scavenged heap stays resident until the kernel is under memory
 // pressure and every memory meter keeps counting it. GODEBUG=madvdontneed=1 is not accepted
 // by //go:debug or go.mod, and the env is fixed before the library loads, so flip
-// runtime.adviseUnused (mem_linux.go sysUnusedOS) instead. The library is linked with
-// -checklinkname=0, so a renamed runtime variable would not fail the link: the toolchain
-// version is pinned in madvise_android_unverified.go.
+// runtime.adviseUnused (mem_linux.go sysUnusedOS) instead.
 //
 //go:linkname runtimeAdviseUnused runtime.adviseUnused
 var runtimeAdviseUnused uint32
