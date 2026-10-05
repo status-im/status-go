@@ -254,6 +254,9 @@ func TestRelayErrors(t *testing.T) {
 		{&relay.APIError{Code: "DEPOSITED_AMOUNT_TOO_LOW_TO_FILL", Message: "x"}, ErrAmountTooLow},
 		{&relay.APIError{Code: "AMOUNT_TOO_HIGH", Message: "x"}, ErrAmountTooHigh},
 		{&relay.APIError{Code: "UNSUPPORTED_CURRENCY", Message: "Unsupported currency"}, ErrUnsupportedCurrency},
+		{&relay.APIError{Code: "INVALID_INPUT_CURRENCY", Message: "x"}, ErrUnsupportedCurrency},
+		{&relay.APIError{Code: "INVALID_OUTPUT_CURRENCY", Message: "x"}, ErrUnsupportedCurrency},
+		{&relay.APIError{Code: "UNSUPPORTED_CHAIN", Message: "x"}, ErrUnsupportedChain},
 	}
 
 	for _, tc := range testCases {

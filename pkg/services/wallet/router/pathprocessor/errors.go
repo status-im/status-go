@@ -61,6 +61,7 @@ var (
 	ErrAmountTooLow             = &errors.ErrorResponse{Code: errors.ErrorCode("WPP-049"), Details: "amount too low"}
 	ErrAmountTooHigh            = &errors.ErrorResponse{Code: errors.ErrorCode("WPP-050"), Details: "amount too high"}
 	ErrUnsupportedCurrency      = &errors.ErrorResponse{Code: errors.ErrorCode("WPP-051"), Details: "unsupported currency"}
+	ErrUnsupportedChain         = &errors.ErrorResponse{Code: errors.ErrorCode("WPP-052"), Details: "unsupported chain"}
 )
 
 func createErrorResponse(processorName string, err error) error {
