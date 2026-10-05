@@ -3,6 +3,7 @@ package collectibles
 import (
 	"errors"
 	"sync"
+	"time"
 
 	"github.com/ethereum/go-ethereum/event"
 	"go.uber.org/zap"
@@ -10,6 +11,7 @@ import (
 	"github.com/status-im/status-go/internal/circuitbreaker"
 	"github.com/status-im/status-go/internal/healthmanager/provider_errors"
 	"github.com/status-im/status-go/internal/logutils"
+	"github.com/status-im/status-go/internal/panics"
 	"github.com/status-im/status-go/pkg/services/wallet/collectibles/ownership"
 	walletCommon "github.com/status-im/status-go/pkg/services/wallet/common"
 	"github.com/status-im/status-go/pkg/services/wallet/connection"
@@ -21,6 +23,7 @@ const EventCollectiblesConnectionStatusChanged walletevent.EventType = "wallet-c
 // Reset connection status to trigger notifications
 // on the next status update
 func (o *Manager) ResetConnectionStatus() {
+	o.Stop()
 	o.statuses.Range(func(key, value interface{}) bool {
 		value.(*connection.Status).ResetStateValue()
 		return true
@@ -66,11 +69,39 @@ func (o *Manager) applyCallStatuses(chainID walletCommon.ChainID, statuses []cir
 	o.recordChainOutcome(chainID, firstErr)
 }
 
+// setChainConnected reports up immediately and down only if no success arrives within downDebounce.
 func (o *Manager) setChainConnected(chainID walletCommon.ChainID, connected bool) {
 	if o.statuses == nil {
 		return
 	}
 	key := chainID.String()
+	o.downMu.Lock()
+	defer o.downMu.Unlock()
+	if connected {
+		if t := o.downTimers[key]; t != nil {
+			t.Stop()
+			delete(o.downTimers, key)
+		}
+		o.applyChainConnected(key, true)
+		return
+	}
+	if o.downTimers[key] != nil {
+		return
+	}
+	var t *time.Timer
+	t = time.AfterFunc(o.downDebounce, func() {
+		defer panics.LogOnPanic()
+		o.downMu.Lock()
+		defer o.downMu.Unlock()
+		if o.downTimers[key] == t {
+			delete(o.downTimers, key)
+			o.applyChainConnected(key, false)
+		}
+	})
+	o.downTimers[key] = t
+}
+
+func (o *Manager) applyChainConnected(key string, connected bool) {
 	if v, ok := o.statuses.Load(key); ok {
 		v.(*connection.Status).SetIsConnected(connected)
 		return
@@ -82,6 +113,23 @@ func (o *Manager) setChainConnected(chainID walletCommon.ChainID, connected bool
 	} else {
 		o.updateStatusNotifier()
 	}
+}
+
+// Stop cancels all pending down reports.
+func (o *Manager) Stop() {
+	o.downMu.Lock()
+	defer o.downMu.Unlock()
+	for key, t := range o.downTimers {
+		t.Stop()
+		delete(o.downTimers, key)
+	}
+}
+
+// SetDownDebounce overrides the down report debounce window.
+func (o *Manager) SetDownDebounce(d time.Duration) {
+	o.downMu.Lock()
+	defer o.downMu.Unlock()
+	o.downDebounce = d
 }
 
 func isCollectiblesIgnorableError(err error) bool {

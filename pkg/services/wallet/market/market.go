@@ -12,8 +12,10 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 
 	"github.com/status-im/status-go/internal/circuitbreaker"
+	"github.com/status-im/status-go/internal/healthmanager"
 	provider_errors "github.com/status-im/status-go/internal/healthmanager/provider_errors"
 	"github.com/status-im/status-go/internal/logutils"
+	"github.com/status-im/status-go/internal/panics"
 	"github.com/status-im/status-go/pkg/services/wallet/thirdparty"
 	tokentypes "github.com/status-im/status-go/pkg/services/wallet/token/types"
 	"github.com/status-im/status-go/pkg/services/wallet/walletevent"
@@ -59,6 +61,9 @@ type Manager struct {
 	IsConnectedLock sync.RWMutex
 	circuitbreaker  *circuitbreaker.CircuitBreaker
 	providers       []thirdparty.MarketDataProvider
+
+	downDebounce time.Duration
+	downTimer    *time.Timer
 }
 
 func NewManager(providers []thirdparty.MarketDataProvider, tokenManager TokenManagerInterface, feed *event.Feed) *Manager {
@@ -78,26 +83,72 @@ func NewManager(providers []thirdparty.MarketDataProvider, tokenManager TokenMan
 		LastCheckedAt:  time.Now().Unix(),
 		circuitbreaker: cb,
 		providers:      providers,
+		downDebounce:   healthmanager.DefaultDownDebounce,
 	}
 }
 
+// setIsConnected reports up immediately and down only if no success arrives within downDebounce.
 func (pm *Manager) setIsConnected(value bool) {
 	pm.IsConnectedLock.Lock()
 	defer pm.IsConnectedLock.Unlock()
 	pm.LastCheckedAt = time.Now().Unix()
-	if value != pm.IsConnected {
-		message := "down"
-		if value {
-			message = "up"
-		}
-		pm.feed.Send(walletevent.Event{
-			Type:     EventMarketStatusChanged,
-			Accounts: []common.Address{},
-			Message:  message,
-			At:       time.Now().Unix(),
-		})
+	if value {
+		pm.stopDownTimerLocked()
+		pm.emitLocked(true)
+		return
 	}
+	if !pm.IsConnected || pm.downTimer != nil {
+		return
+	}
+	var t *time.Timer
+	t = time.AfterFunc(pm.downDebounce, func() {
+		defer panics.LogOnPanic()
+		pm.IsConnectedLock.Lock()
+		defer pm.IsConnectedLock.Unlock()
+		if pm.downTimer == t {
+			pm.downTimer = nil
+			pm.emitLocked(false)
+		}
+	})
+	pm.downTimer = t
+}
+
+func (pm *Manager) emitLocked(value bool) {
+	if value == pm.IsConnected {
+		return
+	}
+	message := "down"
+	if value {
+		message = "up"
+	}
+	pm.feed.Send(walletevent.Event{
+		Type:     EventMarketStatusChanged,
+		Accounts: []common.Address{},
+		Message:  message,
+		At:       time.Now().Unix(),
+	})
 	pm.IsConnected = value
+}
+
+// Stop cancels a pending down report.
+func (pm *Manager) Stop() {
+	pm.IsConnectedLock.Lock()
+	defer pm.IsConnectedLock.Unlock()
+	pm.stopDownTimerLocked()
+}
+
+// SetDownDebounce overrides the down report debounce window.
+func (pm *Manager) SetDownDebounce(d time.Duration) {
+	pm.IsConnectedLock.Lock()
+	defer pm.IsConnectedLock.Unlock()
+	pm.downDebounce = d
+}
+
+func (pm *Manager) stopDownTimerLocked() {
+	if pm.downTimer != nil {
+		pm.downTimer.Stop()
+		pm.downTimer = nil
+	}
 }
 
 func (pm *Manager) makeCall(providers []thirdparty.MarketDataProvider, f func(provider thirdparty.MarketDataProvider) (interface{}, error)) (interface{}, error) {

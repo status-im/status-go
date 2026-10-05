@@ -217,6 +217,7 @@ type WalletConfig struct {
 	RaribleTestnetAPIKey  security.SensitiveString `json:"RaribleTestnetAPIKey"`
 	AlchemyAPIKey         security.SensitiveString `json:"AlchemyAPIKey"`
 	LifiAPIKey            security.SensitiveString `json:"LifiAPIKey"`
+	RelayAPIKey           security.SensitiveString `json:"RelayAPIKey"`
 	InfuraAPIKey          security.SensitiveString `json:"InfuraAPIKey"`
 	InfuraAPIKeySecret    security.SensitiveString `json:"InfuraAPIKeySecret"`
 	PoktAPIKey            security.SensitiveString `json:"PoktAPIKey"`
@@ -227,6 +228,9 @@ type WalletConfig struct {
 
 	StatusProxyStageName     string                   `json:"StatusProxyStageName"`
 	EnableMercuryoProvider   bool                     `json:"EnableMercuryoProvider"`
+	EnableParaswapProvider   bool                     `json:"EnableParaswapProvider"`
+	EnableLiFiProvider       bool                     `json:"EnableLiFiProvider"`
+	EnableRelayProvider      bool                     `json:"EnableRelayProvider"`
 	EthRpcProxyUrl           security.SensitiveString `json:"EthRpcProxyUrl"`
 	EthRpcProxyUser          security.SensitiveString `json:"EthRpcProxyUser"`
 	EthRpcProxyPassword      security.SensitiveString `json:"EthRpcProxyPassword"`
@@ -264,6 +268,9 @@ func (wc WalletConfig) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
 		Enabled                             bool                      `json:"Enabled"`
 		EnableMercuryoProvider              bool                      `json:"EnableMercuryoProvider"`
+		EnableParaswapProvider              bool                      `json:"EnableParaswapProvider"`
+		EnableLiFiProvider                  bool                      `json:"EnableLiFiProvider"`
+		EnableRelayProvider                 bool                      `json:"EnableRelayProvider"`
 		TokensListsAutoRefreshInterval      int                       `json:"TokensListsAutoRefreshInterval"`
 		TokensListsAutoRefreshCheckInterval int                       `json:"TokensListsAutoRefreshCheckInterval"`
 		MulticallOverrides                  map[uint64]common.Address `json:"MulticallOverrides"`
@@ -272,6 +279,9 @@ func (wc WalletConfig) MarshalJSON() ([]byte, error) {
 	}{
 		Enabled:                             wc.Enabled,
 		EnableMercuryoProvider:              wc.EnableMercuryoProvider,
+		EnableParaswapProvider:              wc.EnableParaswapProvider,
+		EnableLiFiProvider:                  wc.EnableLiFiProvider,
+		EnableRelayProvider:                 wc.EnableRelayProvider,
 		TokensListsAutoRefreshInterval:      wc.TokensListsAutoRefreshInterval,
 		TokensListsAutoRefreshCheckInterval: wc.TokensListsAutoRefreshCheckInterval,
 		MulticallOverrides:                  wc.MulticallOverrides,

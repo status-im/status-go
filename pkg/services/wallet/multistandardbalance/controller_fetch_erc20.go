@@ -30,6 +30,15 @@ func (c *Controller) handleERC20Result(ctx context.Context, chainID uint64, resu
 	}
 
 	balances := result.Results
+	// The batch drops the sub-calls that failed; keep the last known balance of
+	// those tokens rather than letting them read as zero until the next fetch.
+	if previous, _, prevErr := c.storage.GetERC20Balances(ctx, key); prevErr == nil {
+		var kept int
+		balances, kept = keepLastKnownBalances(previous, balances)
+		if kept > 0 {
+			c.logger.Warn("ERC20 balances missing from the fetch result, keeping the last known ones", zap.String("address", logutils.TruncateWithDot(key.Account.String())), zap.Uint64("chainID", key.ChainID), zap.Int("kept", kept), zap.Int("answered", len(result.Results)-kept))
+		}
+	}
 	balanceChanged, oldState, err := c.storage.UpdateERC20Balances(ctx, key, balances, state)
 	if err != nil {
 		c.logger.Error("failed to update ERC20 balance", zap.String("address", logutils.TruncateWithDot(key.Account.String())), zap.Uint64("chainID", key.ChainID), zap.Error(err))

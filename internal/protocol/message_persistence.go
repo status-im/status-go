@@ -805,6 +805,8 @@ func (db sqlitePersistence) MessagesByResponseTo(responseTo string) ([]*common.M
 	return getMessagesFromScanRows(db, rows, false)
 }
 
+const maxThreadNameLength = 50
+
 func normalizeThreadName(value string) string {
 	collapsed := strings.Join(strings.Fields(value), " ")
 	trimmed := strings.TrimSpace(collapsed)
@@ -814,7 +816,7 @@ func normalizeThreadName(value string) string {
 
 	graphemes := uniseg.NewGraphemes(trimmed)
 	for count := 0; graphemes.Next(); count++ {
-		if count == 50 {
+		if count == maxThreadNameLength {
 			start, _ := graphemes.Positions()
 			return trimmed[:start]
 		}
@@ -986,6 +988,86 @@ func (db sqlitePersistence) ThreadsByChatID(chatID string) ([]*Thread, error) {
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
+
+	return threads, nil
+}
+
+// ThreadsByChatIDs returns the threads of several chats at once, so a client opening a section
+// does not have to issue one query per chat.
+func (db sqlitePersistence) ThreadsByChatIDs(chatIDs []string) ([]*Thread, error) {
+	threads := make([]*Thread, 0)
+	if len(chatIDs) == 0 {
+		return threads, nil
+	}
+
+	uniqueChatIDs := make([]string, 0, len(chatIDs))
+	seenChatIDs := make(map[string]struct{}, len(chatIDs))
+	for _, chatID := range chatIDs {
+		if _, seen := seenChatIDs[chatID]; seen {
+			continue
+		}
+		seenChatIDs[chatID] = struct{}{}
+		uniqueChatIDs = append(uniqueChatIDs, chatID)
+	}
+
+	const maxSQLiteHostParameters = 999
+	for start := 0; start < len(uniqueChatIDs); start += maxSQLiteHostParameters {
+		end := start + maxSQLiteHostParameters
+		if end > len(uniqueChatIDs) {
+			end = len(uniqueChatIDs)
+		}
+
+		batch := uniqueChatIDs[start:end]
+		args := make([]interface{}, len(batch))
+		for i, chatID := range batch {
+			args[i] = chatID
+		}
+
+		// nolint: gosec
+		query := fmt.Sprintf(`
+			SELECT
+				threads.thread_id,
+				threads.chat_id,
+				threads.parent_message_id,
+				threads.name,
+				(SELECT COUNT(1) FROM user_messages WHERE local_chat_id = threads.chat_id AND thread_id = threads.thread_id AND seen = 0),
+				(SELECT COUNT(1) FROM user_messages WHERE local_chat_id = threads.chat_id AND thread_id = threads.thread_id AND seen = 0 AND (mentioned OR replied))
+			FROM threads
+			WHERE chat_id IN (%s)`, strings.Repeat(",?", len(batch))[1:])
+
+		rows, err := db.db.Query(query, args...)
+		if err != nil {
+			return nil, err
+		}
+
+		for rows.Next() {
+			thread := &Thread{}
+			err = rows.Scan(&thread.ThreadID, &thread.ChatID, &thread.ParentMessageID, &thread.Name, &thread.UnviewedMessagesCount, &thread.UnviewedMentionsCount)
+			if err != nil {
+				rows.Close()
+				return nil, err
+			}
+
+			threads = append(threads, thread)
+		}
+		if err := rows.Err(); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		if err := rows.Close(); err != nil {
+			return nil, err
+		}
+	}
+
+	sort.Slice(threads, func(i, j int) bool {
+		if threads[i].ChatID != threads[j].ChatID {
+			return threads[i].ChatID < threads[j].ChatID
+		}
+		if threads[i].Name != threads[j].Name {
+			return threads[i].Name < threads[j].Name
+		}
+		return threads[i].ThreadID < threads[j].ThreadID
+	})
 
 	return threads, nil
 }
@@ -2023,12 +2105,24 @@ func (db sqlitePersistence) OldestMessageWhisperTimestampByChatIDs(chatIDs []str
 
 // EmojiReactionsByChatID returns the emoji reactions for the queried messages, up to a maximum of 100, as it's a potentially unbound number.
 // NOTE: This is not completely accurate, as the messages in the database might have change since the last call to `MessageByChatID`.
-func (db sqlitePersistence) EmojiReactionsByChatID(chatID string, currCursor string, limit int) ([]*EmojiReaction, error) {
+func (db sqlitePersistence) EmojiReactionsByChatID(chatID string, threadID string, currCursor string, limit int, threadsEnabled bool) ([]*EmojiReaction, error) {
 	cursorWhere := ""
 	if currCursor != "" {
 		cursorWhere = fmt.Sprintf("AND %s <= ?", cursor) //nolint: goconst
 	}
 	args := []interface{}{chatID, chatID}
+
+	// Mirrors MessageByChatID: the reaction window has to be drawn from the same set of messages
+	// the caller is paging through, otherwise thread replies crowd the base chat out of the
+	// subquery's LIMIT and their reactions silently stop loading (and vice versa).
+	var threadWhere string
+	if threadID != "" {
+		threadWhere = "AND m1.thread_id = ?"
+		args = append(args, threadID)
+	} else if threadsEnabled {
+		threadWhere = "AND (m1.thread_id IS NULL OR m1.thread_id = '')"
+	}
+
 	if currCursor != "" {
 		args = append(args, currCursor)
 	}
@@ -2061,10 +2155,10 @@ func (db sqlitePersistence) EmojiReactionsByChatID(chatID string, currCursor str
 			e.local_chat_id = ?
 			AND
 			e.message_id IN
-			(SELECT id FROM user_messages m1 WHERE NOT(m1.hide) AND m1.local_chat_id = ? %s
+			(SELECT id FROM user_messages m1 WHERE NOT(m1.hide) AND m1.local_chat_id = ? %s %s
 			ORDER BY %s DESC LIMIT ?)
 			LIMIT 1000
-		`, cursorWhere, cursor)
+		`, threadWhere, cursorWhere, cursor)
 
 	rows, err := db.db.Query(
 		query,

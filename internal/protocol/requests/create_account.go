@@ -107,6 +107,11 @@ type WalletConfig struct {
 	CommunityTokenDeployerOverrides map[uint64]common.Address `json:"communityTokenDeployerOverrides"` // map[chainID]CommunityTokenDeployer contract address
 
 	CustomTokens []*tokentypes.Token `json:"customTokens"` // custom tokens, mainly used for registering custom tokens for functional tests
+
+	// Swap provider toggles
+	EnableParaswapProvider *bool `json:"enableParaswapProvider,omitempty"` // default: false
+	EnableLiFiProvider     *bool `json:"enableLiFiProvider,omitempty"`     // default: false
+	EnableRelayProvider    *bool `json:"enableRelayProvider,omitempty"`    // default: false
 }
 type WalletSecretsConfig struct {
 	PoktToken            security.SensitiveString `json:"poktToken"`
@@ -116,6 +121,7 @@ type WalletSecretsConfig struct {
 	RaribleTestnetAPIKey security.SensitiveString `json:"raribleTestnetApiKey"`
 	AlchemyAPIKey        security.SensitiveString `json:"alchemyApiKey"`
 	LifiAPIKey           security.SensitiveString `json:"lifiApiKey"`
+	RelayAPIKey          security.SensitiveString `json:"relayApiKey"`
 
 	StatusProxyStageName string `json:"statusProxyStageName"`
 

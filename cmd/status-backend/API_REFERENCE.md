@@ -363,6 +363,33 @@ Same as `wakuext_chatMessages`, but also can get thread history.
 
 ---
 
+### wakuext_emojiReactionsByChatID (deprecated)
+
+Read emoji reactions for a chat. Equivalent to `wakuext_emojiReactionsByChatIDV2` with an empty `threadId`.
+
+**Params:** `[chatId, cursor, limit]`
+- `chatId`: string (communityId + chatUUID)
+- `cursor`: string (empty string for first page)
+- `limit`: number
+
+---
+
+### wakuext_emojiReactionsByChatIDV2
+
+Same as `wakuext_emojiReactionsByChatID`, but also can get reactions on thread messages.
+
+Reactions are selected from the same window of messages `wakuext_chatMessagesV2` would return for
+the same `chatId`/`threadId`/`cursor`/`limit`, so pass the cursor that was used to fetch the
+messages being rendered.
+
+**Params:** `[chatId, threadId, cursor, limit]`
+- `chatId`: string (communityId + chatUUID)
+- `threadId`: string (leave empty to get the reactions of a chat)
+- `cursor`: string (empty string for first page)
+- `limit`: number
+
+---
+
 ### wakuext_createThread
 
 Explicitly create a thread from an existing parent message. The parent message must already be stored locally (i.e. it was previously received or sent).
@@ -396,6 +423,53 @@ For community chats, the caller must be a privileged member (admin/owner) unless
 
 ---
 
+### wakuext_startThreadFromNewMessage
+
+Create a new thread and send its first message in one call. The backend first
+sends a plain-text thread root, creates the thread from that root, then sends
+the supplied message as the root's first reply.
+
+**Params:**
+```json
+[{
+  "message": {
+    "chatId": "<chatId>",
+    "text": "The first full message in the thread",
+    "contentType": 1,
+    "ensName": "alice.eth",
+    "linkPreviews": [],
+    "statusLinkPreviews": []
+  },
+  "threadName": "Optional thread name"
+}]
+```
+
+- `message` is required and must include `chatId`.
+- `threadName` is optional. When omitted or blank, the thread root uses the
+  supplied message text.
+- The root text collapses whitespace and is limited to the first 40 Unicode
+  characters. The same normalized text becomes the thread name.
+- The supplied message must not include `threadId` or `responseTo`; the backend
+  sets both to the generated root message ID.
+- The result contains both sent messages and the created thread metadata.
+
+For community chats, the caller must be a privileged member (admin/owner) unless
+the community has "create threads for all members" enabled.
+
+The two sends are sequential, not transactional. If sending the first reply
+fails after the root was sent, the root remains in the chat and is already a
+created thread.
+
+**Errors:**
+- `"start-thread-from-new-message: invalid message"` — request or message is missing.
+- `"start-thread-from-new-message: invalid chat id"` — `message.chatId` is missing.
+- `"start-thread-from-new-message: thread id must be empty"` — caller supplied `threadId`.
+- `"start-thread-from-new-message: response to must be empty"` — caller supplied `responseTo`.
+- `"thread name or message text is required"` — neither source produces root text.
+- The existing thread feature, chat type, and community-permission errors also apply.
+
+---
+
 ### wakuext_chatThreads
 
 List threads for a chat.
@@ -420,6 +494,19 @@ List threads for a chat.
 Notes:
 - `name` may be empty when the parent message has not been persisted yet.
 - Unknown/placeholder names are intentionally client-defined; backend returns empty string until resolved.
+
+---
+
+### wakuext_chatThreadsByChatIDs
+List threads for several chats at once, so a client opening a section does not have to issue one
+request per chat.
+
+**Params:** `[[chatId, ...]]`
+- `chatIds`: array of chat identifier strings
+
+**Result:** same shape as `wakuext_chatThreads`. Threads from all requested chats are returned in
+one flat list, ordered by `chatId` then `name`; use each thread's `chatId` to group them.
+Requested chats with no threads simply contribute nothing.
 
 ---
 

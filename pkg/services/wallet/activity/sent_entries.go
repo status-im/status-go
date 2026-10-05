@@ -211,6 +211,7 @@ func sentEntryDataToEntriesV2(deps FilterDependencies, data []*sentEntryDataV2) 
 			sender:         &d.RouteInputParams.AddrFrom,
 			recipient:      &d.RouteInputParams.AddrTo,
 			transferType:   getTransferTypeFromSentTx(d.Path.FromToken, d.Path.ProcessorName),
+			swapProvider:   getSentSwapProvider(d.Path),
 			//contractAddress:  // TODO: Handle community contract deployment
 			//communityID:
 		}
@@ -256,15 +257,25 @@ func getSentActivityType(path *routes.Path, isApproval bool) ac.Type {
 		return ac.BridgeAT
 	case pathProcessorCommon.ProcessorSwapParaswapName:
 		return ac.SwapAT
-	case pathProcessorCommon.ProcessorLiFiName:
-		// LI.FI serves both swaps and bridges through one processor; a cross-chain
-		// path is a bridge, a same-chain path is a swap.
+	case pathProcessorCommon.ProcessorLiFiName,
+		pathProcessorCommon.ProcessorRelayName:
 		if isCrossChainPath(path) {
 			return ac.BridgeAT
 		}
 		return ac.SwapAT
 	}
 	return ac.UnknownAT
+}
+
+// getSentSwapProvider names the swap/bridge provider a path went through (its processor name),
+// so the client can attribute the entry without matching contract addresses; nil for plain
+// transfers and the Hop bridge.
+func getSentSwapProvider(path *routes.Path) *string {
+	if path == nil || !wCommon.IsProcessorSwap(path.ProcessorName) {
+		return nil
+	}
+	name := path.ProcessorName
+	return &name
 }
 
 // isCrossChainPath reports whether the path moves funds between two different chains.

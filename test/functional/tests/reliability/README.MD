@@ -2,6 +2,14 @@
 
 This test suite, located under `test/functional/tests/reliability`, is designed to evaluate the robustness and stability of the system under challenging network and runtime conditions. These tests go beyond typical functional checks and simulate real-world scenarios that stress the system's resilience.
 
+## SDS (Scalable Data Sync)
+
+Community SDS outgoing-status tests: `test_community_sds.py` (`@pytest.mark.sds`).
+
+```bash
+pytest test/functional/tests/reliability/test_community_sds.py -m "reliability and sds"
+```
+
 ## 🧪 What We Test
 
 The suite includes tests that simulate:

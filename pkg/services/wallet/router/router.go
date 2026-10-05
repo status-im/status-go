@@ -35,6 +35,7 @@ import (
 	"github.com/status-im/status-go/pkg/services/wallet/router/sendtype"
 	"github.com/status-im/status-go/pkg/services/wallet/thirdparty/lifi"
 	"github.com/status-im/status-go/pkg/services/wallet/thirdparty/paraswap"
+	"github.com/status-im/status-go/pkg/services/wallet/thirdparty/relay"
 	tokentypes "github.com/status-im/status-go/pkg/services/wallet/token/types"
 )
 
@@ -86,6 +87,12 @@ type Router struct {
 
 	paraswapClientFactory func(chainID uint64) paraswap.ClientInterface
 	lifiClientFactory     func(chainID uint64) lifi.ClientInterface
+	relayClientFactory    func(chainID uint64) relay.ClientInterface
+
+	// swap chain-support
+	swapSupportMutex   sync.Mutex
+	swapSupportByChain map[string]cachedChainSupport // "<provider>:<chainID>"
+	relayChainsByHost  map[bool]relaySupportedChains // per API host (mainnet/testnet)
 
 	activeBalanceMap sync.Map // map[string]*big.Int
 
@@ -110,7 +117,8 @@ func NewRouter(
 	tokenBalancesFetcher TokenBalanceFetcher,
 	marketManager *market.Manager,
 	collectibles *collectibles.Service, collectiblesManager *collectibles.Manager,
-	lifiAPIKey security.SensitiveString, lifiIntegrator string) *Router {
+	lifiAPIKey security.SensitiveString, lifiIntegrator string,
+	relayAPIKey security.SensitiveString, relayReferrer string) *Router {
 	processors := make(map[string]pathprocessor.PathProcessor)
 
 	logger := logutils.ZapLogger().Named("router")
@@ -132,12 +140,20 @@ func NewRouter(
 		lifiClientFactory: func(chainID uint64) lifi.ClientInterface {
 			return lifi.NewClient(chainID, lifiIntegrator, lifiAPIKey.Reveal())
 		},
+		relayClientFactory: func(chainID uint64) relay.ClientInterface {
+			return relay.NewClient(chainID, relayReferrer, relayAPIKey.Reveal())
+		},
 		logger: logger,
 	}
 }
 
 func (r *Router) AddPathProcessor(processor pathprocessor.PathProcessor) {
 	r.pathProcessors[processor.Name()] = processor
+}
+
+func (r *Router) isProcessorRegistered(name string) bool {
+	_, ok := r.pathProcessors[name]
+	return ok
 }
 
 func (r *Router) Stop() {
@@ -1082,6 +1098,49 @@ func (r *Router) resolveRoute(ctx context.Context, input *requests.RouteInputPar
 	return
 }
 
+func (r *Router) estimateMainTx(input *requests.RouteInputParams, pathProcessor pathprocessor.PathProcessor,
+	processorInputParams pathprocessor.ProcessorInputParams, approvalRequired bool) ([]byte, uint64, error) {
+	tolerateFailure := input.SendType == sendtype.Swap && approvalRequired
+
+	txPackedData, err := pathProcessor.PackTxInputData(processorInputParams)
+	if err != nil {
+		if tolerateFailure {
+			r.logger.Debug("buildPath: PackTxInputData failed, fee unknown until the approval is mined",
+				zap.String("uuid", input.Uuid),
+				zap.String("processor", pathProcessor.Name()),
+				zap.Error(err))
+			return nil, 0, nil
+		}
+		r.logger.Error("buildPath: PackTxInputData failed",
+			zap.String("uuid", input.Uuid),
+			zap.String("processor", pathProcessor.Name()),
+			zap.Error(err))
+		return nil, 0, err
+	}
+
+	gasLimit, err := pathProcessor.EstimateGas(processorInputParams, txPackedData)
+	if err != nil {
+		if tolerateFailure {
+			r.logger.Debug("buildPath: EstimateGas failed, fee unknown until the approval is mined",
+				zap.String("uuid", input.Uuid),
+				zap.String("processor", pathProcessor.Name()),
+				zap.Error(err))
+			return txPackedData, 0, nil
+		}
+		r.logger.Error("buildPath: EstimateGas failed",
+			zap.String("uuid", input.Uuid),
+			zap.String("processor", pathProcessor.Name()),
+			zap.Error(err))
+		return nil, 0, err
+	}
+
+	r.logger.Debug("buildPath: tx gas estimated",
+		zap.String("uuid", input.Uuid),
+		zap.String("processor", pathProcessor.Name()),
+		zap.Uint64("gasLimit", gasLimit))
+	return txPackedData, gasLimit, nil
+}
+
 func (r *Router) buildPath(ctx context.Context, input *requests.RouteInputParams, fromToken *tokentypes.Token,
 	toToken *tokentypes.Token, pathProcessor pathprocessor.PathProcessor, fetchedFees *fees.SuggestedFees,
 	usedNonces map[uint64]uint64, noBaseFee bool, noPriorityFee bool, useCommunityTokenTransferDetailsAtIndex int) (*routes.Path, error) {
@@ -1190,30 +1249,9 @@ func (r *Router) buildPath(ctx context.Context, input *requests.RouteInputParams
 			zap.Uint64("approvalGasLimit", approvalGasLimit))
 	}
 
-	// Until we change the logic for Bridge to follow the same logic as for Swap (meaning first approval, then bridge tx) we have to provide txPackedData
-	// otherwise we could do the logic below in the else block of `if approvalRequired` codition.
-	if input.SendType != sendtype.Swap || !approvalRequired {
-		txPackedData, err = pathProcessor.PackTxInputData(processorInputParams)
-		if err != nil {
-			r.logger.Error("buildPath: PackTxInputData failed",
-				zap.String("uuid", input.Uuid),
-				zap.String("processor", pathProcessor.Name()),
-				zap.Error(err))
-			return nil, err
-		}
-
-		gasLimit, err = pathProcessor.EstimateGas(processorInputParams, txPackedData)
-		if err != nil {
-			r.logger.Error("buildPath: EstimateGas failed",
-				zap.String("uuid", input.Uuid),
-				zap.String("processor", pathProcessor.Name()),
-				zap.Error(err))
-			return nil, err
-		}
-		r.logger.Debug("buildPath: tx gas estimated",
-			zap.String("uuid", input.Uuid),
-			zap.String("processor", pathProcessor.Name()),
-			zap.Uint64("gasLimit", gasLimit))
+	txPackedData, gasLimit, err = r.estimateMainTx(input, pathProcessor, processorInputParams, approvalRequired)
+	if err != nil {
+		return nil, err
 	}
 
 	amountOut, err := pathProcessor.CalculateAmountOut(processorInputParams)

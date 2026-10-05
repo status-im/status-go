@@ -37,6 +37,7 @@ type Entry struct {
 	communityID               *string
 	interactedContractAddress *eth.Address
 	approvalSpender           *eth.Address
+	swapProvider              *string
 
 	isNew bool // isNew is used to indicate if the entry is newer than session start (changed state also)
 }
@@ -68,6 +69,7 @@ func (e *Entry) MarshalJSON() ([]byte, error) {
 		CommunityID:               e.communityID,
 		InteractedContractAddress: e.interactedContractAddress,
 		ApprovalSpender:           e.approvalSpender,
+		SwapProvider:              e.swapProvider,
 	}
 
 	data.Transaction = e.transaction
@@ -110,6 +112,7 @@ func (e *Entry) UnmarshalJSON(data []byte) error {
 	e.communityID = aux.CommunityID
 	e.interactedContractAddress = aux.InteractedContractAddress
 	e.approvalSpender = aux.ApprovalSpender
+	e.swapProvider = aux.SwapProvider
 
 	e.isNew = aux.IsNew != nil && *aux.IsNew
 

@@ -45,7 +45,9 @@ func NewCollectibleDataDB(sqlDb *sql.DB) *CollectibleDataDB {
 // 3: rows carry the size the provider reported for each media URL. Older rows
 // have no size, which reads as "the provider did not say" and lets the asset
 // past the size cap, so they have to be refetched rather than trusted.
-const collectibleMetadataVersion = 3
+// 4: a still collectible without the provider's png render uses the cached or
+// original asset as its image. Older rows for such assets have no image at all.
+const collectibleMetadataVersion = 4
 
 const collectibleDataColumns = "chain_id, contract_address, token_id, provider, name, description, permalink, image_url, thumbnail_url, image_size, thumbnail_size, animation_size, image_payload, animation_url, animation_media_type, background_color, token_uri, community_id, soulbound"
 

@@ -244,10 +244,26 @@ func (c *Asset) animation() (url string, mediaType string, size int64) {
 	return c.Image.CachedAnimationURL, c.Image.ContentType, c.Image.Size
 }
 
+// stillImage returns the image to show and its size when known. Without a png
+// render the cached or original asset is the image itself, unless it can move.
+func (c *Asset) stillImage() (url string, size int64) {
+	if c.Image.ImageURL != "" {
+		return c.Image.ImageURL, 0
+	}
+	if thirdparty.IsAnimatedMediaType(c.Image.ContentType) {
+		return "", 0
+	}
+	if c.Image.CachedAnimationURL != "" {
+		return c.Image.CachedAnimationURL, c.Image.Size
+	}
+	return c.Image.OriginalAnimationURL, 0
+}
+
 func (c *Asset) toCollectiblesData(id thirdparty.CollectibleUniqueID) thirdparty.CollectibleData {
 	rawMetadata := c.Raw.RawMetadata.(RawMetadata)
 
 	animationURL, animationMediaType, animationSize := c.animation()
+	imageURL, imageSize := c.stillImage()
 
 	return thirdparty.CollectibleData{
 		ID:                 id,
@@ -255,7 +271,8 @@ func (c *Asset) toCollectiblesData(id thirdparty.CollectibleUniqueID) thirdparty
 		Provider:           AlchemyID,
 		Name:               c.Name,
 		Description:        c.Description,
-		ImageURL:           c.Image.ImageURL,
+		ImageURL:           imageURL,
+		ImageSize:          imageSize,
 		ThumbnailURL:       c.Image.ThumbnailURL,
 		AnimationURL:       animationURL,
 		AnimationMediaType: animationMediaType,

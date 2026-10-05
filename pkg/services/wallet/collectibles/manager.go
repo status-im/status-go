@@ -20,6 +20,7 @@ import (
 	"github.com/status-im/status-go/internal/circuitbreaker"
 	"github.com/status-im/status-go/internal/contracts/community-tokens/collectibles"
 	"github.com/status-im/status-go/internal/contracts/ierc1155"
+	"github.com/status-im/status-go/internal/healthmanager"
 	"github.com/status-im/status-go/internal/logutils"
 	"github.com/status-im/status-go/internal/panics"
 	"github.com/status-im/status-go/internal/rpc"
@@ -71,6 +72,10 @@ type Manager struct {
 	statusNotifier *connection.StatusNotifier
 	feed           *event.Feed
 	circuitBreaker *circuitbreaker.CircuitBreaker
+
+	downDebounce time.Duration
+	downMu       sync.Mutex
+	downTimers   map[string]*time.Timer
 }
 
 func NewManager(
@@ -113,6 +118,8 @@ func NewManager(
 		statusNotifier:     statusNotifier,
 		feed:               feed,
 		circuitBreaker:     cb,
+		downDebounce:       healthmanager.DefaultDownDebounce,
+		downTimers:         make(map[string]*time.Timer),
 	}
 }
 

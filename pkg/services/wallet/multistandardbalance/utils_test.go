@@ -276,3 +276,40 @@ func TestIsBigIntMapEqualWithDifferentTypes(t *testing.T) {
 
 	assert.True(t, isBigIntMapEqual(collectibleMap1, collectibleMap2))
 }
+
+func TestKeepLastKnownBalances(t *testing.T) {
+	a := common.HexToAddress("0x1")
+	b := common.HexToAddress("0x2")
+	c := common.HexToAddress("0x3")
+
+	t.Run("a token the batch did not answer keeps its last known balance", func(t *testing.T) {
+		previous := map[common.Address]*big.Int{a: big.NewInt(10), b: big.NewInt(20)}
+		fetched := map[common.Address]*big.Int{a: big.NewInt(11)}
+		merged, kept := keepLastKnownBalances(previous, fetched)
+		assert.Equal(t, 1, kept)
+		assert.Equal(t, big.NewInt(11), merged[a]) // answered: the fresh value wins
+		assert.Equal(t, big.NewInt(20), merged[b]) // unanswered: carried over
+	})
+
+	t.Run("an answered zero is a real zero, not a miss", func(t *testing.T) {
+		previous := map[common.Address]*big.Int{a: big.NewInt(10)}
+		fetched := map[common.Address]*big.Int{a: big.NewInt(0)}
+		merged, kept := keepLastKnownBalances(previous, fetched)
+		assert.Equal(t, 0, kept)
+		assert.Equal(t, big.NewInt(0), merged[a])
+	})
+
+	t.Run("nothing stored yet leaves the result untouched", func(t *testing.T) {
+		fetched := map[common.Address]*big.Int{c: big.NewInt(5)}
+		merged, kept := keepLastKnownBalances(nil, fetched)
+		assert.Equal(t, 0, kept)
+		assert.Equal(t, fetched, merged)
+	})
+
+	t.Run("a nil result still carries the stored balances", func(t *testing.T) {
+		previous := map[common.Address]*big.Int{a: big.NewInt(10)}
+		merged, kept := keepLastKnownBalances(previous, nil)
+		assert.Equal(t, 1, kept)
+		assert.Equal(t, big.NewInt(10), merged[a])
+	})
+}

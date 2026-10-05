@@ -3,6 +3,7 @@ package walletconnect
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -46,14 +47,19 @@ type pairingContext struct {
 // Client handles WalletConnect protocol operations via the relay.
 type Client struct {
 	relay                  Relay
+	doneOnce               sync.Once
+	closeOnce              sync.Once
+	done                   chan struct{} // closed by Close
 	logger                 *zap.Logger
 	mu                     sync.Mutex
 	handlers               *clientHandlers
 	pendingProposals       map[string]*pairingContext // key = fmt.Sprintf("%d", jsonRpcId)
 	pendingRequests        map[int64]chan *JSONRPCResponse
-	pendingSessionRequests map[int64]string  // requestID -> topic; tracks in-flight wc_sessionRequests for deduplication
-	pairingTopics          map[string]string // topic -> pairing symKey (hex), set on Pair()
-	activeSessions         map[string]string // topic -> session symKey (hex), set on ApproveSession
+	pendingSessionRequests map[int64]string    // requestID -> topic; tracks in-flight wc_sessionRequests for deduplication
+	answeredProposals      map[string]struct{} // approved or rejected; the relay may deliver them again
+	answeredRequests       map[int64]struct{}  // responded to or rejected; the relay may deliver them again
+	pairingTopics          map[string]string   // topic -> pairing symKey (hex), set on Pair()
+	activeSessions         map[string]string   // topic -> session symKey (hex), set on ApproveSession
 }
 
 type clientHandlers struct {
@@ -63,11 +69,26 @@ type clientHandlers struct {
 	onSessionDelete   func(topic string)
 }
 
+// RelayOption configures the relay connection of a Client.
+type RelayOption func(*RelayClient)
+
+// WithRelayURL points the client at a relay other than the public one.
+func WithRelayURL(url string) RelayOption {
+	return func(r *RelayClient) {
+		if url != "" {
+			r.url = url
+		}
+	}
+}
+
 // NewClient creates a new WalletConnect client.
-func NewClient(projectID string) (*Client, error) {
+func NewClient(projectID string, opts ...RelayOption) (*Client, error) {
 	relay, err := NewRelayClient(projectID)
 	if err != nil {
 		return nil, fmt.Errorf("create relay client: %w", err)
+	}
+	for _, opt := range opts {
+		opt(relay)
 	}
 
 	c := &Client{
@@ -77,6 +98,8 @@ func NewClient(projectID string) (*Client, error) {
 		pendingProposals:       make(map[string]*pairingContext),
 		pendingRequests:        make(map[int64]chan *JSONRPCResponse),
 		pendingSessionRequests: make(map[int64]string),
+		answeredProposals:      make(map[string]struct{}),
+		answeredRequests:       make(map[int64]struct{}),
 		pairingTopics:          make(map[string]string),
 		activeSessions:         make(map[string]string),
 	}
@@ -312,14 +335,16 @@ func (c *Client) handleRelayMessage(topic, message string, tag int) {
 		}
 		c.mu.Lock()
 		_, alreadyPending := c.pendingProposals[requestID]
-		if !alreadyPending {
+		_, answered := c.answeredProposals[requestID]
+		if !alreadyPending && !answered {
 			c.pendingProposals[requestID] = ctx
 		}
 		handler := c.handlers.onSessionProposal
 		c.mu.Unlock()
 
-		if alreadyPending {
-			c.logger.Info("wc_sessionPropose duplicate ignored", zap.String("topic", topic), zap.String("requestID", requestID))
+		if alreadyPending || answered {
+			c.logger.Info("wc_sessionPropose duplicate ignored", zap.String("topic", topic), zap.String("requestID", requestID),
+				zap.Bool("answered", answered))
 			return
 		}
 
@@ -331,7 +356,8 @@ func (c *Client) handleRelayMessage(topic, message string, tag int) {
 	case "wc_sessionRequest":
 		c.mu.Lock()
 		_, alreadyPendingReq := c.pendingSessionRequests[msgID]
-		if !alreadyPendingReq {
+		_, answeredReq := c.answeredRequests[msgID]
+		if !alreadyPendingReq && !answeredReq {
 			c.pendingSessionRequests[msgID] = topic
 		}
 		handler := c.handlers.onSessionRequest
@@ -339,8 +365,9 @@ func (c *Client) handleRelayMessage(topic, message string, tag int) {
 
 		// Deduplicate: relay may deliver the same request both via FetchMessages
 		// and via an irn_subscription push
-		if alreadyPendingReq {
-			c.logger.Info("wc_sessionRequest duplicate ignored", zap.String("topic", topic), zap.Int64("msgID", msgID))
+		if alreadyPendingReq || answeredReq {
+			c.logger.Info("wc_sessionRequest duplicate ignored", zap.String("topic", topic), zap.Int64("msgID", msgID),
+				zap.Bool("answered", answeredReq))
 			return
 		}
 
@@ -420,8 +447,19 @@ func (c *Client) Publish(topic, message string, tag int) error {
 	return c.relay.Publish(topic, message, tag)
 }
 
+// Done is closed when the client is closed.
+func (c *Client) Done() <-chan struct{} {
+	return c.doneCh()
+}
+
+func (c *Client) doneCh() chan struct{} {
+	c.doneOnce.Do(func() { c.done = make(chan struct{}) })
+	return c.done
+}
+
 // Close closes the relay connection.
 func (c *Client) Close() error {
+	c.closeOnce.Do(func() { close(c.doneCh()) })
 	return c.relay.Close()
 }
 
@@ -486,6 +524,7 @@ func (c *Client) ApproveSession(ctx context.Context, proposalID string, meta Ses
 	c.mu.Lock()
 	c.activeSessions[keys.SessionTopic] = keys.SessionSymKeyHex
 	delete(c.pendingProposals, proposalID)
+	c.answeredProposals[proposalID] = struct{}{}
 	c.mu.Unlock()
 
 	if err := c.sendSessionSettle(keys, &proposal, namespaces, expiry); err != nil {
@@ -606,6 +645,7 @@ func (c *Client) RespondToWCSessionRequest(topic string, requestID int64, result
 	}
 	c.mu.Lock()
 	delete(c.pendingSessionRequests, requestID)
+	c.answeredRequests[requestID] = struct{}{}
 	c.mu.Unlock()
 	return nil
 }
@@ -643,6 +683,7 @@ func (c *Client) RejectWCSessionRequest(topic string, requestID int64, code int,
 	}
 	c.mu.Lock()
 	delete(c.pendingSessionRequests, requestID)
+	c.answeredRequests[requestID] = struct{}{}
 	c.mu.Unlock()
 	return nil
 }
@@ -680,6 +721,7 @@ func (c *Client) RejectSession(proposalID string) error {
 	}
 	c.mu.Lock()
 	delete(c.pendingProposals, proposalID)
+	c.answeredProposals[proposalID] = struct{}{}
 	c.mu.Unlock()
 	return nil
 }
@@ -789,18 +831,21 @@ func (c *Client) onReconnected() {
 		pairingTopics = append(pairingTopics, topic)
 	}
 	c.mu.Unlock()
-	c.resubscribeTopics("session", sessionTopics)
-	c.resubscribeTopics("pairing", pairingTopics)
+	_ = c.resubscribeTopics("session", sessionTopics)
+	_ = c.resubscribeTopics("pairing", pairingTopics)
 }
 
-func (c *Client) resubscribeTopics(label string, topics []string) {
+func (c *Client) resubscribeTopics(label string, topics []string) error {
+	var errs []error
 	for _, topic := range topics {
 		if _, err := c.relay.Subscribe(topic); err != nil {
 			c.logger.Error("failed to re-subscribe", zap.String("type", label), zap.String("topic", topic), zap.Error(err))
+			errs = append(errs, fmt.Errorf("subscribe %s topic %s: %w", label, topic, err))
 		} else {
 			c.logger.Info("re-subscribed", zap.String("type", label), zap.String("topic", topic))
 		}
 	}
+	return errors.Join(errs...)
 }
 
 // RestoredSession holds topic and symKey for session restoration from DB.
@@ -827,8 +872,14 @@ func (c *Client) ConnectAndResubscribe() error {
 	}
 	c.mu.Unlock()
 
-	c.resubscribeTopics("session", topics)
-	return nil
+	return c.resubscribeTopics("session", topics)
+}
+
+// HasRestoredSessions reports whether the client holds sessions to reconnect.
+func (c *Client) HasRestoredSessions() bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return len(c.activeSessions) > 0
 }
 
 // RestoreSessions populates activeSessions from database. Call on startup after a restart.

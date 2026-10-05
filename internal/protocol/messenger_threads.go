@@ -1,18 +1,30 @@
 package protocol
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"database/sql"
 	"errors"
 
 	"github.com/status-im/status-go/internal/protocol/common"
+	"github.com/status-im/status-go/internal/protocol/protobuf"
+	"github.com/status-im/status-go/internal/protocol/requests"
 )
+
+const adminOnlyThreadCreationError = "only admins can create threads in this community"
 
 func (m *Messenger) ThreadsByChatID(chatID string) ([]*Thread, error) {
 	if !m.featureFlags.Threads {
 		return nil, ErrThreadFeatureDisabled
 	}
 	return m.persistence.ThreadsByChatID(chatID)
+}
+
+func (m *Messenger) ThreadsByChatIDs(chatIDs []string) ([]*Thread, error) {
+	if !m.featureFlags.Threads {
+		return nil, ErrThreadFeatureDisabled
+	}
+	return m.persistence.ThreadsByChatIDs(chatIDs)
 }
 
 func (m *Messenger) senderCanCreateThread(chat *Chat, sender *ecdsa.PublicKey) (bool, error) {
@@ -63,7 +75,7 @@ func (m *Messenger) CreateThread(chatID string, parentMessageID string) (*Messen
 		return nil, err
 	}
 	if !allowed {
-		return nil, errors.New("only admins can create threads in this community")
+		return nil, errors.New(adminOnlyThreadCreationError)
 	}
 
 	parentMsg, msgErr := m.persistence.MessageByID(parentMessageID)
@@ -89,6 +101,83 @@ func (m *Messenger) CreateThread(chatID string, parentMessageID string) (*Messen
 
 	response := &MessengerResponse{}
 	response.AddThread(thread)
+	return response, nil
+}
+
+// StartThreadFromNewMessage sends a thread root and the supplied message as its
+// first reply. The root is sent before the reply because its message ID is the
+// thread ID.
+func (m *Messenger) StartThreadFromNewMessage(ctx context.Context, request *requests.StartThreadFromNewMessage) (*MessengerResponse, error) {
+	if err := request.Validate(); err != nil {
+		return nil, err
+	}
+
+	if !m.featureFlags.Threads {
+		return nil, ErrThreadFeatureDisabled
+	}
+
+	message := request.Message
+	chat, ok := m.allChats.Load(message.ChatId)
+	if !ok {
+		return nil, ErrChatNotFoundError
+	}
+
+	allowed, err := m.senderCanCreateThread(chat, &m.identity.PublicKey)
+	if err != nil {
+		return nil, err
+	}
+	if !allowed {
+		return nil, errors.New(adminOnlyThreadCreationError)
+	}
+
+	rootText := normalizeThreadName(request.ThreadName)
+	if rootText == "" {
+		rootText = normalizeThreadName(message.Text)
+	}
+	if rootText == "" {
+		return nil, errors.New("thread name or message text is required")
+	}
+
+	root := common.NewMessage()
+	root.ChatId = message.ChatId
+	root.Text = rootText
+	root.ContentType = protobuf.ChatMessage_TEXT_PLAIN
+	root.MessageType = message.MessageType
+
+	rootResponse, err := m.SendChatMessage(ctx, root)
+	if err != nil {
+		return nil, err
+	}
+
+	rootMessages := rootResponse.Messages()
+	if len(rootMessages) != 1 || rootMessages[0].ID == "" {
+		return nil, errors.New("thread root message was not created")
+	}
+
+	threadID := rootMessages[0].ID
+	threadResponse, err := m.CreateThread(chat.ID, threadID)
+	if err != nil {
+		return nil, err
+	}
+
+	message.ThreadId = &threadID
+	message.ResponseTo = threadID
+	replyResponse, err := m.SendChatMessage(ctx, message)
+	if err != nil {
+		return nil, err
+	}
+
+	response := &MessengerResponse{}
+	if err := response.Merge(rootResponse); err != nil {
+		return nil, err
+	}
+	if err := response.Merge(threadResponse); err != nil {
+		return nil, err
+	}
+	if err := response.Merge(replyResponse); err != nil {
+		return nil, err
+	}
+
 	return response, nil
 }
 

@@ -40,14 +40,6 @@ class TestDeliveryConfirmation:
     def receiver(self, backend_new_profile):
         return backend_new_profile("receiver")
 
-    def _assert_outgoing_status(self, node, message_id, expected_status):
-        # The status field is written just before the corresponding signal fires
-        # (same loop in markDeliveredMessages / processSentMessage), so once we've
-        # seen the signal a single read is enough — no polling needed.
-        message = node.wakuext_service.message_by_message_id(message_id)
-        actual_status = message.get("outgoingStatus", "")
-        assert actual_status == expected_status, f"Message {message_id} outgoing status was '{actual_status}', expected '{expected_status}'"
-
     def test_delivery_confirmation_online(self, sender, receiver):
         messenger.make_contacts(sender, receiver)
 
@@ -61,7 +53,7 @@ class TestDeliveryConfirmation:
         with sender.expect_signal(SignalType.MESSAGE_DELIVERED, pattern=message_id, timeout=120, start="beginning"):
             pass
 
-        self._assert_outgoing_status(sender, message_id, "delivered")
+        messenger.assert_outgoing_status(sender, message_id, "delivered")
 
     def test_sent_status_while_recipient_offline(self, sender, receiver, logos_delivery):
         messenger.make_contacts(sender, receiver)
@@ -90,7 +82,7 @@ class TestDeliveryConfirmation:
 
             # Exact match: "sent" (not "delivered") proves the status came from the
             # envelope-sent path and not from an MVDS ACK.
-            self._assert_outgoing_status(sender, message_id, "sent")
+            messenger.assert_outgoing_status(sender, message_id, "sent")
 
             # envelope.sent means the envelope already reached a peer, so it is
             # already persisted at the store node: a single REST read confirms it

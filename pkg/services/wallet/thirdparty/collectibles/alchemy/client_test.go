@@ -7,6 +7,8 @@ import (
 	"math/big"
 	"net/http"
 	"net/http/httptest"
+	"slices"
+	"strconv"
 	"sync/atomic"
 	"testing"
 
@@ -237,15 +239,19 @@ func newTestClient(baseURL string) *Client {
 
 var testOwner = common.HexToAddress("0x1234567890123456789012345678901234567890")
 
-func TestFetchOwnedAssetsSendsPageSizeAndExcludeFilters(t *testing.T) {
-	var called atomic.Bool
+// Alchemy reads the filter list only from the array form excludeFilters[] and
+// ignores a plain excludeFilters parameter.
+func TestFetchOwnedAssetsExcludesSpam(t *testing.T) {
+	const ownedNFTs = 3
+	const spamNFTs = 1
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		called.Store(true)
 		assert.Equal(t, "/getNFTsForOwner", r.URL.Path)
-		assert.Equal(t, "500", r.URL.Query().Get("pageSize"))
-		assert.Equal(t, "SPAM", r.URL.Query().Get("excludeFilters"))
-		makeNFTResponse(t, w, 1, "")
+		count := ownedNFTs
+		if slices.Contains(r.URL.Query()["excludeFilters[]"], "SPAM") {
+			count -= spamNFTs
+		}
+		makeNFTResponse(t, w, count, "")
 	}))
 	defer server.Close()
 
@@ -253,9 +259,45 @@ func TestFetchOwnedAssetsSendsPageSizeAndExcludeFilters(t *testing.T) {
 		context.Background(), w_common.ChainID(w_common.EthereumMainnet), testOwner, "", thirdparty.FetchNoLimit,
 	)
 	require.NoError(t, err)
-	require.NotNil(t, assets)
-	assert.True(t, called.Load())
-	assert.Len(t, assets.Items, 1)
+	assert.Len(t, assets.Items, ownedNFTs-spamNFTs)
+	assert.Empty(t, assets.NextCursor)
+}
+
+// Alchemy documents pageSize max 100. With orderBy set, the testnet backend
+// answers 500 for a larger pageSize once the owner holds more than 100 NFTs.
+func TestFetchOwnedAssetsStaysWithinProviderPageSizeLimit(t *testing.T) {
+	const alchemyMaxPageSize = 100
+	const ownedNFTs = 250
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		pageSize, err := strconv.Atoi(r.URL.Query().Get("pageSize"))
+		if err != nil {
+			pageSize = alchemyMaxPageSize
+		}
+		if r.URL.Query().Get("orderBy") != "" && pageSize > alchemyMaxPageSize {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		offset := 0
+		if key := r.URL.Query().Get("pageKey"); key != "" {
+			offset, err = strconv.Atoi(key)
+			require.NoError(t, err)
+		}
+		count := min(pageSize, ownedNFTs-offset)
+		nextPageKey := ""
+		if offset+count < ownedNFTs {
+			nextPageKey = strconv.Itoa(offset + count)
+		}
+		makeNFTResponse(t, w, count, nextPageKey)
+	}))
+	defer server.Close()
+
+	assets, err := newTestClient(server.URL).FetchAllAssetsByOwner(
+		context.Background(), w_common.ChainID(w_common.ArbitrumSepolia), testOwner, "", thirdparty.FetchNoLimit,
+	)
+	require.NoError(t, err)
+	assert.Len(t, assets.Items, ownedNFTs)
 	assert.Empty(t, assets.NextCursor)
 }
 
@@ -494,4 +536,63 @@ func TestFetchOwnedAssetsLimitedPagesCoverTheWholeCollection(t *testing.T) {
 	}
 
 	assert.Len(t, seen, total, "every owned collectible is reached by following the cursor")
+}
+
+func TestAssetStillImage(t *testing.T) {
+	const pngURL = "https://res.cloudinary.com/alchemyapi/image/upload/convert-png/eth-mainnet/png"
+	const cachedURL = "https://nft-cdn.alchemy.com/eth-mainnet/cached"
+	const originalURL = "https://example.com/original.png"
+	const cachedSize = int64(9247003)
+
+	testCases := []struct {
+		name          string
+		image         Image
+		expectedURL   string
+		expectedSize  int64
+		expectedAnimo string
+	}{
+		{
+			name:         "uses the png render when the provider has one",
+			image:        Image{ImageURL: pngURL, ContentType: "image/png", CachedAnimationURL: cachedURL, Size: cachedSize},
+			expectedURL:  pngURL,
+			expectedSize: 0,
+		},
+		{
+			// Alchemy leaves pngUrl empty for assets it hasn't rendered, e.g. on testnets.
+			name:         "falls back to the cached still when there is no png render",
+			image:        Image{ContentType: "image/png", CachedAnimationURL: cachedURL, Size: cachedSize},
+			expectedURL:  cachedURL,
+			expectedSize: cachedSize,
+		},
+		{
+			name:         "falls back to the cached asset when its content type is missing",
+			image:        Image{CachedAnimationURL: cachedURL, OriginalAnimationURL: originalURL, Size: cachedSize},
+			expectedURL:  cachedURL,
+			expectedSize: cachedSize,
+		},
+		{
+			name:         "falls back to the original asset when nothing is cached",
+			image:        Image{OriginalAnimationURL: originalURL},
+			expectedURL:  originalURL,
+			expectedSize: 0,
+		},
+		{
+			name:          "leaves a video in the animation slot only",
+			image:         Image{ContentType: "video/mp4", CachedAnimationURL: cachedURL, Size: cachedSize},
+			expectedURL:   "",
+			expectedSize:  0,
+			expectedAnimo: cachedURL,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			asset := Asset{Image: tc.image, Raw: Raw{RawMetadata: RawMetadata{}}}
+
+			data := asset.toCollectiblesData(thirdparty.CollectibleUniqueID{})
+			assert.Equal(t, tc.expectedURL, data.ImageURL)
+			assert.Equal(t, tc.expectedSize, data.ImageSize)
+			assert.Equal(t, tc.expectedAnimo, data.AnimationURL)
+		})
+	}
 }

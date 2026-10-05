@@ -1,14 +1,12 @@
 services:
   anvil:
     image: ghcr.io/foundry-rs/foundry:v1.4.0
-    platform: linux/amd64
     command:
       - anvil --host 0.0.0.0 --block-time 2
     ports:
       - 8545
 
   foundry:
-    platform: linux/amd64
     environment:
       - API_KEY_ETHERSCAN="" # env var is required, but value isn't used
       - API_KEY_ARBISCAN="" # env var is required, but value isn't used

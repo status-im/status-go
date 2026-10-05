@@ -562,8 +562,23 @@ func (api *PublicAPI) CreateThread(chatID string, parentMessageID string) (*prot
 	return api.service.messenger.CreateThread(chatID, parentMessageID)
 }
 
+func (api *PublicAPI) StartThreadFromNewMessage(ctx context.Context, request *requests.StartThreadFromNewMessage) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.StartThreadFromNewMessage(ctx, request)
+}
+
 func (api *PublicAPI) ChatThreads(chatID string) (*ApplicationThreadsResponse, error) {
 	threads, err := api.service.messenger.ThreadsByChatID(chatID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &ApplicationThreadsResponse{
+		Threads: threads,
+	}, nil
+}
+
+func (api *PublicAPI) ChatThreadsByChatIDs(chatIDs []string) (*ApplicationThreadsResponse, error) {
+	threads, err := api.service.messenger.ThreadsByChatIDs(chatIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -1023,7 +1038,11 @@ func (api *PublicAPI) SendEmojiReactionRetraction(ctx context.Context, emojiReac
 }
 
 func (api *PublicAPI) EmojiReactionsByChatID(chatID string, cursor string, limit int) ([]*protocol.EmojiReaction, error) {
-	return api.service.messenger.EmojiReactionsByChatID(chatID, cursor, limit)
+	return api.service.messenger.EmojiReactionsByChatID(chatID, "", cursor, limit)
+}
+
+func (api *PublicAPI) EmojiReactionsByChatIDV2(chatID, threadID, cursor string, limit int) ([]*protocol.EmojiReaction, error) {
+	return api.service.messenger.EmojiReactionsByChatID(chatID, threadID, cursor, limit)
 }
 
 func (api *PublicAPI) EmojiReactionsByChatIDMessageID(chatID string, messageID string) ([]*protocol.EmojiReaction, error) {
