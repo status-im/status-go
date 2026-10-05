@@ -55,3 +55,20 @@ func TestStopPprofClosesServerAndIsIdempotent(t *testing.T) {
 	_, err := client.Get("http://" + addr + "/debug/pprof/")
 	require.Error(t, err)
 }
+
+func TestStartPprofRejectsNonLoopbackAddresses(t *testing.T) {
+	b := NewStatusBackend(testutils.MustCreateTestLogger())
+	for _, addr := range []string{":0", "0.0.0.0:0", "[::]:0", "192.168.1.10:0", "example.com:0", "127.0.0.1"} {
+		require.Error(t, b.StartPprof(addr), addr)
+	}
+	require.NoError(t, b.StopPprof())
+}
+
+func TestStartPprofAcceptsLoopbackAddresses(t *testing.T) {
+	b := NewStatusBackend(testutils.MustCreateTestLogger())
+	t.Cleanup(func() { _ = b.StopPprof() })
+	for _, addr := range []string{"127.0.0.1:0", "localhost:0"} {
+		require.NoError(t, b.StartPprof(addr), addr)
+	}
+	require.NoError(t, requireLoopbackAddr("[::1]:6060"))
+}

@@ -3017,7 +3017,11 @@ func (b *StatusBackend) wakuMetricsHandler() http.Handler {
 }
 
 // StartPprof serves net/http/pprof on addr for on-device profiling. A running server is replaced.
+// addr must be a loopback address: the endpoints are unauthenticated.
 func (b *StatusBackend) StartPprof(addr string) error {
+	if err := requireLoopbackAddr(addr); err != nil {
+		return err
+	}
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	_ = b.closePprofLocked()
@@ -3063,4 +3067,18 @@ func (b *StatusBackend) closePprofLocked() error {
 	b.pprofServer = nil
 	b.pprofListener = nil
 	return err
+}
+
+func requireLoopbackAddr(addr string) error {
+	host, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		return err
+	}
+	if host == "localhost" {
+		return nil
+	}
+	if ip := net.ParseIP(host); ip != nil && ip.IsLoopback() {
+		return nil
+	}
+	return fmt.Errorf("pprof address %q is not a loopback address", addr)
 }

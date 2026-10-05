@@ -912,12 +912,22 @@ func resumeServices(namesJSON string) string {
 }
 
 // StartPprof starts a pprof HTTP server on addr (e.g. "127.0.0.1:6060").
-func StartPprof(addr string) string { return callWithResponse(startPprof, addr) }
-func startPprof(addr string) string { return makeJSONResponse(statusBackend.StartPprof(addr)) }
+func StartPprof(addr string) string {
+	return callWithResponse(startPprof, addr)
+}
+
+func startPprof(addr string) string {
+	return makeJSONResponse(statusBackend.StartPprof(addr))
+}
 
 // StopPprof shuts down the pprof server started by StartPprof.
-func StopPprof() string { return callWithResponse(stopPprof) }
-func stopPprof() string { return makeJSONResponse(statusBackend.StopPprof()) }
+func StopPprof() string {
+	return callWithResponse(stopPprof)
+}
+
+func stopPprof() string {
+	return makeJSONResponse(statusBackend.StopPprof())
+}
 
 func StartLocalNotifications() string {
 	return callWithResponse(startLocalNotifications)
