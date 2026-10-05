@@ -33,3 +33,6 @@ go test -race="$race" -tags 'tkl gowaku_no_rln' "$@"
 GOFLAGS="${GOFLAGS:-} -tags=tkl,gowaku_no_rln,lint" \
   go tool goroutine-defer-guard -test=false \
   -target github.com/status-im/status-go/internal/panics.LogOnPanic ./pkg/services/wallet/token/...
+# Ordinary lint builds exclude tkl files. Apply the repository's full linter
+# configuration to these optional packages using the pinned public module.
+golangci-lint run --build-tags 'tkl,gowaku_no_rln,lint' ./pkg/services/wallet/token/...
