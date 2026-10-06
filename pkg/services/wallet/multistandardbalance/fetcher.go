@@ -57,13 +57,7 @@ func (f *Fetcher) FetchBalances(ctx context.Context, chainID uint64, config mult
 		return nil, errors.New("Multicall3 not supported on chain ID " + strconv.Itoa(int(chainID)))
 	}
 
-	// Create multicall3 contract instance for the caller interface
-	multicallContract, err := multicall3.NewMulticall3(multicallAddr, ethClient)
-	if err != nil {
-		return nil, err
-	}
-
-	resultsCh := multistandardfetcher.FetchBalances(ctx, multicallAddr, multicallContract, config, f.batchSize)
+	resultsCh := multistandardfetcher.FetchBalances(ctx, multicallAddr, newMulticallCaller(multicallAddr, ethClient), config, f.batchSize)
 
 	return resultsCh, nil
 }
