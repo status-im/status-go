@@ -34,11 +34,15 @@ func TestDownloadTokensSuccess(t *testing.T) {
 	require.NoError(t, err)
 	require.Contains(t, string(written), `StatusTokenList.ID = "status"`)
 	require.Contains(t, string(written), `StatusTokenList.SourceURL = "`+server.URL+`"`)
-	require.Contains(t, string(written), formatBytes(body))
+	require.Contains(t, string(written), "//go:embed status.json\n")
+	require.Contains(t, string(written), "StatusTokenList.JsonData = statusTokenListJSON")
+	embedded, err := os.ReadFile(filepath.Join(filepath.Dir(output), "status.json"))
+	require.NoError(t, err)
+	require.Equal(t, body, embedded)
 
 	entries, err := os.ReadDir(filepath.Dir(output))
 	require.NoError(t, err)
-	require.Len(t, entries, 1)
+	require.Len(t, entries, 2)
 
 	info, err := os.Stat(output)
 	require.NoError(t, err)
