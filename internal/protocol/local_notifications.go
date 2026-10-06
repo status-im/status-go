@@ -3,6 +3,8 @@ package protocol
 import (
 	"crypto/ecdsa"
 	"encoding/json"
+	"fmt"
+	"net/url"
 	"strings"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -337,6 +339,31 @@ func NewOutgoingMessageNotification(id string, message *common.Message, chat *Ch
 		notif.ChatIcon = chatIconDataURI(chat)
 	}
 	return notif
+}
+
+func setThreadNotificationMetadata(notif *localnotifications.Notification, chat *Chat, message *common.Message, threadName string, messagePreview int) {
+	threadID := message.GetThreadId()
+	if threadID == "" {
+		return
+	}
+
+	if threadName != "" {
+		if chat.CommunityChat() && !strings.HasPrefix(notif.Title, "#") {
+			notif.Title = "#" + notif.Title
+		}
+		notif.Title = fmt.Sprintf("%s Ξ%s", notif.Title, threadName)
+	}
+	notif.DisplayTitle, notif.DisplayMessage = applyMessagePreview(notif.Title, notif.Message, messagePreview)
+
+	values := url.Values{
+		"chatId":    {chat.ID},
+		"threadId":  {threadID},
+		"messageId": {message.ID},
+	}
+	if chat.CommunityID != "" {
+		values.Set("communityId", chat.CommunityID)
+	}
+	notif.Deeplink = "status-app://thread-notification?" + values.Encode()
 }
 
 func NewPrivateGroupInviteNotification(id string, chat *Chat, contact *contacts.Contact, profilePicturesVisibility int, messagePreview int) *localnotifications.Notification {
