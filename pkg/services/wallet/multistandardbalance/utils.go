@@ -27,10 +27,9 @@ func deleteChainsNotInList[T any](m map[BalancesKey]T, chains []uint64) {
 // reusing the fetched map. Zero balances are not stored: a token missing from
 // the map reads as zero. A batched fetch (multicall with requireSuccess=false)
 // drops the sub-calls that failed; such a token keeps its stored entry, or is
-// stored as nil (unknown) when there is none, rather than reading as a hard zero
-// until a later fetch answers it. So does a stored token the fetch did not ask
-// for. Returns the map and how many calls failed.
-func mergeERC20Balances(requested []ContractAddress, previous, fetched map[ContractAddress]*big.Int, failed []ContractAddress) (map[ContractAddress]*big.Int, int) {
+// stored as nil (unknown) when there is none, rather than reading as a hard
+// zero until a later fetch answers it.
+func mergeERC20Balances(previous, fetched map[ContractAddress]*big.Int, failed []ContractAddress) map[ContractAddress]*big.Int {
 	if fetched == nil {
 		fetched = make(map[ContractAddress]*big.Int)
 	}
@@ -42,19 +41,7 @@ func mergeERC20Balances(requested []ContractAddress, previous, fetched map[Contr
 	for _, token := range failed {
 		fetched[token] = previous[token]
 	}
-	if len(previous) > 0 {
-		notRequested := make(map[ContractAddress]struct{}, len(previous))
-		for token := range previous {
-			notRequested[token] = struct{}{}
-		}
-		for _, token := range requested {
-			delete(notRequested, token)
-		}
-		for token := range notRequested {
-			fetched[token] = previous[token]
-		}
-	}
-	return fetched, len(failed)
+	return fetched
 }
 
 func isBigIntMapEqual[T comparable](m1 map[T]*big.Int, m2 map[T]*big.Int) bool {

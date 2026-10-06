@@ -240,7 +240,7 @@ func runFakeFetch(tb testing.TB, c *Controller, config multistandardfetcher.Fetc
 	resultsCh, err := c.fetcher.FetchBalances(ctx, fakeChainID, config)
 	require.NoError(tb, err)
 	for result := range resultsCh {
-		c.handleFetchResult(ctx, fakeChainID, config, result)
+		c.handleFetchResult(ctx, fakeChainID, result)
 	}
 }
 
