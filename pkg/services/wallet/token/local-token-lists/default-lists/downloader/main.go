@@ -21,14 +21,18 @@ import (
 const templateText = `package defaulttokenlists
 
 import (
+	_ "embed" // for go:embed
 	"time"
 )
+
+//go:embed {{ .JSONFile }}
+var {{ .JSONVar }} []byte
 
 func init() {
 	{{ .TokenListName }}.ID = "{{ .TokenListIdentifier }}"
 	{{ .TokenListName }}.SourceURL = "{{ .TokenListSource }}"
 	{{ .TokenListName }}.Fetched = time.Unix({{ .FetchedTimestamp }}, 0)
-	{{ .TokenListName }}.JsonData = {{ .JsonData }}
+	{{ .TokenListName }}.JsonData = {{ .JSONVar }}
 }
 `
 
@@ -37,15 +41,8 @@ type templateData struct {
 	TokenListIdentifier string
 	TokenListSource     string
 	FetchedTimestamp    int64
-	JsonData            string
-}
-
-func formatBytes(data []byte) string {
-	var parts []string
-	for _, b := range data {
-		parts = append(parts, fmt.Sprintf("0x%02x", b))
-	}
-	return fmt.Sprintf("[]byte{%s}", strings.Join(parts, ", "))
+	JSONFile            string
+	JSONVar             string
 }
 
 func validateDocument(doc string, schemaURL string) (bool, error) {
@@ -125,12 +122,20 @@ func downloadTokens(client *http.Client, key string, source defaulttokenlists.To
 		return fmt.Sprintf("%s%s", strings.ToUpper(string(s[0])), s[1:])
 	}
 
+	// The list is embedded from a sibling .json file so it stays in the binary's data section, off the heap.
+	jsonPath := strings.TrimSuffix(source.OutputFile, filepath.Ext(source.OutputFile)) + ".json"
+	if err := os.WriteFile(jsonPath, body, 0o600); err != nil {
+		return fmt.Errorf("failed to write json file: %w", err)
+	}
+
+	tokenListName := capitalizedFirstLetter(fmt.Sprintf("%sTokenList", key))
 	data := templateData{
-		TokenListName:       capitalizedFirstLetter(fmt.Sprintf("%sTokenList", key)),
+		TokenListName:       tokenListName,
 		TokenListIdentifier: key,
 		TokenListSource:     source.SourceURL,
 		FetchedTimestamp:    time.Now().Unix(),
-		JsonData:            formatBytes(body),
+		JSONFile:            filepath.Base(jsonPath),
+		JSONVar:             strings.ToLower(tokenListName[:1]) + tokenListName[1:] + "JSON",
 	}
 
 	tmpl := template.Must(template.New("tokenList").Parse(templateText))
