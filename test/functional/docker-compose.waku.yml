@@ -16,6 +16,8 @@ services:
       "--max-connections=18000",
       "--nodekey=03ce9122016be1f80a23df36525103bed1c7c4b9a0ff7605d97553ed8ed96bcf",
       "--peer-exchange=true",
+      # TODO: enable after logos-messaging/logos-delivery#4383 is fixed
+      "--quic-support=false",
       "--relay=true",
       "--rest=true",
       "--rest-address=0.0.0.0",
@@ -63,6 +65,8 @@ services:
       "--max-connections=18000",
       "--nodekey=3190bc9b55b18dbc171997a7a67abcd5bbf0c81002ad9617b1cb67f2f15daa64",
       "--peer-exchange=true",
+      # TODO: enable after logos-messaging/logos-delivery#4383 is fixed
+      "--quic-support=false",
       "--relay=true",
       "--rest=true",
       "--rest-address=0.0.0.0",
