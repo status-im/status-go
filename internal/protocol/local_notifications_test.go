@@ -563,6 +563,29 @@ func TestMessageNotifications_PreserveThreadID(t *testing.T) {
 	require.False(t, containsThreadID)
 }
 
+func TestThreadNotificationMetadata(t *testing.T) {
+	threadID := "thread-1"
+	message := common.NewMessage()
+	message.ID = "message-1"
+	message.ChatMessage.ThreadId = &threadID
+	chat := &Chat{ID: "chat-1", CommunityID: "community-1", Name: "general", ChatType: ChatTypeCommunityChat}
+	notif := &localnotifications.Notification{
+		Title:          chat.Name,
+		Message:        "hello",
+		DisplayTitle:   chat.Name,
+		DisplayMessage: "hello",
+	}
+
+	setThreadNotificationMetadata(notif, chat, message, "Thread name", messagePreviewNameOnly)
+
+	require.Equal(t, "#general ΞThread name", notif.Title)
+	require.Equal(t, "#general ΞThread name", notif.DisplayTitle)
+	require.Equal(t, messagePreviewDefaultMessage, notif.DisplayMessage)
+	require.Equal(t,
+		"status-app://thread-notification?chatId=chat-1&communityId=community-1&messageId=message-1&threadId=thread-1",
+		notif.Deeplink)
+}
+
 func TestNewPrivateGroupInviteNotification_ChatIcon(t *testing.T) {
 	key, _ := crypto.GenerateKey()
 	contact, _ := contacts.BuildContactFromPublicKey(&key.PublicKey)
