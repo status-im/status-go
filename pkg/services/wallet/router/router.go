@@ -1109,7 +1109,7 @@ func (r *Router) resolveRoute(ctx context.Context, input *requests.RouteInputPar
 
 func (r *Router) estimateMainTx(input *requests.RouteInputParams, pathProcessor pathprocessor.PathProcessor,
 	processorInputParams pathprocessor.ProcessorInputParams, approvalRequired bool) ([]byte, uint64, error) {
-	tolerateFailure := input.SendType == sendtype.Swap && approvalRequired
+	tolerateFailure := walletCommon.IsProcessorSwap(pathProcessor.Name()) && approvalRequired
 
 	txPackedData, err := pathProcessor.PackTxInputData(processorInputParams)
 	if err != nil {
@@ -1130,6 +1130,16 @@ func (r *Router) estimateMainTx(input *requests.RouteInputParams, pathProcessor 
 	gasLimit, err := pathProcessor.EstimateGas(processorInputParams, txPackedData)
 	if err != nil {
 		if tolerateFailure {
+			if estimator, ok := pathProcessor.(pathprocessor.ApprovalPendingGasEstimator); ok {
+				if gas, ok := estimator.GasBeforeApproval(processorInputParams); ok {
+					r.logger.Debug("buildPath: EstimateGas failed, using the processor's gas before approval",
+						zap.String("uuid", input.Uuid),
+						zap.String("processor", pathProcessor.Name()),
+						zap.Uint64("gasLimit", gas),
+						zap.Error(err))
+					return txPackedData, gas, nil
+				}
+			}
 			r.logger.Debug("buildPath: EstimateGas failed, fee unknown until the approval is mined",
 				zap.String("uuid", input.Uuid),
 				zap.String("processor", pathProcessor.Name()),
