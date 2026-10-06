@@ -3,6 +3,7 @@ package messaging
 import (
 	"context"
 	"crypto/ecdsa"
+	"fmt"
 	"sync"
 	"time"
 
@@ -176,6 +177,7 @@ func newCore(waku wakutypes.Waku, params CoreParams, config *config) (*Core, err
 func buildSDSRetrievalHint(logger *zap.Logger, tracker sdsEnvelopeHashesTracker, messageID string) []byte {
 	decodedMessageID, err := cryptotypes.DecodeHex(messageID)
 	if err != nil {
+		fmt.Println("[sds-debug] retrieval hint unavailable: invalid SDS ID", "sdsID", messageID, "error", err)
 		logger.Debug("failed to decode SDS message ID for retrieval hint",
 			zap.String("messageID", messageID),
 			zap.Error(err),
@@ -185,6 +187,7 @@ func buildSDSRetrievalHint(logger *zap.Logger, tracker sdsEnvelopeHashesTracker,
 
 	hashes, err := tracker.TrackedEnvelopeHashes(decodedMessageID)
 	if err != nil {
+		fmt.Println("[sds-debug] retrieval hint unavailable: no tracked envelope hashes", "sdsID", messageID, "error", err)
 		logger.Debug("no tracked envelope hash for SDS message ID",
 			zap.String("messageID", messageID),
 			zap.Error(err),
@@ -201,6 +204,7 @@ func buildSDSRetrievalHint(logger *zap.Logger, tracker sdsEnvelopeHashesTracker,
 		EnvelopeHashes: envelopeHashes,
 	})
 	if err != nil {
+		fmt.Println("[sds-debug] retrieval hint marshal failed", "sdsID", messageID, "error", err)
 		logger.Debug("failed to marshal SDS retrieval hint",
 			zap.String("messageID", messageID),
 			zap.Error(err),
@@ -208,6 +212,7 @@ func buildSDSRetrievalHint(logger *zap.Logger, tracker sdsEnvelopeHashesTracker,
 		return nil
 	}
 
+	fmt.Println("[sds-debug] retrieval hint built", "sdsID", messageID, "envelopeHashes", hashes, "hintBytes", len(hint))
 	return hint
 }
 
@@ -316,12 +321,14 @@ func (c *Core) stop() error {
 }
 
 func (c *Core) fetchMissingDependenciesAsync(messageID string, missingDeps []string, channelID string) error {
+	fmt.Println("[sds-debug] missing-dependency fetch scheduled", "sdsID", messageID, "channelID", channelID, "hashes", missingDeps)
 	if len(missingDeps) == 0 {
 		return nil
 	}
 
 	select {
 	case <-c.ctx.Done():
+		fmt.Println("[sds-debug] missing-dependency fetch skipped: core stopped", "sdsID", messageID)
 		return nil
 	default:
 	}
@@ -336,6 +343,7 @@ func (c *Core) fetchMissingDependenciesAsync(messageID string, missingDeps []str
 
 		alreadyProcessed, err := c.stack.Transport.AlreadyProcessed(missingDeps)
 		if err != nil {
+			fmt.Println("[sds-debug] processed-cache lookup failed", "sdsID", messageID, "error", err)
 			c.logger.Debug("failed to check missing dependencies cache",
 				zap.String("messageID", messageID),
 				zap.String("channelID", channelID),
@@ -352,10 +360,13 @@ func (c *Core) fetchMissingDependenciesAsync(messageID string, missingDeps []str
 			}
 		}
 		if len(missingDepsToFetch) == 0 {
+			fmt.Println("[sds-debug] missing-dependency fetch skipped: all hashes already processed", "sdsID", messageID, "processed", alreadyProcessed)
 			return
 		}
 
+		fmt.Println("[sds-debug] fetching missing envelope hashes", "sdsID", messageID, "channelID", channelID, "hashes", missingDepsToFetch, "processed", alreadyProcessed)
 		err = c.stack.Transport.FetchMessagesByHashes(fetchCtx, missingDepsToFetch)
+		fmt.Println("[sds-debug] missing-dependency fetch finished (no retry here)", "sdsID", messageID, "channelID", channelID, "error", err)
 		if err != nil {
 			c.logger.Debug("failed to fetch missing dependencies from storenode",
 				zap.String("messageID", messageID),

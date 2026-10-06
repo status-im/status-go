@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"encoding/hex"
+	"fmt"
 
 	"github.com/golang/protobuf/proto"
 	"github.com/pkg/errors"
@@ -109,6 +110,7 @@ type processMessageResponse struct {
 }
 
 func (r *Processor) processMessage(m *messagingtypes.ReceivedMessage) (*processMessageResponse, error) {
+	fmt.Println("[recovery-debug] processing envelope", "hash", types.EncodeHex(m.Hash))
 	logger := r.logger.With(zap.Stringer("hash", types.HexBytes(m.Hash)))
 	logger.Debug("processing received message")
 
@@ -121,12 +123,14 @@ func (r *Processor) processMessage(m *messagingtypes.ReceivedMessage) (*processM
 
 	err := processTransportLayer(responseMessage, m)
 	if err != nil {
+		fmt.Println("[recovery-debug] transport processing failed", "hash", types.EncodeHex(m.Hash), "error", err)
 		logger.Error("failed to process transport layer", zap.Error(err))
 		return nil, err
 	}
 
 	err = r.processSegmentationLayer(responseMessage)
 	if err != nil {
+		fmt.Println("[recovery-debug] segmentation failed", "hash", types.EncodeHex(m.Hash), "error", err)
 		return nil, err
 	}
 
@@ -134,6 +138,7 @@ func (r *Processor) processMessage(m *messagingtypes.ReceivedMessage) (*processM
 	if responseMessage.SegmentationLayer.Segmented {
 		// Segments not completed yet, stop processing
 		if !responseMessage.SegmentationLayer.Completed {
+			fmt.Println("[recovery-debug] waiting for remaining segments", "hash", types.EncodeHex(m.Hash))
 			return nil, nil
 		}
 		hashes = responseMessage.SegmentationLayer.Hashes
@@ -153,12 +158,14 @@ func (r *Processor) processMessage(m *messagingtypes.ReceivedMessage) (*processM
 	} else {
 		// Hash ratchet with a group id not found yet, save the message for future processing
 		if err == encryption.ErrHashRatchetGroupIDNotFound && len(responseMessage.EncryptionLayer.HashRatchetInfo) == 1 {
+			fmt.Println("[recovery-debug] envelope queued: hash-ratchet key unavailable", "hash", types.EncodeHex(m.Hash), "error", err)
 			info := responseMessage.EncryptionLayer.HashRatchetInfo[0]
 			span.AddEvent("hash ratchet with group id not found yet", oteltrace.WithAttributes(
 				otelattribute.String("groupID", types.ToHex(info.GroupID)),
 			))
 			return nil, r.hashRatchetStorage.SaveMessage(info.GroupID, info.KeyID, m)
 		} else {
+			fmt.Println("[recovery-debug] encryption processing failed", "hash", types.EncodeHex(m.Hash), "error", err)
 			span.AddEvent("encryption layer not processed", oteltrace.WithAttributes(
 				otelattribute.String("error", err.Error()),
 			))
@@ -170,6 +177,7 @@ func (r *Processor) processMessage(m *messagingtypes.ReceivedMessage) (*processM
 	// so fail the whole envelope instead: it must be retried, not marked processed.
 	err = r.processSDSLayer(responseMessage)
 	if err != nil {
+		fmt.Println("[recovery-debug] SDS processing failed", "hash", types.EncodeHex(m.Hash), "error", err)
 		logger.Error("failed to unwrap payload for SDS", zap.Error(err))
 		return nil, err
 	}
@@ -184,6 +192,7 @@ func (r *Processor) processMessage(m *messagingtypes.ReceivedMessage) (*processM
 		logger.Debug("failed to process reliability layer", zap.Error(err))
 	}
 
+	fmt.Println("[recovery-debug] envelope processing finished", "hash", types.EncodeHex(m.Hash), "messages", len(response.messages), "reliabilityError", err)
 	return response, nil
 }
 

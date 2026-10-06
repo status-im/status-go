@@ -2,6 +2,7 @@ package reliability
 
 import (
 	"crypto/ecdsa"
+	"fmt"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -177,27 +178,32 @@ func (r *Reliability) provideRetrievalHint(messageID sds.MessageID) []byte {
 }
 
 func (r *Reliability) handleMissingDependencies(messageID sds.MessageID, missingDeps []sds.HistoryEntry, channelID string) {
+	fmt.Println("[sds-debug] missing-dependencies callback", "sdsID", messageID, "channelID", channelID, "dependencies", len(missingDeps))
 	r.missingDepsHandlerMu.RLock()
 	handler := r.missingDepsHandler
 	r.missingDepsHandlerMu.RUnlock()
 
 	if handler == nil || len(missingDeps) == 0 {
+		fmt.Println("[sds-debug] missing-dependencies callback skipped", "handlerAvailable", handler != nil, "dependencies", len(missingDeps))
 		return
 	}
 
 	missingDepsAsString := make([]string, 0, len(missingDeps))
 	for _, dep := range missingDeps {
 		if len(dep.RetrievalHint) == 0 {
+			fmt.Println("[sds-debug] dependency discarded: empty retrieval hint", "sdsID", messageID, "dependencyID", dep.MessageID, "channelID", channelID)
 			continue
 		}
 
 		var hint protobuf.RetrievalHint
 		if err := proto.Unmarshal(dep.RetrievalHint, &hint); err != nil {
+			fmt.Println("[sds-debug] dependency discarded: invalid retrieval hint", "dependencyID", dep.MessageID, "hintBytes", len(dep.RetrievalHint), "error", err)
 			r.logger.Debug("failed to unmarshal retrieval hint",
 				zap.String("messageId", string(dep.MessageID)),
 				zap.Error(err))
 			continue
 		}
+		fmt.Println("[sds-debug] dependency retrieval hint decoded", "dependencyID", dep.MessageID, "envelopeHashes", len(hint.EnvelopeHashes))
 
 		for _, envelopeHash := range hint.EnvelopeHashes {
 			if len(envelopeHash) > 0 {
@@ -206,10 +212,12 @@ func (r *Reliability) handleMissingDependencies(messageID sds.MessageID, missing
 		}
 	}
 	if len(missingDepsAsString) == 0 {
+		fmt.Println("[sds-debug] no usable envelope hashes; SDS recovery will not query store", "sdsID", messageID, "channelID", channelID)
 		return
 	}
 
 	if err := handler(string(messageID), missingDepsAsString, channelID); err != nil {
+		fmt.Println("[sds-debug] missing-dependencies handler failed", "sdsID", messageID, "error", err)
 		r.logger.Debug("failed to fetch missing dependencies from sds callback", zap.Error(err))
 	}
 }

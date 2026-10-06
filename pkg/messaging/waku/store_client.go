@@ -3,6 +3,7 @@ package waku
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"go.uber.org/zap"
 
@@ -50,6 +51,7 @@ func (sc *StoreClient) SetStorenodes(nodes []peer.AddrInfo) {
 func (sc *StoreClient) nextStorenode() peer.AddrInfo {
 	candidates := sc.selector.candidates()
 	if len(candidates) == 0 {
+		fmt.Println("[history-debug] store query failed: no eligible store nodes")
 		return peer.AddrInfo{}
 	}
 	return candidates[0]
@@ -75,6 +77,7 @@ func (sc *StoreClient) Query(
 
 	pubsubTopic := sc.resolvePubsubTopic(batch.PubsubTopic)
 	contentTopics := sc.contentTopics(batch)
+	fmt.Println("[history-debug] store query", "pubsubTopic", pubsubTopic, "contentTopics", contentTopics, "from", batch.From, "to", batch.To, "candidateNodes", len(candidates))
 
 	var lastErr error
 	for i, node := range candidates {
@@ -82,6 +85,7 @@ func (sc *StoreClient) Query(
 			break
 		}
 		err := sc.pager.run(ctx, node, pubsubTopic, contentTopics, batch.From, batch.To, pageLimit, shouldProcessNextPage, processEnvelopes)
+		fmt.Println("[history-debug] store node attempt finished", "attempt", i+1, "peerID", node.ID, "error", err)
 		if err == nil {
 			sc.selector.markSuccess(node.ID)
 			return nil

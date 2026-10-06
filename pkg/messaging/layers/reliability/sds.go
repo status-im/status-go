@@ -1,6 +1,8 @@
 package reliability
 
 import (
+	"fmt"
+
 	"github.com/pkg/errors"
 	"github.com/waku-org/sds-go-bindings/sds"
 	"go.uber.org/zap"
@@ -24,8 +26,10 @@ func newSdsReliabilityManager(
 ) (*sds.ReliabilityManager, error) {
 	reliabilityManager, err := sdsManagerFactory(logger)
 	if err != nil {
+		fmt.Println("[sds-debug] SDS manager creation failed", "error", err)
 		return nil, errors.Wrap(err, "failed to create ReliabilityManager")
 	}
+	fmt.Println("[sds-debug] fresh SDS manager created")
 
 	callbacks := sds.EventCallbacks{
 		OnMessageSent: func(messageId sds.MessageID, channelId string) {
@@ -86,8 +90,10 @@ func (r *Reliability) WrapPayloadForSDS(payload []byte, channelID string) ([]byt
 	)
 	sdsWrappedPayload, err := manager.WrapOutgoingMessage(payload, sds.MessageID(cryptotypes.EncodeHex(sdsMessageID)), channelID)
 	if err != nil {
+		fmt.Println("[sds-debug] outgoing SDS wrap failed", "channelID", channelID, "sdsID", cryptotypes.EncodeHex(sdsMessageID), "error", err)
 		return nil, nil, errors.Wrap(err, "failed to wrap message with SDS")
 	}
+	fmt.Println("[sds-debug] outgoing SDS wrapped", "channelID", channelID, "sdsID", cryptotypes.EncodeHex(sdsMessageID), "payloadBytes", len(payload), "wrappedBytes", len(sdsWrappedPayload))
 
 	return sdsWrappedPayload, sdsMessageID, nil
 }
@@ -103,12 +109,14 @@ func (r *Reliability) UnwrapPayloadFromSDS(wrappedPayload []byte) ([]byte, error
 
 	unwrappedMessage, err := manager.UnwrapReceivedMessage(wrappedPayload)
 	if err != nil {
+		fmt.Println("[sds-debug] SDS unwrap failed; passing original payload through", "payloadBytes", len(wrappedPayload), "error", err)
 		r.logger.Debug("failed to unwrap received message with SDS", zap.Error(err))
 		// return original payload since wrapping is not mandatory for all kinds of messages
 		return wrappedPayload, nil
 	}
 
 	missingDeps := *unwrappedMessage.MissingDeps
+	fmt.Println("[sds-debug] incoming SDS unwrapped", "wrappedBytes", len(wrappedPayload), "payloadBytes", len(*unwrappedMessage.Message), "missingDependencies", len(missingDeps))
 	if len(missingDeps) > 0 {
 		r.logger.Debug("missing deps with SDS", zap.Any("missing-deps", missingDeps))
 	}

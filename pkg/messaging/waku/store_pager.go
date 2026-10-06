@@ -3,6 +3,7 @@ package waku
 import (
 	"context"
 	"encoding/hex"
+	"fmt"
 	"sync"
 	"time"
 
@@ -177,8 +178,10 @@ func (p *storePager) fetchChunk(
 			}
 
 			reqCtx, reqCancel := context.WithTimeout(ctx, storeRequestTimeout)
+			fmt.Println("[history-debug] store page request", "requestID", request.RequestId, "peerID", peerInfo.ID, "pubsubTopic", pubsubTopic, "contentTopics", contentTopics, "from", windowStart, "to", windowEnd, "fromNs", windowStart.UnixNano(), "toNs", windowEnd.UnixNano(), "limit", limit, "cursorBytes", len(cursor))
 			messages, nextCursor, err := p.requestor.query(reqCtx, peerInfo, request)
 			reqCancel()
+			fmt.Println("[history-debug] store page response", "requestID", request.RequestId, "messages", len(messages), "nextCursorBytes", len(nextCursor), "complete", nextCursor == nil, "error", err)
 			if err != nil {
 				return err
 			}
@@ -186,6 +189,7 @@ func (p *storePager) fetchChunk(
 			for _, mkv := range messages {
 				env := protocol.NewEnvelope(mkv.Message, mkv.Message.GetTimestamp(), mkv.GetPubsubTopic())
 				if err := p.processor.OnEnvelope(env, processEnvelopes); err != nil {
+					fmt.Println("[history-debug] store envelope rejected", "requestID", request.RequestId, "hash", env.Hash(), "error", err)
 					return err
 				}
 			}

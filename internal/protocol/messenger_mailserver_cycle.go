@@ -1,6 +1,7 @@
 package protocol
 
 import (
+	"fmt"
 	"sort"
 	"time"
 
@@ -113,6 +114,7 @@ func coalesceHistoricSyncRequests(requests []historicSyncRequest) []historicSync
 // Waku.OnHistoryReconcileNeeded.
 func (m *Messenger) startHistoryReconciliationLoop() {
 	if !m.config.codeControlFlags.AutoRequestHistoricMessages {
+		fmt.Println("[history-debug] reconciliation loop disabled: AutoRequestHistoricMessages=false")
 		return
 	}
 
@@ -132,7 +134,9 @@ func (m *Messenger) startHistoryReconciliationLoop() {
 					time.Now(),
 					m.historicSyncNow(),
 				)
+				fmt.Println("[history-debug] reconciliation event", "transportFrom", transportWindow.From, "transportTo", transportWindow.To, "messengerFrom", window.From, "messengerTo", window.To)
 				if window.From.IsZero() {
+					fmt.Println("[history-debug] reconciliation event skipped: invalid window")
 					continue
 				}
 				m.advanceHistoryCursors(window.From)
@@ -182,14 +186,18 @@ func (m *Messenger) advanceHistoryCursors(through time.Time) {
 	hasPending := len(m.historicSyncQueue) > 0
 	m.historicSyncQueueMu.Unlock()
 	if hasPending || m.historicSyncWorkerActive.Load() {
+		fmt.Println("[history-debug] cursor advance blocked", "through", through, "pending", hasPending, "workerActive", m.historicSyncWorkerActive.Load())
 		return
 	}
 	m.historicSyncMu.Lock()
 	defer m.historicSyncMu.Unlock()
 	if m.historicSyncInFlight {
+		fmt.Println("[history-debug] cursor advance blocked: sync in flight", "through", through)
 		return
 	}
+	fmt.Println("[history-debug] advancing all initialized cursors WITHOUT store query", "through", through, "unix", through.Unix())
 	if err := m.mailserversDatabase.AdvanceHistoryCursors(int(through.Unix())); err != nil {
+		fmt.Println("[history-debug] cursor advance failed", "error", err)
 		m.logger.Warn("failed to advance history cursors", zap.Error(err))
 	}
 }
@@ -198,6 +206,7 @@ func (m *Messenger) advanceHistoryCursors(through time.Time) {
 // fixed upper bound. It is used at startup, where the preceding app-off period
 // is a genuine delivery gap.
 func (m *Messenger) asyncRequestAllHistoricMessages() {
+	fmt.Println("[history-debug] scheduling startup/cursor catch-up", "wallNow", time.Now(), "autoSync", m.config.codeControlFlags.AutoRequestHistoricMessages, "paused", m.isPaused())
 	m.enqueueHistoricSync(historicSyncRequest{To: m.historicSyncNow()})
 }
 
@@ -207,6 +216,7 @@ func (m *Messenger) asyncRequestHistoricMessages(window messagingtypes.HistoryRe
 
 func (m *Messenger) enqueueHistoricSync(request historicSyncRequest) {
 	if !request.valid() {
+		fmt.Println("[history-debug] enqueue skipped: invalid request", "from", request.From, "to", request.To)
 		return
 	}
 
@@ -217,6 +227,7 @@ func (m *Messenger) enqueueHistoricSync(request historicSyncRequest) {
 	m.historicSyncQueueMu.Lock()
 	m.historicSyncQueue = append(m.historicSyncQueue, request)
 	m.historicSyncQueue = coalesceHistoricSyncRequests(m.historicSyncQueue)
+	fmt.Println("[history-debug] sync enqueued", "from", request.From, "to", request.To, "queue", m.historicSyncQueue)
 	m.historicSyncQueueMu.Unlock()
 
 	m.notifyHistoricSyncWorker()
@@ -258,8 +269,10 @@ func (m *Messenger) requeueHistoricSync(request historicSyncRequest) {
 // this loop decides when to try again.
 func (m *Messenger) startHistoricSyncWorker() {
 	if !m.config.codeControlFlags.AutoRequestHistoricMessages {
+		fmt.Println("[history-debug] historic sync worker disabled: AutoRequestHistoricMessages=false")
 		return
 	}
+	fmt.Println("[history-debug] historic sync worker starting")
 
 	m.shutdownWaitGroup.Add(1)
 	go func() {
@@ -273,6 +286,7 @@ func (m *Messenger) startHistoricSyncWorker() {
 			case <-m.quit:
 				return
 			case <-m.historicSyncTrigger:
+				fmt.Println("[history-debug] worker awakened", "paused", m.isPaused())
 			}
 
 			for {
@@ -286,6 +300,7 @@ func (m *Messenger) startHistoricSyncWorker() {
 					m.historicSyncWorkerActive.Store(false)
 					break
 				}
+				fmt.Println("[history-debug] worker took request", "from", request.From, "to", request.To)
 
 				if wait := historicSyncMinInterval - time.Since(lastAttempt); wait > 0 {
 					select {
@@ -311,6 +326,7 @@ func (m *Messenger) startHistoricSyncWorker() {
 					previousAttempt := lastAttempt
 					lastAttempt = time.Now()
 					executed, err := m.runAutomaticHistoricSync(request)
+					fmt.Println("[history-debug] sync attempt finished", "from", request.From, "to", request.To, "executed", executed, "error", err)
 					if err == nil && executed {
 						break
 					}
@@ -321,12 +337,14 @@ func (m *Messenger) startHistoricSyncWorker() {
 						// Offline and policy-blocked requests stay pending. Their
 						// corresponding online/resume/setting transition wakes us.
 						m.requeueHistoricSync(request)
+						fmt.Println("[history-debug] skipped sync requeued; waiting for wakeup")
 						deferred = true
 						break
 					}
 					if time.Now().After(deadline) {
 						m.logger.Error("historic sync failed after retries", zap.Error(err))
 						m.requeueHistoricSync(request)
+						fmt.Println("[history-debug] retry deadline reached; request requeued", "error", err)
 						deferred = true
 						break
 					}

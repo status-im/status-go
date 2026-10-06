@@ -3,6 +3,7 @@ package transport
 import (
 	"context"
 	"crypto/ecdsa"
+	"fmt"
 	"sync"
 	"time"
 
@@ -204,6 +205,7 @@ func (t *Transport) handleReceivedMessage(msg *wakutypes.ReceivedMessage) {
 
 	candidates := t.filters.WatchersByTopic(msg.PubsubTopic, msg.ContentTopic)
 	if len(candidates) == 0 {
+		fmt.Println("[recovery-debug] received envelope dropped: no topic filters", "hash", cryptotypes.EncodeHex(msg.Hash), "pubsubTopic", msg.PubsubTopic, "contentTopic", msg.ContentTopic)
 		return
 	}
 
@@ -222,6 +224,7 @@ func (t *Transport) handleReceivedMessage(msg *wakutypes.ReceivedMessage) {
 
 		symKey, privKey, err := t.filterKeys(filter)
 		if err != nil {
+			fmt.Println("[recovery-debug] receive filter key unavailable", "hash", cryptotypes.EncodeHex(msg.Hash), "chatID", filter.ChatID, "error", err)
 			continue
 		}
 
@@ -253,6 +256,7 @@ func (t *Transport) handleReceivedMessage(msg *wakutypes.ReceivedMessage) {
 
 		for _, filter := range group.filters {
 			t.bufferMessage(filter.FilterID, toMessage(decoded, filter, msg, group.privKey))
+			fmt.Println("[recovery-debug] envelope buffered for chat", "hash", cryptotypes.EncodeHex(msg.Hash), "chatID", filter.ChatID, "contentTopic", msg.ContentTopic)
 		}
 		matched = true
 		break // only one key can authenticate a given message
@@ -260,6 +264,8 @@ func (t *Transport) handleReceivedMessage(msg *wakutypes.ReceivedMessage) {
 
 	if matched {
 		t.matchedPublisher.Publish(struct{}{})
+	} else {
+		fmt.Println("[recovery-debug] received envelope not matched/decrypted", "hash", cryptotypes.EncodeHex(msg.Hash), "contentTopic", msg.ContentTopic, "candidateFilters", len(candidates), "listeningKeyGroups", len(groups))
 	}
 }
 
@@ -883,6 +889,7 @@ func (t *Transport) FetchMessagesByHashes(ctx context.Context, messageHashes []s
 	}
 
 	storenode := provider.GetActiveStorenode()
+	fmt.Println("[sds-debug] hash-fetch store selection", "peerID", storenode.ID, "addresses", storenode.Addrs, "hashes", messageHashes)
 	if storenode.ID == "" {
 		return errors.New("no active storenode")
 	}

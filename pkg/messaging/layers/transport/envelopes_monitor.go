@@ -2,6 +2,7 @@ package transport
 
 import (
 	"errors"
+	"fmt"
 	"sync"
 
 	"go.uber.org/zap"
@@ -111,10 +112,12 @@ func (m *EnvelopesMonitor) AddSDSAlias(applicationMessageID, sdsMessageID []byte
 	sdsKey := cryptotypes.HexBytes(sdsMessageID).String()
 	hashes, ok := m.messageEnvelopeHashes[applicationKey]
 	if !ok {
+		fmt.Println("[sds-debug] SDS alias not added: application hashes absent", "applicationID", applicationKey, "sdsID", sdsKey)
 		return
 	}
 	m.messageEnvelopeHashes[sdsKey] = hashes
 	m.sdsApplicationMessageIDs[sdsKey] = applicationKey
+	fmt.Println("[sds-debug] SDS envelope hashes tracked", "applicationID", applicationKey, "sdsID", sdsKey, "hashes", hashes)
 }
 
 // TakeApplicationMessageIDForSDS resolves and consumes an SDS delivery
@@ -134,6 +137,7 @@ func (m *EnvelopesMonitor) TakeApplicationMessageIDForSDS(sdsMessageID []byte) (
 	}
 	delete(m.sdsApplicationMessageIDs, sdsKey)
 	delete(m.messageEnvelopeHashes, sdsKey)
+	fmt.Println("[sds-debug] SDS confirmation deleted retrieval-hint hashes", "applicationID", applicationKey, "sdsID", sdsKey)
 	return applicationMessageID, true
 }
 
@@ -394,6 +398,7 @@ func (m *EnvelopesMonitor) clearMessageState(envelopeID cryptotypes.Hash) {
 		delete(m.messageEnvelopeHashes, messageKey)
 		for sdsKey, applicationKey := range m.sdsApplicationMessageIDs {
 			if applicationKey == messageKey {
+				fmt.Println("[sds-debug] envelope cleanup deleted retrieval-hint hashes", "applicationID", applicationKey, "sdsID", sdsKey, "envelopeHash", envelopeID)
 				delete(m.sdsApplicationMessageIDs, sdsKey)
 				delete(m.messageEnvelopeHashes, sdsKey)
 			}

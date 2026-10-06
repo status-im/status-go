@@ -46,6 +46,7 @@ var ErrNoFiltersForChat = errors.New("no filter registered for given chat")
 
 func (m *Messenger) shouldSync() (bool, error) {
 	if !m.started || !m.Online() {
+		fmt.Println("[history-debug] shouldSync=false", "started", m.started, "online", m.Online())
 		return false, nil
 	}
 
@@ -55,6 +56,7 @@ func (m *Messenger) shouldSync() (bool, error) {
 		return false, err
 	}
 	if !useMailserver {
+		fmt.Println("[history-debug] shouldSync=false: mailservers disabled")
 		return false, nil
 	}
 
@@ -241,6 +243,7 @@ func (m *Messenger) requestAllHistoricMessages(aggregateResponses bool) (*Messen
 
 func (m *Messenger) runAutomaticHistoricSync(request historicSyncRequest) (bool, error) {
 	if m.isPaused() {
+		fmt.Println("[history-debug] automatic sync skipped: messenger paused")
 		return false, nil
 	}
 	_, executed, err := m.requestAllHistoricMessagesWithOptions(false, syncFiltersOptions{
@@ -260,6 +263,7 @@ func (m *Messenger) requestAllHistoricMessagesWithOptions(aggregateResponses boo
 	}
 
 	if m.mailserversDatabase == nil {
+		fmt.Println("[history-debug] sync reports executed without query: mailservers database is nil")
 		return nil, true, nil
 	}
 
@@ -268,6 +272,7 @@ func (m *Messenger) requestAllHistoricMessagesWithOptions(aggregateResponses boo
 		return nil, false, err
 	}
 	if !canSync {
+		fmt.Println("[history-debug] historic sync skipped: store policy blocked")
 		return nil, false, nil
 	}
 
@@ -278,6 +283,7 @@ func (m *Messenger) requestAllHistoricMessagesWithOptions(aggregateResponses boo
 		}
 
 		filters := m.messaging.ChatFilters()
+		fmt.Println("[history-debug] historic sync filters", "count", len(filters), "window", options.Window)
 		err = m.updateFiltersPriority(filters)
 		if err != nil {
 			return nil, fmt.Errorf("failed to update filters priority: %w", err)
@@ -312,6 +318,7 @@ func (m *Messenger) withHistoricSyncInFlight(fn func() (*MessengerResponse, erro
 	if m.historicSyncInFlight {
 		m.historicSyncMu.Unlock()
 		m.logger.Debug("skip historic sync request (already in progress)")
+		fmt.Println("[history-debug] historic sync skipped: another sync in flight")
 		return nil, false, nil
 	}
 	m.historicSyncInFlight = true
@@ -364,6 +371,7 @@ func (m *Messenger) syncFiltersWithOptions(filters messagingtypes.ChatFilters, o
 		return nil, err
 	}
 	if !canSync {
+		fmt.Println("[history-debug] syncFilters skipped: store policy blocked")
 		return nil, nil
 	}
 
@@ -408,10 +416,12 @@ func (m *Messenger) syncFiltersWithOptions(filters messagingtypes.ChatFilters, o
 	if err != nil {
 		return nil, err
 	}
+	fmt.Println("[history-debug] building store batches", "filters", len(filters), "storedTopics", len(topicInfo), "defaultFromUnix", defaultPeriodFromNow, "to", to, "window", options.Window, "exactFromUnix", options.ExactFrom)
 
 	contentTopicsPerPubsubTopic := make(map[string]map[string]*messagingtypes.ChatFilter, len(filters))
 	for _, filter := range filters {
 		if !filter.IsListening() || filter.IsEphemeral() {
+			fmt.Println("[history-debug] filter excluded", "chatID", filter.ChatID(), "contentTopic", filter.ContentTopic(), "listening", filter.IsListening(), "ephemeral", filter.IsEphemeral())
 			continue
 		}
 
@@ -450,6 +460,7 @@ func (m *Messenger) syncFiltersWithOptions(filters messagingtypes.ChatFilters, o
 			// duplicates. Skip it here and fetch only the newest description
 			// (single page, newest-first) below. See status-im/status-app#21498.
 			if _, isCommunityDescription := communityDescriptionChatIDs[chatID]; isCommunityDescription {
+				fmt.Println("[history-debug] community description excluded from history batch", "chatID", chatID)
 				communityDescriptionFilters = append(communityDescriptionFilters, filter)
 				continue
 			}
@@ -507,7 +518,9 @@ func (m *Messenger) syncFiltersWithOptions(filters messagingtypes.ChatFilters, o
 					topicExists && topicData.LastRequest > 0,
 					options.Window,
 				)
+				fmt.Println("[history-debug] topic bounds", "chatID", chatID, "pubsubTopic", pubsubTopic, "contentTopic", filter.ContentTopic(), "existing", topicExists, "cursorUnix", topicData.LastRequest, "fromUnix", from, "toUnix", to.Unix(), "window", options.Window)
 				if int64(from) >= to.Unix() {
+					fmt.Println("[history-debug] topic skipped: from >= to", "chatID", chatID)
 					continue
 				}
 				batch = messagingtypes.StoreNodeBatch{From: time.Unix(int64(from), 0), To: to}
@@ -554,6 +567,7 @@ func (m *Messenger) syncFiltersWithOptions(filters messagingtypes.ChatFilters, o
 	}
 
 	if len(syncedTopics) > 0 {
+		fmt.Println("[history-debug] persisting topic cursors after store queries", "topics", syncedTopics)
 		err = m.mailserversDatabase.AddTopics(syncedTopics)
 		if err != nil {
 			return nil, err
@@ -693,7 +707,9 @@ func (m *Messenger) calculateGapForChat(chat *Chat, from uint32) (*common.Messag
 
 func (m *Messenger) canSyncWithStoreNodes() (bool, error) {
 	if m.connectionState.IsExpensive() {
-		return m.settings.CanSyncOnMobileNetwork()
+		allowed, err := m.settings.CanSyncOnMobileNetwork()
+		fmt.Println("[history-debug] expensive-network store policy", "allowed", allowed, "error", err)
+		return allowed, err
 	}
 	return true, nil
 }
@@ -712,10 +728,14 @@ func (m *Messenger) processMailserverBatch(batch messagingtypes.StoreNodeBatch) 
 		return err
 	}
 	if !canSync {
+		fmt.Println("[history-debug] batch skipped but returns nil: store policy blocked", "chatIDs", batch.ChatIDs, "from", batch.From, "to", batch.To)
 		return nil
 	}
 
-	return m.messaging.Query(m.ctx, batch, defaultStoreNodeRequestPageSize, nil, false)
+	fmt.Println("[history-debug] querying batch", "chatIDs", batch.ChatIDs, "pubsubTopic", batch.PubsubTopic, "topics", batch.Topics, "from", batch.From, "to", batch.To)
+	err = m.messaging.Query(m.ctx, batch, defaultStoreNodeRequestPageSize, nil, false)
+	fmt.Println("[history-debug] batch query finished", "chatIDs", batch.ChatIDs, "from", batch.From, "to", batch.To, "error", err)
+	return err
 }
 
 func (m *Messenger) processMailserverBatchWithOptions(batch messagingtypes.StoreNodeBatch, pageLimit uint64, shouldProcessNextPage func(int) (bool, uint64), processEnvelopes bool) error {

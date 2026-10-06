@@ -1672,6 +1672,7 @@ func (w *Waku) StoreQuery(
 	// (e.g. a queued historic sync firing before/around startup) — see #7620.
 	storeClient := w.currentStoreClient()
 	if storeClient == nil {
+		fmt.Println("[history-debug] StoreQuery failed: store client not initialized")
 		return ErrNoStorenodesReachable
 	}
 	return storeClient.Query(ctx, batch, pageLimit, shouldProcessNextPage, processEnvelopes)
@@ -1687,6 +1688,7 @@ func (w *Waku) GetActiveStorenode() peer.AddrInfo {
 }
 
 func (w *Waku) FetchMessagesByHashes(ctx context.Context, storenode peer.AddrInfo, messageHashes []string) error {
+	fmt.Println("[sds-debug] hash store fetch starting", "peerID", storenode.ID, "hashes", messageHashes)
 	if len(messageHashes) == 0 {
 		return nil
 	}
@@ -1695,6 +1697,7 @@ func (w *Waku) FetchMessagesByHashes(ctx context.Context, storenode peer.AddrInf
 	for _, messageHash := range messageHashes {
 		decodedHash, err := hexutil.Decode(messageHash)
 		if err != nil {
+			fmt.Println("[sds-debug] hash discarded: invalid hex", "hash", messageHash, "error", err)
 			w.logger.Debug("invalid message hash for storenode fetch", zap.String("messageHash", messageHash), zap.Error(err))
 			continue
 		}
@@ -1702,6 +1705,7 @@ func (w *Waku) FetchMessagesByHashes(ctx context.Context, storenode peer.AddrInf
 	}
 
 	if len(parsedHashes) == 0 {
+		fmt.Println("[sds-debug] hash store fetch returns nil without query: no valid hashes")
 		return nil
 	}
 
@@ -1710,6 +1714,7 @@ func (w *Waku) FetchMessagesByHashes(ctx context.Context, storenode peer.AddrInf
 	// Encapsulate the peer ID into the multiaddresses as expected by the missing API
 	encapsulatedAddrs := utils.EncapsulatePeerID(storenodeInfo.ID, storenodeInfo.Addrs...)
 	storenodeInfo.Addrs = encapsulatedAddrs
+	fmt.Println("[sds-debug] hash fetch peerstore addresses", "peerID", storenodeInfo.ID, "addresses", storenodeInfo.Addrs)
 
 	type hashRequestor interface {
 		GetMessagesByHash(ctx context.Context, peerInfo peer.AddrInfo, pageSize uint64, messageHashes []pb.MessageHash) (commonapi.StoreRequestResult, error)
@@ -1722,19 +1727,24 @@ func (w *Waku) FetchMessagesByHashes(ctx context.Context, storenode peer.AddrInf
 
 	result, err := requestor.GetMessagesByHash(ctx, storenodeInfo, uint64(len(parsedHashes)), parsedHashes)
 	if err != nil {
+		fmt.Println("[sds-debug] hash store request failed", "peerID", storenode.ID, "error", err)
 		return err
 	}
 
 	if result == nil {
+		fmt.Println("[sds-debug] hash store request returned nil result", "peerID", storenode.ID)
 		return nil
 	}
 
 	for {
 		messages := result.Messages()
+		fmt.Println("[sds-debug] hash store page response", "peerID", storenode.ID, "messages", len(messages), "complete", result.IsComplete())
 
 		for _, mkv := range messages {
 			envelope := protocol.NewEnvelope(mkv.Message, mkv.Message.GetTimestamp(), mkv.GetPubsubTopic())
+			fmt.Println("[sds-debug] fetched dependency envelope", "hash", envelope.Hash(), "timestampNs", mkv.Message.GetTimestamp(), "pubsubTopic", mkv.GetPubsubTopic(), "contentTopic", mkv.Message.GetContentTopic())
 			if err := w.OnNewEnvelopes(envelope, common.StoreMessageType, true); err != nil {
+				fmt.Println("[sds-debug] fetched dependency envelope rejected", "hash", envelope.Hash(), "error", err)
 				return err
 			}
 		}
@@ -1744,6 +1754,7 @@ func (w *Waku) FetchMessagesByHashes(ctx context.Context, storenode peer.AddrInf
 		}
 
 		if err := result.Next(ctx); err != nil {
+			fmt.Println("[sds-debug] hash store pagination failed", "peerID", storenode.ID, "error", err)
 			return err
 		}
 	}
