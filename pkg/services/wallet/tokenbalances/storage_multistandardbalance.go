@@ -39,13 +39,12 @@ func (s *StorageMultistandardBalance) GetBalances(ctx context.Context, tokens []
 					needsNative = true
 				}
 				if balance, exists := erc20balances[token.Address]; exists {
+					// nil: the fetch did not answer for the token. The reader keeps the
+					// last persisted value for it and reads zero only when there is none.
 					ret[chainID][account][token.Address] = balance
 				} else if erc20State.FetchedAt != multistandardbalance.NeverFetched {
-					// The fetch keeps zero balances, so a token missing from a fetched
-					// map is one the batch did not answer for. Report it as unknown
-					// (present, nil) rather than as zero: the reader keeps the last
-					// persisted value for it and reads zero only when there is none.
-					ret[chainID][account][token.Address] = nil
+					// Zero balances are not stored.
+					ret[chainID][account][token.Address] = new(big.Int)
 				}
 			}
 			if needsNative {

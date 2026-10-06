@@ -17,10 +17,11 @@ func (c *Controller) buildMultiStandardFetcherFetchConfigs(balancesToFetch map[B
 	for balancesKey, resultTypes := range balancesToFetch {
 		if _, exists := fetchConfigs[balancesKey.ChainID]; !exists {
 			fetchConfigs[balancesKey.ChainID] = multistandardfetcher.FetchConfig{
-				Native:  make([]AccountAddress, 0),
-				ERC20:   make(map[AccountAddress][]ContractAddress),
-				ERC721:  make(map[AccountAddress][]ContractAddress),
-				ERC1155: make(map[AccountAddress][]CollectibleID),
+				Native:                make([]AccountAddress, 0),
+				ERC20:                 make(map[AccountAddress][]ContractAddress),
+				ERC721:                make(map[AccountAddress][]ContractAddress),
+				ERC1155:               make(map[AccountAddress][]CollectibleID),
+				OmitZeroERC20Balances: true,
 			}
 		}
 
@@ -73,7 +74,7 @@ func (c *Controller) buildMultiStandardFetcherFetchConfigs(balancesToFetch map[B
 	return fetchConfigs
 }
 
-func (c *Controller) handleFetchResult(ctx context.Context, chainID uint64, fetchResult multistandardfetcher.FetchResult) {
+func (c *Controller) handleFetchResult(ctx context.Context, chainID uint64, config multistandardfetcher.FetchConfig, fetchResult multistandardfetcher.FetchResult) {
 	c.logger.Debug("processing result", zap.Uint64("chainID", chainID), zap.String("fetchResult.ResultType", string(fetchResult.ResultType)))
 	switch fetchResult.ResultType {
 	case multistandardfetcher.ResultTypeNative:
@@ -89,7 +90,7 @@ func (c *Controller) handleFetchResult(ctx context.Context, chainID uint64, fetc
 			c.logger.Error("failed to parse ERC20 result", zap.Any("result", fetchResult.Result))
 			return
 		}
-		c.handleERC20Result(ctx, chainID, result)
+		c.handleERC20Result(ctx, chainID, config.ERC20[result.Account], result)
 	case multistandardfetcher.ResultTypeERC721:
 		result, ok := fetchResult.Result.(multistandardfetcher.ERC721Result)
 		if !ok {
