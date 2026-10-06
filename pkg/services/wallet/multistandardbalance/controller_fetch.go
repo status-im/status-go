@@ -11,6 +11,8 @@ import (
 
 func (c *Controller) buildMultiStandardFetcherFetchConfigs(balancesToFetch map[BalancesKey][]multistandardfetcher.ResultType) map[uint64]multistandardfetcher.FetchConfig {
 	fetchConfigs := make(map[uint64]multistandardfetcher.FetchConfig)
+	// One token list per chain, shared by all the accounts of the fetch.
+	tokensByChain := make(map[uint64][]ContractAddress)
 
 	for balancesKey, resultTypes := range balancesToFetch {
 		if _, exists := fetchConfigs[balancesKey.ChainID]; !exists {
@@ -34,10 +36,15 @@ func (c *Controller) buildMultiStandardFetcherFetchConfigs(balancesToFetch map[B
 		}
 		if hasERC20 {
 			fetchConfig := fetchConfigs[balancesKey.ChainID]
-			tokens, err := c.tokenListProvider.GetTokenContractAddresses(balancesKey.ChainID)
-			if err != nil {
-				c.logger.Error("failed to get token contract addresses", zap.Error(err))
-				continue
+			tokens, ok := tokensByChain[balancesKey.ChainID]
+			if !ok {
+				var err error
+				tokens, err = c.tokenListProvider.GetTokenContractAddresses(balancesKey.ChainID)
+				if err != nil {
+					c.logger.Error("failed to get token contract addresses", zap.Error(err))
+					continue
+				}
+				tokensByChain[balancesKey.ChainID] = tokens
 			}
 			fetchConfig.ERC20[balancesKey.Account] = tokens
 			fetchConfigs[balancesKey.ChainID] = fetchConfig
