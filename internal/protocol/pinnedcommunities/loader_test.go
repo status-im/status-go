@@ -3,6 +3,7 @@ package pinnedcommunities
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -87,4 +88,20 @@ func TestEmbeddedPinnedCommunitiesAreImportable(t *testing.T) {
 				p.CommunityID, description.ID, p.FileName)
 		}
 	}
+}
+
+func TestLoadEmbeddedDoesNotCopyPayloads(t *testing.T) {
+	_, err := LoadEmbedded()
+	require.NoError(t, err)
+
+	var before, after runtime.MemStats
+	runtime.GC()
+	runtime.ReadMemStats(&before)
+	payloads, err := LoadEmbedded()
+	runtime.ReadMemStats(&after)
+	require.NoError(t, err)
+	require.NotEmpty(t, payloads)
+
+	allocated := after.TotalAlloc - before.TotalAlloc
+	require.Less(t, allocated, uint64(64*1024), "LoadEmbedded allocated %d KiB", allocated>>10)
 }

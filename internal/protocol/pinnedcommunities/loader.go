@@ -1,6 +1,7 @@
 package pinnedcommunities
 
 import (
+	"bytes"
 	"encoding/hex"
 	"fmt"
 	"io/fs"
@@ -12,7 +13,10 @@ import (
 	"github.com/status-im/status-go/internal/protocol/pinnedcommunities/assets"
 )
 
-const RawPayloadHexSuffix = ".rawpayload.hex"
+const (
+	RawPayloadSuffix    = ".rawpayload"
+	RawPayloadHexSuffix = ".rawpayload.hex"
+)
 
 type Payload struct {
 	CommunityID string
@@ -20,9 +24,24 @@ type Payload struct {
 	FileName    string
 }
 
-// LoadEmbedded returns pinned communities shipped inside the binary.
+// LoadEmbedded returns pinned communities shipped inside the binary, sorted by community ID.
+// RawPayload aliases the embedded bytes and must not be modified.
 func LoadEmbedded() ([]Payload, error) {
-	return loadFromFS(assets.FS, ".")
+	ids := make([]string, 0, len(assets.Payloads))
+	for id := range assets.Payloads {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+
+	payloads := make([]Payload, 0, len(ids))
+	for _, id := range ids {
+		payloads = append(payloads, Payload{
+			CommunityID: id,
+			RawPayload:  assets.Payloads[id],
+			FileName:    id + RawPayloadSuffix,
+		})
+	}
+	return payloads, nil
 }
 
 // LoadFromDir reads all *.rawpayload.hex files and returns decoded payloads.
@@ -63,19 +82,20 @@ func loadFromFS(fsys fs.FS, dir string) ([]Payload, error) {
 			return nil, fmt.Errorf("read pinned community payload %q: %w", name, err)
 		}
 
-		hexString := strings.TrimSpace(string(rawHex))
-		if hexString == "" {
+		rawHex = bytes.TrimSpace(rawHex)
+		if len(rawHex) == 0 {
 			return nil, fmt.Errorf("invalid pinned community payload %q: empty content", name)
 		}
 
-		decoded, err := hex.DecodeString(hexString)
+		// Decode in place: the payloads are megabytes and the hex buffer is not needed afterwards.
+		n, err := hex.Decode(rawHex, rawHex)
 		if err != nil {
 			return nil, fmt.Errorf("decode pinned community payload %q: %w", name, err)
 		}
 
 		payloads = append(payloads, Payload{
 			CommunityID: communityID,
-			RawPayload:  decoded,
+			RawPayload:  rawHex[:n],
 			FileName:    name,
 		})
 	}
