@@ -24,7 +24,8 @@ The payloads are encoded using [protocol-buffers](https://developers.google.com/
 Source precedence:
 
 1. If `STATUS_GO_PINNED_COMMUNITIES_DIR` is set, payloads are loaded from that directory (`*.rawpayload.hex`).
-2. Otherwise, payloads embedded in the binary from `pinned-communities/*.rawpayload.hex` are used.
+2. Otherwise, the raw payloads embedded in the binary from `pinnedcommunities/assets/*.rawpayload` are used
+   (registered in `assets/embedded.go`). Convert a hex dump with `xxd -r -p <id>.rawpayload.hex > <id>.rawpayload`.
 
 Runtime behavior:
 
