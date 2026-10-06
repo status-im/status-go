@@ -281,38 +281,27 @@ func TestMergeERC20Balances(t *testing.T) {
 	a := common.HexToAddress("0x1")
 	b := common.HexToAddress("0x2")
 	c := common.HexToAddress("0x3")
-	d := common.HexToAddress("0x4")
 
-	t.Run("zero balances are not stored", func(t *testing.T) {
+	t.Run("zero and missing balances are not stored", func(t *testing.T) {
 		previous := map[common.Address]*big.Int{a: big.NewInt(10)}
 		fetched := map[common.Address]*big.Int{b: big.NewInt(0), c: big.NewInt(5)}
-		merged, failed := mergeERC20Balances([]common.Address{a, b, c}, previous, fetched, nil)
-		assert.Equal(t, 0, failed)
+		merged := mergeERC20Balances(previous, fetched, nil)
 		assert.Equal(t, map[common.Address]*big.Int{c: big.NewInt(5)}, merged)
 	})
 
 	t.Run("a token whose call failed keeps its stored entry", func(t *testing.T) {
-		previous := map[common.Address]*big.Int{a: big.NewInt(10), b: nil}
-		merged, failed := mergeERC20Balances([]common.Address{a, b, c}, previous, nil, []common.Address{a, b})
-		assert.Equal(t, 2, failed)
+		previous := map[common.Address]*big.Int{a: big.NewInt(10), b: nil, c: big.NewInt(30)}
+		merged := mergeERC20Balances(previous, nil, []common.Address{a, b})
 		assert.Equal(t, map[common.Address]*big.Int{a: big.NewInt(10), b: nil}, merged)
 	})
 
 	t.Run("a token whose call failed and nothing stored is unknown", func(t *testing.T) {
 		fetched := map[common.Address]*big.Int{a: big.NewInt(1)}
-		merged, failed := mergeERC20Balances([]common.Address{a, b}, nil, fetched, []common.Address{b})
-		assert.Equal(t, 1, failed)
+		merged := mergeERC20Balances(nil, fetched, []common.Address{b})
 		value, present := merged[b]
 		assert.True(t, present)
 		assert.Nil(t, value)
 		assert.Equal(t, big.NewInt(1), merged[a])
-	})
-
-	t.Run("a token the fetch did not ask for keeps its stored entry", func(t *testing.T) {
-		previous := map[common.Address]*big.Int{a: big.NewInt(10), d: big.NewInt(40)}
-		merged, failed := mergeERC20Balances([]common.Address{a}, previous, nil, nil)
-		assert.Equal(t, 0, failed)
-		assert.Equal(t, map[common.Address]*big.Int{d: big.NewInt(40)}, merged)
 	})
 }
 
