@@ -11,7 +11,7 @@ import (
 	"github.com/status-im/status-go/internal/logutils"
 )
 
-func (c *Controller) handleERC20Result(ctx context.Context, chainID uint64, requested []ContractAddress, result multistandardfetcher.ERC20Result) {
+func (c *Controller) handleERC20Result(ctx context.Context, chainID uint64, result multistandardfetcher.ERC20Result) {
 	key := BalancesKey{Account: result.Account, ChainID: chainID}
 	resultType := multistandardfetcher.ResultTypeERC20
 
@@ -33,9 +33,9 @@ func (c *Controller) handleERC20Result(ctx context.Context, chainID uint64, requ
 	if prevErr != nil {
 		previous = nil
 	}
-	balances, failed := mergeERC20Balances(requested, previous, result.Results, result.Failed)
-	if failed > 0 {
-		c.logger.Warn("ERC20 balances missing from the fetch result, keeping the last known ones", zap.String("address", logutils.TruncateWithDot(key.Account.String())), zap.Uint64("chainID", key.ChainID), zap.Int("failed", failed), zap.Int("requested", len(requested)))
+	balances := mergeERC20Balances(previous, result.Results, result.Failed)
+	if len(result.Failed) > 0 {
+		c.logger.Warn("ERC20 balance calls failed, keeping the last known balances", zap.String("address", logutils.TruncateWithDot(key.Account.String())), zap.Uint64("chainID", key.ChainID), zap.Int("failed", len(result.Failed)))
 	}
 	balanceChanged, oldState, err := c.storage.UpdateERC20Balances(ctx, key, balances, state)
 	if err != nil {
