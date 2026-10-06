@@ -277,39 +277,48 @@ func TestIsBigIntMapEqualWithDifferentTypes(t *testing.T) {
 	assert.True(t, isBigIntMapEqual(collectibleMap1, collectibleMap2))
 }
 
-func TestKeepLastKnownBalances(t *testing.T) {
+func TestMergeERC20Balances(t *testing.T) {
 	a := common.HexToAddress("0x1")
 	b := common.HexToAddress("0x2")
 	c := common.HexToAddress("0x3")
+	d := common.HexToAddress("0x4")
 
-	t.Run("a token the batch did not answer keeps its last known balance", func(t *testing.T) {
-		previous := map[common.Address]*big.Int{a: big.NewInt(10), b: big.NewInt(20)}
-		fetched := map[common.Address]*big.Int{a: big.NewInt(11)}
-		merged, kept := keepLastKnownBalances(previous, fetched)
-		assert.Equal(t, 1, kept)
-		assert.Equal(t, big.NewInt(11), merged[a]) // answered: the fresh value wins
-		assert.Equal(t, big.NewInt(20), merged[b]) // unanswered: carried over
-	})
-
-	t.Run("an answered zero is a real zero, not a miss", func(t *testing.T) {
+	t.Run("zero balances are not stored", func(t *testing.T) {
 		previous := map[common.Address]*big.Int{a: big.NewInt(10)}
-		fetched := map[common.Address]*big.Int{a: big.NewInt(0)}
-		merged, kept := keepLastKnownBalances(previous, fetched)
-		assert.Equal(t, 0, kept)
-		assert.Equal(t, big.NewInt(0), merged[a])
+		fetched := map[common.Address]*big.Int{b: big.NewInt(0), c: big.NewInt(5)}
+		merged, failed := mergeERC20Balances([]common.Address{a, b, c}, previous, fetched, nil)
+		assert.Equal(t, 0, failed)
+		assert.Equal(t, map[common.Address]*big.Int{c: big.NewInt(5)}, merged)
 	})
 
-	t.Run("nothing stored yet leaves the result untouched", func(t *testing.T) {
-		fetched := map[common.Address]*big.Int{c: big.NewInt(5)}
-		merged, kept := keepLastKnownBalances(nil, fetched)
-		assert.Equal(t, 0, kept)
-		assert.Equal(t, fetched, merged)
+	t.Run("a token whose call failed keeps its stored entry", func(t *testing.T) {
+		previous := map[common.Address]*big.Int{a: big.NewInt(10), b: nil}
+		merged, failed := mergeERC20Balances([]common.Address{a, b, c}, previous, nil, []common.Address{a, b})
+		assert.Equal(t, 2, failed)
+		assert.Equal(t, map[common.Address]*big.Int{a: big.NewInt(10), b: nil}, merged)
 	})
 
-	t.Run("a nil result still carries the stored balances", func(t *testing.T) {
-		previous := map[common.Address]*big.Int{a: big.NewInt(10)}
-		merged, kept := keepLastKnownBalances(previous, nil)
-		assert.Equal(t, 1, kept)
-		assert.Equal(t, big.NewInt(10), merged[a])
+	t.Run("a token whose call failed and nothing stored is unknown", func(t *testing.T) {
+		fetched := map[common.Address]*big.Int{a: big.NewInt(1)}
+		merged, failed := mergeERC20Balances([]common.Address{a, b}, nil, fetched, []common.Address{b})
+		assert.Equal(t, 1, failed)
+		value, present := merged[b]
+		assert.True(t, present)
+		assert.Nil(t, value)
+		assert.Equal(t, big.NewInt(1), merged[a])
 	})
+
+	t.Run("a token the fetch did not ask for keeps its stored entry", func(t *testing.T) {
+		previous := map[common.Address]*big.Int{a: big.NewInt(10), d: big.NewInt(40)}
+		merged, failed := mergeERC20Balances([]common.Address{a}, previous, nil, nil)
+		assert.Equal(t, 0, failed)
+		assert.Equal(t, map[common.Address]*big.Int{d: big.NewInt(40)}, merged)
+	})
+}
+
+func TestIsBigIntMapEqual_NilValues(t *testing.T) {
+	a := common.HexToAddress("0x1")
+	assert.True(t, isBigIntMapEqual(map[common.Address]*big.Int{a: nil}, map[common.Address]*big.Int{a: nil}))
+	assert.False(t, isBigIntMapEqual(map[common.Address]*big.Int{a: nil}, map[common.Address]*big.Int{a: big.NewInt(0)}))
+	assert.False(t, isBigIntMapEqual(map[common.Address]*big.Int{a: big.NewInt(0)}, map[common.Address]*big.Int{a: nil}))
 }

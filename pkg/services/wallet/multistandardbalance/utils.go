@@ -23,26 +23,38 @@ func deleteChainsNotInList[T any](m map[BalancesKey]T, chains []uint64) {
 	}
 }
 
-// keepLastKnownBalances carries the previously stored balance of every token the
-// new fetch did not answer. A batched balance fetch (multicall with
-// requireSuccess=false) drops the sub-calls that failed, so a token can be
-// missing from the result although it is still in the token list. Storing the
-// result as-is would make the reader report that token as a hard zero (no
-// error) until a later fetch answers it again. Returns the merged map and how
-// many tokens were carried over.
-func keepLastKnownBalances[T comparable](previous map[T]*big.Int, fetched map[T]*big.Int) (map[T]*big.Int, int) {
+// mergeERC20Balances builds the ERC20 balances to store from a fetch result,
+// reusing the fetched map. Zero balances are not stored: a token missing from
+// the map reads as zero. A batched fetch (multicall with requireSuccess=false)
+// drops the sub-calls that failed; such a token keeps its stored entry, or is
+// stored as nil (unknown) when there is none, rather than reading as a hard zero
+// until a later fetch answers it. So does a stored token the fetch did not ask
+// for. Returns the map and how many calls failed.
+func mergeERC20Balances(requested []ContractAddress, previous, fetched map[ContractAddress]*big.Int, failed []ContractAddress) (map[ContractAddress]*big.Int, int) {
 	if fetched == nil {
-		fetched = make(map[T]*big.Int)
+		fetched = make(map[ContractAddress]*big.Int)
 	}
-	kept := 0
-	for token, balance := range previous {
-		if _, answered := fetched[token]; answered {
-			continue
+	for token, balance := range fetched {
+		if balance == nil || balance.Sign() == 0 {
+			delete(fetched, token)
 		}
-		fetched[token] = balance
-		kept++
 	}
-	return fetched, kept
+	for _, token := range failed {
+		fetched[token] = previous[token]
+	}
+	if len(previous) > 0 {
+		notRequested := make(map[ContractAddress]struct{}, len(previous))
+		for token := range previous {
+			notRequested[token] = struct{}{}
+		}
+		for _, token := range requested {
+			delete(notRequested, token)
+		}
+		for token := range notRequested {
+			fetched[token] = previous[token]
+		}
+	}
+	return fetched, len(failed)
 }
 
 func isBigIntMapEqual[T comparable](m1 map[T]*big.Int, m2 map[T]*big.Int) bool {
@@ -53,6 +65,12 @@ func isBigIntMapEqual[T comparable](m1 map[T]*big.Int, m2 map[T]*big.Int) bool {
 		v2, ok := m2[k]
 		if !ok {
 			return false
+		}
+		if v1 == nil || v2 == nil {
+			if v1 != v2 {
+				return false
+			}
+			continue
 		}
 		if v1.Cmp(v2) != 0 {
 			return false
