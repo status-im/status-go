@@ -4,9 +4,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"text/template"
 	"time"
@@ -62,41 +64,57 @@ func validateDocument(doc string, schemaURL string) (bool, error) {
 	return true, nil
 }
 
+var (
+	osExit           = os.Exit
+	createTempOutput = func(dir, pattern string) (string, io.WriteCloser, error) {
+		file, err := os.CreateTemp(dir, pattern)
+		if err != nil {
+			return "", nil, err
+		}
+		return file.Name(), file, nil
+	}
+	tokenSources = defaulttokenlists.TokensSources
+)
+
 func main() {
 	client := &http.Client{Timeout: time.Minute}
+	failed := false
 
-	for key, source := range defaulttokenlists.TokensSources {
-		downloadTokens(client, key, source)
+	for key, source := range tokenSources {
+		if err := downloadTokens(client, key, source); err != nil {
+			fmt.Fprintf(os.Stderr, "ERR: [%s] %v\n", key, err)
+			failed = true
+		}
+	}
+
+	if failed {
+		osExit(1)
 	}
 }
 
-func downloadTokens(client *http.Client, key string, source defaulttokenlists.TokensSource) {
+func downloadTokens(client *http.Client, key string, source defaulttokenlists.TokensSource) error {
 	response, err := client.Get(source.SourceURL)
 	if err != nil {
-		fmt.Printf("[%s] failed to fetch tokens: %v\n", key, err)
-		return
+		return fmt.Errorf("failed to fetch tokens: %w", err)
 	}
 	defer response.Body.Close()
 
 	body, err := ioutil.ReadAll(response.Body)
 	if err != nil {
-		fmt.Printf("[%s] failed to read tokens: %v\n", key, err)
-		return
+		return fmt.Errorf("failed to read tokens: %w", err)
+	}
+	if response.StatusCode != http.StatusOK {
+		return fmt.Errorf("unexpected status %s", response.Status)
 	}
 
-	// check if body is valid json
 	var jsonData map[string]interface{}
-	err = json.Unmarshal(body, &jsonData)
-	if err != nil {
-		fmt.Printf("ERR: [%s] failed to unmarshal body: %v\n", key, err)
-		body = []byte{}
+	if err = json.Unmarshal(body, &jsonData); err != nil {
+		return fmt.Errorf("failed to unmarshal body: %w", err)
 	}
 
-	if source.Schema != "" && len(body) > 0 {
-		_, err = validateDocument(string(body), source.Schema)
-		if err != nil {
-			fmt.Printf("ERR: [%s] failed to validate token list against schema: %v\n", key, err)
-			body = []byte{}
+	if source.Schema != "" {
+		if _, err = validateDocument(string(body), source.Schema); err != nil {
+			return fmt.Errorf("failed to validate token list against schema: %w", err)
 		}
 	}
 
@@ -117,24 +135,43 @@ func downloadTokens(client *http.Client, key string, source defaulttokenlists.To
 
 	tmpl := template.Must(template.New("tokenList").Parse(templateText))
 
-	// Create the output Go file
-	file, err := os.Create(source.OutputFile)
-	if err != nil {
-		fmt.Printf("ERR: [%s] failed to create go file: %v\n", key, err)
-		return
-	}
-	defer file.Close()
-
-	// Execute the template with the tokens data and write the result to the file
-	err = tmpl.Execute(file, data)
-	if err != nil {
-		fmt.Printf("ERR: [%s] failed to write file: %v\n", key, err)
-		return
+	if err = writeGeneratedFile(source.OutputFile, tmpl, data); err != nil {
+		return err
 	}
 
-	if len(body) > 0 {
-		fmt.Printf("INFO: [%s] downloaded tokens successfully\n", key)
-	} else {
-		fmt.Printf("WARN: [%s] stored with empty token list\n", key)
+	fmt.Printf("INFO: [%s] downloaded tokens successfully\n", key)
+	return nil
+}
+
+func writeGeneratedFile(path string, tmpl *template.Template, data templateData) error {
+	tmpName, file, err := createTempOutput(filepath.Dir(path), "."+filepath.Base(path)+".*")
+	if err != nil {
+		return fmt.Errorf("failed to create go file: %w", err)
 	}
+
+	closed := false
+	renamed := false
+	defer func() {
+		if !closed {
+			_ = file.Close()
+		}
+		if !renamed {
+			_ = os.Remove(tmpName)
+		}
+	}()
+
+	if err = tmpl.Execute(file, data); err != nil {
+		return fmt.Errorf("failed to write file: %w", err)
+	}
+	if err = file.Close(); err != nil {
+		closed = true
+		return fmt.Errorf("failed to write file: %w", err)
+	}
+	closed = true
+
+	if err = os.Rename(tmpName, path); err != nil {
+		return fmt.Errorf("failed to replace go file: %w", err)
+	}
+	renamed = true
+	return nil
 }
