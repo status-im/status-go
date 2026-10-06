@@ -107,7 +107,7 @@ BUILD_TAGS ?= gowaku_no_rln
 # `nim-sds` variables
 
 # Pin nim-sds revision here. Can be a tag or commit hash.
-NIM_SDS_VERSION ?= 8ccee6e84f12506c66b27dc36c06e8a6ddcf20a0
+NIM_SDS_VERSION ?= 4b08d508dbfa69c0e2e3883db67adf1fe5a0c994
 
 NIMBLE ?= nimble
 
