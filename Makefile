@@ -521,8 +521,8 @@ generate-contracts:
 
 download-tokens:
 	echo "Downloading token lists..."; \
-	GOROOT=$$(go env GOROOT) GOFLAGS="-mod=mod" go run ./pkg/services/wallet/token/local-token-lists/default-lists/downloader/main.go; \
-	echo "token list downloaded successfully"; \
+	GOROOT=$$(go env GOROOT) GOWORK=off go run -mod=mod ./pkg/services/wallet/token/local-token-lists/default-lists/downloader/main.go && \
+	echo "token list downloaded successfully"
 
 analyze-token-stores:
 	go run -mod=mod ./pkg/services/wallet/token/local-token-lists/analyzer/main.go
