@@ -12,8 +12,10 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
+	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/internal/crypto/types"
+	"github.com/status-im/status-go/internal/logutils"
 	"github.com/status-im/status-go/internal/rpc"
 	"github.com/status-im/status-go/internal/transactions"
 	"github.com/status-im/status-go/pkg/security"
@@ -322,6 +324,32 @@ func relayStepValue(data relay.StepTxData, params ProcessorInputParams) *big.Int
 	return big.NewInt(0)
 }
 
+// An ERC20 step cannot be simulated until the approval is mined, and Relay quotes
+// no gas limit for it either (its own simulation fails the same way). This stands in
+// for the fee shown until the route is re-evaluated after the approval.
+const relayDefaultERC20GasLimit = 500_000
+
+// relayFallbackGas is the gas limit for a step the node cannot estimate yet: the limit
+// Relay quoted on the step, else the one behind Relay's origin-chain gas fee (fee /
+// fee cap it quoted, when the fee is in the native token), else a conservative
+// default. The second value names the source.
+func relayFallbackGas(quote *relay.Quote, data relay.StepTxData) (uint64, string) {
+	if gas, ok := relayStepGas(data); ok {
+		return gas, "quoted"
+	}
+	fee := quote.Fees.Gas
+	feeCap := data.MaxFeePerGas
+	feeInNative := strings.EqualFold(fee.Currency.Address, walletCommon.ZeroAddress().Hex())
+	if feeInNative && fee.Amount != nil && fee.Amount.Int != nil && fee.Amount.Sign() > 0 &&
+		feeCap != nil && feeCap.Int != nil && feeCap.Sign() > 0 {
+		derived := new(big.Int).Div(fee.Amount.Int, feeCap.Int)
+		if derived.IsUint64() && derived.Uint64() > 0 {
+			return derived.Uint64(), "fee"
+		}
+	}
+	return relayDefaultERC20GasLimit, "default"
+}
+
 func relayStepGas(data relay.StepTxData) (uint64, bool) {
 	if data.Gas == nil || data.Gas.Int == nil || !data.Gas.IsUint64() || data.Gas.Uint64() == 0 {
 		return 0, false
@@ -330,8 +358,6 @@ func relayStepGas(data relay.StepTxData) (uint64, bool) {
 }
 
 func (s *RelayProcessor) EstimateGas(params ProcessorInputParams, input []byte) (uint64, error) {
-	isNative := params.FromToken.IsNative()
-
 	quote, err := s.getOrFetchQuote(params)
 	if err != nil {
 		return 0, err
@@ -357,25 +383,38 @@ func (s *RelayProcessor) EstimateGas(params ProcessorInputParams, input []byte) 
 
 	estimation, err := ethClient.EstimateGas(context.Background(), msg)
 	if err != nil {
-		// ERC20 estimation reverts before approval; fall back to the gas Relay quoted (when it does).
-		if isNative {
-			return 0, createRelayErrorResponse(err)
-		}
-		quotedGas, ok := relayStepGas(data)
-		if !ok {
-			return 0, createRelayErrorResponse(err)
-		}
-		estimation = quotedGas
+		// An ERC20 step reverts until its approval is mined; the router knows when that
+		// is the case and asks GasBeforeApproval instead of treating this as a failure.
+		return 0, createRelayErrorResponse(err)
 	}
 
-	gasFactor := pathProcessorCommon.IncreaseEstimatedGasFactor
+	return uint64(float64(estimation) * s.relayGasFactor(params)), nil
+}
+
+func (s *RelayProcessor) relayGasFactor(params ProcessorInputParams) float64 {
 	if isRelayBridge(params) {
-		gasFactor = pathProcessorCommon.IncreaseEstimatedGasFactorForBridge
+		return pathProcessorCommon.IncreaseEstimatedGasFactorForBridge
 	}
+	return pathProcessorCommon.IncreaseEstimatedGasFactor
+}
 
-	increasedEstimation := float64(estimation) * gasFactor
-
-	return uint64(increasedEstimation), nil
+// GasBeforeApproval implements ApprovalPendingGasEstimator: the stand-in gas limit for
+// the main step while the allowance it needs is not granted yet.
+func (s *RelayProcessor) GasBeforeApproval(params ProcessorInputParams) (uint64, bool) {
+	quote, err := s.getOrFetchQuote(params)
+	if err != nil {
+		return 0, false
+	}
+	main, err := relayMainStep(quote)
+	if err != nil {
+		return 0, false
+	}
+	gas, source := relayFallbackGas(quote, main.Items[0].Data)
+	logutils.ZapLogger().Debug("relay: main step not estimable before approval, using a stand-in gas limit",
+		zap.String("requestId", quote.RequestID),
+		zap.Uint64("gasLimit", gas),
+		zap.String("source", source))
+	return uint64(float64(gas) * s.relayGasFactor(params)), true
 }
 
 func (s *RelayProcessor) fetchAndStoreQuoteFromSendTxArgs(sendArgs *wallettypes.SendTxArgs) (*relay.Quote, error) {

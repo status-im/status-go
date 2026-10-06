@@ -448,7 +448,7 @@ func TestRelayEstimateGas(t *testing.T) {
 		require.Equal(t, uint64(float64(21000)*pathProcessorCommon.IncreaseEstimatedGasFactorForBridge), estimation)
 	})
 
-	t.Run("erc20 estimation error falls back to the quoted gas", func(t *testing.T) {
+	t.Run("erc20 estimation error is propagated; the router asks for the gas before approval instead", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 		processor, mockEthClient := newProcessorWithEthClient(t, ctrl)
@@ -460,25 +460,7 @@ func TestRelayEstimateGas(t *testing.T) {
 		processor.quotes.Store(pathProcessorCommon.MakeKey(fromToken.Key(), toToken.Key(), amountIn), &quote)
 
 		mockEthClient.EXPECT().EstimateGas(gomock.Any(), gomock.Any()).
-			Return(uint64(0), errors.New("execution reverted: ERC20: transfer amount exceeds allowance"))
-
-		estimation, err := processor.EstimateGas(p, []byte{})
-		require.NoError(t, err)
-		require.Equal(t, uint64(float64(150000)*pathProcessorCommon.IncreaseEstimatedGasFactor), estimation)
-	})
-
-	t.Run("erc20 estimation error without quoted gas is propagated", func(t *testing.T) {
-		ctrl := gomock.NewController(t)
-		defer ctrl.Finish()
-		processor, mockEthClient := newProcessorWithEthClient(t, ctrl)
-
-		fromToken := relayUsdcToken(walletCommon.EthereumMainnet)
-		toToken := relayNativeToken(walletCommon.EthereumMainnet)
-		p := relayInputParams(&fromToken, &toToken, amountIn)
-		quote := relayQuoteWith(relayTxStep("swap", relayTestRouter, "0xabcd", big.NewInt(0), nil, walletCommon.EthereumMainnet))
-		processor.quotes.Store(pathProcessorCommon.MakeKey(fromToken.Key(), toToken.Key(), amountIn), &quote)
-
-		mockEthClient.EXPECT().EstimateGas(gomock.Any(), gomock.Any()).Return(uint64(0), errors.New("execution reverted"))
+			Return(uint64(0), errors.New("execution reverted: O\xd3\xaf\x07")) // NotEnoughAllowance()
 
 		_, err := processor.EstimateGas(p, []byte{})
 		require.Error(t, err)
@@ -499,6 +481,89 @@ func TestRelayEstimateGas(t *testing.T) {
 
 		_, err := processor.EstimateGas(p, []byte{})
 		require.Error(t, err)
+	})
+}
+
+// While the allowance is not granted the main step cannot be simulated and Relay
+// quotes no gas limit for it either; the stand-in is read off what the quote carries.
+func TestRelayGasBeforeApproval(t *testing.T) {
+	amountIn := big.NewInt(1000)
+	fromToken := relayUsdcToken(walletCommon.EthereumMainnet)
+	key := func(toToken *tokentypes.Token) string {
+		return pathProcessorCommon.MakeKey(fromToken.Key(), toToken.Key(), amountIn)
+	}
+
+	t.Run("the gas limit Relay quoted on the step", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		processor, _ := newRelayTestProcessor(t, ctrl)
+		toToken := relayNativeToken(walletCommon.EthereumMainnet)
+		quote := relayQuoteWith(relayTxStep("swap", relayTestRouter, "0xabcd", big.NewInt(0), big.NewInt(150000), walletCommon.EthereumMainnet))
+		processor.quotes.Store(key(&toToken), &quote)
+
+		gas, ok := processor.GasBeforeApproval(relayInputParams(&fromToken, &toToken, amountIn))
+		require.True(t, ok)
+		require.Equal(t, uint64(float64(150000)*pathProcessorCommon.IncreaseEstimatedGasFactor), gas)
+	})
+
+	t.Run("else the limit behind the native gas fee Relay quoted", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		processor, _ := newRelayTestProcessor(t, ctrl)
+		toToken := relayNativeToken(walletCommon.OptimismMainnet) // a bridge: bridge gas factor
+		quote := relayQuoteWith(relayTxStep("deposit", relayTestRouter, "0xabcd", big.NewInt(0), nil, walletCommon.EthereumMainnet))
+		quote.Steps[0].Items[0].Data.MaxFeePerGas = &bigint.BigInt{Int: big.NewInt(2_000_000_000)} // 2 gwei
+		quote.Fees.Gas = relay.CurrencyAmount{
+			Currency: relay.Currency{Address: walletCommon.ZeroAddress().Hex()},
+			Amount:   &bigint.BigInt{Int: big.NewInt(600_000_000_000_000)}, // 300k gas at 2 gwei
+		}
+		processor.quotes.Store(key(&toToken), &quote)
+
+		gas, ok := processor.GasBeforeApproval(relayInputParams(&fromToken, &toToken, amountIn))
+		require.True(t, ok)
+		require.Equal(t, uint64(float64(300_000)*pathProcessorCommon.IncreaseEstimatedGasFactorForBridge), gas)
+	})
+
+	t.Run("a gas fee not in the native token is not divided by the fee cap", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		processor, _ := newRelayTestProcessor(t, ctrl)
+		toToken := relayNativeToken(walletCommon.EthereumMainnet)
+		quote := relayQuoteWith(relayTxStep("swap", relayTestRouter, "0xabcd", big.NewInt(0), nil, walletCommon.EthereumMainnet))
+		quote.Steps[0].Items[0].Data.MaxFeePerGas = &bigint.BigInt{Int: big.NewInt(2_000_000_000)}
+		quote.Fees.Gas = relay.CurrencyAmount{
+			Currency: relay.Currency{Address: fromToken.Address.Hex()},
+			Amount:   &bigint.BigInt{Int: big.NewInt(600_000_000_000_000)},
+		}
+		processor.quotes.Store(key(&toToken), &quote)
+
+		gas, ok := processor.GasBeforeApproval(relayInputParams(&fromToken, &toToken, amountIn))
+		require.True(t, ok)
+		require.Equal(t, uint64(float64(relayDefaultERC20GasLimit)*pathProcessorCommon.IncreaseEstimatedGasFactor), gas)
+	})
+
+	t.Run("else a conservative default", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		processor, _ := newRelayTestProcessor(t, ctrl)
+		toToken := relayNativeToken(walletCommon.EthereumMainnet)
+		quote := relayQuoteWith(relayTxStep("swap", relayTestRouter, "0xabcd", big.NewInt(0), nil, walletCommon.EthereumMainnet))
+		processor.quotes.Store(key(&toToken), &quote)
+
+		gas, ok := processor.GasBeforeApproval(relayInputParams(&fromToken, &toToken, amountIn))
+		require.True(t, ok)
+		require.Equal(t, uint64(float64(relayDefaultERC20GasLimit)*pathProcessorCommon.IncreaseEstimatedGasFactor), gas)
+	})
+
+	t.Run("nothing without a quote", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		processor, client := newRelayTestProcessor(t, ctrl)
+		toToken := relayNativeToken(walletCommon.EthereumMainnet)
+		client.EXPECT().FetchQuote(gomock.Any(), gomock.Any()).Return(relay.Quote{}, errors.New("network down"))
+
+		_, ok := processor.GasBeforeApproval(relayInputParams(&fromToken, &toToken, amountIn))
+		require.False(t, ok)
 	})
 }
 

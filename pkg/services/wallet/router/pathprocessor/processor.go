@@ -40,6 +40,15 @@ type PathProcessorClearable interface {
 	Clear()
 }
 
+// ApprovalPendingGasEstimator is implemented by processors that can name a gas limit
+// for the main tx while it cannot be simulated yet because the approval it needs is
+// not mined. The router asks for it only once the allowance is known to be too low.
+type ApprovalPendingGasEstimator interface {
+	// GasBeforeApproval returns the gas limit to show until the approval is mined,
+	// and whether the processor has one.
+	GasBeforeApproval(params ProcessorInputParams) (uint64, bool)
+}
+
 // ensResolverIface is the subset of ensresolver.EnsResolver used by the ENS processors,
 // so tests can substitute a fake.
 type ensResolverIface interface {
