@@ -39,6 +39,28 @@ func TestDownloadTokensSuccess(t *testing.T) {
 	entries, err := os.ReadDir(filepath.Dir(output))
 	require.NoError(t, err)
 	require.Len(t, entries, 1)
+
+	info, err := os.Stat(output)
+	require.NoError(t, err)
+	require.Equal(t, os.FileMode(0o644), info.Mode().Perm())
+}
+
+func TestDownloadTokensPreservesExistingFileMode(t *testing.T) {
+	output := filepath.Join(t.TempDir(), "status.go")
+	require.NoError(t, os.WriteFile(output, []byte("previous list"), 0o600))
+
+	err := downloadTokens(okClient(), "status", defaulttokenlists.TokensSource{
+		SourceURL:  "http://example.test/tokens",
+		OutputFile: output,
+	})
+	require.NoError(t, err)
+
+	info, err := os.Stat(output)
+	require.NoError(t, err)
+	require.Equal(t, os.FileMode(0o600), info.Mode().Perm())
+	written, err := os.ReadFile(output)
+	require.NoError(t, err)
+	require.Contains(t, string(written), `StatusTokenList.ID = "status"`)
 }
 
 func TestDownloadTokensValidatesAgainstSchema(t *testing.T) {
@@ -177,10 +199,10 @@ func TestDownloadTokensWriteFailureKeepsExistingFile(t *testing.T) {
 	dir := t.TempDir()
 	output := filepath.Join(dir, "out.go")
 	const previous = "package defaulttokenlists\n// previous list\n"
-	require.NoError(t, os.WriteFile(output, []byte(previous), 0o644))
+	require.NoError(t, os.WriteFile(output, []byte(previous), 0o600))
 
 	leftover := filepath.Join(dir, ".out.go.leftover")
-	require.NoError(t, os.WriteFile(leftover, []byte("temp"), 0o644))
+	require.NoError(t, os.WriteFile(leftover, []byte("temp"), 0o600))
 	stubTempOutput(t, func(string, string) (string, io.WriteCloser, error) {
 		return leftover, failWriteCloser{}, nil
 	})
@@ -202,10 +224,10 @@ func TestDownloadTokensCloseFailureDoesNotReplaceFile(t *testing.T) {
 	dir := t.TempDir()
 	output := filepath.Join(dir, "out.go")
 	const previous = "package defaulttokenlists\n// previous list\n"
-	require.NoError(t, os.WriteFile(output, []byte(previous), 0o644))
+	require.NoError(t, os.WriteFile(output, []byte(previous), 0o600))
 
 	leftover := filepath.Join(dir, ".out.go.leftover")
-	require.NoError(t, os.WriteFile(leftover, []byte("temp"), 0o644))
+	require.NoError(t, os.WriteFile(leftover, []byte("temp"), 0o600))
 	stubTempOutput(t, func(string, string) (string, io.WriteCloser, error) {
 		return leftover, failCloseWriter{}, nil
 	})
@@ -226,7 +248,7 @@ func TestDownloadTokensCloseFailureDoesNotReplaceFile(t *testing.T) {
 func TestDownloadTokensRenameFailureKeepsExistingFile(t *testing.T) {
 	dir := t.TempDir()
 	output := filepath.Join(dir, "out.go")
-	require.NoError(t, os.Mkdir(output, 0o755))
+	require.NoError(t, os.Mkdir(output, 0o750))
 
 	err := downloadTokens(okClient(), "status", defaulttokenlists.TokensSource{
 		SourceURL:  "http://example.test/tokens",

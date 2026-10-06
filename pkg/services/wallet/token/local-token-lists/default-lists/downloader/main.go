@@ -169,9 +169,28 @@ func writeGeneratedFile(path string, tmpl *template.Template, data templateData)
 	}
 	closed = true
 
+	mode, err := generatedFileMode(path)
+	if err != nil {
+		return err
+	}
+	if err = os.Chmod(tmpName, mode); err != nil {
+		return fmt.Errorf("failed to set go file mode: %w", err)
+	}
+
 	if err = os.Rename(tmpName, path); err != nil {
 		return fmt.Errorf("failed to replace go file: %w", err)
 	}
 	renamed = true
 	return nil
+}
+
+func generatedFileMode(path string) (os.FileMode, error) {
+	info, err := os.Stat(path)
+	if err == nil {
+		return info.Mode().Perm(), nil
+	}
+	if !os.IsNotExist(err) {
+		return 0, fmt.Errorf("failed to stat go file: %w", err)
+	}
+	return 0o644, nil
 }
