@@ -63,23 +63,8 @@ func NewHTTPClient(origin string) *http.Client {
 	}
 }
 
-// readRequestBody materializes the body once for retries. Prefers [http.Request.GetBody] when set.
+// readRequestBody materializes the body once for retries.
 func readRequestBody(req *http.Request) ([]byte, error) {
-	if req.GetBody != nil {
-		r, err := req.GetBody()
-		if err != nil {
-			return nil, fmt.Errorf("puzzleauth: get request body: %w", err)
-		}
-		body, err := io.ReadAll(r)
-		_ = r.Close()
-		if err != nil {
-			return nil, fmt.Errorf("puzzleauth: read request body: %w", err)
-		}
-		if req.Body != nil {
-			_ = req.Body.Close()
-		}
-		return body, nil
-	}
 	if req.Body == nil {
 		return nil, nil
 	}
@@ -91,27 +76,48 @@ func readRequestBody(req *http.Request) ([]byte, error) {
 	return body, nil
 }
 
+// canStreamBody reports whether each attempt can send the request's own body:
+// GetBody replays it for retries and the known length avoids chunked encoding.
+func canStreamBody(req *http.Request) bool {
+	return req.Body != nil && req.Body != http.NoBody && req.GetBody != nil && req.ContentLength > 0
+}
+
 // RoundTrip implements [http.RoundTripper].
 func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 	ctx := req.Context()
-	body, err := readRequestBody(req)
-	if err != nil {
-		return nil, err
+	stream := canStreamBody(req)
+	var body []byte
+	if !stream {
+		var err error
+		if body, err = readRequestBody(req); err != nil {
+			return nil, err
+		}
 	}
 
 	for attempt := 0; ; attempt++ {
 		r := req.Clone(ctx)
-		if body != nil {
+		switch {
+		case stream:
+			if attempt > 0 {
+				rc, err := req.GetBody()
+				if err != nil {
+					return nil, fmt.Errorf("puzzleauth: get request body: %w", err)
+				}
+				r.Body = rc
+			}
+			// Keep transport from using chunked encoding; some proxies reject that for JSON-RPC.
+			r.TransferEncoding = nil
+			r.Header.Del("Transfer-Encoding")
+		case body != nil:
 			b := body
 			r.Body = io.NopCloser(bytes.NewReader(b))
 			r.GetBody = func() (io.ReadCloser, error) {
 				return io.NopCloser(bytes.NewReader(b)), nil
 			}
 			r.ContentLength = int64(len(b))
-			// Keep transport from using chunked encoding; some proxies reject that for JSON-RPC.
 			r.TransferEncoding = nil
 			r.Header.Del("Transfer-Encoding")
-		} else {
+		default:
 			r.ContentLength = 0
 		}
 		var usedBearer string
