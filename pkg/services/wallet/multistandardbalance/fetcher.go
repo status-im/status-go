@@ -11,6 +11,7 @@ import (
 
 	"github.com/status-im/go-wallet-sdk/pkg/balance/multistandardfetcher"
 	"github.com/status-im/go-wallet-sdk/pkg/contracts/multicall3"
+	"github.com/status-im/go-wallet-sdk/pkg/multicall"
 
 	"github.com/status-im/status-go/internal/rpc/chain/ethclient"
 )
@@ -57,7 +58,7 @@ func (f *Fetcher) FetchBalances(ctx context.Context, chainID uint64, config mult
 		return nil, errors.New("Multicall3 not supported on chain ID " + strconv.Itoa(int(chainID)))
 	}
 
-	resultsCh := multistandardfetcher.FetchBalances(ctx, multicallAddr, newMulticallCaller(multicallAddr, ethClient), config, f.batchSize)
+	resultsCh := multistandardfetcher.FetchBalances(ctx, multicallAddr, multicall.NewDirectCaller(multicallAddr, ethClient), config, f.batchSize)
 
 	return resultsCh, nil
 }
