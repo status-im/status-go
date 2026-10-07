@@ -3,7 +3,7 @@
 set -euo pipefail
 library="${1:?Usage: check_tkl_exports.sh <libstatus>}"
 case "${TKL_TARGET_OS:-$(uname -s)}" in
-  Darwin|darwin) symbols="$("${NM:-nm}" -gU "$library")" ;;
+  Darwin|darwin|ios) symbols="$("${NM:-nm}" -gU "$library")" ;;
   Linux|linux|android) symbols="$("${NM:-nm}" -D --defined-only "$library")" ;;
   Windows*|windows|MINGW*|MSYS*) symbols="$("${OBJDUMP:-objdump}" -p "$library")" ;;
   *) echo "Unsupported export audit platform" >&2; exit 1 ;;
