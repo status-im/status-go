@@ -33,6 +33,7 @@ jobs:
         run: |
           bash scripts/tkl_env.sh go test -tags tkl ./internal/tklbuild
           bash scripts/test_tkl_link.sh
+          bash scripts/test_tkl_static.sh
   windows:
     runs-on: windows-2022
     timeout-minutes: 20
@@ -99,6 +100,5 @@ jobs:
           for spec in 'iphoneos arm64 13.0' 'iphonesimulator arm64 14.0' 'iphonesimulator amd64 13.0'; do
             read -r sdk arch minimum <<< "$spec"
             GOARCH="$arch" IPHONE_SDK="$sdk" IOS_TARGET="$minimum" \
-              bash scripts/tkl_env.sh go test -c -tags tkl \
-                -o "build/tkl-$sdk-$arch.test" ./internal/tklbuild
+              bash scripts/test_tkl_static.sh
           done
