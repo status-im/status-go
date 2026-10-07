@@ -16,7 +16,7 @@ let
 in
 stdenv.mkDerivation {
   pname = "libtkl";
-  version = "7b3c5e715f4e";
+  version = "2238b179f78d";
   inherit src;
   nativeBuildInputs = [ compiler ] ++ lib.optionals stdenv.isDarwin [ darwin.cctools ];
   buildPhase = ''
