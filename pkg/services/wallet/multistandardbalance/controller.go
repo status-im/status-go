@@ -62,12 +62,18 @@ type LastBlockManager interface {
 type ControllerConfig struct {
 	FetchDebounceTime time.Duration
 	FetchPeriod       time.Duration
+	// IdleFetchPeriod is the full fetch period while the client says nobody
+	// is looking at balances (SetActive(false)). A full fetch reads every
+	// token of every list on every chain for every account, so it is most of
+	// the RPC traffic. Zero keeps FetchPeriod.
+	IdleFetchPeriod time.Duration
 }
 
 func DefaultControllerConfig() ControllerConfig {
 	return ControllerConfig{
 		FetchDebounceTime: 10 * time.Second,
 		FetchPeriod:       2 * time.Minute,
+		IdleFetchPeriod:   15 * time.Minute,
 	}
 }
 
@@ -97,6 +103,12 @@ type Controller struct {
 	tokenListsColdFetchPending atomic.Bool
 	pendingFullFetch           bool
 	pendingFetchConfig         FetchConfig
+
+	idle            atomic.Bool
+	activityChanged chan struct{}
+	// lastPeriodicFetch keeps the monotonic clock reading time.Now gives, so
+	// that a change of the wall clock does not move the next fetch.
+	lastPeriodicFetch atomic.Pointer[time.Time]
 
 	chainFetchMu      sync.Mutex
 	chainFetchCancels map[uint64]context.CancelFunc
@@ -130,6 +142,7 @@ func NewController(
 		publisher:               pubsub.NewPublisher(),
 		fetchDebounceFn:         debounce.New(config.FetchDebounceTime),
 		pendingFetchConfig:      make(FetchConfig),
+		activityChanged:         make(chan struct{}, 1),
 		chainFetchCancels:       make(map[uint64]context.CancelFunc),
 		walletFeed:              walletFeed,
 		logger:                  logger,
@@ -355,23 +368,66 @@ func (c *Controller) stopWalletEventsWatcher() {
 	}
 }
 
+// SetActive tells whether someone looks at balances: while not, full fetches
+// run at IdleFetchPeriod instead of FetchPeriod. Becoming active fetches at
+// once when the last periodic fetch is older than FetchPeriod.
+func (c *Controller) SetActive(active bool) {
+	if c.idle.Swap(!active) == !active {
+		return
+	}
+	c.logger.Info("balances refresh period changed", zap.Bool("active", active), zap.Duration("period", c.fetchPeriod()))
+	select {
+	case c.activityChanged <- struct{}{}:
+	default:
+	}
+}
+
+func (c *Controller) fetchPeriod() time.Duration {
+	if c.idle.Load() && c.config.IdleFetchPeriod > 0 {
+		return c.config.IdleFetchPeriod
+	}
+	return c.config.FetchPeriod
+}
+
 func (c *Controller) startFetcher() {
 	stopCh := c.stopCh
-	ticker := time.NewTicker(c.config.FetchPeriod)
+	periodicFetch := func() {
+		now := time.Now()
+		c.lastPeriodicFetch.Store(&now)
+		c.TriggerFullFetch()
+	}
+	sinceLastFetch := func() time.Duration {
+		last := c.lastPeriodicFetch.Load()
+		if last == nil {
+			return c.fetchPeriod()
+		}
+		return time.Since(*last)
+	}
+
+	timer := time.NewTimer(c.fetchPeriod())
 	go func() {
 		defer panics.LogOnPanic()
-		defer ticker.Stop()
+		defer timer.Stop()
 		for {
 			select {
 			case <-stopCh:
 				return
-			case <-ticker.C:
-				c.TriggerFullFetch()
+			case <-timer.C:
+				periodicFetch()
+				timer.Reset(c.fetchPeriod())
+			case <-c.activityChanged:
+				timer.Stop()
+				wait := c.fetchPeriod() - sinceLastFetch()
+				if wait <= 0 {
+					periodicFetch()
+					wait = c.fetchPeriod()
+				}
+				timer.Reset(wait)
 			}
 		}
 	}()
 	// Trigger initial fetch
-	c.TriggerFullFetch()
+	periodicFetch()
 }
 
 // Triggers delayed fetch for some accounts/networks/types, according to fetchConfig
@@ -401,7 +457,7 @@ func (c *Controller) triggerFetch() {
 
 // Needs to fetch if the balance has never been fetched or if the last fetch was more than fetchPeriod ago
 func (c *Controller) needsToFetch(state State) bool {
-	return state.FetchedAt == NeverFetched || state.FetchedAt+int64(c.config.FetchPeriod.Seconds()) < time.Now().Unix()
+	return state.FetchedAt == NeverFetched || state.FetchedAt+int64(c.fetchPeriod().Seconds()) < time.Now().Unix()
 }
 
 func (c *Controller) getAllAccounts() ([]common.Address, error) {
