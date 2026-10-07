@@ -1133,11 +1133,12 @@ func (b *StatusBackend) LoggedIn(keyUID string, err error) error {
 		}
 	}
 
-	signal.SendLoggedIn(acc, s, ensUsernamesJSON, nil)
-	b.statusNode.StartTokenManager()
+	// Armed before the signal: a client may pause synchronously from its LoggedIn handler.
 	if platform.IsMobilePlatform() {
 		b.memRelease.scheduleAfterLogin(releaseAfterLoginDelay)
 	}
+	signal.SendLoggedIn(acc, s, ensUsernamesJSON, nil)
+	b.statusNode.StartTokenManager()
 	return nil
 }
 
