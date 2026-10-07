@@ -229,12 +229,13 @@ func (c *Controller) startAccountsWatcher() {
 	}
 
 	addedCh, addedUnsubFn := pubsub.Subscribe[accountsevent.AccountsAddedEvent](c.accountsPublisher, 10)
+	stopCh := c.stopCh
 	go func() {
 		defer panics.LogOnPanic()
 		defer addedUnsubFn()
 		for {
 			select {
-			case <-c.stopCh:
+			case <-stopCh:
 				return
 			case _, ok := <-addedCh:
 				if !ok {
@@ -253,12 +254,13 @@ func (c *Controller) startNetworksWatcher() {
 
 	ch, unsubFn := pubsub.Subscribe[networks.EventActiveNetworksChanged](c.networksProvider.GetPublisher(), 10)
 
+	stopCh := c.stopCh
 	go func() {
 		defer panics.LogOnPanic()
 		defer unsubFn()
 		for {
 			select {
-			case <-c.stopCh:
+			case <-stopCh:
 				return
 			case _, ok := <-ch:
 				if !ok {
@@ -354,13 +356,14 @@ func (c *Controller) stopWalletEventsWatcher() {
 }
 
 func (c *Controller) startFetcher() {
+	stopCh := c.stopCh
 	ticker := time.NewTicker(c.config.FetchPeriod)
 	go func() {
 		defer panics.LogOnPanic()
 		defer ticker.Stop()
 		for {
 			select {
-			case <-c.stopCh:
+			case <-stopCh:
 				return
 			case <-ticker.C:
 				c.TriggerFullFetch()
@@ -569,7 +572,7 @@ func (c *Controller) executeFetchConfigs(fetchConfigs map[uint64]multistandardfe
 			defer cancel()
 			for {
 				select {
-				case <-c.stopCh:
+				case <-ctx.Done():
 					return
 				case result, ok := <-resultsCh:
 					if !ok {
