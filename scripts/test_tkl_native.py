@@ -33,6 +33,12 @@ class NativeDependencyTest(unittest.TestCase):
             "\tprintf archive > $(OUT)/libtkl_isolated.a\n"
             "\tprintf '%s\\n' '$(EXTRA_NIMFLAGS)' > $(OUT)/compiler-flags\n"
             "\techo build >> $(CURDIR)/build-count\n")
+        (source / "scripts").mkdir()
+        (source / "scripts/build_mobile.sh").write_text(
+            '#!/bin/bash\nset -eu\ncd "$(dirname "$0")/.."\n'
+            'test "$TKL_BUILD_TESTS" = 0\nmkdir -p "$OUT/link"\n'
+            'printf "%s" "$1" > "$OUT/link/libtkl.a"\n'
+            'echo "$1" >> build-count\n')
         self.run_cmd("git", "init", "-q", str(source))
         self.run_cmd("git", "-C", str(source), "add", ".")
         self.run_cmd("git", "-C", str(source), "-c", "user.name=Test", "-c",
@@ -52,6 +58,8 @@ class NativeDependencyTest(unittest.TestCase):
             self.env.pop(key, None)
         self.source = self.repo / "build/deps/nim-token-lists"
         self.lock = self.repo / "build/deps/.nim-token-lists-lock"
+        target = self.run_cmd("go", "env", "GOHOSTOS", "GOHOSTARCH").stdout.split()
+        self.out = self.source / "build" / "-".join(target)
 
     def run_cmd(self, *args, **kwargs):
         return subprocess.run(args, text=True, stdout=subprocess.PIPE,
@@ -103,12 +111,12 @@ class NativeDependencyTest(unittest.TestCase):
         self.helper("clean")
         self.assertFalse(self.source.exists())
         self.helper()
-        self.assertTrue((self.source / "build/link/libtkl.a").is_file())
+        self.assertTrue((self.out / "link/libtkl.a").is_file())
 
     def test_changed_flags_rebuild_and_missing_archive_rebuild(self):
         self.helper()
         self.helper(EXTRA_NIMFLAGS="-d:fixture")
-        (self.source / "build/link/libtkl.a").unlink()
+        (self.out / "link/libtkl.a").unlink()
         self.helper(EXTRA_NIMFLAGS="-d:fixture")
         self.assertEqual(len((self.source / "build-count").read_text().splitlines()), 3)
 
@@ -131,6 +139,26 @@ class NativeDependencyTest(unittest.TestCase):
         self.assertFalse(self.source.exists())
         self.helper("clean", NIM_TKL_LIB_DIR=str(lib), NIM_TKL_INC_DIR=str(lib))
         self.assertTrue((lib / "libtkl.a").exists())
+
+    def test_windows_prebuilt_audit_fails_closed(self):
+        lib = self.root / "prebuilt"
+        lib.mkdir()
+        (lib / "libtkl.a").write_text("archive")
+        (lib / "tkl.h").write_text("header")
+        inspector = self.root / "objdump"
+        cases = (
+            ("exit 1", False),
+            ("printf '.drectve\\n'; awk 'BEGIN { for (i=0; i<10000; i++) print \"other sections\" }'", False),
+            ("printf '.text\\n'", True),
+        )
+        for body, accepted in cases:
+            with self.subTest(body=body):
+                inspector.write_text("#!/bin/sh\n" + body + "\n")
+                inspector.chmod(0o755)
+                result = self.helper(check=False, NIM_TKL_LIB_DIR=str(lib),
+                                     NIM_TKL_INC_DIR=str(lib), TKL_HIDE_EXPORTS="1",
+                                     GOOS="windows", OBJDUMP=str(inspector))
+                self.assertEqual(result.returncode == 0, accepted, result.stderr)
 
     def test_clean_cannot_remove_an_active_build(self):
         self.helper()
@@ -206,8 +234,8 @@ bash "$1" bash -c 'printf "%s\\n" "$CGO_CFLAGS" "$CGO_LDFLAGS"'
                 self.assertEqual(len(lines), 6)
                 self.assertEqual(lines[:2], lines[2:4])
                 self.assertEqual(lines[:2], lines[4:])
-                self.assertTrue(lines[0].startswith(cflags + " -I"))
-                self.assertTrue(lines[1].startswith(ldflags + " -L"))
+                self.assertTrue(lines[0].startswith(cflags + ' "-I'))
+                self.assertTrue(lines[1].startswith(ldflags + ' "-L'))
 
     def test_managed_reentry_uses_only_original_compiler_flags(self):
         for cflags in ("", "-DUSER_FLAG=1"):
@@ -216,14 +244,15 @@ bash "$1" bash -c 'printf "%s\\n" "$CGO_CFLAGS" "$CGO_LDFLAGS"'
                 self.run_cmd(
                     "bash", "-c", '''
 source "$1"
+archive="$NIM_TKL_LIB_DIR/libtkl.a"
 unset NIM_TKL_LIB_DIR NIM_TKL_INC_DIR
 bash scripts/tkl_native.sh
-rm build/deps/nim-token-lists/build/link/libtkl.a
+rm "$archive"
 bash scripts/tkl_native.sh
 ''', "bash", str(self.repo / "scripts/tkl_env.sh"),
                     env=dict(self.env, CGO_CFLAGS=cflags))
                 self.assertEqual(len((self.source / "build-count").read_text().splitlines()), 2)
-                flags = (self.source / "build/compiler-flags").read_text()
+                flags = (self.out / "compiler-flags").read_text()
                 self.assertNotIn("TKL_BUILD_ID", flags)
                 self.assertNotIn("--passC:-I", flags)
                 if cflags:
@@ -234,15 +263,55 @@ bash scripts/tkl_native.sh
         self.helper(CGO_CFLAGS="-DUSER_FLAG=2")
         self.assertEqual(len((self.source / "build-count").read_text().splitlines()), 2)
         self.assertIn("--passC:-DUSER_FLAG=2",
-                      (self.source / "build/compiler-flags").read_text())
+                      (self.out / "compiler-flags").read_text())
 
     def test_corrupt_archive_is_rebuilt(self):
         self.helper()
-        archive = self.source / "build/link/libtkl.a"
+        archive = self.out / "link/libtkl.a"
         archive.write_bytes(b"")
         self.helper()
         self.assertEqual(archive.read_text(), "archive")
         self.assertEqual(len((self.source / "build-count").read_text().splitlines()), 2)
+
+    def test_android_archives_are_cached_separately_and_api_invalidates(self):
+        host = "darwin" if os.uname().sysname == "Darwin" else "linux"
+        ndk = self.root / "ndk"
+        tools = ndk / f"toolchains/llvm/prebuilt/{host}-x86_64/bin"
+        tools.mkdir(parents=True)
+        for name in ("aarch64-linux-android28-clang", "x86_64-linux-android28-clang",
+                     "aarch64-linux-android29-clang"):
+            compiler = tools / name
+            compiler.write_text('#!/bin/sh\necho "fixture clang"\n')
+            compiler.chmod(0o755)
+        env = dict(GOOS="android", GOARCH="arm64", ANDROID_NDK_ROOT=str(ndk))
+        self.helper(**env)
+        self.helper(**dict(env, GOARCH="amd64"))
+        self.helper(**env)
+        self.assertEqual((self.source / "build-count").read_text().splitlines(),
+                         ["android-arm64", "android-x86_64"])
+        self.helper(**dict(env, ANDROID_API="29"))
+        self.assertEqual(len((self.source / "build-count").read_text().splitlines()), 3)
+        for target in ("android-arm64", "android-x86_64"):
+            self.assertEqual((self.source / f"build/{target}/link/libtkl.a").read_text(), target)
+        self.helper("clean")
+        self.assertFalse(self.source.exists())
+
+    def test_unsupported_architecture_fails_before_checkout(self):
+        result = self.helper(check=False, GOOS="android", GOARCH="386")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Unsupported", result.stderr)
+        self.assertFalse(self.source.exists())
+
+    @unittest.skipUnless(shutil.which("xcrun"), "requires Xcode SDK discovery")
+    def test_ios_device_and_simulator_keep_distinct_archives(self):
+        env = dict(GOOS="ios", GOARCH="arm64", IOS_TARGET="14.0")
+        self.helper(**dict(env, IPHONE_SDK="iphoneos"))
+        self.helper(**dict(env, IPHONE_SDK="iphonesimulator"))
+        self.helper(**dict(env, IPHONE_SDK="iphoneos"))
+        self.assertEqual((self.source / "build-count").read_text().splitlines(),
+                         ["ios-arm64", "ios-simulator-arm64"])
+        self.helper(**dict(env, IPHONE_SDK="iphoneos", IOS_TARGET="15.0"))
+        self.assertEqual(len((self.source / "build-count").read_text().splitlines()), 3)
 
     def test_prebuilt_hash_tools(self):
         lib = self.root / "prebuilt"
@@ -261,7 +330,7 @@ bash scripts/tkl_native.sh
                     continue  # Each host exercises its available checksum tools.
                 bindir = self.root / (tool or "no-hash-tool")
                 bindir.mkdir()
-                for name in ("bash", "dirname", "awk") + ((tool,) if tool else ()):
+                for name in ("bash", "dirname", "awk", "go") + ((tool,) if tool else ()):
                     (bindir / name).symlink_to(shutil.which(name))
                 result = subprocess.run(
                     [str(bindir / "bash"), str(self.repo / "scripts/tkl_env.sh"),
