@@ -408,7 +408,7 @@ For community chats, the caller must be a privileged member (admin/owner) unless
       "threadId": "0x-parent-message-id",
       "chatId": "0xcommunity...<chatUUID>",
       "parentMessageId": "0x-parent-message-id",
-      "name": "First 40 chars of parent text (or empty)"
+      "name": "First 50 characters of parent text (or empty)"
     }
   ]
 }
@@ -420,6 +420,45 @@ For community chats, the caller must be a privileged member (admin/owner) unless
 - `"thread already exists for this message"` — thread already created for this parent.
 - `"parent message not found"` — parent message doesn't exist locally.
 - `"only admins can create threads in this community"` — permission denied.
+
+---
+
+### wakuext_editThread
+
+Update thread metadata. This release supports only `name`; the request is an object so
+future metadata fields can be added without changing the endpoint.
+
+**Params:**
+```json
+[{
+  "chatId": "<chatId>",
+  "threadId": "<threadId>",
+  "name": "Updated thread name"
+}]
+```
+
+- `name` collapses whitespace and must contain 1–50 Unicode grapheme clusters.
+  Empty and overlong values are rejected; names are never silently truncated.
+- The root/parent message is not edited.
+- The creator who started the thread may edit it. Community owners, admins, and
+  token masters may edit any accessible community thread; private-group admins
+  may edit any group thread.
+- Creator metadata is unavailable on legacy threads, so only the applicable
+  community/group administrator can edit them. One-to-one legacy threads cannot
+  be edited until creator provenance is available.
+- A creator with channel access can rename even when read-only. Removed or banned
+  users cannot edit.
+
+**Result:** standard messenger response with the updated `threads` entry. The
+same response shape is emitted to other clients via `messages.new`; no chat
+message is created or changed.
+
+**Errors:**
+- `"edit-thread: invalid request"` — no supported metadata property was supplied.
+- `"edit-thread: invalid chat id"` / `"edit-thread: invalid thread id"` — identifier is missing.
+- `"edit-thread: invalid name"` / `"edit-thread: name exceeds 50 characters"` — invalid name.
+- `"only the thread creator or an admin can edit this thread"` — permission denied.
+- Existing thread feature, unsupported-chat, and missing chat/thread errors also apply.
 
 ---
 
@@ -447,7 +486,7 @@ the supplied message as the root's first reply.
 - `message` is required and must include `chatId`.
 - `threadName` is optional. When omitted or blank, the thread root uses the
   supplied message text.
-- The root text collapses whitespace and is limited to the first 40 Unicode
+- The root text collapses whitespace and is limited to the first 50 Unicode
   characters. The same normalized text becomes the thread name.
 - The supplied message must not include `threadId` or `responseTo`; the backend
   sets both to the generated root message ID.
