@@ -1,0 +1,104 @@
+name: Token library integration
+on:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: token-library-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  native:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, ubuntu-24.04-arm, macos-14, macos-15-intel]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff
+        with:
+          go-version: '1.26.5'
+          cache: false
+      - uses: jiro4989/setup-nim-action@189b145833368cc92f1e7b3e166a25a3e057a693
+        with:
+          nim-version: '2.2.10'
+      - name: Dependency lifecycle and mobile build selection
+        run: |
+          python3 scripts/test_tkl_native.py
+          python3 scripts/test_tkl_backend.py
+          python3 scripts/test_tkl_mobile_make.py
+      - name: Public ABI and private shared-library symbols
+        run: |
+          bash scripts/tkl_env.sh go test -tags tkl ./internal/tklbuild
+          bash scripts/test_tkl_link.sh
+  windows:
+    runs-on: windows-2022
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff
+        with:
+          go-version: '1.26.5'
+          cache: false
+      - uses: jiro4989/setup-nim-action@189b145833368cc92f1e7b3e166a25a3e057a693
+        with:
+          nim-version: '2.2.10'
+      - uses: msys2/setup-msys2@ec48f7c5447b3140e2b088413ae3a55687bccb6e
+        with:
+          msystem: MINGW64
+          path-type: inherit
+          install: mingw-w64-x86_64-gcc make
+      - name: Public ABI and private DLL symbols
+        shell: msys2 {0}
+        run: |
+          CC=gcc bash scripts/tkl_env.sh go test -tags tkl ./internal/tklbuild
+          CC=gcc bash scripts/test_tkl_link.sh
+  android:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff
+        with:
+          go-version: '1.26.5'
+          cache: false
+      - uses: jiro4989/setup-nim-action@189b145833368cc92f1e7b3e166a25a3e057a693
+        with:
+          nim-version: '2.2.10'
+      - name: Install NDK
+        run: |
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'ndk;27.2.12479018' < <(yes)
+          echo "ANDROID_NDK_ROOT=$ANDROID_HOME/ndk/27.2.12479018" >> "$GITHUB_ENV"
+      - name: Cross-link consumers and verify private exports
+        run: |
+          export CGO_ENABLED=1 GOOS=android
+          tools="$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          for arch in arm64 amd64; do
+            triple=aarch64
+            [ "$arch" != amd64 ] || triple=x86_64
+            GOARCH="$arch" CC="$tools/$triple-linux-android28-clang" NM="$tools/llvm-nm" \
+              bash scripts/test_tkl_link.sh
+          done
+  ios:
+    runs-on: macos-14
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff
+        with:
+          go-version: '1.26.5'
+          cache: false
+      - uses: jiro4989/setup-nim-action@189b145833368cc92f1e7b3e166a25a3e057a693
+        with:
+          nim-version: '2.2.10'
+      - name: Cross-link device and simulator consumers
+        run: |
+          export CGO_ENABLED=1 GOOS=ios
+          for spec in 'iphoneos arm64 13.0' 'iphonesimulator arm64 14.0' 'iphonesimulator amd64 13.0'; do
+            read -r sdk arch minimum <<< "$spec"
+            GOARCH="$arch" IPHONE_SDK="$sdk" IOS_TARGET="$minimum" \
+              bash scripts/tkl_env.sh go test -c -tags tkl \
+                -o "build/tkl-$sdk-$arch.test" ./internal/tklbuild
+          done
