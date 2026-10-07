@@ -48,18 +48,25 @@ func (r *memoryReleaser) scheduleAfterLogin(delay time.Duration) {
 	var t *time.Timer
 	t = r.afterFn(delay, func() {
 		defer panics.LogOnPanic()
-		r.mu.Lock()
-		// A timer replaced or stopped after it already fired must not release.
-		if r.timer != t {
-			r.mu.Unlock()
-			return
+		if r.claimFired(t) {
+			r.release()
 		}
-		r.timer = nil
-		r.last = r.now()
-		r.mu.Unlock()
-		r.release()
 	})
 	r.timer = t
+}
+
+// claimFired clears the fired timer and records the release under one lock, so a concurrent
+// releaseNow sees either the pending timer or the fresh release time. A timer replaced or stopped
+// after it already fired claims nothing.
+func (r *memoryReleaser) claimFired(t *time.Timer) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.timer != t {
+		return false
+	}
+	r.timer = nil
+	r.last = r.now()
+	return true
 }
 
 // releaseNow releases unless the post-login release is still pending or a release ran within
