@@ -248,3 +248,20 @@ func TestMarshalWalletConfigJSON(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "some-key", walletConfig.RaribleMainnetAPIKey.Reveal())
 }
+
+func TestNodeConfigJSONRoundTripPreservesEFPBaseURL(t *testing.T) {
+	original := params.NodeConfig{
+		WalletConfig: params.WalletConfig{
+			Enabled:    true,
+			EFPBaseURL: "https://efp.example",
+		},
+	}
+
+	encoded, err := json.Marshal(original)
+	require.NoError(t, err)
+
+	var decoded params.NodeConfig
+	require.NoError(t, json.Unmarshal(encoded, &decoded))
+	require.Equal(t, original.WalletConfig.EFPBaseURL, decoded.WalletConfig.EFPBaseURL)
+	require.Equal(t, original.WalletConfig.Enabled, decoded.WalletConfig.Enabled)
+}
