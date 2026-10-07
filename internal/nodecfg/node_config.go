@@ -25,15 +25,15 @@ func insertNodeConfig(tx *sql.Tx, c *params.NodeConfig) error {
 	_, err := tx.Exec(`
 	INSERT OR REPLACE INTO node_config (
 		network_id, data_dir, keystore_dir, node_key,
-		api_modules, enable_ntp_sync, wallet_enabled,
+		api_modules, enable_ntp_sync, wallet_enabled, efp_base_url,
 		browser_enabled, permissions_enabled, connector_enabled, synthetic_id)
 		VALUES (
 		?, ?, ?, ?,
-		?, ?, ?,
+		?, ?, ?, ?,
 		?, ?, ?, 'id'
 	)`,
 		c.NetworkID, "", "", c.NodeKey, c.APIModules, true,
-		c.WalletConfig.Enabled, c.BrowsersConfig.Enabled,
+		c.WalletConfig.Enabled, c.WalletConfig.EFPBaseURL, c.BrowsersConfig.Enabled,
 		c.PermissionsConfig.Enabled, c.ConnectorConfig.Enabled,
 	)
 	return err
@@ -249,12 +249,12 @@ func loadNodeConfig(tx *sql.Tx) (*params.NodeConfig, error) {
 	err := tx.QueryRow(`
 	SELECT
 		network_id, node_key, api_modules,
-		wallet_enabled, browser_enabled, permissions_enabled,
+		wallet_enabled, efp_base_url, browser_enabled, permissions_enabled,
 		connector_enabled FROM node_config
 		WHERE synthetic_id = 'id'
 	`).Scan(
 		&nodecfg.NetworkID, &nodecfg.NodeKey, &nodecfg.APIModules,
-		&nodecfg.WalletConfig.Enabled, &nodecfg.BrowsersConfig.Enabled, &nodecfg.PermissionsConfig.Enabled,
+		&nodecfg.WalletConfig.Enabled, &nodecfg.WalletConfig.EFPBaseURL, &nodecfg.BrowsersConfig.Enabled, &nodecfg.PermissionsConfig.Enabled,
 		&nodecfg.ConnectorConfig.Enabled,
 	)
 	if err != nil && err != sql.ErrNoRows {

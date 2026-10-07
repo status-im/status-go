@@ -11,6 +11,12 @@ class WalletService(Service):
     def __init__(self, client: RpcClient):
         super().__init__(client, "wallet")
 
+    def get_following_addresses(self, user_address: str, search: str = "", limit: int = 10, offset: int = 0):
+        return self.rpc_request("getFollowingAddresses", [user_address, search, limit, offset])
+
+    def get_following_stats(self, user_address: str):
+        return self.rpc_request("getFollowingStats", [user_address])
+
     def get_balances_at_by_chain(self, addresses: list, tokens: list):
         params = [addresses, tokens]
         return self.rpc_request("getBalancesByChain", params)

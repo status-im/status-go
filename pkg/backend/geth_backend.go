@@ -708,8 +708,17 @@ func (b *StatusBackend) StartNodeWithKey(acc multiaccounts.Account, password str
 }
 
 func (b *StatusBackend) OverwriteNodeConfigValues(conf *params.NodeConfig, n *params.NodeConfig) (*params.NodeConfig, error) {
+	savedEFPBaseURL := ""
+	if conf != nil {
+		savedEFPBaseURL = conf.WalletConfig.EFPBaseURL
+	}
+
 	if err := mergo.Merge(conf, n, mergo.WithOverride); err != nil {
 		return nil, err
+	}
+
+	if n.WalletConfig.EFPBaseURL == "" && savedEFPBaseURL != "" {
+		conf.WalletConfig.EFPBaseURL = savedEFPBaseURL
 	}
 
 	conf.Networks = n.Networks

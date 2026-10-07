@@ -103,6 +103,59 @@ func TestFetchFollowingAddressesProviderError(t *testing.T) {
 	require.Equal(t, expectedError, err)
 }
 
+func TestFetchFollowingStatsProviderNotConnected(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	ctx := t.Context()
+	userAddress := common.HexToAddress("0x742d35cc6cf4c7c7")
+
+	mockProvider := mock_efp.NewMockFollowingDataProvider(mockCtrl)
+	mockProvider.EXPECT().IsConnected().Return(false)
+	mockProvider.EXPECT().ID().Return("efp").AnyTimes()
+
+	manager := NewManager(mockProvider, zap.NewNop())
+
+	result, err := manager.FetchFollowingStats(ctx, userAddress)
+
+	require.NoError(t, err)
+	require.Equal(t, 0, result)
+}
+
+func TestFetchFollowingStatsProviderError(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	ctx := t.Context()
+	userAddress := common.HexToAddress("0x742d35cc6cf4c7c7")
+	expectedError := errors.New("provider error")
+
+	mockProvider := mock_efp.NewMockFollowingDataProvider(mockCtrl)
+	mockProvider.EXPECT().IsConnected().Return(true)
+	mockProvider.EXPECT().FetchFollowingStats(ctx, userAddress).Return(0, expectedError)
+
+	manager := NewManager(mockProvider, zap.NewNop())
+
+	result, err := manager.FetchFollowingStats(ctx, userAddress)
+
+	require.Error(t, err)
+	require.Equal(t, 0, result)
+	require.Equal(t, expectedError, err)
+}
+
+func TestFetchFollowingStatsNoProvider(t *testing.T) {
+	ctx := t.Context()
+	userAddress := common.HexToAddress("0x742d35cc6cf4c7c7")
+
+	manager := NewManager(nil, zap.NewNop())
+
+	result, err := manager.FetchFollowingStats(ctx, userAddress)
+
+	require.Error(t, err)
+	require.Equal(t, 0, result)
+	require.Contains(t, err.Error(), "EFP provider not initialized")
+}
+
 func TestFetchFollowingAddressesNoProvider(t *testing.T) {
 	ctx := t.Context()
 	userAddress := common.HexToAddress("0x742d35cc6cf4c7c7")
