@@ -25,6 +25,7 @@ import (
 	"github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/healthmanager"
 	"github.com/status-im/status-go/internal/logutils"
+	"github.com/status-im/status-go/internal/traffic"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/services/typeddata"
 	"github.com/status-im/status-go/pkg/services/wallet/activity"
@@ -45,6 +46,7 @@ import (
 	"github.com/status-im/status-go/pkg/services/wallet/wallettypes"
 
 	"github.com/status-im/go-wallet-sdk/pkg/ethclient"
+	"github.com/status-im/go-wallet-sdk/pkg/httptraffic"
 )
 
 func NewAPI(s *Service) *API {
@@ -796,6 +798,23 @@ func (api *API) FetchMarketTokenPageAsync(ctx context.Context, page, pageSize, s
 func (api *API) UnsubscribeFromLeaderboard() error {
 	logutils.ZapLogger().Debug("call to UnsubscribeFromLeaderboard")
 	return api.s.leaderboardService.UnsubscribeFromLeaderboard()
+}
+
+// GetHTTPTrafficReport returns the HTTP traffic stats with only the endpoints
+// the query asks for, e.g. none for an overview, or those of one source when
+// it is looked at. Insights still cover every endpoint.
+func (api *API) GetHTTPTrafficReport(ctx context.Context, query httptraffic.Query) httptraffic.Snapshot {
+	return traffic.Default.Snapshot().Filter(query)
+}
+
+func (api *API) ResetHTTPTrafficStats(ctx context.Context) {
+	traffic.Default.Reset()
+}
+
+// SetHTTPTrafficStatsEnabled turns the HTTP traffic stats on or off. They start
+// off, as they cost work on every request; clients turn them on where wanted.
+func (api *API) SetHTTPTrafficStatsEnabled(ctx context.Context, enabled bool) {
+	traffic.Default.SetEnabled(enabled)
 }
 
 // GetFollowingAddresses fetches the list of addresses that the given user is following via EFP
