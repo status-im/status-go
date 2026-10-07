@@ -1,0 +1,5 @@
+# These files are executed/read by Bash, including under MSYS2.
+scripts/*tkl*.sh text eol=lf
+scripts/tkl.version text eol=lf
+scripts/tkl-*.txt text eol=lf
+scripts/tkl-*.map text eol=lf
