@@ -28,17 +28,17 @@
         "zerokit": "zerokit"
       },
       "locked": {
-        "lastModified": 1788798722,
-        "narHash": "sha256-DIqnZiykAvKLc7y6+aNMJn8JgYRnU4F6PDO4vOSg+Ic=",
+        "lastModified": 1791365883,
+        "narHash": "sha256-SwGxvPeyBP733iFxceWX60hrI35ePIigOiA6xyHx7TM=",
         "ref": "refs/heads/master",
-        "rev": "4db855c2eb884772e54ec690c3507ece4e84ad3f",
-        "revCount": 2482,
+        "rev": "2025acaacd3d2f25e229d87180976320d3586dea",
+        "revCount": 2634,
         "submodules": true,
         "type": "git",
         "url": "https://github.com/logos-messaging/logos-delivery"
       },
       "original": {
-        "rev": "4db855c2eb884772e54ec690c3507ece4e84ad3f",
+        "rev": "2025acaacd3d2f25e229d87180976320d3586dea",
         "submodules": true,
         "type": "git",
         "url": "https://github.com/logos-messaging/logos-delivery"
@@ -214,17 +214,17 @@
         "rust-overlay": "rust-overlay_2"
       },
       "locked": {
-        "lastModified": 1779168423,
-        "narHash": "sha256-OmCnpM+ZcI79EVozdKADj9h4sFsLwfCs5w7OK8Ir6fc=",
+        "lastModified": 1789606952,
+        "narHash": "sha256-QY6DsVWLvE5tylfHNjt6b+vQ8EEMeaAQ1KWNMKzztnI=",
         "owner": "vacp2p",
         "repo": "zerokit",
-        "rev": "5e64cb8822bee65eed6cf459f95ae72b80c6ba63",
+        "rev": "ea80f39be3e7944e4537b5f4726a7c4aabfe0ab5",
         "type": "github"
       },
       "original": {
         "owner": "vacp2p",
         "repo": "zerokit",
-        "rev": "5e64cb8822bee65eed6cf459f95ae72b80c6ba63",
+        "rev": "ea80f39be3e7944e4537b5f4726a7c4aabfe0ab5",
         "type": "github"
       }
     }
