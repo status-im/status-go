@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"sync"
 	"time"
+
+	"github.com/status-im/status-go/internal/traffic"
 )
 
 var retryStatusCodes = map[int]bool{
@@ -25,7 +27,7 @@ func sharedAuthServiceForOrigin(origin string) *Service {
 	}
 	authClient := &http.Client{
 		Timeout:   30 * time.Second,
-		Transport: http.DefaultTransport,
+		Transport: traffic.Transport,
 	}
 	svc := NewService(origin, authClient)
 	if actual, loaded := sharedAuthServices.LoadOrStore(origin, svc); loaded {
@@ -42,11 +44,11 @@ type Transport struct {
 }
 
 // NewTransport returns a [Transport] for the given auth server origin. Actual requests are sent via base;
-// if base is nil, [http.DefaultTransport] is used. Fetching /auth/puzzle and /auth/solve uses a
+// if base is nil, [traffic.Transport] is used. Fetching /auth/puzzle and /auth/solve uses a
 // separate client (default round tripper) so the puzzle layer never calls itself.
 func NewTransport(origin string, base http.RoundTripper) *Transport {
 	if base == nil {
-		base = http.DefaultTransport
+		base = traffic.Transport
 	}
 	return &Transport{
 		base:        base,

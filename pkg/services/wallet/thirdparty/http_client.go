@@ -17,7 +17,10 @@ import (
 	"github.com/cenkalti/backoff/v4"
 	"go.uber.org/zap"
 
+	"github.com/status-im/go-wallet-sdk/pkg/httptraffic"
+
 	"github.com/status-im/status-go/internal/logutils"
+	"github.com/status-im/status-go/internal/traffic"
 	"github.com/status-im/status-go/pkg/security"
 )
 
@@ -52,6 +55,8 @@ func (e *HTTPStatusError) Error() string {
 type HTTPClient struct {
 	client     *http.Client
 	maxRetries int
+	// traffic records what the client sends and receives.
+	traffic *httptraffic.Recorder
 }
 
 // Struct to hold request modifiers and data collectors
@@ -101,6 +106,13 @@ func WithTimeout(timeout time.Duration) Option {
 	}
 }
 
+// WithTrafficRecorder records the client's traffic in rec instead of traffic.Default.
+func WithTrafficRecorder(rec *httptraffic.Recorder) Option {
+	return func(c *HTTPClient) {
+		c.traffic = rec
+	}
+}
+
 // WithMaxRetries sets the maximum number of retries for failed requests
 func WithMaxRetries(maxRetries int) Option {
 	return func(c *HTTPClient) {
@@ -136,6 +148,15 @@ func NewHTTPClient(opts ...Option) *HTTPClient {
 	// Apply all provided options
 	for _, opt := range opts {
 		opt(client)
+	}
+
+	switch {
+	case client.traffic == nil && client.client.Transport == nil:
+		client.client.Transport = traffic.Transport
+	case client.traffic == nil:
+		client.client.Transport = traffic.Default.Instrument(client.client.Transport)
+	default:
+		client.client.Transport = client.traffic.Instrument(client.client.Transport)
 	}
 
 	return client

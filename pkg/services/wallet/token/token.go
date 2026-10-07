@@ -34,6 +34,7 @@ import (
 	"github.com/status-im/status-go/internal/panics"
 	"github.com/status-im/status-go/internal/rpc"
 	"github.com/status-im/status-go/internal/signal"
+	"github.com/status-im/status-go/internal/traffic"
 	"github.com/status-im/status-go/pkg/pubsub"
 	"github.com/status-im/status-go/pkg/services/accounts/accountsevent"
 	"github.com/status-im/status-go/pkg/services/communitytokens/communitytokensdatabase"
@@ -207,7 +208,9 @@ func initialListIDsFromEmbedded() []string {
 func setUpTokenListsManager(mng *Manager, walletDB *sql.DB, enabledChains []uint64, lastUpdate time.Time,
 	autoRefreshInterval time.Duration, autoRefreshCheckInterval time.Duration) (manager.Manager, error) {
 
-	wsdkFetcher := fetcher.New(fetcher.DefaultConfig())
+	fetcherConfig := fetcher.DefaultConfig()
+	fetcherConfig.Transport = traffic.Transport
+	wsdkFetcher := fetcher.New(fetcherConfig)
 
 	contentStore := NewContentStore(walletDB)
 

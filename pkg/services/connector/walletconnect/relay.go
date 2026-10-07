@@ -20,6 +20,7 @@ import (
 
 	"github.com/status-im/status-go/internal/logutils"
 	"github.com/status-im/status-go/internal/panics"
+	"github.com/status-im/status-go/internal/traffic"
 )
 
 const (
@@ -415,8 +416,9 @@ func (r *RelayClient) dialRelay(dialCtx context.Context) (*websocket.Conn, error
 	// so the socket is closed on cancellation to abort a handshake the relay never answers.
 	var stopWatch func() bool
 	dialer := *websocket.DefaultDialer
+	dial := traffic.Default.WrapDialContext((&net.Dialer{}).DialContext)
 	dialer.NetDialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
-		netConn, err := (&net.Dialer{}).DialContext(ctx, network, addr)
+		netConn, err := dial(ctx, network, addr)
 		if err != nil {
 			return nil, err
 		}

@@ -16,6 +16,7 @@ import (
 	"github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/logutils"
 	"github.com/status-im/status-go/internal/panics"
+	"github.com/status-im/status-go/internal/traffic"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/pubsub"
 	"github.com/status-im/status-go/pkg/services/accounts/accountsevent"
@@ -204,7 +205,7 @@ func (c *Controller) startChainFetch(chainID uint64) (context.Context, context.C
 	if cancel, ok := c.chainFetchCancels[chainID]; ok {
 		cancel()
 	}
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(traffic.WithSource(context.Background(), traffic.Balances))
 	c.chainFetchCancels[chainID] = cancel
 	return ctx, cancel
 }

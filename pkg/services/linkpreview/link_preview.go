@@ -15,6 +15,7 @@ import (
 
 	"github.com/status-im/status-go/internal/db/multiaccounts/settings"
 	"github.com/status-im/status-go/internal/protocol/common"
+	"github.com/status-im/status-go/internal/traffic"
 	"github.com/status-im/status-go/pkg/services/linkpreview/unfurlers"
 	"github.com/status-im/status-go/pkg/services/sharedurls"
 )
@@ -137,7 +138,7 @@ func GetTextURLsToUnfurl(text string, URLUnfurlingMode settings.URLUnfurlingMode
 }
 
 func NewDefaultHTTPClient() *http.Client {
-	return &http.Client{Timeout: unfurlers.DefaultRequestTimeout}
+	return &http.Client{Timeout: unfurlers.DefaultRequestTimeout, Transport: traffic.Transport}
 }
 
 // UnfurlURLs assumes clients pass URLs verbatim that were validated and

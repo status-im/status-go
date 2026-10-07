@@ -20,6 +20,7 @@ import (
 	"github.com/status-im/status-go/internal/panics"
 	"github.com/status-im/status-go/internal/signal"
 	"github.com/status-im/status-go/internal/timesource"
+	"github.com/status-im/status-go/internal/traffic"
 	"github.com/status-im/status-go/pkg/backend"
 )
 
@@ -156,7 +157,7 @@ func NewBaseClient(c *ConnectionParams, logger *zap.Logger) (*BaseClient, error)
 	}
 
 	return &BaseClient{
-		Client:         &http.Client{Transport: tr, Jar: cj},
+		Client:         &http.Client{Transport: traffic.Default.Instrument(tr), Jar: cj},
 		serverCert:     serverCert,
 		challengeTaker: NewChallengeTaker(NewPayloadEncryptor(c.aesKey)),
 		baseAddress:    baseAddress,

@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/status-im/status-go/internal/traffic"
 	"github.com/status-im/status-go/pkg/security"
 )
 
@@ -37,7 +38,7 @@ type AuthTransport struct {
 // NewAuthTransport creates a new AuthTransport.
 func NewAuthTransport(httpClient *http.Client, auth AuthParams, providerID string) *AuthTransport {
 	if httpClient == nil {
-		httpClient = &http.Client{Timeout: time.Minute}
+		httpClient = &http.Client{Timeout: time.Minute, Transport: traffic.Transport}
 	}
 	return &AuthTransport{
 		httpClient: httpClient,

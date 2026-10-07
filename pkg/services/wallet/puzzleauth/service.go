@@ -14,6 +14,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/internal/logutils"
+	"github.com/status-im/status-go/internal/traffic"
 )
 
 // Service manages puzzle authentication tokens
@@ -30,7 +31,8 @@ type Service struct {
 func NewService(origin string, httpClient *http.Client) *Service {
 	if httpClient == nil {
 		httpClient = &http.Client{
-			Timeout: 30 * time.Second,
+			Timeout:   30 * time.Second,
+			Transport: traffic.Transport,
 		}
 	}
 	return &Service{

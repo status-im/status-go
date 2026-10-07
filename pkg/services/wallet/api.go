@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"net/http"
 	"slices"
 	"strings"
 	"time"
@@ -721,7 +722,8 @@ func (api *API) GetActivityCollectiblesAsync(requestID int32, chainIDs []wcommon
 func (api *API) FetchChainIDForURL(ctx context.Context, rpcURL string) (*big.Int, error) {
 	logutils.ZapLogger().Debug("wallet.api.VerifyURL", zap.String("rpcURL", rpcURL))
 
-	rpcClient, err := gethrpc.Dial(rpcURL)
+	ctx = traffic.WithSource(ctx, "RPC URL check")
+	rpcClient, err := gethrpc.DialOptions(ctx, rpcURL, gethrpc.WithHTTPClient(&http.Client{Transport: traffic.PrivateTransport}))
 	if err != nil {
 		return nil, fmt.Errorf("dial upstream server: %s", err)
 	}

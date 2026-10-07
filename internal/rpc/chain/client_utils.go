@@ -8,6 +8,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/rpc"
 
+	"github.com/status-im/status-go/internal/traffic"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/services/wallet/puzzleauth"
 )
@@ -40,6 +41,14 @@ func CreateEthClientFromProvider(provider params.RpcProvider, rpcUserAgentName s
 		opts = append(opts, rpc.WithHTTPClient(puzzleauth.NewHTTPClient(origin)))
 	default:
 		return nil, fmt.Errorf("unknown auth type: %s", provider.AuthType)
+	}
+	if provider.AuthType != params.PuzzleAuth {
+		// A provider the user added is theirs: its host stays out of the report.
+		transport := traffic.Transport
+		if provider.Type == params.UserProviderType {
+			transport = traffic.PrivateTransport
+		}
+		opts = append(opts, rpc.WithHTTPClient(&http.Client{Transport: transport}))
 	}
 
 	opts = append(opts, rpc.WithHeaders(headers))

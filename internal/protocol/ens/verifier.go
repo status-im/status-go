@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"math/big"
+	"net/http"
 	"sync"
 	"time"
 
@@ -22,6 +23,7 @@ import (
 	"github.com/status-im/status-go/internal/panics"
 	"github.com/status-im/status-go/internal/pausable"
 	"github.com/status-im/status-go/internal/timesource"
+	"github.com/status-im/status-go/internal/traffic"
 )
 
 const contractQueryTimeout = 5000 * time.Millisecond
@@ -158,13 +160,19 @@ func (v *Verifier) ReverseResolve(ctx context.Context, address gethcommon.Addres
 	ctx, cancel := context.WithTimeout(ctx, contractQueryTimeout)
 	defer cancel()
 
-	rpcClient, err := rpc.DialContext(ctx, v.rpcEndpoint)
+	rpcClient, err := dialRPC(ctx, v.rpcEndpoint)
 	if err != nil {
 		return "", err
 	}
 
 	ethClient := ethclient.NewClient(rpcClient)
 	return ens.ReverseResolve(ethClient, address)
+}
+
+// dialRPC connects to endpoint with the HTTP client of status-go's other RPC
+// calls, whose traffic is recorded.
+func dialRPC(ctx context.Context, endpoint string) (*rpc.Client, error) {
+	return rpc.DialOptions(ctx, endpoint, rpc.WithHTTPClient(&http.Client{Transport: traffic.Transport}))
 }
 
 // Verify verifies that a registered ENS name matches the expected public key
@@ -197,7 +205,7 @@ func (v *Verifier) verify(ctx context.Context, rpcEndpoint, contractAddress stri
 	ch := make(chan Response)
 	ensResponse := make(map[string]Response)
 
-	rpcClient, err := rpc.DialContext(ctx, rpcEndpoint)
+	rpcClient, err := dialRPC(ctx, rpcEndpoint)
 	if err != nil {
 		return errors.Wrap(err, "failed to dial rpc endpoint")
 	}
