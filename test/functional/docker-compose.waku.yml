@@ -1,6 +1,6 @@
 services:
   boot-1:
-    image: harbor.status.im/wakuorg/nwaku:v0.39.0
+    image: harbor.status.im/wakuorg/nwaku:v0.39.1
     entrypoint: [
       "/usr/local/bin/logosdeliverynode",
       "--discv5-discovery=true",
@@ -16,8 +16,6 @@ services:
       "--max-connections=18000",
       "--nodekey=03ce9122016be1f80a23df36525103bed1c7c4b9a0ff7605d97553ed8ed96bcf",
       "--peer-exchange=true",
-      # TODO: enable after logos-messaging/logos-delivery#4383 is fixed
-      "--quic-support=false",
       "--relay=true",
       "--rest=true",
       "--rest-address=0.0.0.0",
@@ -43,7 +41,7 @@ services:
       test: ["CMD-SHELL", "curl -X GET -H 'Content-Type: application/json' http://0.0.0.0:8645 || exit 0"]
 
   store:
-    image: harbor.status.im/wakuorg/nwaku:v0.39.0
+    image: harbor.status.im/wakuorg/nwaku:v0.39.1
     # Publish the logos-delivery REST API (incl. Store API) on an ephemeral host port so
     # tests on the host can query it without colliding on shared CI hosts.
     # The actual host port is discovered at runtime via the Docker API
@@ -65,8 +63,6 @@ services:
       "--max-connections=18000",
       "--nodekey=3190bc9b55b18dbc171997a7a67abcd5bbf0c81002ad9617b1cb67f2f15daa64",
       "--peer-exchange=true",
-      # TODO: enable after logos-messaging/logos-delivery#4383 is fixed
-      "--quic-support=false",
       "--relay=true",
       "--rest=true",
       "--rest-address=0.0.0.0",
