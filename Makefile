@@ -104,6 +104,15 @@ GIT_AUTHOR ?= $(shell git config user.email || echo $$USER)
 
 BUILD_TAGS ?= gowaku_no_rln
 
+# Keep the existing backend available until the platform rollout is verified.
+USE_NIM_TOKEN_LISTS ?= false
+MOBILE_BUILD_TAGS := gowaku_no_rln nowatchdog disable_torrent
+ifeq ($(USE_NIM_TOKEN_LISTS),true)
+MOBILE_BUILD_TAGS += tkl
+ANDROID_TOKEN_ENV = ANDROID_NDK_ROOT="$(ANDROID_NDK_ROOT)" ANDROID_API="$(ANDROID_API)" TKL_HIDE_EXPORTS=1 bash scripts/tkl_env.sh
+IOS_TOKEN_ENV = IPHONE_SDK="$(IPHONE_SDK)" IOS_TARGET="$(IOS_TARGET)" bash scripts/tkl_env.sh
+endif
+
 # `nim-sds` variables
 
 # Pin nim-sds revision here. Can be a tag (default) or commit hash.
@@ -425,7 +434,7 @@ statusgo-library: STATUS_GO_LIBRARY_OUT ?= build/bin
 statusgo-library: generate
 statusgo-library: statusgo-c-bindings $(LIBSDS)  ##@cross-compile Build status-go as static library for current platform
 	@echo "Building static library..."
-	CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
+	CGO_LDFLAGS='$(CGO_LDFLAGS)' CGO_CFLAGS='$(CGO_CFLAGS)' \
 	go build \
 		-tags '$(BUILD_TAGS)' \
 		$(BUILD_FLAGS) \
@@ -456,7 +465,7 @@ statusgo-shared-library: generate
 statusgo-shared-library: statusgo-c-bindings $(LIBSDS) ##@cross-compile Build status-go as shared library for current platform
 	@echo "Building shared library..."
 	@echo "Tags: $(BUILD_TAGS)"
-	CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
+	CGO_LDFLAGS='$(CGO_LDFLAGS)' CGO_CFLAGS='$(CGO_CFLAGS)' \
  	go build \
 		-tags '$(BUILD_TAGS)' \
 		$(BUILD_FLAGS) \
@@ -475,18 +484,22 @@ endif
 statusgo-android-library: generate statusgo-c-bindings build-libsds-android ##@cross-compile Build status-go as Android mobile library
 	@echo "Building Android mobile library..."
 	$(ANDROID_BUILD_FLAGS) CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
-	go build -buildmode=c-shared -tags 'gowaku_no_rln nowatchdog disable_torrent' \
+	$(ANDROID_TOKEN_ENV) go build -buildmode=c-shared -tags '$(MOBILE_BUILD_TAGS)' \
 		-ldflags="-s -w -buildid= -checklinkname=0 -X github.com/status-im/status-go/vendor/github.com/ethereum/go-ethereum/metrics.EnabledStr=true" \
 		-o "build/bin/libstatus.so" ./build/bin/statusgo-lib
 	@echo "Android library built"
 	@file build/bin/libstatus.so
+ifeq ($(USE_NIM_TOKEN_LISTS),true)
+	TKL_TARGET_OS=android NM="$(ANDROID_NDK_ROOT)/toolchains/llvm/prebuilt/$(HOST_OS)-x86_64/bin/llvm-nm" \
+		bash scripts/check_tkl_exports.sh build/bin/libstatus.so
+endif
 
 statusgo-ios-library: generate statusgo-c-bindings build-libsds-ios ##@cross-compile Build status-go as iOS mobile library
 	@echo "Building iOS mobile library..."
 	DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" \
 	CC="$$(xcrun --sdk $(IPHONE_SDK) --find clang)" \
 	$(IOS_BUILD_FLAGS) CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
-	go build -buildmode=c-archive -tags 'gowaku_no_rln nowatchdog disable_torrent' \
+	$(IOS_TOKEN_ENV) go build -buildmode=c-archive -tags '$(MOBILE_BUILD_TAGS)' \
 		-ldflags="-checklinkname=0 -X github.com/status-im/status-go/vendor/github.com/ethereum/go-ethereum/metrics.EnabledStr=true" \
 		-o "build/bin/libstatus.a" ./build/bin/statusgo-lib
 	@echo "iOS library built"
@@ -639,6 +652,7 @@ clean-libtkl: ##@other Remove the managed token-library checkout and build
 
 test-libtkl: ##@test Check native dependency reuse and public ABI
 	python3 scripts/test_tkl_native.py
+	python3 scripts/test_tkl_mobile_make.py
 	bash scripts/tkl_env.sh go test -tags tkl ./internal/tklbuild
 
 git-clean:
