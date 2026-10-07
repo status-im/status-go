@@ -817,6 +817,13 @@ func (api *API) SetHTTPTrafficStatsEnabled(ctx context.Context, enabled bool) {
 	traffic.Default.SetEnabled(enabled)
 }
 
+// SetBalancesActive tells whether balances are on screen. While they are not,
+// balances are refreshed far less often; once they are again, stale ones are
+// refreshed at once. Balances count as on screen until a client says otherwise.
+func (api *API) SetBalancesActive(ctx context.Context, active bool) {
+	api.s.multistandardBalanceController.SetActive(active)
+}
+
 // GetFollowingAddresses fetches the list of addresses that the given user is following via EFP
 func (api *API) GetFollowingAddresses(ctx context.Context, userAddress common.Address, search string, limit, offset int) ([]efp.FollowingAddress, error) {
 	logutils.ZapLogger().Debug("call to GetFollowingAddresses",
