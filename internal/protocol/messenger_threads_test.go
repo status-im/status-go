@@ -84,6 +84,23 @@ func (s *MessengerThreadsSuite) TestSenderCanCreateThreadRequiresPrivilegedCommu
 	s.Require().False(allowed)
 }
 
+func (s *MessengerThreadsSuite) TestSenderCanEditThreadRequiresVerifiedCreatorInOneToOneChat() {
+	chat := CreateOneToOneChat("thread-editor", &s.m.identity.PublicKey, s.m.getTimesource())
+	creatorID := contacts.ContactIDFromPublicKey(&s.m.identity.PublicKey)
+
+	allowed, err := s.m.senderCanEditThread(chat, &Thread{CreatorID: creatorID}, &s.m.identity.PublicKey)
+	s.Require().NoError(err)
+	s.Require().True(allowed)
+
+	allowed, err = s.m.senderCanEditThread(chat, &Thread{}, &s.m.identity.PublicKey)
+	s.Require().NoError(err)
+	s.Require().False(allowed)
+
+	allowed, err = s.m.senderCanEditThread(chat, &Thread{CreatorID: creatorID}, nil)
+	s.Require().ErrorIs(err, ErrThreadSenderRequired)
+	s.Require().False(allowed)
+}
+
 func (s *MessengerThreadsSuite) TestCreateThreadSucceedsWithExistingParent() {
 	chat := CreateOneToOneChat("test-user", &s.m.identity.PublicKey, s.m.getTimesource())
 	s.Require().NoError(s.m.SaveChat(chat))
@@ -105,8 +122,34 @@ func (s *MessengerThreadsSuite) TestCreateThreadSucceedsWithExistingParent() {
 	s.Require().Equal("parent-id", thread.ThreadID)
 	s.Require().Equal(chat.ID, thread.ChatID)
 	s.Require().Equal("parent-id", thread.ParentMessageID)
-	// Name should be normalized from parent text (trimmed to 40 chars)
+	// Name should be normalized from parent text (trimmed to 50 characters)
 	s.Require().Equal("This is a test thread message", thread.Name)
+}
+
+func (s *MessengerThreadsSuite) TestEditThreadUpdatesMetadataWithoutChangingParent() {
+	chat := CreateOneToOneChat("test-user", &s.m.identity.PublicKey, s.m.getTimesource())
+	s.Require().NoError(s.m.SaveChat(chat))
+
+	parent := buildTestMessage(*chat)
+	parent.ID = "parent-id"
+	parent.Text = "Original parent message"
+	parent.ChatMessage.Text = parent.Text
+	s.Require().NoError(s.m.SaveMessages([]*common.Message{parent}))
+	_, err := s.m.CreateThread(chat.ID, parent.ID)
+	s.Require().NoError(err)
+
+	name := "  Renamed\nthread  "
+	response, err := s.m.EditThread(context.Background(), &requests.EditThread{
+		ChatID: chat.ID, ThreadID: parent.ID, Name: &name,
+	})
+	s.Require().NoError(err)
+	s.Require().Len(response.Threads(), 1)
+	s.Require().Equal("Renamed thread", response.Threads()[0].Name)
+	s.Require().NotEmpty(response.Threads()[0].CreatorID)
+
+	storedParent, err := s.m.MessageByID(parent.ID)
+	s.Require().NoError(err)
+	s.Require().Equal("Original parent message", storedParent.Text)
 }
 
 func (s *MessengerThreadsSuite) TestCreateThreadRejectsParentAlreadyInThread() {
@@ -179,7 +222,7 @@ func (s *MessengerThreadsSuite) TestStartThreadFromNewMessageUsesNormalizedMessa
 	s.Require().NoError(err)
 	s.Require().Len(response.Threads(), 1)
 
-	expectedRootText := strings.Repeat("é", maxThreadNameLength)
+	expectedRootText := strings.Repeat("é", common.MaxThreadNameLength)
 	thread := response.Threads()[0]
 	s.Require().Equal(expectedRootText, thread.Name)
 	for _, responseMessage := range response.Messages() {
@@ -251,7 +294,7 @@ func (s *MessengerThreadsSuite) TestStartThreadFromNewMessageRequiresThreadNameO
 	s.Require().Empty(messages)
 }
 
-func (s *MessengerThreadsSuite) TestCreateThreadFailsWhenAlreadyExists() {
+func (s *MessengerThreadsSuite) TestCreateThreadResendsMetadataWhenRetriedByCreator() {
 	chat := CreateOneToOneChat("test-user", &s.m.identity.PublicKey, s.m.getTimesource())
 	s.Require().NoError(s.m.SaveChat(chat))
 
@@ -267,10 +310,11 @@ func (s *MessengerThreadsSuite) TestCreateThreadFailsWhenAlreadyExists() {
 	s.Require().NoError(err)
 	s.Require().Len(response.Threads(), 1)
 
-	// Attempt to create thread again
-	_, err = s.m.CreateThread(chat.ID, "parent-id")
-	s.Require().Error(err)
-	s.Require().Contains(err.Error(), "thread already exists for this message")
+	// Retrying as the creator resends creation metadata after a delivery failure.
+	response, err = s.m.CreateThread(chat.ID, "parent-id")
+	s.Require().NoError(err)
+	s.Require().Len(response.Threads(), 1)
+	s.Require().Equal("parent-id", response.Threads()[0].ThreadID)
 }
 
 func (s *MessengerThreadsSuite) TestCreateThreadFailsWhenFeatureFlagDisabled() {
@@ -1117,8 +1161,10 @@ func (s *MessengerThreadsSuite) TestStartThreadFromNewMessageIsReceivedWithThrea
 	s.Require().Len(senderResponse.Threads(), 1)
 
 	threadID := senderResponse.Threads()[0].ThreadID
+	// The root, the creation metadata and the reply may arrive in one batch or
+	// several, and in any order, so accumulate what was observed across responses.
+	var receivedRoot, receivedReply, receivedCreator bool
 	_, err = WaitOnMessengerResponse(receiver, func(response *MessengerResponse) bool {
-		var receivedRoot, receivedReply bool
 		for _, receivedMessage := range response.Messages() {
 			switch receivedMessage.ID {
 			case threadID:
@@ -1127,18 +1173,43 @@ func (s *MessengerThreadsSuite) TestStartThreadFromNewMessageIsReceivedWithThrea
 				receivedReply = true
 			}
 		}
-		return receivedRoot && receivedReply
-	}, "thread root and first reply not received")
+		for _, receivedThread := range response.Threads() {
+			if receivedThread.ThreadID == threadID && receivedThread.CreatorID == sender.selfContact.ID {
+				receivedCreator = true
+			}
+		}
+		return receivedRoot && receivedReply && receivedCreator
+	}, "thread root, first reply and creation metadata not received")
 	s.Require().NoError(err)
 
 	thread, err := receiver.persistence.ThreadByID(receiverChat.ID, threadID)
 	s.Require().NoError(err)
 	s.Require().Equal("New thread", thread.Name)
+	s.Require().Equal(sender.selfContact.ID, thread.CreatorID)
+	s.Require().False(thread.CreatorPending)
 
-	receivedReply, err := receiver.MessageByID(message.ID)
+	// The creator's later edits must be accepted by the receiver.
+	newName := "Renamed thread"
+	_, err = sender.EditThread(context.Background(), &requests.EditThread{
+		ChatID:   senderChat.ID,
+		ThreadID: threadID,
+		Name:     &newName,
+	})
 	s.Require().NoError(err)
-	s.Require().Equal(threadID, receivedReply.GetThreadId())
-	s.Require().Equal(threadID, receivedReply.ResponseTo)
+	_, err = WaitOnMessengerResponse(receiver, func(response *MessengerResponse) bool {
+		for _, receivedThread := range response.Threads() {
+			if receivedThread.ThreadID == threadID && receivedThread.Name == newName {
+				return true
+			}
+		}
+		return false
+	}, "thread edit not received")
+	s.Require().NoError(err)
+
+	storedReply, err := receiver.MessageByID(message.ID)
+	s.Require().NoError(err)
+	s.Require().Equal(threadID, storedReply.GetThreadId())
+	s.Require().Equal(threadID, storedReply.ResponseTo)
 
 	threadMessages, cursor, err := receiver.MessageByChatID(receiverChat.ID, threadID, "", 10)
 	s.Require().NoError(err)
@@ -1413,4 +1484,54 @@ func (s *MessengerThreadsSuite) TestThreadMessagesAreReceivedAndListedWhenThread
 	}
 
 	s.Require().True(foundThreadReply)
+}
+
+func (s *MessengerThreadsSuite) TestThreadCreationMetadataClaimsOnlyPendingPlaceholders() {
+	creator, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+	creatorID := contacts.ContactIDFromPublicKey(&creator.PublicKey)
+	chat := CreateOneToOneChat("pending-creator", &creator.PublicKey, s.m.getTimesource())
+	s.Require().NoError(s.m.SaveChat(chat))
+
+	handle := func(metadata *protobuf.ThreadMetadata) (*MessengerResponse, error) {
+		metadata.ChatId = chat.ID
+		metadata.MessageType = protobuf.MessageType_ONE_TO_ONE
+		state := &ReceivedMessageState{
+			Response: &MessengerResponse{},
+			CurrentMessageState: &CurrentMessageState{
+				PublicKey:        &creator.PublicKey,
+				WhisperTimestamp: metadata.Clock,
+			},
+		}
+		err := s.m.HandleThreadMetadata(context.Background(), state, metadata, nil)
+		return state.Response, err
+	}
+
+	// A reply arrived before the creation metadata.
+	s.Require().NoError(s.m.persistence.UpsertPendingCreatorThread("pending", chat.ID, "pending", "Parent text"))
+	response, err := handle(&protobuf.ThreadMetadata{Clock: 10, ThreadId: "pending", Name: "Created", CreatorId: creatorID})
+	s.Require().NoError(err)
+	s.Require().Len(response.Threads(), 1)
+	thread, err := s.m.persistence.ThreadByID(chat.ID, "pending")
+	s.Require().NoError(err)
+	s.Require().Equal(creatorID, thread.CreatorID)
+	s.Require().False(thread.CreatorPending)
+	s.Require().Equal("Created", thread.Name)
+
+	// The creator can then edit the thread.
+	_, err = handle(&protobuf.ThreadMetadata{Clock: 20, ThreadId: "pending", Name: "Edited"})
+	s.Require().NoError(err)
+	thread, err = s.m.persistence.ThreadByID(chat.ID, "pending")
+	s.Require().NoError(err)
+	s.Require().Equal("Edited", thread.Name)
+
+	// Legacy creator-unknown threads are never claimed.
+	s.Require().NoError(s.m.persistence.UpsertThread("legacy", chat.ID, "legacy", "Legacy"))
+	response, err = handle(&protobuf.ThreadMetadata{Clock: 30, ThreadId: "legacy", Name: "Claimed", CreatorId: creatorID})
+	s.Require().NoError(err)
+	s.Require().Empty(response.Threads())
+	thread, err = s.m.persistence.ThreadByID(chat.ID, "legacy")
+	s.Require().NoError(err)
+	s.Require().Empty(thread.CreatorID)
+	s.Require().Equal("Legacy", thread.Name)
 }

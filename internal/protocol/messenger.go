@@ -80,6 +80,7 @@ var (
 	ErrChatNotFoundError              = errors.New("Chat not found")
 	ErrThreadFeatureDisabled          = errors.New("threads feature is disabled")
 	ErrThreadsNotSupportedForChatType = errors.New("threads are not supported for this chat type")
+	ErrThreadSenderRequired           = errors.New("thread sender is required")
 )
 
 const communityAdvertiseIntervalSecond int64 = 24 * 60 * 60
@@ -2193,6 +2194,19 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 		ResendType:           chat.DefaultResendType(),
 	}
 
+	if message.ThreadMetadataCreationAuthorized && message.GetThreadId() != "" {
+		name := m.persistence.threadNameFromParentByID(message.GetThreadId())
+		if err := m.persistence.UpsertThread(message.GetThreadId(), chat.ID, message.GetThreadId(), name); err != nil {
+			return nil, err
+		}
+		if err := m.persistence.SetThreadCreator(message.GetThreadId(), chat.ID, contacts.ContactIDFromPublicKey(&m.identity.PublicKey)); err != nil {
+			return nil, err
+		}
+		if err := m.dispatchThreadCreationMetadata(ctx, chat, message.GetThreadId(), name); err != nil {
+			return nil, err
+		}
+	}
+
 	// We want to save the raw message before dispatching it, to avoid race conditions
 	// since it might get dispatched and confirmed before it's saved.
 	// This is not the best solution, probably it would be better to split
@@ -2234,7 +2248,6 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 	if err != nil {
 		return nil, err
 	}
-
 	msg, err := m.pullMessagesAndResponsesFromDB([]*common.Message{message})
 	if err != nil {
 		return nil, err

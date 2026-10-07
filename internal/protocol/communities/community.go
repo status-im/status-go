@@ -2182,6 +2182,11 @@ func (o *Community) CanPost(pk *ecdsa.PublicKey, chatID string, messageType prot
 	}
 
 	switch messageType {
+	case protobuf.ApplicationMetadataMessage_THREAD_METADATA:
+		// Thread metadata has stricter creator/admin authorization in the
+		// messenger handler. Access is sufficient at this transport gate.
+		return true, nil
+
 	case protobuf.ApplicationMetadataMessage_PIN_MESSAGE:
 		pinAllowed := o.IsPrivilegedMember(pk) || o.AllowsAllMembersToPinMessage()
 		return pinAllowed, nil

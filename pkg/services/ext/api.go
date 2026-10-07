@@ -566,6 +566,10 @@ func (api *PublicAPI) CreateThread(chatID string, parentMessageID string) (*prot
 	return api.service.messenger.CreateThread(chatID, parentMessageID)
 }
 
+func (api *PublicAPI) EditThread(ctx context.Context, request *requests.EditThread) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.EditThread(ctx, request)
+}
+
 func (api *PublicAPI) StartThreadFromNewMessage(ctx context.Context, request *requests.StartThreadFromNewMessage) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.StartThreadFromNewMessage(ctx, request)
 }
