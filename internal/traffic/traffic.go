@@ -34,6 +34,7 @@ var attribution = httptraffic.Attribution{
 	// Packages and functions that carry requests for someone else.
 	Plumbing: []string{
 		statusGoModule + "internal/traffic.",
+		statusGoModule + "internal/requestgzip.",
 		statusGoModule + "internal/rpc",
 		statusGoModule + "internal/circuitbreaker.",
 		statusGoModule + "internal/panics.",

@@ -24,6 +24,7 @@ func TestAttribution_SkipsPlumbingAndRPCEntryPoints(t *testing.T) {
 		statusGoModule + "pkg/services/wallet.(*API).FetchPrices":                                  false,
 		statusGoModule + "internal/rpc/chain.(*ClientWithFallback).CallContext":                    false,
 		statusGoModule + "internal/traffic.WithSource":                                             false,
+		statusGoModule + "internal/requestgzip.(*Transport).RoundTrip":                             false,
 		statusGoModule + "mobile.CallPrivateRPC":                                                   false,
 		walletSDKModule + "pkg/httptraffic.(*roundTripper).RoundTrip":                              false,
 		"github.com/ethereum/go-ethereum/rpc.(*Client).CallContext":                                false,
