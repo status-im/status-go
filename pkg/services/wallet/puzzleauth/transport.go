@@ -57,11 +57,11 @@ func NewTransport(origin string, base http.RoundTripper) *Transport {
 	}
 }
 
-// NewHTTPClient returns an [*http.Client] with [Transport] set to [NewTransport](origin, nil) and a 60s timeout.
-func NewHTTPClient(origin string) *http.Client {
+// NewHTTPClient returns an [*http.Client] with [Transport] set to [NewTransport](origin, base) and a 60s timeout.
+func NewHTTPClient(origin string, base http.RoundTripper) *http.Client {
 	return &http.Client{
 		Timeout:   60 * time.Second,
-		Transport: NewTransport(origin, nil),
+		Transport: NewTransport(origin, base),
 	}
 }
 
