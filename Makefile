@@ -103,6 +103,7 @@ GIT_COMMIT ?= $(shell git rev-parse --short HEAD)
 GIT_AUTHOR ?= $(shell git config user.email || echo $$USER)
 
 BUILD_TAGS ?= gowaku_no_rln
+TKL_COMMA := ,
 
 # Keep the existing backend available until the platform rollout is verified.
 USE_NIM_TOKEN_LISTS ?= false
@@ -111,6 +112,7 @@ ifeq ($(USE_NIM_TOKEN_LISTS),true)
 MOBILE_BUILD_TAGS += tkl
 ANDROID_TOKEN_ENV = ANDROID_NDK_ROOT="$(ANDROID_NDK_ROOT)" ANDROID_API="$(ANDROID_API)" TKL_HIDE_EXPORTS=1 bash scripts/tkl_env.sh
 IOS_TOKEN_ENV = IPHONE_SDK="$(IPHONE_SDK)" IOS_TARGET="$(IOS_TARGET)" bash scripts/tkl_env.sh
+IOS_TOKEN_ARCHIVE = bash scripts/tkl_bundle_archive.sh build/bin/libstatus.a
 endif
 
 # `nim-sds` variables
@@ -431,11 +433,12 @@ statusgo-stub-bindings:
 
 statusgo-library: STATUS_GO_BINDINGS_PATH ?= build/bin/statusgo-lib
 statusgo-library: STATUS_GO_LIBRARY_OUT ?= build/bin
+statusgo-library: TOKEN_STATIC_BUILD = $(if $(filter tkl,$(subst $(TKL_COMMA), ,$(BUILD_TAGS))),bash scripts/tkl_bundle_archive.sh "$(STATUS_GO_LIBRARY_OUT)/libstatus.a",)
 statusgo-library: generate
 statusgo-library: statusgo-c-bindings $(LIBSDS)  ##@cross-compile Build status-go as static library for current platform
 	@echo "Building static library..."
 	CGO_LDFLAGS='$(CGO_LDFLAGS)' CGO_CFLAGS='$(CGO_CFLAGS)' \
-	go build \
+	$(TOKEN_STATIC_BUILD) go build \
 		-tags '$(BUILD_TAGS)' \
 		$(BUILD_FLAGS) \
 		-buildmode=c-archive \
@@ -499,7 +502,7 @@ statusgo-ios-library: generate statusgo-c-bindings build-libsds-ios ##@cross-com
 	DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" \
 	CC="$$(xcrun --sdk $(IPHONE_SDK) --find clang)" \
 	$(IOS_BUILD_FLAGS) CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
-	$(IOS_TOKEN_ENV) go build -buildmode=c-archive -tags '$(MOBILE_BUILD_TAGS)' \
+	$(IOS_TOKEN_ENV) $(IOS_TOKEN_ARCHIVE) go build -buildmode=c-archive -tags '$(MOBILE_BUILD_TAGS)' \
 		-ldflags="-checklinkname=0 -X github.com/status-im/status-go/vendor/github.com/ethereum/go-ethereum/metrics.EnabledStr=true" \
 		-o "build/bin/libstatus.a" ./build/bin/statusgo-lib
 	@echo "iOS library built"

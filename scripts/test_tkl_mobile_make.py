@@ -6,6 +6,18 @@ import unittest
 
 
 class MobileBuildTest(unittest.TestCase):
+    def test_static_archive_bundling_accepts_both_go_tag_separators(self):
+        repo = Path(__file__).resolve().parent.parent
+        for tags, bundled in (("gowaku_no_rln", False), ("gowaku_no_rln tkl", True),
+                              ("gowaku_no_rln,tkl", True), ("not_tkl", False)):
+            with self.subTest(tags=tags):
+                result = subprocess.run(
+                    ["make", "-n", "statusgo-library", "-o", "generate",
+                     "-o", "statusgo-c-bindings", "LIBSDS=/fixture/libsds.a",
+                     "-o", "/fixture/libsds.a", f"BUILD_TAGS={tags}"],
+                    cwd=repo, text=True, capture_output=True, check=True)
+                self.assertEqual("scripts/tkl_bundle_archive.sh" in result.stdout, bundled)
+
     def test_opt_in_adds_native_preparation_and_go_tag(self):
         repo = Path(__file__).resolve().parent.parent
         for platform in ("android", "ios"):
@@ -22,6 +34,8 @@ class MobileBuildTest(unittest.TestCase):
                     command = result.stdout
                     self.assertEqual("bash scripts/tkl_env.sh" in command, enabled == "true")
                     self.assertEqual("disable_torrent tkl'" in command, enabled == "true")
+                    self.assertEqual("scripts/tkl_bundle_archive.sh" in command,
+                                     platform == "ios" and enabled == "true")
                     if enabled == "true":
                         if platform == "android":
                             self.assertIn("TKL_HIDE_EXPORTS=1", command)
