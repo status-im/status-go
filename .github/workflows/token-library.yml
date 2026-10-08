@@ -56,6 +56,9 @@ jobs:
         run: |
           CC=gcc bash scripts/tkl_env.sh go test -tags tkl ./internal/tklbuild
           CC=gcc bash scripts/test_tkl_link.sh
+      - name: Bundled static library and C application
+        shell: msys2 {0}
+        run: CC=gcc bash scripts/test_tkl_static.sh
   android:
     runs-on: ubuntu-24.04
     timeout-minutes: 20

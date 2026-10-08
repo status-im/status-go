@@ -7,6 +7,7 @@ mkdir -p build
 go build -buildmode=c-archive -o build/tkl-static.a ./scripts/testdata/tkl-probe
 bash scripts/tkl_bundle_archive.sh "$PWD/build/tkl-static.a"
 flags=()
+application=build/tkl-static-app
 case "$(go env GOOS)" in
   darwin)
     flags=(-framework CoreFoundation -framework Security
@@ -22,11 +23,14 @@ case "$(go env GOOS)" in
       -framework CoreFoundation -framework Security
       "-Wl,-unexported_symbols_list,$repo/scripts/tkl-unexported-macos.txt") ;;
   linux) flags=(-ldl "-Wl,--version-script=$repo/scripts/tkl-private-linux.map") ;;
+  windows)
+    flags=(-lntdll -lws2_32 -lwinmm)
+    application="$application.exe" ;;
   *) echo "Unsupported static probe target" >&2; exit 1 ;;
 esac
 "${CC:-cc}" scripts/testdata/tkl-caller.c -Ibuild build/tkl-static.a \
-  "${flags[@]}" -pthread -lm -o build/tkl-static-app
+  "${flags[@]}" -pthread -lm -o "$application"
 if [ "$(go env GOOS)/$(go env GOARCH)" = "$(go env GOHOSTOS)/$(go env GOHOSTARCH)" ]; then
-  ./build/tkl-static-app
+  "./$application"
 fi
-TKL_TARGET_OS="$(go env GOOS)" bash scripts/check_tkl_exports.sh build/tkl-static-app
+TKL_TARGET_OS="$(go env GOOS)" bash scripts/check_tkl_exports.sh "$application"

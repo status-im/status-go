@@ -13,11 +13,15 @@ trap 'rm -r -- "$scratch"' EXIT
 case "$(go env GOOS)" in
   darwin|ios)
     "${TKL_LIBTOOL:-libtool}" -static -o "$scratch/bundled.a" "$archive" "$NIM_TKL_LIB_DIR/libtkl.a" ;;
-  linux)
+  linux|windows)
+    # GNU ar (including MinGW) merges archive members using its MRI command mode.
     # Simple relative names also avoid MRI quoting differences across ar versions.
     cp "$archive" "$scratch/status.a"
     cp "$NIM_TKL_LIB_DIR/libtkl.a" "$scratch/tkl.a"
-    (cd "$scratch"; printf 'create bundled.a\naddlib status.a\naddlib tkl.a\nsave\nend\n' | "${TKL_AR:-ar}" -M) ;;
+    (
+      cd "$scratch"
+      printf 'create bundled.a\naddlib status.a\naddlib tkl.a\nsave\nend\n' | "${TKL_AR:-ar}" -M
+    ) ;;
   *) echo "Unsupported static token-library target" >&2; exit 1 ;;
 esac
 mv -- "$scratch/bundled.a" "$archive"
