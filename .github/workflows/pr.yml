@@ -49,6 +49,10 @@ jobs:
         run: |
           make lint-panics USE_LOGOS_STORAGE=true USE_TORRENT=true
 
+      - name: argon2 fork matches upstream
+        run: |
+          make lint-argon2-fork
+
       - name: go mod tidy
         run: go mod tidy && git diff --exit-code
 
