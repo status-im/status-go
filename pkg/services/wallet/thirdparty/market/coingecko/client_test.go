@@ -12,8 +12,8 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 
 	"github.com/status-im/go-wallet-sdk/pkg/common"
-	"github.com/status-im/go-wallet-sdk/pkg/tokens/builder"
-	"github.com/status-im/go-wallet-sdk/pkg/tokens/types"
+
+	types "github.com/status-im/status-go/pkg/services/wallet/token/tokenlist"
 
 	"github.com/status-im/status-go/pkg/security"
 	walletcommon "github.com/status-im/status-go/pkg/services/wallet/common"
@@ -139,16 +139,16 @@ func TestGetTokensSuccess(t *testing.T) {
 		if chainID == common.BSCMainnet || chainID == common.BSCTestnet {
 			expectedMap[token.Key()] = GeckoToken{
 				ID:     nativeBNBTokenID,
-				Name:   builder.BinanceSmartChainNativeName,
-				Symbol: builder.BinanceSmartChainNativeSymbol,
+				Name:   "BNB",
+				Symbol: "BNB",
 			}
 			continue
 		}
 
 		expectedMap[token.Key()] = GeckoToken{
 			ID:     nativeEthTokenID,
-			Name:   builder.EthereumNativeName,
-			Symbol: builder.EthereumNativeSymbol,
+			Name:   "Ethereum",
+			Symbol: "ETH",
 		}
 	}
 

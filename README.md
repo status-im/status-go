@@ -59,6 +59,12 @@ The optional `tkl` build supports the C-backed Nim token catalogue. Set
 using the same inputs, without another fetcher or storage writer. Both options
 default to false; shadow comparison requires the Nim catalogue.
 
+Wallet consumers and the native facade use status-go's token/list DTOs and
+catalogue interface in `pkg/services/wallet/token/tokenlist`. Their JSON fields
+and token-key format remain unchanged. SDK types are translated at the rollback
+adapter and shadow-comparison boundary; the offline list analyzer still uses the
+SDK parser.
+
 Comparison logs include revision, token differences, parser failures and timing.
 They compare unique token metadata; list metadata and query behavior are outside
 this comparison. Work is bounded per login to 64 snapshots or 24 hours, with

@@ -5,9 +5,9 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/status-im/go-wallet-sdk/pkg/tokens/types"
 	"github.com/stretchr/testify/require"
 
+	types "github.com/status-im/status-go/pkg/services/wallet/token/tokenlist"
 	tokentypes "github.com/status-im/status-go/pkg/services/wallet/token/types"
 )
 
