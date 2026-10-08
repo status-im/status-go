@@ -1,5 +1,3 @@
-//go:build tkl
-
 package token
 
 import (
@@ -48,8 +46,7 @@ func putTKLBatch(ctx context.Context, db *sql.DB, writes []tkl.ListContent) erro
 	return tx.Commit()
 }
 
-// newTKLRefreshManager's callbacks own success timestamps and update events;
-// callers must not route its notify channel through the legacy SDK notifier.
+// newTKLRefreshManager owns refresh persistence, success timestamps and update events.
 func newTKLRefreshManager(mng *Manager, chains []uint64, lastSuccess time.Time, client *http.Client, refreshInterval, checkInterval time.Duration) (*tklmanager.Manager, error) {
 	options := tklmanager.RefreshOptions{
 		Client: client, RefreshInterval: refreshInterval, CheckInterval: checkInterval,
@@ -67,9 +64,6 @@ func newTKLRefreshManager(mng *Manager, chains []uint64, lastSuccess time.Time, 
 			}
 		},
 		OnError: func(err error) { logutils.ZapLogger().Error("Token catalogue refresh failed", zap.Error(err)) },
-	}
-	if mng.shadowComparison {
-		options.OnShadow = logShadowComparison
 	}
 	return newTKLReadManager(mng, chains, lastSuccess, options)
 }
