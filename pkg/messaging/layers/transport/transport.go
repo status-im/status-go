@@ -6,7 +6,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/pkg/errors"
 	"github.com/waku-org/go-waku/waku/v2/api/history"
 	"go.uber.org/zap"
@@ -873,22 +872,8 @@ func (t *Transport) FetchMessagesByHashes(ctx context.Context, messageHashes []s
 		return nil
 	}
 
-	type activeStorenodeProvider interface {
-		GetActiveStorenode() peer.AddrInfo
-	}
-
-	provider, ok := t.waku.(activeStorenodeProvider)
-	if !ok {
-		return errors.New("waku backend does not expose an active storenode")
-	}
-
-	storenode := provider.GetActiveStorenode()
-	if storenode.ID == "" {
-		return errors.New("no active storenode")
-	}
-
 	type hashFetcher interface {
-		FetchMessagesByHashes(ctx context.Context, storenode peer.AddrInfo, messageHashes []string) error
+		FetchMessagesByHashes(ctx context.Context, messageHashes []string) error
 	}
 
 	fetcher, ok := t.waku.(hashFetcher)
@@ -896,7 +881,7 @@ func (t *Transport) FetchMessagesByHashes(ctx context.Context, messageHashes []s
 		return errors.New("waku backend does not support hash-based message fetch")
 	}
 
-	return fetcher.FetchMessagesByHashes(ctx, storenode, messageHashes)
+	return fetcher.FetchMessagesByHashes(ctx, messageHashes)
 }
 
 func (t *Transport) SetStorenodeConfigProvider(c history.StorenodeConfigProvider) {
