@@ -35,4 +35,5 @@ GOFLAGS="${GOFLAGS:-} -tags=tkl,gowaku_no_rln,lint" \
   -target github.com/status-im/status-go/internal/panics.LogOnPanic ./pkg/services/wallet/token/...
 # Ordinary lint builds exclude tkl files. Apply the repository's full linter
 # configuration to these optional packages using the pinned public module.
-golangci-lint run --build-tags 'tkl,gowaku_no_rln,lint' ./pkg/services/wallet/token/...
+golangci-lint run --build-tags 'tkl,gowaku_no_rln,lint' \
+  ./pkg/services/wallet/token/... ./pkg/backend/... ./params/ ./internal/protocol/requests/

@@ -32,6 +32,20 @@ For controlled builds with prebuilt artifacts, supply both `NIM_TKL_INC_DIR`
 Both must come from the recorded revision and target. Native builds currently
 support Linux and macOS; cross builds require matching prebuilt inputs.
 
+# Optional token catalogue
+
+The optional `tkl` build supports the C-backed Nim token catalogue. Set
+`tokenListsUseNim` in the login wallet configuration to select it. The separate
+`tokenListsShadow` option compares its committed catalogue with the SDK builder
+using the same inputs, without another fetcher or storage writer. Both options
+default to false; shadow comparison requires the Nim catalogue.
+
+Comparison logs include revision, token differences, parser failures and timing.
+They compare unique token metadata; list metadata and query behavior are outside
+this comparison. Work is bounded per login to 64 snapshots or 24 hours, with
+input limits and a coalescing queue. Known custom-token marker differences are
+counted separately. Live development runs are still needed to assess parity.
+
 # License
 
 [Mozilla Public License 2.0](https://github.com/status-im/status-go/blob/develop/LICENSE.md)

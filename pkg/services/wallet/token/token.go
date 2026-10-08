@@ -92,7 +92,8 @@ type Manager struct {
 	accountsPublisher          *pubsub.Publisher
 	tokenBalancesStorage       balanceStorage
 
-	tokensManager manager.Manager
+	tokensManager    manager.Manager
+	shadowComparison bool
 
 	stopCh      chan struct{}
 	notifyCh    chan struct{}
@@ -102,7 +103,10 @@ type Manager struct {
 }
 
 // ManagerOptions selects the optional C-backed catalogue. It remains off by default.
-type ManagerOptions struct{ UseNim bool }
+type ManagerOptions struct {
+	UseNim bool
+	Shadow bool
+}
 
 // CataloguePausable exposes the optional refresh scheduler to the node registry.
 func (tm *Manager) CataloguePausable() pausable.Pausable {
@@ -128,6 +132,10 @@ func NewTokenManager(
 		return nil, errors.New("only one token manager configuration is allowed")
 	}
 	useNim := len(options) == 1 && options[0].UseNim
+	shadow := len(options) == 1 && options[0].Shadow
+	if shadow && !useNim {
+		return nil, errors.New("TokenListsShadow requires TokenListsUseNim")
+	}
 	maker := contracts.NewContractMaker(ethClientGetter)
 
 	settings, err := settings.MakeNewDB(appDB)
@@ -141,6 +149,7 @@ func NewTokenManager(
 	}
 
 	manager := &Manager{
+		shadowComparison:           shadow,
 		walletDB:                   walletDB,
 		settings:                   settings,
 		ethClientGetter:            ethClientGetter,
