@@ -28,12 +28,11 @@ cd "$repo"
 if [ "$#" -eq 0 ]; then
   set -- ./pkg/services/wallet/token/...
 fi
-go test -race="$race" -tags 'tkl gowaku_no_rln' "$@"
-# Resolve the optional module for the goroutine guard as well as tests.
-GOFLAGS="${GOFLAGS:-} -tags=tkl,gowaku_no_rln,lint" \
+go test -race="$race" -tags 'gowaku_no_rln' "$@"
+# Check the same native implementation used in production.
+GOFLAGS="${GOFLAGS:-} -tags=gowaku_no_rln,lint" \
   go tool goroutine-defer-guard -test=false \
   -target github.com/status-im/status-go/internal/panics.LogOnPanic ./pkg/services/wallet/token/...
-# Ordinary lint builds exclude tkl files. Apply the repository's full linter
-# configuration to these optional packages using the pinned public module.
-golangci-lint run --build-tags 'tkl,gowaku_no_rln,lint' \
+# Apply the repository linter to the catalogue and its callers.
+golangci-lint run --build-tags 'gowaku_no_rln,lint' \
   ./pkg/services/wallet/token/... ./pkg/backend/... ./params/ ./internal/protocol/requests/
