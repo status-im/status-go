@@ -48,7 +48,8 @@ RUN set -eu && \
 
 ENV PATH="/opt/nim/bin:${PATH}"
 
-# nim-sds builds through Nimble; the one bundled with Nim is too old for it.
+# Nimble supplies nim-sds' pinned Nim; the one above builds logos-storage.
+# Must match NIMBLE_VERSION in ci-nimble.yml.
 ARG NIMBLE_VERSION=0.26.0
 RUN set -eu && \
     case "$(dpkg --print-architecture)" in \
@@ -89,7 +90,7 @@ RUN --mount=type=cache,target="/root/.cache/go-build",id=statusgo-build-$cache_i
 
 # Stage runtime shared libraries required by built binaries.
 RUN mkdir -p /tmp/status-runtime-libs \
-    && cp /go/src/github.com/status-im/nim-sds/build/libsds.so /tmp/status-runtime-libs/ \
+    && cp /go/src/github.com/status-im/status-go/build/libsds.so /tmp/status-runtime-libs/ \
     && if [ -f /go/src/github.com/status-im/logos-storage-nim/build/libstorage.so ]; then \
     cp /go/src/github.com/status-im/logos-storage-nim/build/libstorage.so /tmp/status-runtime-libs/; \
     fi

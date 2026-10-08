@@ -105,23 +105,12 @@ GIT_AUTHOR ?= $(shell git config user.email || echo $$USER)
 BUILD_TAGS ?= gowaku_no_rln
 
 # `nim-sds` variables
-
-# Pin nim-sds revision here. Can be a tag or commit hash.
-NIM_SDS_VERSION ?= 4b08d508dbfa69c0e2e3883db67adf1fe5a0c994
+#
+# Option 1 (default): Nimble builds libsds into build/. sds-go-bindings pins the revision.
+# Option 2: Provide NIM_SDS_LIB_DIR and NIM_SDS_INC_DIR (used by Nix).
 
 NIMBLE ?= nimble
 
-# Option 1: Provide NIM_SDS_SOURCE_DIR. Make force-reclones a fresh copy (with submodules)
-# to guarantee a clean checkout on every build.
-NIM_SDS_SOURCE_DIR ?= $(GIT_ROOT)/../nim-sds
-# Normalize path separators for Windows (backslashes cause issues when passed through shells)
-ifeq ($(mkspecs),win32)
-	NIM_SDS_SOURCE_DIR := $(subst \,/,$(NIM_SDS_SOURCE_DIR))
-endif
-
-# Option 2: Provide NIM_SDS_LIB_DIR and NIM_SDS_INC_DIR
-
-# Determine which approach to use
 ifdef NIM_SDS_LIB_DIR
 ifdef NIM_SDS_INC_DIR
     # External lib/include approach (e.g. used in Nix)
@@ -130,11 +119,18 @@ else
     $(error NIM_SDS_INC_DIR must be provided when NIM_SDS_LIB_DIR is set)
 endif
 else
-    # Source directory approach
-    NIM_SDS_LIB_DIR := $(NIM_SDS_SOURCE_DIR)/build
-    NIM_SDS_INC_DIR := $(NIM_SDS_SOURCE_DIR)/library
+    # Nimble approach
+    NIM_SDS_LIB_DIR := $(CURDIR)/build
+    NIM_SDS_INC_DIR := $(CURDIR)/build
     NIM_SDS_BUILD_FROM_SOURCE := true
+    # Nix builds have no Nimble on PATH.
+    NIMBLE_SETUP := nimble.paths
 endif
+
+# nimble.paths has every --path, so parent configs (status-app's) are skipped.
+NIMBLE_SDS_ENV = \
+	LIBSDS_OUT="$(NIM_SDS_LIB_DIR)" \
+	NIM_PARAMS="--skipParentCfg $$NIM_PARAMS $$(tr '\n' ' ' < $(CURDIR)/nimble.paths)"
 
 LIBSDS ?= $(NIM_SDS_LIB_DIR)/libsds.$(LIB_EXT)
 CGO_CFLAGS+=-I$(NIM_SDS_INC_DIR)
@@ -325,25 +321,17 @@ USE_SYSTEM_NIM ?= 1
 
 # libsds targets
 
-.PHONY: clone-nim-sds
-clone-nim-sds: ##@build Clone or update nim-sds
-ifeq ($(NIM_SDS_BUILD_FROM_SOURCE),true)
-	@echo "Cloning or updating nim-sds ..."
-	if [ ! -d "$(NIM_SDS_SOURCE_DIR)" ]; then \
-		git clone --recurse-submodules https://github.com/waku-org/nim-sds.git "$(NIM_SDS_SOURCE_DIR)"; \
-	else \
-		cd "$(NIM_SDS_SOURCE_DIR)" && git fetch --tags; \
-	fi
-	cd "$(NIM_SDS_SOURCE_DIR)" && \
-		git switch --no-recurse-submodules --force --detach "$(NIM_SDS_VERSION)" && \
-		git clean -fdx && \
-		git submodule update --init --recursive --force
-endif
+.PHONY: nimble-deps
 
-$(LIBSDS): clone-nim-sds
+nimble.paths: status_go.nimble
+	$(NIMBLE) setup --localdeps -y
+
+nimble-deps: nimble.paths ##@build Resolve the Nim dependencies
+
+$(LIBSDS): | $(NIMBLE_SETUP)
 ifeq ($(NIM_SDS_BUILD_FROM_SOURCE),true)
 	@echo "Building nim-sds: $(LIBSDS)"
-	cd "$(NIM_SDS_SOURCE_DIR)" && $(NIMBLE) setup -l -y && $(NIMBLE) libsds
+	$(NIMBLE_SDS_ENV) $(NIMBLE) libsds
 	@test -f $(LIBSDS) || (echo "Error: libsds not found at $(LIBSDS) after build" && exit 1)
 else
 	@test -f $(LIBSDS) || (echo "Error: libsds not found at $(LIBSDS)" && exit 1)
@@ -359,14 +347,14 @@ build-libsds-android: SDSARCH = $(strip $(if $(filter arm64,$(ARCH)),arm64,\
 	$(if $(filter amd64,$(ARCH)),amd64,\
 	$(if $(filter x86 x86_64,$(ARCH)),amd64,\
 	$(error Unsupported ARCH '$(ARCH)'. Please set ARCH to one of: arm64, arm, amd64, x86, x86_64))))))
-build-libsds-android: clone-nim-sds
+build-libsds-android: | nimble.paths
 	@echo "Building nim-sds for Android" $(LIBSDS)
-	cd "$(NIM_SDS_SOURCE_DIR)" && $(NIMBLE) setup -l -y && \
-		ARCH="$(SDSARCH)" ANDROID_NDK_ROOT="$(ANDROID_NDK_ROOT)" $(NIMBLE) libsdsAndroid
+	$(NIMBLE_SDS_ENV) ARCH="$(SDSARCH)" ANDROID_NDK_ROOT="$(ANDROID_NDK_ROOT)" \
+		$(NIMBLE) libsdsAndroid
 
-build-libsds-ios: clone-nim-sds
+build-libsds-ios: | nimble.paths
 	@echo "Building nim-sds for iOS" $(LIBSDS)
-	cd "$(NIM_SDS_SOURCE_DIR)" && $(NIMBLE) setup -l -y && $(NIMBLE) libsdsIOS
+	$(NIMBLE_SDS_ENV) $(NIMBLE) libsdsIOS
 
 clean-libsds:
 	@echo "Removing libsds"
