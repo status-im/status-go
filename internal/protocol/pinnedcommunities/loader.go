@@ -27,17 +27,13 @@ type Payload struct {
 // LoadEmbedded returns pinned communities shipped inside the binary, sorted by community ID.
 // RawPayload aliases the embedded bytes and must not be modified.
 func LoadEmbedded() ([]Payload, error) {
-	ids := make([]string, 0, len(assets.Payloads))
-	for id := range assets.Payloads {
-		ids = append(ids, id)
-	}
-	sort.Strings(ids)
-
+	ids := assets.IDs()
 	payloads := make([]Payload, 0, len(ids))
 	for _, id := range ids {
+		raw, _ := assets.Payload(id)
 		payloads = append(payloads, Payload{
 			CommunityID: id,
-			RawPayload:  assets.Payloads[id],
+			RawPayload:  raw,
 			FileName:    id + RawPayloadSuffix,
 		})
 	}
