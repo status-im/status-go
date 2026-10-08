@@ -59,7 +59,7 @@ func setupTestTokenDB(t *testing.T) (*Manager, func()) {
 		}
 }
 
-func setupTestTokenManager(t *testing.T) (*Manager, *pubsub.Publisher, func()) {
+func setupTestTokenManager(t *testing.T, options ...ManagerOptions) (*Manager, *pubsub.Publisher, func()) {
 	appDB, err := testutils.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
 	require.NoError(t, err)
 
@@ -96,18 +96,11 @@ func setupTestTokenManager(t *testing.T) (*Manager, *pubsub.Publisher, func()) {
 	nm.EXPECT().GetTestNetworksEnabled().Return(false, nil).AnyTimes()
 
 	manager, err := NewTokenManager(walletDB, rpcClient, nil, nm, appDB, nil, nil, accountsPublisher,
-		accountsDB, 1*time.Hour, 1*time.Hour)
+		accountsDB, 1*time.Hour, 1*time.Hour, options...)
 	require.NoError(t, err)
-
-	lastTokensUpdate := time.Time{}
-
-	activeChains, err := getEnabledChains(nm)
-	require.NoError(t, err)
-	tokensManager, err := setUpTokenListsManager(manager, walletDB, activeChains, lastTokensUpdate, 1*time.Hour, 1*time.Hour)
-	require.NoError(t, err)
-	manager.tokensManager = tokensManager
 
 	return manager, accountsPublisher, func() {
+		manager.Stop()
 		mockCtrl.Finish()
 		require.NoError(t, appDB.Close())
 		require.NoError(t, walletDB.Close())
@@ -353,7 +346,11 @@ func TestMarkAsPreviouslyOwnedToken(t *testing.T) {
 }
 
 func Test_removeTokenBalanceOnEventAccountRemoved(t *testing.T) {
-	manager, accountsPublisher, stop := setupTestTokenManager(t)
+	testRemoveTokenBalanceOnEventAccountRemoved(t)
+}
+
+func testRemoveTokenBalanceOnEventAccountRemoved(t *testing.T, options ...ManagerOptions) {
+	manager, accountsPublisher, stop := setupTestTokenManager(t, options...)
 	defer stop()
 
 	err := manager.Start(context.Background())
@@ -411,7 +408,11 @@ func Test_removeTokenBalanceOnEventAccountRemoved(t *testing.T) {
 }
 
 func Test_tokensListsValidity(t *testing.T) {
-	manager, _, stop := setupTestTokenManager(t)
+	testTokenListsValidity(t)
+}
+
+func testTokenListsValidity(t *testing.T, options ...ManagerOptions) {
+	manager, _, stop := setupTestTokenManager(t, options...)
 	defer stop()
 
 	err := manager.Start(context.Background())
@@ -456,7 +457,11 @@ func Test_tokensListsValidity(t *testing.T) {
 }
 
 func TestGetTokensOfInterestForActiveNetworksMode_AddsCrossChainAndMandatoryTokens(t *testing.T) {
-	manager, _, stop := setupTestTokenManager(t)
+	testTokensOfInterest(t)
+}
+
+func testTokensOfInterest(t *testing.T, options ...ManagerOptions) {
+	manager, _, stop := setupTestTokenManager(t, options...)
 	defer stop()
 
 	require.NoError(t, manager.Start(context.Background()))

@@ -4,19 +4,25 @@ package token
 
 import (
 	"context"
-	"fmt"
 	"sort"
 	"time"
 
 	"github.com/status-im/go-wallet-sdk/pkg/tokens/manager"
+	"github.com/status-im/go-wallet-sdk/pkg/tokens/types"
 	"github.com/status-im/nim-token-lists/go/tkl"
+
 	walletcommon "github.com/status-im/status-go/pkg/services/wallet/common"
 	"github.com/status-im/status-go/pkg/services/wallet/token/tklmanager"
 )
 
-// newTKLReadManager constructs the optional catalogue without selecting it as
-// the application's manager. Refresh and durable custom writes are integrated
-// before the runtime selection is enabled.
+func selectTokenListsManager(m *Manager, chains []uint64, last time.Time, refresh, check time.Duration, useNim bool) (manager.Manager, error) {
+	if !useNim {
+		return setUpTokenListsManager(m, m.walletDB, chains, last, refresh, check)
+	}
+	return newTKLRefreshManager(m, chains, last, nil, refresh, check)
+}
+
+// newTKLReadManager constructs the C-backed catalogue and its SQL bootstrap.
 func newTKLReadManager(mng *Manager, chains []uint64, lastSuccess time.Time, options ...tklmanager.RefreshOptions) (*tklmanager.Manager, error) {
 	config := tkl.Config{Chains: chains, MainListID: walletcommon.StatusTokenListID,
 		RegistryID: remoteListOfTokenListsID, RegistryURL: remoteListOfTokenLists,
@@ -53,7 +59,7 @@ func newTKLReadManager(mng *Manager, chains []uint64, lastSuccess time.Time, opt
 		if !lastSuccess.IsZero() {
 			bootstrap.State = tkl.RefreshState{LastSuccess: lastSuccess.Unix(), HasSuccess: true}
 		}
-		contents, err := NewContentStore(mng.walletDB).GetAll()
+		contents, err := (&contentStore{walletDb: mng.walletDB}).getAll(ctx)
 		if err != nil {
 			return bootstrap, err
 		}
@@ -73,13 +79,17 @@ func newTKLReadManager(mng *Manager, chains []uint64, lastSuccess time.Time, opt
 			bootstrap.Contents = append(bootstrap.Contents, row)
 		}
 		sort.Slice(bootstrap.Contents, func(i, j int) bool { return bootstrap.Contents[i].ID < bootstrap.Contents[j].ID })
-		customs, err := NewCustomTokenStore(mng).GetAll()
+		// Load only persisted ordinary metadata; community enrichment belongs to
+		// the Go query layer and must not introduce uncancellable SQL here.
+		rows, err := mng.walletDB.QueryContext(ctx, "SELECT address,name,symbol,decimals,network_id FROM tokens WHERE community_id IS NULL OR community_id = ''")
 		if err != nil {
 			return bootstrap, err
 		}
-		for _, token := range customs {
-			if token == nil {
-				return bootstrap, fmt.Errorf("nil stored custom token")
+		defer rows.Close()
+		for rows.Next() {
+			var token types.Token
+			if err := rows.Scan(&token.Address, &token.Name, &token.Symbol, &token.Decimals, &token.ChainID); err != nil {
+				return bootstrap, err
 			}
 			// Invalid customs are skipped by the SDK and core. Values outside
 			// the ABI's uint8 field must be skipped before narrowing as well.
@@ -87,6 +97,9 @@ func newTKLReadManager(mng *Manager, chains []uint64, lastSuccess time.Time, opt
 				continue
 			}
 			bootstrap.Customs = append(bootstrap.Customs, tkl.Token{ChainID: token.ChainID, Address: token.Address.Hex(), Decimals: uint8(token.Decimals), Name: token.Name, Symbol: token.Symbol, LogoURI: token.LogoURI, CrossChainID: token.CrossChainID, Custom: true})
+		}
+		if err := rows.Err(); err != nil {
+			return bootstrap, err
 		}
 		return bootstrap, ctx.Err()
 	}, options...)

@@ -100,6 +100,18 @@ func (m *Manager) Start(ctx context.Context, autoRefresh bool, notify chan struc
 	if err := ctx.Err(); err != nil {
 		return err
 	}
+	if err := m.ensureLoaded(ctx); err != nil {
+		return err
+	}
+	if err := m.rebuild(); err != nil {
+		return err
+	}
+	m.started, m.notify = true, notify
+	return m.startRefresh(ctx, autoRefresh)
+}
+
+// ensureLoaded runs under mu and is also used by configuration writes before Start.
+func (m *Manager) ensureLoaded(ctx context.Context) error {
 	if !m.loaded {
 		bootstrap, err := m.load(ctx)
 		if err != nil {
@@ -119,11 +131,7 @@ func (m *Manager) Start(ctx context.Context, autoRefresh bool, notify chan struc
 		}
 		m.hasPendingChains = false
 	}
-	if err := m.rebuild(); err != nil {
-		return err
-	}
-	m.started, m.notify = true, notify
-	return m.startRefresh(ctx, autoRefresh)
+	return nil
 }
 
 func (m *Manager) Stop() error {

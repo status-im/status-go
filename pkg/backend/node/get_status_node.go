@@ -355,8 +355,15 @@ func (n *StatusNode) StopMediaServer() error {
 	return err
 }
 
-func (n *StatusNode) startWithDB(config *params.NodeConfig) error {
+func (n *StatusNode) startWithDB(config *params.NodeConfig) (startErr error) {
 	n.config = config
+	// A failed startup can leave an allocated C catalogue even before services
+	// are registered. Release it on every error path, before the caller closes DBs.
+	defer func() {
+		if startErr != nil && n.tokenManager != nil {
+			n.tokenManager.Stop()
+		}
+	}()
 
 	if err := n.setupRPCClient(); err != nil {
 		return err
@@ -425,6 +432,11 @@ func (n *StatusNode) startWithDB(config *params.NodeConfig) error {
 // populateServiceRegistry registers all services that implement Pausable and wraps the
 // media server as a pausable. Called once after all services are started.
 func (n *StatusNode) populateServiceRegistry() {
+	if n.tokenManager != nil {
+		if catalogue := n.tokenManager.CataloguePausable(); catalogue != nil {
+			n.serviceRegistry.Register(catalogue)
+		}
+	}
 	// Register services implementing Pausable
 	for _, service := range n.services {
 		if p, ok := service.(pausable.Pausable); ok {
@@ -473,7 +485,7 @@ func (n *StatusNode) createTokenManager() error {
 
 	n.tokenManager, err = token.NewTokenManager(n.walletDB, n.rpcClient, community.NewManager(n.appDB, n.mediaServer, nil),
 		n.rpcClient.GetNetworkManager(), n.appDB, n.mediaServer, &n.walletFeed, n.accountsPublisher, accDB,
-		autoRefreshInterval, autoRefreshCheckInterval)
+		autoRefreshInterval, autoRefreshCheckInterval, token.ManagerOptions{UseNim: n.config.WalletConfig.TokenListsUseNim})
 	if err != nil {
 		return err
 	}
@@ -483,6 +495,7 @@ func (n *StatusNode) createTokenManager() error {
 		for _, token := range n.config.WalletConfig.CustomTokens {
 			err := n.tokenManager.UpsertCustom(*token)
 			if err != nil {
+				n.tokenManager.Stop()
 				return err
 			}
 		}
@@ -556,7 +569,10 @@ func (n *StatusNode) Stop() error {
 		n.tokenManagerStartDone = nil
 		n.tokenManager.Stop()
 	}
-	n.timeSourceSrvc.Stop()
+	// Catalogue setup can fail before initServices creates the time source.
+	if n.timeSourceSrvc != nil {
+		n.timeSourceSrvc.Stop()
+	}
 
 	for _, service := range n.services {
 		err := service.Stop()

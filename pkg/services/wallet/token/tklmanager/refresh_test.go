@@ -59,7 +59,7 @@ func TestRefreshPersistsBeforePublication(t *testing.T) {
 				}, OnChange: func(tkl.Change) { notifiedBeforeSuccess = !successAttempted; signals++ },
 			})
 			require.NoError(t, err)
-			defer m.Stop()
+			defer func() { _ = m.Stop() }()
 			require.NoError(t, m.Start(context.Background(), false, nil))
 			require.Error(t, m.TriggerRefresh(context.Background()))
 			require.Equal(t, 0, signals)
@@ -122,7 +122,7 @@ func TestConcurrentStopCancelsPersistence(t *testing.T) {
 func TestReadOnlyPauseIsNoOp(t *testing.T) {
 	m, err := New(tkl.Config{Chains: []uint64{1}}, func(context.Context) (tkl.Bootstrap, error) { return tkl.Bootstrap{}, nil })
 	require.NoError(t, err)
-	defer m.Stop()
+	defer func() { _ = m.Stop() }()
 	require.NoError(t, m.Start(context.Background(), false, nil))
 	require.NoError(t, m.Pause())
 	require.NoError(t, m.Resume())
@@ -224,7 +224,7 @@ func TestAutomaticRefreshPausesAndResumes(t *testing.T) {
 	defer server.Close()
 	m, err := New(tkl.Config{Chains: []uint64{1}, RegistryID: "registry", RegistryURL: server.URL}, func(context.Context) (tkl.Bootstrap, error) { return tkl.Bootstrap{}, nil }, RefreshOptions{RefreshInterval: time.Second, CheckInterval: time.Second, Persist: func(context.Context, []tkl.ListContent) error { return nil }})
 	require.NoError(t, err)
-	defer m.Stop()
+	defer func() { _ = m.Stop() }()
 	require.NoError(t, m.Start(context.Background(), true, nil))
 	require.Eventually(t, func() bool { return calls.Load() > 0 }, 3*time.Second, 10*time.Millisecond)
 	require.NoError(t, m.Pause())
@@ -269,7 +269,7 @@ func TestPartialRefreshRetainsInvalidSource(t *testing.T) {
 		return nil
 	}})
 	require.NoError(t, err)
-	defer m.Stop()
+	defer func() { _ = m.Stop() }()
 	require.NoError(t, m.Start(context.Background(), false, nil))
 	require.NoError(t, m.TriggerRefresh(context.Background()))
 	token, ok := m.GetTokenByChainAddress(1, common.HexToAddress("0x2"))
@@ -299,7 +299,7 @@ func TestRefreshCancellationAndSupersession(t *testing.T) {
 			persists := 0
 			m, err := New(tkl.Config{Chains: []uint64{1}, RegistryID: "registry", RegistryURL: server.URL}, func(context.Context) (tkl.Bootstrap, error) { return tkl.Bootstrap{}, nil }, RefreshOptions{Persist: func(context.Context, []tkl.ListContent) error { persists++; return nil }})
 			require.NoError(t, err)
-			defer m.Stop()
+			defer func() { _ = m.Stop() }()
 			require.NoError(t, m.Start(context.Background(), false, nil))
 			result := make(chan error, 1)
 			go func() { result <- m.TriggerRefresh(context.Background()) }()
@@ -380,7 +380,7 @@ func TestUnchangedRefreshDoesNotSignal(t *testing.T) {
 	signals, successes := 0, 0
 	m, err := New(tkl.Config{Chains: []uint64{1}, RegistryID: "registry", RegistryURL: server.URL}, func(context.Context) (tkl.Bootstrap, error) { return tkl.Bootstrap{}, nil }, RefreshOptions{Persist: func(context.Context, []tkl.ListContent) error { return nil }, OnSuccess: func(context.Context, time.Time) error { successes++; return nil }, OnChange: func(tkl.Change) { signals++ }})
 	require.NoError(t, err)
-	defer m.Stop()
+	defer func() { _ = m.Stop() }()
 	require.NoError(t, m.Start(context.Background(), false, nil))
 	require.NoError(t, m.TriggerRefresh(context.Background()))
 	first := signals
@@ -403,7 +403,7 @@ func TestSuccessful304UsesRefreshIntervalNotCheckInterval(t *testing.T) {
 	successes := 0
 	m, err := New(tkl.Config{Chains: []uint64{1}, RegistryID: "registry", RegistryURL: server.URL}, func(context.Context) (tkl.Bootstrap, error) { return tkl.Bootstrap{}, nil }, RefreshOptions{Now: func() time.Time { return time.Unix(now, 0) }, Persist: func(context.Context, []tkl.ListContent) error { return nil }, OnSuccess: func(context.Context, time.Time) error { successes++; return nil }})
 	require.NoError(t, err)
-	defer m.Stop()
+	defer func() { _ = m.Stop() }()
 	require.NoError(t, m.Start(context.Background(), false, nil))
 	// Drive the scheduler's non-forced path with an explicit clock, without a
 	// wall-clock ticker racing this table of due times.
