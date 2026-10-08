@@ -45,16 +45,6 @@ func (sc *StoreClient) SetStorenodes(nodes []peer.AddrInfo) {
 	sc.selector.setStorenodes(nodes)
 }
 
-// nextStorenode returns a currently eligible storenode for APIs that need one
-// concrete peer, such as targeted hash retrieval.
-func (sc *StoreClient) nextStorenode() peer.AddrInfo {
-	candidates := sc.selector.candidates()
-	if len(candidates) == 0 {
-		return peer.AddrInfo{}
-	}
-	return candidates[0]
-}
-
 // Query retrieves historic messages for a single batch (one pubsub topic and its
 // content topics over [batch.From, batch.To]). It tries storenodes in turn until
 // one serves the whole query; on a mid-query failure it restarts on the next node
@@ -68,20 +58,37 @@ func (sc *StoreClient) Query(
 	shouldProcessNextPage func(int) (bool, uint64),
 	processEnvelopes bool,
 ) error {
+	pubsubTopic := sc.resolvePubsubTopic(batch.PubsubTopic)
+	contentTopics := sc.contentTopics(batch)
+
+	return sc.withFailover(ctx, "store query", func(node peer.AddrInfo) error {
+		return sc.pager.run(ctx, node, pubsubTopic, contentTopics, batch.From, batch.To, pageLimit, shouldProcessNextPage, processEnvelopes)
+	})
+}
+
+// FetchByHashes runs a targeted by-hash retrieval with the same storenode
+// failover as Query. fetch performs the request against one storenode; it is
+// retried on the next candidate if it fails, so it must be safe to repeat
+// (already delivered envelopes are deduplicated downstream).
+func (sc *StoreClient) FetchByHashes(ctx context.Context, fetch func(node peer.AddrInfo) error) error {
+	return sc.withFailover(ctx, "store fetch by hash", fetch)
+}
+
+// withFailover calls fn on up to maxStoreQueryAttempts storenodes, in selector
+// order, until one succeeds. Failed nodes are backed off so the next request
+// prefers a healthy one.
+func (sc *StoreClient) withFailover(ctx context.Context, op string, fn func(node peer.AddrInfo) error) error {
 	candidates := sc.selector.candidates()
 	if len(candidates) == 0 {
 		return ErrNoStorenodesReachable
 	}
-
-	pubsubTopic := sc.resolvePubsubTopic(batch.PubsubTopic)
-	contentTopics := sc.contentTopics(batch)
 
 	var lastErr error
 	for i, node := range candidates {
 		if i >= maxStoreQueryAttempts {
 			break
 		}
-		err := sc.pager.run(ctx, node, pubsubTopic, contentTopics, batch.From, batch.To, pageLimit, shouldProcessNextPage, processEnvelopes)
+		err := fn(node)
 		if err == nil {
 			sc.selector.markSuccess(node.ID)
 			return nil
@@ -91,7 +98,7 @@ func (sc *StoreClient) Query(
 		}
 		sc.selector.markFailure(node.ID)
 		lastErr = err
-		sc.logger.Debug("store query failed, trying next storenode",
+		sc.logger.Debug(op+" failed, trying next storenode",
 			zap.Stringer("peerID", node.ID), zap.Error(err))
 	}
 

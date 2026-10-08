@@ -1677,16 +1677,10 @@ func (w *Waku) StoreQuery(
 	return storeClient.Query(ctx, batch, pageLimit, shouldProcessNextPage, processEnvelopes)
 }
 
-func (w *Waku) GetActiveStorenode() peer.AddrInfo {
-	storeClient := w.currentStoreClient()
-	if storeClient == nil {
-		return peer.AddrInfo{}
-	}
-
-	return storeClient.nextStorenode()
-}
-
-func (w *Waku) FetchMessagesByHashes(ctx context.Context, storenode peer.AddrInfo, messageHashes []string) error {
+// FetchMessagesByHashes retrieves specific messages from the store by envelope
+// hash (used to recover SDS missing dependencies) and feeds them through the
+// regular envelope pipeline. Storenodes are failed over like StoreQuery.
+func (w *Waku) FetchMessagesByHashes(ctx context.Context, messageHashes []string) error {
 	if len(messageHashes) == 0 {
 		return nil
 	}
@@ -1705,6 +1699,17 @@ func (w *Waku) FetchMessagesByHashes(ctx context.Context, storenode peer.AddrInf
 		return nil
 	}
 
+	storeClient := w.currentStoreClient()
+	if storeClient == nil {
+		return ErrNoStorenodesReachable
+	}
+
+	return storeClient.FetchByHashes(ctx, func(storenode peer.AddrInfo) error {
+		return w.fetchMessagesByHashesFrom(ctx, storenode, parsedHashes)
+	})
+}
+
+func (w *Waku) fetchMessagesByHashesFrom(ctx context.Context, storenode peer.AddrInfo, parsedHashes []pb.MessageHash) error {
 	// Enrich the storenode AddrInfo with addresses from the peerstore
 	storenodeInfo := w.node.Host().Peerstore().PeerInfo(storenode.ID)
 	// Encapsulate the peer ID into the multiaddresses as expected by the missing API
