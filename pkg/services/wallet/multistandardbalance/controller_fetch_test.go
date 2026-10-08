@@ -92,30 +92,35 @@ func erc20FetchResult(block int64, account common.Address, balances map[common.A
 	}
 }
 
-func storedERC20Balances(t *testing.T, c *Controller, account common.Address) map[common.Address]*big.Int {
+func storedERC20Balances(t *testing.T, c *Controller, account common.Address) ERC20Balances {
 	stored, state, err := c.storage.GetERC20Balances(context.Background(), BalancesKey{Account: account, ChainID: 1})
 	require.NoError(t, err)
 	require.NotEqual(t, NeverFetched, state.FetchedAt)
 	return stored
 }
 
-// With zero balances left out of the results, a token missing from a fetch is
-// a zero unless its call failed. The reader reads a token missing from fetched
-// storage as zero (tokenbalances tests).
+func erc20Config(account common.Address, asked ...common.Address) multistandardfetcher.FetchConfig {
+	return multistandardfetcher.FetchConfig{ERC20: map[AccountAddress][]ContractAddress{account: asked}}
+}
+
+// With zero balances left out of the results, a token the fetch asked for and
+// that is missing from the result is a zero unless its call failed.
 func TestHandleERC20Result_ZeroAndFailedAcrossFetches(t *testing.T) {
 	account := common.Address{19: 1}
 	dropsToZero := common.Address{0x70, 19: 1}
 	fails := common.Address{0x70, 19: 2}
 	ctx := context.Background()
+	config := erc20Config(account, dropsToZero, fails)
 	c := NewController(DefaultControllerConfig(), NewStorageMemory(), nil, nil, nil, nil, nil, nil, noopLastBlockManager{}, nil, zap.NewNop())
 
-	c.handleFetchResult(ctx, 1, erc20FetchResult(1, account, map[common.Address]*big.Int{dropsToZero: big.NewInt(5), fails: big.NewInt(7)}))
-	require.Equal(t, int64(5), storedERC20Balances(t, c, account)[dropsToZero].Int64())
+	c.handleFetchResult(ctx, 1, config, erc20FetchResult(1, account, map[common.Address]*big.Int{dropsToZero: big.NewInt(5), fails: big.NewInt(7)}))
+	require.Equal(t, int64(5), storedERC20Balances(t, c, account).Balances[dropsToZero].Int64())
 
-	c.handleFetchResult(ctx, 1, erc20FetchResult(2, account, map[common.Address]*big.Int{}, fails))
+	c.handleFetchResult(ctx, 1, config, erc20FetchResult(2, account, map[common.Address]*big.Int{}, fails))
 	stored := storedERC20Balances(t, c, account)
-	require.NotContains(t, stored, dropsToZero, "5 -> 0: not stored, reads 0")
-	require.Equal(t, int64(7), stored[fails].Int64(), "a failed call keeps the last known balance")
+	require.NotContains(t, stored.Balances, dropsToZero, "5 -> 0: not stored")
+	require.Contains(t, stored.Answered, dropsToZero, "... answered, so it reads 0")
+	require.Equal(t, int64(7), stored.Balances[fails].Int64(), "a failed call keeps the last known balance")
 }
 
 func TestHandleERC20Result_FailedWithoutKnownBalanceIsUnknown(t *testing.T) {
@@ -123,8 +128,8 @@ func TestHandleERC20Result_FailedWithoutKnownBalanceIsUnknown(t *testing.T) {
 	fails := common.Address{0x70, 19: 2}
 	c := NewController(DefaultControllerConfig(), NewStorageMemory(), nil, nil, nil, nil, nil, nil, noopLastBlockManager{}, nil, zap.NewNop())
 
-	c.handleFetchResult(context.Background(), 1, erc20FetchResult(1, account, map[common.Address]*big.Int{}, fails))
-	value, present := storedERC20Balances(t, c, account)[fails]
-	require.True(t, present)
-	require.Nil(t, value, "unknown, not zero")
+	c.handleFetchResult(context.Background(), 1, erc20Config(account, fails), erc20FetchResult(1, account, map[common.Address]*big.Int{}, fails))
+	stored := storedERC20Balances(t, c, account)
+	require.NotContains(t, stored.Balances, fails)
+	require.NotContains(t, stored.Answered, fails, "unknown, not zero")
 }

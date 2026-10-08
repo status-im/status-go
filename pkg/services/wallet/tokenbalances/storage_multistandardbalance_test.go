@@ -32,8 +32,9 @@ func TestGetBalances_ERC20NeverFetched_MissingTokenNotInMap(t *testing.T) {
 	assert.False(t, ok, "token should be absent when ERC20 balances were never fetched")
 }
 
-// Zero balances are not stored, so a token missing from a fetched map is a zero.
-func TestGetBalances_ERC20Fetched_MissingTokenIsZero(t *testing.T) {
+// Zero balances are not stored: a token a fetch answered for and missing from
+// the balances is a zero.
+func TestGetBalances_ERC20Fetched_AnsweredMissingTokenIsZero(t *testing.T) {
 	storage := multistandardbalance.NewStorageMemory()
 	adapter := tokenbalances.NewStorageMultistandardBalance(storage)
 
@@ -44,8 +45,9 @@ func TestGetBalances_ERC20Fetched_MissingTokenIsZero(t *testing.T) {
 	knownToken := erc20Token(chainID, "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913")
 	zeroToken := erc20Token(chainID, "0x820C137fA9D5348B4B9B2E229CBeD970E8e7E360")
 
-	_, _, err := storage.UpdateERC20Balances(context.Background(), key, map[common.Address]*big.Int{
-		knownToken.Address: big.NewInt(42),
+	_, _, err := storage.UpdateERC20Balances(context.Background(), key, multistandardbalance.ERC20Balances{
+		Balances: map[common.Address]*big.Int{knownToken.Address: big.NewInt(42)},
+		Answered: map[common.Address]struct{}{knownToken.Address: {}, zeroToken.Address: {}},
 	}, fetchedState())
 	require.NoError(t, err)
 
@@ -57,8 +59,8 @@ func TestGetBalances_ERC20Fetched_MissingTokenIsZero(t *testing.T) {
 	assert.Equal(t, 0, knownBalance.Cmp(big.NewInt(42)))
 
 	zeroBalance, ok := balances[chainID][account][zeroToken.Address]
-	require.True(t, ok, "a token missing from a fetched map is present after fetch")
-	require.NotNil(t, zeroBalance, "... as a zero balance, not as unknown")
+	require.True(t, ok)
+	require.NotNil(t, zeroBalance, "a zero balance, not unknown")
 	assert.Equal(t, 0, zeroBalance.Sign())
 }
 
@@ -71,16 +73,14 @@ func TestGetBalances_ERC20Fetched_UnansweredTokenIsUnknown(t *testing.T) {
 	key := multistandardbalance.BalancesKey{Account: account, ChainID: chainID}
 	unansweredToken := erc20Token(chainID, "0x820C137fA9D5348B4B9B2E229CBeD970E8e7E360")
 
-	_, _, err := storage.UpdateERC20Balances(context.Background(), key, map[common.Address]*big.Int{
-		unansweredToken.Address: nil,
-	}, fetchedState())
+	_, _, err := storage.UpdateERC20Balances(context.Background(), key, multistandardbalance.ERC20Balances{}, fetchedState())
 	require.NoError(t, err)
 
 	balances, err := adapter.GetBalances(context.Background(), []*tokentypes.Token{unansweredToken}, []common.Address{account})
 	require.NoError(t, err)
 
 	balance, ok := balances[chainID][account][unansweredToken.Address]
-	require.True(t, ok, "a token the fetch did not answer for is present after fetch")
+	require.True(t, ok, "a token no fetch answered for is present after fetch")
 	assert.Nil(t, balance, "an unanswered token has no value, it is not a zero balance")
 }
 
