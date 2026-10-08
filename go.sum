@@ -2359,8 +2359,8 @@ github.com/status-im/extkeys v1.4.0 h1:HiB/vQXZrGveZbGy3W6hI4T0CfCt0uP4xvGwjXL4c
 github.com/status-im/extkeys v1.4.0/go.mod h1:AZGS9vJKbME5tovNqYH/LrfHu8t9ad9nxl76fbLG5PY=
 github.com/status-im/go-sqlcipher/v4 v4.5.5 h1:Sq+785b/GEI3jJTHr9sXOQ8gTsogzE+/LgkCkB5pl2Y=
 github.com/status-im/go-sqlcipher/v4 v4.5.5/go.mod h1:mF2UmIpBnzFeBdu/ypTDb/LdbS0nk0dfSN1WUsWTjMA=
-github.com/status-im/go-wallet-sdk v0.0.0-20261006102854-4271395d5d49 h1:eym2iJYGAJ+6DginefbQFYor8Zx7pM19gfHRYdI74hA=
-github.com/status-im/go-wallet-sdk v0.0.0-20261006102854-4271395d5d49/go.mod h1:E4E1D0mflc2pcjsutZpvMYSjI+a231uBHQf8UjdT1Ug=
+github.com/status-im/go-wallet-sdk v0.0.0-20261008062624-d975f5abdb55 h1:Cidu4VPX75VUT6SbtoRaT0A70MAZYohHDO1JKGIIu/k=
+github.com/status-im/go-wallet-sdk v0.0.0-20261008062624-d975f5abdb55/go.mod h1:E4E1D0mflc2pcjsutZpvMYSjI+a231uBHQf8UjdT1Ug=
 github.com/status-im/gomoji v1.1.3-0.20220213022530-e5ac4a8732d4 h1:CtobZoiNdHpx+xurFxnuJ1xsGm3oKMfcZkB3vmomJmA=
 github.com/status-im/gomoji v1.1.3-0.20220213022530-e5ac4a8732d4/go.mod h1:hmpnZzkzSZJbFYWAUkrPV8I36x7mdYiPhPqnALP4fKA=
 github.com/status-im/goroutine-defer-guard v0.3.1 h1:cZhcJ3gO6OgMYBOfEaAAUZaZgKZeSzMlGNEjMyejuRo=
