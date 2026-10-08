@@ -1,5 +1,3 @@
-//go:build tkl
-
 package tklmanager
 
 import (
@@ -167,7 +165,7 @@ func TestDurableCustomWriteRecoversOnRead(t *testing.T) {
 			row := &types.Token{ChainID: 1, Address: common.HexToAddress("0x1234"), Symbol: "DURABLE", Decimals: 18}
 			writes := 0
 			token := tkl.Token{ChainID: row.ChainID, Address: row.Address.Hex(), Symbol: row.Symbol, Decimals: 18}
-			err = m.mutateCustom(context.Background(), row.Key(), &token, func() (tkl.Mutation, error) {
+			err = m.mutateCustom(context.Background(), func() (tkl.Mutation, error) {
 				return m.handle.CustomValidateUpsert(token)
 			}, func(_ context.Context, mutation tkl.Mutation) error {
 				writes++
@@ -251,7 +249,7 @@ func TestCustomMirrorFailureAfterNativeCommitRecovers(t *testing.T) {
 	require.NoError(t, m.Start(context.Background(), false, nil))
 	row := tkl.Token{ChainID: 1, Address: common.HexToAddress("0x1234").Hex(), Symbol: "DURABLE", Decimals: 18}
 	writes := 0
-	err = m.mutateCustom(context.Background(), convertToken(row).Key(), &row, func() (tkl.Mutation, error) {
+	err = m.mutateCustom(context.Background(), func() (tkl.Mutation, error) {
 		mutation, err := m.handle.CustomValidateUpsert(row)
 		// Leave the native proposal intact, but make the host's lookup fail.
 		mutation.Key = "invalid"
@@ -276,7 +274,7 @@ func TestDurableCustomRecoveryBeforeChainChange(t *testing.T) {
 				require.NoError(t, m.Start(context.Background(), false, nil))
 			}
 			row := tkl.Token{ChainID: 1, Address: common.HexToAddress("0x1234").Hex(), Symbol: "DURABLE", Decimals: 18}
-			err = m.mutateCustom(context.Background(), convertToken(row).Key(), &row, func() (tkl.Mutation, error) { return m.handle.CustomValidateUpsert(row) }, func(_ context.Context, mutation tkl.Mutation) error {
+			err = m.mutateCustom(context.Background(), func() (tkl.Mutation, error) { return m.handle.CustomValidateUpsert(row) }, func(_ context.Context, mutation tkl.Mutation) error {
 				_, err := m.handle.CustomAbort(mutation.ID)
 				return err
 			})
@@ -287,7 +285,7 @@ func TestDurableCustomRecoveryBeforeChainChange(t *testing.T) {
 			_, ok := m.GetTokenByChainAddress(1, common.HexToAddress(row.Address))
 			require.True(t, ok)
 			// Failed publication of a durable delete must recover as well.
-			err = m.mutateCustom(context.Background(), convertToken(row).Key(), nil, func() (tkl.Mutation, error) {
+			err = m.mutateCustom(context.Background(), func() (tkl.Mutation, error) {
 				return m.handle.CustomValidateDelete(types.TokenKey(1, common.HexToAddress(row.Address)))
 			}, func(_ context.Context, mutation tkl.Mutation) error {
 				_, err := m.handle.CustomAbort(mutation.ID)

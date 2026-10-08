@@ -1,5 +1,3 @@
-//go:build tkl
-
 package token
 
 import (
@@ -9,7 +7,6 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/status-im/go-wallet-sdk/pkg/tokens/autofetcher"
 	"github.com/stretchr/testify/require"
 
 	types "github.com/status-im/status-go/pkg/services/wallet/token/tokenlist"
@@ -21,7 +18,7 @@ func TestTKLBootstrapExistingDatabase(t *testing.T) {
 	manager, cleanup := setupTestTokenDB(t)
 	defer cleanup()
 	// A corrupt cache must fall back to the embedded Status list.
-	require.NoError(t, NewContentStore(manager.walletDB).Set(walletcommon.StatusTokenListID, autofetcher.Content{SourceURL: "https://prod.market.status.im/static/token-list.json", Data: []byte("broken")}))
+	require.NoError(t, NewContentStore(manager.walletDB).Set(walletcommon.StatusTokenListID, storedContent{SourceURL: "https://prod.market.status.im/static/token-list.json", Data: []byte("broken")}))
 	facade, err := newTKLReadManager(manager, []uint64{1}, time.Time{})
 	require.NoError(t, err)
 	defer func() { _ = facade.Stop() }()
@@ -33,7 +30,7 @@ func TestTKLBootstrapExistingDatabase(t *testing.T) {
 	list, ok := facade.TokenList(walletcommon.StatusTokenListID)
 	require.True(t, ok)
 	require.NotEmpty(t, list.Tokens)
-	// Bootstrap must not rewrite or delete rows used by the rollback path.
+	// Bootstrap must not rewrite or delete cached source data.
 	stored, err := NewContentStore(manager.walletDB).Get(walletcommon.StatusTokenListID)
 	require.NoError(t, err)
 	require.Equal(t, []byte("broken"), stored.Data)
@@ -61,34 +58,36 @@ func TestTKLBootstrapInvalidAndCommunityCustoms(t *testing.T) {
 	}
 }
 
-func TestTKLEmbeddedReadParity(t *testing.T) {
+func TestTKLEmbeddedCatalogue(t *testing.T) {
 	manager, cleanup := setupTestTokenDB(t)
 	defer cleanup()
 	chains := walletcommon.AllChainIDsAsUint64()
 	facade, err := newTKLReadManager(manager, chains, time.Time{})
 	require.NoError(t, err)
-	defer func() { _ = facade.Stop() }()
-	old, err := setUpTokenListsManager(manager, manager.walletDB, chains, time.Time{}, time.Hour, time.Minute)
-	require.NoError(t, err)
-	require.NoError(t, old.Start(context.Background(), false, nil))
-	defer func() { _ = old.Stop() }()
+	defer func() { require.NoError(t, facade.Stop()) }()
 	require.NoError(t, facade.Start(context.Background(), false, nil))
-	byKey := func(tokens []*types.Token) map[string]*types.Token {
-		result := make(map[string]*types.Token)
-		for _, token := range tokens {
-			result[token.Key()] = token
-		}
-		return result
-	}
-	require.Equal(t, byKey(old.UniqueTokens()), byKey(facade.UniqueTokens()))
+	require.NotEmpty(t, facade.UniqueTokens())
 	for _, chain := range chains {
-		require.Equal(t, byKey(old.GetTokensByChain(chain)), byKey(facade.GetTokensByChain(chain)))
+		native, ok := facade.GetTokenByChainAddress(chain, common.Address{})
+		require.True(t, ok)
+		symbol, name := walletcommon.EthSymbol, walletcommon.EthName
+		if chain == walletcommon.BSCMainnet || chain == walletcommon.BSCTestnet {
+			symbol, name = walletcommon.BNBSymbol, walletcommon.BNBName
+		}
+		require.Equal(t, symbol, native.Symbol)
+		require.Equal(t, name, native.Name)
+		require.Equal(t, uint(18), native.Decimals)
+		for _, token := range facade.GetTokensByChain(chain) {
+			found, ok := facade.GetTokenByChainAddress(chain, token.Address)
+			require.True(t, ok)
+			require.Equal(t, token, found)
+		}
 	}
-	for _, list := range old.TokenLists() {
-		actual, ok := facade.TokenList(list.ID)
-		require.True(t, ok, list.ID)
-		require.Equal(t, list.Source, actual.Source, list.ID)
-		require.Equal(t, list.FetchedTimestamp, actual.FetchedTimestamp, list.ID)
-		require.Equal(t, byKey(list.Tokens), byKey(actual.Tokens), list.ID)
+	for _, id := range initialListIDsFromEmbedded() {
+		list, ok := facade.TokenList(id)
+		require.True(t, ok, id)
+		require.NotEmpty(t, list.Tokens, id)
+		require.Equal(t, types.LocalSourceURL, list.Source)
+		require.Equal(t, (time.Time{}).Format(time.RFC3339), list.FetchedTimestamp)
 	}
 }
