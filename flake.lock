@@ -65,6 +65,25 @@
         "url": "https://github.com/logos-messaging/nim-sds"
       }
     },
+    "nim-token-lists": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1791183937,
+        "narHash": "sha256-tnvI6457mbSlnfOWGnIjr2X2rNVZIkZuPrrQ5OpP3k0=",
+        "ref": "refs/heads/main",
+        "rev": "7b3c5e715f4ed76c235a5ed043760a8e0c230352",
+        "revCount": 32,
+        "submodules": true,
+        "type": "git",
+        "url": "https://github.com/status-im/nim-token-lists"
+      },
+      "original": {
+        "rev": "7b3c5e715f4ed76c235a5ed043760a8e0c230352",
+        "submodules": true,
+        "type": "git",
+        "url": "https://github.com/status-im/nim-token-lists"
+      }
+    },
     "nixpkgs": {
       "locked": {
         "lastModified": 1736200483,
@@ -117,6 +136,7 @@
       "inputs": {
         "logos-storage-nim": "logos-storage-nim",
         "nim-sds": "nim-sds",
+        "nim-token-lists": "nim-token-lists",
         "nixpkgs": "nixpkgs_3"
       }
     }
