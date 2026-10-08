@@ -13,7 +13,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/status-im/go-wallet-sdk/pkg/tokens/types"
+	types "github.com/status-im/status-go/pkg/services/wallet/token/tokenlist"
 
 	provider_errors "github.com/status-im/status-go/internal/healthmanager/provider_errors"
 	walletcommon "github.com/status-im/status-go/pkg/services/wallet/common"

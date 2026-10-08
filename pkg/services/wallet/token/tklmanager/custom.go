@@ -9,11 +9,11 @@ import (
 	"slices"
 	"time"
 
-	"github.com/status-im/go-wallet-sdk/pkg/tokens/types"
 	"github.com/status-im/nim-token-lists/go/tkl"
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/internal/logutils"
+	types "github.com/status-im/status-go/pkg/services/wallet/token/tokenlist"
 )
 
 // UpsertCustom validates in the core before invoking persist. Persistence must
