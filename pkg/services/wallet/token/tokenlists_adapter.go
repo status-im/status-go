@@ -114,7 +114,8 @@ func (c *customTokenStore) GetAll() ([]*types.Token, error) {
 
 	tokens := make([]*types.Token, 0)
 	for _, token := range customTokens {
-		tokens = append(tokens, token.Token)
+		converted := types.Token(*token.Token)
+		tokens = append(tokens, &converted)
 	}
 
 	return tokens, nil
