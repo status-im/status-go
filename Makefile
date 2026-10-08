@@ -106,13 +106,10 @@ BUILD_TAGS ?= gowaku_no_rln
 
 # `nim-sds` variables
 
-# Pin nim-sds revision here. Can be a tag (default) or commit hash.
-# v0.3.3 lives on the release/v0.3 branch: it carries the SDS retrieval-hint
-# provider required by the sds-go-bindings pin in go.mod, on the CamelCase FFI
-# ABI, with the causalHistory wire format kept backward-compatible with released
-# (v0.2.x) nodes. master/release-v0.4 moved to the snake_case CBOR ABI, which
-# these bindings do not link against, so we track release/v0.3.
-NIM_SDS_VERSION ?= v0.3.4
+# Pin nim-sds revision here. Can be a tag or commit hash.
+NIM_SDS_VERSION ?= 4b08d508dbfa69c0e2e3883db67adf1fe5a0c994
+
+NIMBLE ?= nimble
 
 # Option 1: Provide NIM_SDS_SOURCE_DIR. Make force-reclones a fresh copy (with submodules)
 # to guarantee a clean checkout on every build.
@@ -346,8 +343,7 @@ endif
 $(LIBSDS): clone-nim-sds
 ifeq ($(NIM_SDS_BUILD_FROM_SOURCE),true)
 	@echo "Building nim-sds: $(LIBSDS)"
-	$(MAKE) -C $(NIM_SDS_SOURCE_DIR) update USE_SYSTEM_NIM=$(USE_SYSTEM_NIM)
-	$(MAKE) -C $(NIM_SDS_SOURCE_DIR) libsds USE_SYSTEM_NIM=$(USE_SYSTEM_NIM) NIMFLAGS=-d:noSignalHandler SHELL=$(MAKE_SHELL)
+	cd "$(NIM_SDS_SOURCE_DIR)" && $(NIMBLE) setup -l -y && $(NIMBLE) libsds
 	@test -f $(LIBSDS) || (echo "Error: libsds not found at $(LIBSDS) after build" && exit 1)
 else
 	@test -f $(LIBSDS) || (echo "Error: libsds not found at $(LIBSDS)" && exit 1)
@@ -365,11 +361,12 @@ build-libsds-android: SDSARCH = $(strip $(if $(filter arm64,$(ARCH)),arm64,\
 	$(error Unsupported ARCH '$(ARCH)'. Please set ARCH to one of: arm64, arm, amd64, x86, x86_64))))))
 build-libsds-android: clone-nim-sds
 	@echo "Building nim-sds for Android" $(LIBSDS)
-	$(MAKE) -C $(NIM_SDS_SOURCE_DIR) libsds-android ARCH=$(SDSARCH) ANDROID_NDK_ROOT=$(ANDROID_NDK_ROOT) USE_SYSTEM_NIM=1 SHELL=$(MAKE_SHELL)
+	cd "$(NIM_SDS_SOURCE_DIR)" && $(NIMBLE) setup -l -y && \
+		ARCH="$(SDSARCH)" ANDROID_NDK_ROOT="$(ANDROID_NDK_ROOT)" $(NIMBLE) libsdsAndroid
 
 build-libsds-ios: clone-nim-sds
 	@echo "Building nim-sds for iOS" $(LIBSDS)
-	$(MAKE) -C $(NIM_SDS_SOURCE_DIR) libsds-ios USE_SYSTEM_NIM=$(USE_SYSTEM_NIM) SHELL=$(MAKE_SHELL)
+	cd "$(NIM_SDS_SOURCE_DIR)" && $(NIMBLE) setup -l -y && $(NIMBLE) libsdsIOS
 
 clean-libsds:
 	@echo "Removing libsds"
