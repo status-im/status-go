@@ -226,3 +226,59 @@ func TestStoreClientNoStorenodes(t *testing.T) {
 	require.ErrorIs(t, sc.Query(context.Background(), batch(), 10, nil, false), ErrNoStorenodesReachable)
 	require.Empty(t, r.calls())
 }
+
+func TestStoreClientFetchByHashesFailsOverToNextNode(t *testing.T) {
+	sc := newClient(&fakeRequestor{respond: emptyResponse}, []peer.AddrInfo{{ID: "n1"}, {ID: "n2"}})
+
+	var tried []peer.ID
+	err := sc.FetchByHashes(context.Background(), func(node peer.AddrInfo) error {
+		tried = append(tried, node.ID)
+		if len(tried) == 1 {
+			return errors.New("EOF")
+		}
+		return nil
+	})
+	require.NoError(t, err)
+	require.Len(t, tried, 2)
+	require.NotEqual(t, tried[0], tried[1])
+
+	// The failed node is backed off, so the next fetch goes to the healthy one first.
+	require.Equal(t, tried[1], sc.selector.candidates()[0].ID)
+}
+
+func TestStoreClientFetchByHashesBoundedAttempts(t *testing.T) {
+	sc := newClient(&fakeRequestor{respond: emptyResponse}, []peer.AddrInfo{{ID: "n1"}, {ID: "n2"}, {ID: "n3"}, {ID: "n4"}})
+
+	attempts := 0
+	fetchErr := errors.New("down")
+	err := sc.FetchByHashes(context.Background(), func(peer.AddrInfo) error {
+		attempts++
+		return fetchErr
+	})
+	require.ErrorIs(t, err, fetchErr)
+	require.Equal(t, min(maxStoreQueryAttempts, len(sc.selector.candidates())), attempts)
+}
+
+func TestStoreClientFetchByHashesStopsOnCancelledContext(t *testing.T) {
+	sc := newClient(&fakeRequestor{respond: emptyResponse}, []peer.AddrInfo{{ID: "n1"}, {ID: "n2"}})
+	ctx, cancel := context.WithCancel(context.Background())
+
+	attempts := 0
+	err := sc.FetchByHashes(ctx, func(peer.AddrInfo) error {
+		attempts++
+		cancel()
+		return context.Canceled
+	})
+	require.Error(t, err)
+	require.Equal(t, 1, attempts)
+}
+
+func TestStoreClientFetchByHashesNoStorenodes(t *testing.T) {
+	sc := newClient(&fakeRequestor{respond: emptyResponse}, nil)
+
+	err := sc.FetchByHashes(context.Background(), func(peer.AddrInfo) error {
+		t.Fatal("fetch must not be called without storenodes")
+		return nil
+	})
+	require.ErrorIs(t, err, ErrNoStorenodesReachable)
+}

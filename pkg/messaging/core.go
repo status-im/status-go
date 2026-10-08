@@ -331,14 +331,38 @@ func (c *Core) fetchMissingDependenciesAsync(messageID string, missingDeps []str
 		defer panics.LogOnPanic()
 		defer c.wg.Done()
 
-		fetchCtx, cancel := context.WithTimeout(c.ctx, 30*time.Second)
-		defer cancel()
+		logger := c.logger.With(
+			zap.String("messageID", messageID),
+			zap.String("channelID", channelID),
+		)
+		fetchMissingDependencies(c.ctx, logger, c.stack.Transport, missingDeps, missingDependencyFetchRetryDelays)
+	}()
 
-		alreadyProcessed, err := c.stack.Transport.AlreadyProcessed(missingDeps)
+	return nil
+}
+
+const missingDependencyFetchTimeout = 30 * time.Second
+
+// missingDependencyFetchRetryDelays are the waits before each retry of a failed
+// by-hash fetch. Each attempt already fails over across storenodes, so these
+// cover the case where every storenode failed (e.g. dropped connections, EOF).
+// SDS only re-detects a missing dependency when a later message references it
+// again, so a fetch that is not retried is usually lost for good.
+var missingDependencyFetchRetryDelays = []time.Duration{5 * time.Second, 15 * time.Second, 45 * time.Second}
+
+type missingDependencyFetcher interface {
+	AlreadyProcessed(messageHashes []string) (map[string]bool, error)
+	FetchMessagesByHashes(ctx context.Context, messageHashes []string) error
+}
+
+// fetchMissingDependencies fetches the missing dependencies from the store,
+// retrying after each of retryDelays if the fetch fails. Before every attempt
+// it drops the hashes that have been received in the meantime.
+func fetchMissingDependencies(ctx context.Context, logger *zap.Logger, fetcher missingDependencyFetcher, missingDeps []string, retryDelays []time.Duration) {
+	for attempt := 0; ; attempt++ {
+		alreadyProcessed, err := fetcher.AlreadyProcessed(missingDeps)
 		if err != nil {
-			c.logger.Debug("failed to check missing dependencies cache",
-				zap.String("messageID", messageID),
-				zap.String("channelID", channelID),
+			logger.Debug("failed to check missing dependencies cache",
 				zap.Strings("missingDeps", missingDeps),
 				zap.Error(err),
 			)
@@ -355,18 +379,37 @@ func (c *Core) fetchMissingDependenciesAsync(messageID string, missingDeps []str
 			return
 		}
 
-		err = c.stack.Transport.FetchMessagesByHashes(fetchCtx, missingDepsToFetch)
-		if err != nil {
-			c.logger.Debug("failed to fetch missing dependencies from storenode",
-				zap.String("messageID", messageID),
-				zap.String("channelID", channelID),
+		fetchCtx, cancel := context.WithTimeout(ctx, missingDependencyFetchTimeout)
+		err = fetcher.FetchMessagesByHashes(fetchCtx, missingDepsToFetch)
+		cancel()
+		if err == nil {
+			return
+		}
+
+		if ctx.Err() != nil || attempt >= len(retryDelays) {
+			logger.Warn("failed to fetch missing dependencies from storenode",
 				zap.Strings("missingDeps", missingDepsToFetch),
+				zap.Int("attempts", attempt+1),
 				zap.Error(err),
 			)
+			return
 		}
-	}()
 
-	return nil
+		logger.Debug("failed to fetch missing dependencies from storenode, will retry",
+			zap.Strings("missingDeps", missingDepsToFetch),
+			zap.Int("attempt", attempt+1),
+			zap.Duration("retryIn", retryDelays[attempt]),
+			zap.Error(err),
+		)
+
+		timer := time.NewTimer(retryDelays[attempt])
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return
+		case <-timer.C:
+		}
+	}
 }
 
 type wakuParams struct {
