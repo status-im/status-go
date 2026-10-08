@@ -6,6 +6,25 @@ import unittest
 
 
 class MobileBuildTest(unittest.TestCase):
+    def test_ios_deployment_target_defaults_and_overrides(self):
+        repo = Path(__file__).resolve().parent.parent
+        for sdk, arch, minimum in (("iphoneos", "arm64", "13.0"),
+                                   ("iphonesimulator", "arm64", "14.0"),
+                                   ("iphonesimulator", "x86_64", "13.0")):
+            for override in (None, "17.0"):
+                with self.subTest(sdk=sdk, arch=arch, override=override):
+                    command = [
+                        "make", "-n", "statusgo-ios-library", "-o", "generate",
+                        "-o", "statusgo-c-bindings", "-o", "build-libsds-ios",
+                        "USE_NIM_TOKEN_LISTS=true", f"ARCH={arch}", f"IPHONE_SDK={sdk}"]
+                    if override:
+                        command.append(f"IOS_TARGET={override}")
+                    result = subprocess.run(command, cwd=repo, text=True, capture_output=True)
+                    self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                    target = override or minimum
+                    self.assertIn(f'IPHONE_SDK="{sdk}" IOS_TARGET="{target}"', result.stdout)
+                    self.assertIn(f'-miphoneos-version-min={target}', result.stdout)
+
     def test_static_archive_bundling_accepts_both_go_tag_separators(self):
         repo = Path(__file__).resolve().parent.parent
         for tags, bundled in (("gowaku_no_rln", False), ("gowaku_no_rln tkl", True),
