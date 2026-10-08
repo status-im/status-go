@@ -6,8 +6,9 @@ import (
 	"context"
 	"testing"
 
-	"github.com/status-im/go-wallet-sdk/pkg/tokens/types"
 	"github.com/stretchr/testify/require"
+
+	types "github.com/status-im/status-go/pkg/services/wallet/token/tokenlist"
 
 	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/params"
