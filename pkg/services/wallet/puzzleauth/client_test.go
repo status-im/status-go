@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	netUrl "net/url"
 	"sync/atomic"
 	"testing"
@@ -364,4 +365,92 @@ func TestTransport_Do_ContextCancelled(t *testing.T) {
 	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, "http://localhost:1", nil)
 	_, err := client.Do(req)
 	require.Error(t, err)
+}
+
+type bodyRecordingTransport struct {
+	statuses  []int
+	bodies    [][]byte
+	readers   []io.ReadCloser
+	consumeFn func(io.Reader) ([]byte, error)
+}
+
+func (t *bodyRecordingTransport) RoundTrip(r *http.Request) (*http.Response, error) {
+	t.readers = append(t.readers, r.Body)
+	body, err := t.consumeFn(r.Body)
+	if err != nil {
+		return nil, err
+	}
+	_ = r.Body.Close()
+	t.bodies = append(t.bodies, body)
+	status := http.StatusOK
+	if len(t.statuses) > 0 {
+		status, t.statuses = t.statuses[0], t.statuses[1:]
+	}
+	return &http.Response{StatusCode: status, Body: http.NoBody, Request: r}, nil
+}
+
+func newGethLikeRequest(t testing.TB, url string, payload []byte, getBodyCalls *int32) *http.Request {
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, url, io.NopCloser(bytes.NewReader(payload)))
+	require.NoError(t, err)
+	req.ContentLength = int64(len(payload))
+	req.GetBody = func() (io.ReadCloser, error) {
+		if getBodyCalls != nil {
+			atomic.AddInt32(getBodyCalls, 1)
+		}
+		return io.NopCloser(bytes.NewReader(payload)), nil
+	}
+	return req
+}
+
+func TestTransport_RoundTrip_RetryResendsGetBody(t *testing.T) {
+	server := newPuzzleAuthServer(t)
+	defer server.Close()
+
+	payload := bytes.Repeat([]byte(`{"jsonrpc":"2.0"}`), 1<<14)
+	base := &bodyRecordingTransport{statuses: []int{http.StatusUnauthorized, http.StatusOK}, consumeFn: io.ReadAll}
+	var getBodyCalls int32
+	resp, err := NewTransport(server.URL, base).RoundTrip(newGethLikeRequest(t, server.URL+"/resource", payload, &getBodyCalls))
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+
+	require.Len(t, base.bodies, 2)
+	require.Equal(t, payload, base.bodies[0])
+	require.Equal(t, payload, base.bodies[1])
+	require.Equal(t, int32(1), atomic.LoadInt32(&getBodyCalls), "the first attempt sends the request body, each retry a fresh GetBody")
+}
+
+func TestTransport_RoundTrip_DoesNotCopyRequestBody(t *testing.T) {
+	server := newPuzzleAuthServer(t)
+	defer server.Close()
+
+	payload := bytes.Repeat([]byte{'x'}, 1<<20)
+	base := &bodyRecordingTransport{consumeFn: io.ReadAll}
+	var getBodyCalls int32
+	req := newGethLikeRequest(t, server.URL+"/resource", payload, &getBodyCalls)
+	resp, err := NewTransport(server.URL, base).RoundTrip(req)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+
+	require.Len(t, base.readers, 1)
+	require.True(t, req.Body == base.readers[0], "the request's own body is sent, not a buffered copy")
+	require.Zero(t, atomic.LoadInt32(&getBodyCalls), "GetBody is for retries only")
+	require.Equal(t, payload, base.bodies[0])
+}
+
+func BenchmarkTransport_RoundTrip_1MBBody(b *testing.B) {
+	server := httptest.NewServer(http.NotFoundHandler())
+	defer server.Close()
+
+	payload := bytes.Repeat([]byte{'x'}, 1<<20)
+	discard := func(r io.Reader) ([]byte, error) {
+		_, err := io.Copy(io.Discard, r)
+		return nil, err
+	}
+	transport := NewTransport(server.URL, &bodyRecordingTransport{consumeFn: discard})
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, err := transport.RoundTrip(newGethLikeRequest(b, server.URL+"/resource", payload, nil))
+		require.NoError(b, err)
+	}
 }

@@ -23,26 +23,69 @@ func deleteChainsNotInList[T any](m map[BalancesKey]T, chains []uint64) {
 	}
 }
 
-// keepLastKnownBalances carries the previously stored balance of every token the
-// new fetch did not answer. A batched balance fetch (multicall with
-// requireSuccess=false) drops the sub-calls that failed, so a token can be
-// missing from the result although it is still in the token list. Storing the
-// result as-is would make the reader report that token as a hard zero (no
-// error) until a later fetch answers it again. Returns the merged map and how
-// many tokens were carried over.
-func keepLastKnownBalances[T comparable](previous map[T]*big.Int, fetched map[T]*big.Int) (map[T]*big.Int, int) {
+// mergeERC20Balances builds the stored ERC20 state from the previous one and a
+// fetch that asked for the asked tokens. fetched holds the non-zero balances it
+// answered (reused); failed the tokens whose call failed. A token the fetch
+// answered and left out of fetched is a zero. Previous balances of failed and
+// of not asked tokens are kept.
+func mergeERC20Balances(previous ERC20Balances, asked []ContractAddress, fetched map[ContractAddress]*big.Int, failed []ContractAddress) ERC20Balances {
 	if fetched == nil {
-		fetched = make(map[T]*big.Int)
+		fetched = make(map[ContractAddress]*big.Int)
 	}
-	kept := 0
-	for token, balance := range previous {
-		if _, answered := fetched[token]; answered {
+	var failedSet map[ContractAddress]struct{}
+	if len(failed) > 0 {
+		failedSet = make(map[ContractAddress]struct{}, len(failed))
+		for _, token := range failed {
+			failedSet[token] = struct{}{}
+		}
+	}
+	answeredNow := func(token ContractAddress) bool {
+		_, isFailed := failedSet[token]
+		return !isFailed
+	}
+
+	if len(previous.Balances) > 0 {
+		kept := make(map[ContractAddress]struct{}, len(previous.Balances))
+		for token := range previous.Balances {
+			if _, ok := fetched[token]; !ok {
+				kept[token] = struct{}{}
+			}
+		}
+		for _, token := range asked {
+			if answeredNow(token) {
+				delete(kept, token)
+			}
+		}
+		for token := range kept {
+			fetched[token] = previous.Balances[token]
+		}
+	}
+
+	answered := previous.Answered
+	grown := false
+	for _, token := range asked {
+		if !answeredNow(token) {
 			continue
 		}
-		fetched[token] = balance
-		kept++
+		if _, ok := answered[token]; ok {
+			continue
+		}
+		if !grown {
+			answered = make(map[ContractAddress]struct{}, len(previous.Answered)+len(asked))
+			for t := range previous.Answered {
+				answered[t] = struct{}{}
+			}
+			grown = true
+		}
+		answered[token] = struct{}{}
 	}
-	return fetched, kept
+
+	return ERC20Balances{Balances: fetched, Answered: answered}
+}
+
+// isERC20BalancesEqual relies on Answered only ever growing.
+func isERC20BalancesEqual(b1 ERC20Balances, b2 ERC20Balances) bool {
+	return len(b1.Answered) == len(b2.Answered) && isBigIntMapEqual(b1.Balances, b2.Balances)
 }
 
 func isBigIntMapEqual[T comparable](m1 map[T]*big.Int, m2 map[T]*big.Int) bool {

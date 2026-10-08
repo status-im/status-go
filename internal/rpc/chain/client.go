@@ -4,6 +4,7 @@ package chain
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math/big"
@@ -515,6 +516,22 @@ func (c *ClientWithFallback) CallContract(ctx context.Context, msg ethereum.Call
 			MethodName: "eth_CallContract",
 			Func: func(client ethclient.EthClientInterface) (interface{}, error) {
 				return client.CallContract(ctx, msg, blockNumber)
+			},
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return res.([]byte), nil
+}
+
+func (c *ClientWithFallback) CallContractRaw(ctx context.Context, callArg json.RawMessage, blockNumber *big.Int) ([]byte, error) {
+	res, err := c.makeCall(
+		ctx, MakeCallFunctor{
+			MethodName: "eth_CallContract",
+			Func: func(client ethclient.EthClientInterface) (interface{}, error) {
+				return client.CallContractRaw(ctx, callArg, blockNumber)
 			},
 		},
 	)

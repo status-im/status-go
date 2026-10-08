@@ -67,7 +67,7 @@ func TestController_DebounceTiming(t *testing.T) {
 	}
 
 	storage.EXPECT().GetNativeBalance(gomock.Any(), key).Return(big.NewInt(1000), oldState, nil).AnyTimes()
-	storage.EXPECT().GetERC20Balances(gomock.Any(), key).Return(map[multistandardbalance.ContractAddress]*big.Int{}, oldState, nil).AnyTimes()
+	storage.EXPECT().GetERC20Balances(gomock.Any(), key).Return(multistandardbalance.ERC20Balances{}, oldState, nil).AnyTimes()
 	storage.EXPECT().GetERC721Balances(gomock.Any(), key).Return(map[multistandardbalance.ContractAddress]*big.Int{}, oldState, nil).AnyTimes()
 	storage.EXPECT().GetERC1155Balances(gomock.Any(), key).Return(map[multistandardbalance.HashableCollectibleID]*big.Int{}, oldState, nil).AnyTimes()
 	storage.EXPECT().ClearMissingAccounts(gomock.Any(), gomock.Any()).AnyTimes()
@@ -190,7 +190,7 @@ func TestController_FetchPeriod(t *testing.T) {
 	}
 
 	storage.EXPECT().GetNativeBalance(gomock.Any(), key).Return(big.NewInt(1000), oldState, nil).AnyTimes()
-	storage.EXPECT().GetERC20Balances(gomock.Any(), key).Return(map[multistandardbalance.ContractAddress]*big.Int{}, oldState, nil).AnyTimes()
+	storage.EXPECT().GetERC20Balances(gomock.Any(), key).Return(multistandardbalance.ERC20Balances{}, oldState, nil).AnyTimes()
 	storage.EXPECT().GetERC721Balances(gomock.Any(), key).Return(map[multistandardbalance.ContractAddress]*big.Int{}, oldState, nil).AnyTimes()
 	storage.EXPECT().GetERC1155Balances(gomock.Any(), key).Return(map[multistandardbalance.HashableCollectibleID]*big.Int{}, oldState, nil).AnyTimes()
 	storage.EXPECT().ClearMissingAccounts(gomock.Any(), gomock.Any()).AnyTimes()
@@ -347,25 +347,25 @@ func TestController_BasicFlow(t *testing.T) {
 	// Mock storage calls with different states for different keys
 	// key1_1: recent state (should NOT fetch)
 	storage.EXPECT().GetNativeBalance(gomock.Any(), key1_1).Return(big.NewInt(1000), recentState, nil).AnyTimes()
-	storage.EXPECT().GetERC20Balances(gomock.Any(), key1_1).Return(map[multistandardbalance.ContractAddress]*big.Int{}, recentState, nil).AnyTimes()
+	storage.EXPECT().GetERC20Balances(gomock.Any(), key1_1).Return(multistandardbalance.ERC20Balances{}, recentState, nil).AnyTimes()
 	storage.EXPECT().GetERC721Balances(gomock.Any(), key1_1).Return(map[multistandardbalance.ContractAddress]*big.Int{}, recentState, nil).AnyTimes()
 	storage.EXPECT().GetERC1155Balances(gomock.Any(), key1_1).Return(map[multistandardbalance.HashableCollectibleID]*big.Int{}, recentState, nil).AnyTimes()
 
 	// key1_2: old state (should fetch)
 	storage.EXPECT().GetNativeBalance(gomock.Any(), key1_2).Return(big.NewInt(2000), oldState, nil).AnyTimes()
-	storage.EXPECT().GetERC20Balances(gomock.Any(), key1_2).Return(map[multistandardbalance.ContractAddress]*big.Int{}, oldState, nil).AnyTimes()
+	storage.EXPECT().GetERC20Balances(gomock.Any(), key1_2).Return(multistandardbalance.ERC20Balances{}, oldState, nil).AnyTimes()
 	storage.EXPECT().GetERC721Balances(gomock.Any(), key1_2).Return(map[multistandardbalance.ContractAddress]*big.Int{}, oldState, nil).AnyTimes()
 	storage.EXPECT().GetERC1155Balances(gomock.Any(), key1_2).Return(map[multistandardbalance.HashableCollectibleID]*big.Int{}, oldState, nil).AnyTimes()
 
 	// key2_1: never fetched (should fetch)
 	storage.EXPECT().GetNativeBalance(gomock.Any(), key2_1).Return((*big.Int)(nil), neverFetchedState, nil).AnyTimes()
-	storage.EXPECT().GetERC20Balances(gomock.Any(), key2_1).Return((map[multistandardbalance.ContractAddress]*big.Int)(nil), neverFetchedState, nil).AnyTimes()
+	storage.EXPECT().GetERC20Balances(gomock.Any(), key2_1).Return(multistandardbalance.ERC20Balances{}, neverFetchedState, nil).AnyTimes()
 	storage.EXPECT().GetERC721Balances(gomock.Any(), key2_1).Return((map[multistandardbalance.ContractAddress]*big.Int)(nil), neverFetchedState, nil).AnyTimes()
 	storage.EXPECT().GetERC1155Balances(gomock.Any(), key2_1).Return((map[multistandardbalance.HashableCollectibleID]*big.Int)(nil), neverFetchedState, nil).AnyTimes()
 
 	// key2_2: recent state (should NOT fetch)
 	storage.EXPECT().GetNativeBalance(gomock.Any(), key2_2).Return(big.NewInt(4000), recentState, nil).AnyTimes()
-	storage.EXPECT().GetERC20Balances(gomock.Any(), key2_2).Return(map[multistandardbalance.ContractAddress]*big.Int{}, recentState, nil).AnyTimes()
+	storage.EXPECT().GetERC20Balances(gomock.Any(), key2_2).Return(multistandardbalance.ERC20Balances{}, recentState, nil).AnyTimes()
 	storage.EXPECT().GetERC721Balances(gomock.Any(), key2_2).Return(map[multistandardbalance.ContractAddress]*big.Int{}, recentState, nil).AnyTimes()
 	storage.EXPECT().GetERC1155Balances(gomock.Any(), key2_2).Return(map[multistandardbalance.HashableCollectibleID]*big.Int{}, recentState, nil).AnyTimes()
 
@@ -847,7 +847,7 @@ func newTestController(
 
 	recentState := multistandardbalance.State{FetchedAt: time.Now().Unix()}
 	storage.EXPECT().GetNativeBalance(gomock.Any(), gomock.Any()).Return(big.NewInt(0), recentState, nil).AnyTimes()
-	storage.EXPECT().GetERC20Balances(gomock.Any(), gomock.Any()).Return(map[multistandardbalance.ContractAddress]*big.Int{}, recentState, nil).AnyTimes()
+	storage.EXPECT().GetERC20Balances(gomock.Any(), gomock.Any()).Return(multistandardbalance.ERC20Balances{}, recentState, nil).AnyTimes()
 	storage.EXPECT().GetERC721Balances(gomock.Any(), gomock.Any()).Return(map[multistandardbalance.ContractAddress]*big.Int{}, recentState, nil).AnyTimes()
 	storage.EXPECT().GetERC1155Balances(gomock.Any(), gomock.Any()).Return(map[multistandardbalance.HashableCollectibleID]*big.Int{}, recentState, nil).AnyTimes()
 	storage.EXPECT().ClearMissingAccounts(gomock.Any(), gomock.Any()).AnyTimes()
@@ -1050,7 +1050,7 @@ func TestController_CancelsInFlightFetchWhenStartingNewFetchForSameChain(t *test
 	networksProvider.EXPECT().GetActiveNetworks().Return([]*params.Network{{ChainID: chainID}}, nil).AnyTimes()
 	networksProvider.EXPECT().GetPublisher().Return(pubsub.NewPublisher()).AnyTimes()
 	storage.EXPECT().GetNativeBalance(gomock.Any(), key).Return(big.NewInt(0), neverFetched, nil).AnyTimes()
-	storage.EXPECT().GetERC20Balances(gomock.Any(), key).Return(map[multistandardbalance.ContractAddress]*big.Int{}, neverFetched, nil).AnyTimes()
+	storage.EXPECT().GetERC20Balances(gomock.Any(), key).Return(multistandardbalance.ERC20Balances{}, neverFetched, nil).AnyTimes()
 	storage.EXPECT().GetERC721Balances(gomock.Any(), key).Return(map[multistandardbalance.ContractAddress]*big.Int{}, neverFetched, nil).AnyTimes()
 	storage.EXPECT().GetERC1155Balances(gomock.Any(), key).Return(map[multistandardbalance.HashableCollectibleID]*big.Int{}, neverFetched, nil).AnyTimes()
 	storage.EXPECT().ClearMissingAccounts(gomock.Any(), gomock.Any()).AnyTimes()
@@ -1143,7 +1143,7 @@ func TestController_FirstFetchAfterStartBypassesDebounce(t *testing.T) {
 	}
 	neverFetched := multistandardbalance.State{FetchedAt: multistandardbalance.NeverFetched}
 	storage.EXPECT().GetNativeBalance(gomock.Any(), key).Return(nil, neverFetched, nil).AnyTimes()
-	storage.EXPECT().GetERC20Balances(gomock.Any(), key).Return(map[multistandardbalance.ContractAddress]*big.Int{}, neverFetched, nil).AnyTimes()
+	storage.EXPECT().GetERC20Balances(gomock.Any(), key).Return(multistandardbalance.ERC20Balances{}, neverFetched, nil).AnyTimes()
 	storage.EXPECT().GetERC721Balances(gomock.Any(), key).Return(map[multistandardbalance.ContractAddress]*big.Int{}, neverFetched, nil).AnyTimes()
 	storage.EXPECT().GetERC1155Balances(gomock.Any(), key).Return(map[multistandardbalance.HashableCollectibleID]*big.Int{}, neverFetched, nil).AnyTimes()
 	storage.EXPECT().ClearMissingAccounts(gomock.Any(), gomock.Any()).AnyTimes()
@@ -1251,8 +1251,8 @@ func TestController_TokenListsUpdatedRefetchesImmediately(t *testing.T) {
 	storage.EXPECT().GetNativeBalance(gomock.Any(), key).DoAndReturn(func(_ context.Context, _ multistandardbalance.BalancesKey) (*big.Int, multistandardbalance.State, error) {
 		return big.NewInt(0), currentState(), nil
 	}).AnyTimes()
-	storage.EXPECT().GetERC20Balances(gomock.Any(), key).DoAndReturn(func(_ context.Context, _ multistandardbalance.BalancesKey) (map[multistandardbalance.ContractAddress]*big.Int, multistandardbalance.State, error) {
-		return map[multistandardbalance.ContractAddress]*big.Int{}, currentState(), nil
+	storage.EXPECT().GetERC20Balances(gomock.Any(), key).DoAndReturn(func(_ context.Context, _ multistandardbalance.BalancesKey) (multistandardbalance.ERC20Balances, multistandardbalance.State, error) {
+		return multistandardbalance.ERC20Balances{}, currentState(), nil
 	}).AnyTimes()
 	storage.EXPECT().GetERC721Balances(gomock.Any(), key).DoAndReturn(func(_ context.Context, _ multistandardbalance.BalancesKey) (map[multistandardbalance.ContractAddress]*big.Int, multistandardbalance.State, error) {
 		return map[multistandardbalance.ContractAddress]*big.Int{}, currentState(), nil
@@ -1381,7 +1381,7 @@ func TestController_ProviderErrorAtStartCountsAsColdStart(t *testing.T) {
 	}
 	neverFetched := multistandardbalance.State{FetchedAt: multistandardbalance.NeverFetched}
 	storage.EXPECT().GetNativeBalance(gomock.Any(), key).Return(nil, neverFetched, nil).AnyTimes()
-	storage.EXPECT().GetERC20Balances(gomock.Any(), key).Return(map[multistandardbalance.ContractAddress]*big.Int{}, neverFetched, nil).AnyTimes()
+	storage.EXPECT().GetERC20Balances(gomock.Any(), key).Return(multistandardbalance.ERC20Balances{}, neverFetched, nil).AnyTimes()
 	storage.EXPECT().GetERC721Balances(gomock.Any(), key).Return(map[multistandardbalance.ContractAddress]*big.Int{}, neverFetched, nil).AnyTimes()
 	storage.EXPECT().GetERC1155Balances(gomock.Any(), key).Return(map[multistandardbalance.HashableCollectibleID]*big.Int{}, neverFetched, nil).AnyTimes()
 	storage.EXPECT().ClearMissingAccounts(gomock.Any(), gomock.Any()).AnyTimes()
@@ -1468,7 +1468,7 @@ func TestController_WarmStartKeepsDebounce(t *testing.T) {
 	// cold login).
 	fetched := multistandardbalance.State{FetchedAt: time.Now().Unix()}
 	storage.EXPECT().GetNativeBalance(gomock.Any(), key).Return(big.NewInt(0), fetched, nil).AnyTimes()
-	storage.EXPECT().GetERC20Balances(gomock.Any(), key).Return(map[multistandardbalance.ContractAddress]*big.Int{}, fetched, nil).AnyTimes()
+	storage.EXPECT().GetERC20Balances(gomock.Any(), key).Return(multistandardbalance.ERC20Balances{}, fetched, nil).AnyTimes()
 	storage.EXPECT().GetERC721Balances(gomock.Any(), key).Return(map[multistandardbalance.ContractAddress]*big.Int{}, fetched, nil).AnyTimes()
 	storage.EXPECT().GetERC1155Balances(gomock.Any(), key).Return(map[multistandardbalance.HashableCollectibleID]*big.Int{}, fetched, nil).AnyTimes()
 	storage.EXPECT().ClearMissingAccounts(gomock.Any(), gomock.Any()).AnyTimes()
@@ -1578,8 +1578,8 @@ func TestController_ColdStartLeadingEdgeDoesNotSurviveRestart(t *testing.T) {
 	storage.EXPECT().GetNativeBalance(gomock.Any(), key).DoAndReturn(func(_ context.Context, _ multistandardbalance.BalancesKey) (*big.Int, multistandardbalance.State, error) {
 		return big.NewInt(0), currentState(), nil
 	}).AnyTimes()
-	storage.EXPECT().GetERC20Balances(gomock.Any(), key).DoAndReturn(func(_ context.Context, _ multistandardbalance.BalancesKey) (map[multistandardbalance.ContractAddress]*big.Int, multistandardbalance.State, error) {
-		return map[multistandardbalance.ContractAddress]*big.Int{}, currentState(), nil
+	storage.EXPECT().GetERC20Balances(gomock.Any(), key).DoAndReturn(func(_ context.Context, _ multistandardbalance.BalancesKey) (multistandardbalance.ERC20Balances, multistandardbalance.State, error) {
+		return multistandardbalance.ERC20Balances{}, currentState(), nil
 	}).AnyTimes()
 	storage.EXPECT().GetERC721Balances(gomock.Any(), key).DoAndReturn(func(_ context.Context, _ multistandardbalance.BalancesKey) (map[multistandardbalance.ContractAddress]*big.Int, multistandardbalance.State, error) {
 		return map[multistandardbalance.ContractAddress]*big.Int{}, currentState(), nil
@@ -1689,7 +1689,7 @@ func TestController_WarmStartWithoutCollectiblesKeepsDebounce(t *testing.T) {
 	fetched := multistandardbalance.State{FetchedAt: time.Now().Unix()}
 	neverFetched := multistandardbalance.State{FetchedAt: multistandardbalance.NeverFetched}
 	storage.EXPECT().GetNativeBalance(gomock.Any(), key).Return(big.NewInt(0), fetched, nil).AnyTimes()
-	storage.EXPECT().GetERC20Balances(gomock.Any(), key).Return(map[multistandardbalance.ContractAddress]*big.Int{}, fetched, nil).AnyTimes()
+	storage.EXPECT().GetERC20Balances(gomock.Any(), key).Return(multistandardbalance.ERC20Balances{}, fetched, nil).AnyTimes()
 	storage.EXPECT().GetERC721Balances(gomock.Any(), key).Return(map[multistandardbalance.ContractAddress]*big.Int{}, neverFetched, nil).AnyTimes()
 	storage.EXPECT().GetERC1155Balances(gomock.Any(), key).Return(map[multistandardbalance.HashableCollectibleID]*big.Int{}, neverFetched, nil).AnyTimes()
 	storage.EXPECT().ClearMissingAccounts(gomock.Any(), gomock.Any()).AnyTimes()
