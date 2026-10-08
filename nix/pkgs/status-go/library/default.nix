@@ -46,6 +46,7 @@ in pkgs.buildGoModule {
   # Code generation should be run before buildPhase because buildGoModule
   # performs deps check before buildPhase, and will fail without generated files.
   preBuild = ''
+    patchShebangs scripts/
     make generate GO_GENERATE_CMD='go generate'
   '';
 
