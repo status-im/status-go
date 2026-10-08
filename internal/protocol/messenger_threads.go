@@ -13,6 +13,46 @@ import (
 
 const adminOnlyThreadCreationError = "only admins can create threads in this community"
 
+type MessagePageWithThreadSummaries struct {
+	Messages             []*common.Message `json:"messages"`
+	Cursor               string            `json:"cursor"`
+	Threads              []*Thread         `json:"threads"`
+	ThreadSummariesError string            `json:"threadSummariesError,omitempty"`
+}
+
+// MessagesWithThreadSummaries keeps summary work bounded to the returned page.
+// Summary failures must not prevent the message page from loading.
+func (m *Messenger) MessagesWithThreadSummaries(chatID, cursor string, limit, participantPreviewLimit int) (*MessagePageWithThreadSummaries, error) {
+	messages, nextCursor, err := m.MessageByChatID(chatID, "", cursor, limit)
+	if err != nil {
+		return nil, err
+	}
+	page := &MessagePageWithThreadSummaries{
+		Messages: messages,
+		Cursor:   nextCursor,
+		Threads:  []*Thread{},
+	}
+	if len(messages) == 0 || !m.featureFlags.Threads {
+		return page, nil
+	}
+	parentIDs := make([]string, 0, len(messages))
+	for _, message := range messages {
+		if message.HasThread == nil || *message.HasThread {
+			parentIDs = append(parentIDs, message.ID)
+		}
+	}
+	if len(parentIDs) == 0 {
+		return page, nil
+	}
+	threads, err := m.ThreadSummariesByParentMessageIDs(chatID, parentIDs, participantPreviewLimit)
+	if err != nil {
+		page.ThreadSummariesError = err.Error()
+	} else {
+		page.Threads = threads
+	}
+	return page, nil
+}
+
 func (m *Messenger) ThreadsByChatID(chatID string) ([]*Thread, error) {
 	if !m.featureFlags.Threads {
 		return nil, ErrThreadFeatureDisabled
