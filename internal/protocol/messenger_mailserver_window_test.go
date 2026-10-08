@@ -93,3 +93,24 @@ func TestEnqueueHistoricSyncConcurrent(t *testing.T) {
 		To:   from.Add(100 * time.Second),
 	}}, m.historicSyncQueue)
 }
+
+func TestBoundedHistoricSyncWidenedUntilSessionCatchUp(t *testing.T) {
+	m := &Messenger{logger: zap.NewNop()}
+	bounded := historicSyncRequest{From: time.Unix(1_000, 0), To: time.Unix(1_001, 0)}
+
+	widened := m.prepareHistoricSyncRun(bounded)
+	require.Equal(t, historicSyncRequest{To: bounded.To}, widened,
+		"before the session catch-up, a bounded window must run from the persisted cursors")
+
+	m.recordHistoricSyncSuccess(bounded)
+	require.False(t, m.historicCatchUpDone.Load(),
+		"a bounded run must not count as the session catch-up")
+
+	m.recordHistoricSyncSuccess(widened)
+	require.True(t, m.historicCatchUpDone.Load())
+	require.Equal(t, bounded, m.prepareHistoricSyncRun(bounded),
+		"after the session catch-up, bounded windows run as requested")
+
+	cursor := historicSyncRequest{To: time.Unix(2_000, 0)}
+	require.Equal(t, cursor, (&Messenger{logger: zap.NewNop()}).prepareHistoricSyncRun(cursor))
+}

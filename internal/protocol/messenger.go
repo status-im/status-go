@@ -154,6 +154,10 @@ type Messenger struct {
 	historicSyncQueueMu      sync.Mutex
 	historicSyncQueue        []historicSyncRequest
 	historicSyncWorkerActive atomic.Bool
+	// historicCatchUpDone is set once a cursor-based historic sync succeeds in
+	// this session. Until then, persisted cursors may predate the app-off gap,
+	// so windowed syncs and cursor advancement must not move them forward.
+	historicCatchUpDone atomic.Bool
 	// historicSyncTrigger wakes the worker after pending work is added.
 	historicSyncTrigger  chan struct{}
 	ratchetNotFoundDelay time.Duration
