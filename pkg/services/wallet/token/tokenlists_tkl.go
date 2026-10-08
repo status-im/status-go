@@ -17,7 +17,7 @@ import (
 // newTKLReadManager constructs the optional catalogue without selecting it as
 // the application's manager. Refresh and durable custom writes are integrated
 // before the runtime selection is enabled.
-func newTKLReadManager(mng *Manager, chains []uint64, lastSuccess time.Time) (*tklmanager.Manager, error) {
+func newTKLReadManager(mng *Manager, chains []uint64, lastSuccess time.Time, options ...tklmanager.RefreshOptions) (*tklmanager.Manager, error) {
 	config := tkl.Config{Chains: chains, MainListID: walletcommon.StatusTokenListID,
 		RegistryID: remoteListOfTokenListsID, RegistryURL: remoteListOfTokenLists,
 		Policy: tkl.Policy{SkippedKeys: walletcommon.SkippedTokenKeys()}}
@@ -89,5 +89,5 @@ func newTKLReadManager(mng *Manager, chains []uint64, lastSuccess time.Time) (*t
 			bootstrap.Customs = append(bootstrap.Customs, tkl.Token{ChainID: token.ChainID, Address: token.Address.Hex(), Decimals: uint8(token.Decimals), Name: token.Name, Symbol: token.Symbol, LogoURI: token.LogoURI, CrossChainID: token.CrossChainID, Custom: true})
 		}
 		return bootstrap, ctx.Err()
-	})
+	}, options...)
 }
