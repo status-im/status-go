@@ -2,6 +2,7 @@ package multistandardbalance
 
 import (
 	"math/big"
+	"reflect"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -277,37 +278,49 @@ func TestIsBigIntMapEqualWithDifferentTypes(t *testing.T) {
 	assert.True(t, isBigIntMapEqual(collectibleMap1, collectibleMap2))
 }
 
+func answeredSet(tokens ...common.Address) map[common.Address]struct{} {
+	set := make(map[common.Address]struct{}, len(tokens))
+	for _, token := range tokens {
+		set[token] = struct{}{}
+	}
+	return set
+}
+
 func TestMergeERC20Balances(t *testing.T) {
 	a := common.HexToAddress("0x1")
 	b := common.HexToAddress("0x2")
 	c := common.HexToAddress("0x3")
+	d := common.HexToAddress("0x4")
 
-	t.Run("zero and missing balances are not stored", func(t *testing.T) {
-		previous := map[common.Address]*big.Int{a: big.NewInt(10)}
-		fetched := map[common.Address]*big.Int{b: big.NewInt(0), c: big.NewInt(5)}
-		merged := mergeERC20Balances(previous, fetched, nil)
-		assert.Equal(t, map[common.Address]*big.Int{c: big.NewInt(5)}, merged)
+	t.Run("asked and missing is an answered zero", func(t *testing.T) {
+		previous := ERC20Balances{Balances: map[common.Address]*big.Int{a: big.NewInt(10)}, Answered: answeredSet(a)}
+		merged := mergeERC20Balances(previous, []common.Address{a, b, c}, map[common.Address]*big.Int{c: big.NewInt(5)}, nil)
+		assert.Equal(t, map[common.Address]*big.Int{c: big.NewInt(5)}, merged.Balances)
+		assert.Equal(t, answeredSet(a, b, c), merged.Answered)
 	})
 
-	t.Run("a token whose call failed keeps its stored entry", func(t *testing.T) {
-		previous := map[common.Address]*big.Int{a: big.NewInt(10), b: nil, c: big.NewInt(30)}
-		merged := mergeERC20Balances(previous, nil, []common.Address{a, b})
-		assert.Equal(t, map[common.Address]*big.Int{a: big.NewInt(10), b: nil}, merged)
+	t.Run("a failed call keeps the stored balance and is not answered", func(t *testing.T) {
+		previous := ERC20Balances{Balances: map[common.Address]*big.Int{a: big.NewInt(10)}, Answered: answeredSet(a)}
+		merged := mergeERC20Balances(previous, []common.Address{a, b}, nil, []common.Address{a, b})
+		assert.Equal(t, map[common.Address]*big.Int{a: big.NewInt(10)}, merged.Balances)
+		assert.Equal(t, answeredSet(a), merged.Answered)
 	})
 
-	t.Run("a token whose call failed and nothing stored is unknown", func(t *testing.T) {
-		fetched := map[common.Address]*big.Int{a: big.NewInt(1)}
-		merged := mergeERC20Balances(nil, fetched, []common.Address{b})
-		value, present := merged[b]
-		assert.True(t, present)
-		assert.Nil(t, value)
-		assert.Equal(t, big.NewInt(1), merged[a])
+	t.Run("tokens not asked keep their stored state", func(t *testing.T) {
+		previous := ERC20Balances{Balances: map[common.Address]*big.Int{d: big.NewInt(40)}, Answered: answeredSet(c, d)}
+		merged := mergeERC20Balances(previous, []common.Address{a}, map[common.Address]*big.Int{a: big.NewInt(1)}, nil)
+		assert.Equal(t, map[common.Address]*big.Int{a: big.NewInt(1), d: big.NewInt(40)}, merged.Balances)
+		assert.Equal(t, answeredSet(a, c, d), merged.Answered)
 	})
-}
 
-func TestIsBigIntMapEqual_NilValues(t *testing.T) {
-	a := common.HexToAddress("0x1")
-	assert.True(t, isBigIntMapEqual(map[common.Address]*big.Int{a: nil}, map[common.Address]*big.Int{a: nil}))
-	assert.False(t, isBigIntMapEqual(map[common.Address]*big.Int{a: nil}, map[common.Address]*big.Int{a: big.NewInt(0)}))
-	assert.False(t, isBigIntMapEqual(map[common.Address]*big.Int{a: big.NewInt(0)}, map[common.Address]*big.Int{a: nil}))
+	t.Run("the answered set is reused while it does not grow", func(t *testing.T) {
+		previous := ERC20Balances{Balances: map[common.Address]*big.Int{}, Answered: answeredSet(a, b)}
+		merged := mergeERC20Balances(previous, []common.Address{a, b}, nil, nil)
+		assert.Equal(t, reflect.ValueOf(previous.Answered).Pointer(), reflect.ValueOf(merged.Answered).Pointer())
+		assert.True(t, isERC20BalancesEqual(previous, merged))
+
+		grown := mergeERC20Balances(merged, []common.Address{a, b, c}, nil, nil)
+		assert.Equal(t, answeredSet(a, b), previous.Answered, "previous set untouched")
+		assert.False(t, isERC20BalancesEqual(merged, grown))
+	})
 }

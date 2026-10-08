@@ -563,7 +563,7 @@ func (c *Controller) executeFetchConfigs(fetchConfigs map[uint64]multistandardfe
 		c.logger.Debug("fetch started", zap.Uint64("chainID", chainID))
 		c.sendEventBalanceFetchStarted(chainID, chainFetchConfig)
 
-		go func(fetchChainID uint64, ctx context.Context, cancel context.CancelFunc) {
+		go func(fetchChainID uint64, fetchConfig multistandardfetcher.FetchConfig, ctx context.Context, cancel context.CancelFunc) {
 			defer panics.LogOnPanic()
 			defer cancel()
 			for {
@@ -574,10 +574,10 @@ func (c *Controller) executeFetchConfigs(fetchConfigs map[uint64]multistandardfe
 					if !ok {
 						return
 					}
-					c.handleFetchResult(ctx, fetchChainID, result)
+					c.handleFetchResult(ctx, fetchChainID, fetchConfig, result)
 				}
 			}
-		}(chainID, ctx, cancel)
+		}(chainID, chainFetchConfig, ctx, cancel)
 	}
 }
 

@@ -8,6 +8,9 @@ import (
 	tokentypes "github.com/status-im/status-go/pkg/services/wallet/token/types"
 )
 
+// zeroBalance is returned for every answered zero balance; the reader only reads balances.
+var zeroBalance = new(big.Int)
+
 type StorageMultistandardBalance struct {
 	multistandardbalanceStorage multistandardbalance.Storage
 }
@@ -38,13 +41,15 @@ func (s *StorageMultistandardBalance) GetBalances(ctx context.Context, tokens []
 				if token.IsNative() {
 					needsNative = true
 				}
-				if balance, exists := erc20balances[token.Address]; exists {
-					// nil: the fetch did not answer for the token. The reader keeps the
-					// last persisted value for it and reads zero only when there is none.
+				if balance, exists := erc20balances.Balances[token.Address]; exists {
 					ret[chainID][account][token.Address] = balance
+				} else if _, answered := erc20balances.Answered[token.Address]; answered {
+					ret[chainID][account][token.Address] = zeroBalance
 				} else if erc20State.FetchedAt != multistandardbalance.NeverFetched {
-					// Zero balances are not stored.
-					ret[chainID][account][token.Address] = new(big.Int)
+					// A token no fetch answered for is unknown (present, nil): the
+					// reader keeps the last persisted value for it and reads zero
+					// only when there is none.
+					ret[chainID][account][token.Address] = nil
 				}
 			}
 			if needsNative {
