@@ -4,11 +4,9 @@
   meta,
   version,
   stdenv,
-  withTokenLists ? false,
 }:
 
 let
-  optionalString = pkgs.lib.optionalString;
 
   # Fixes fatal: not a git repository (or any of the parent directories): .git
   fakeGit = pkgs.writeScriptBin "git" "echo ${version}";
@@ -21,10 +19,13 @@ in pkgs.buildGoModule {
 
   inherit meta version;
 
+  NIM_TKL_INC_DIR = "${pkgs.libtkl}/include";
+  NIM_TKL_LIB_DIR = "${pkgs.libtkl}/lib";
+
   nativeBuildInputs = with pkgs; [
     mockgen
     protobuf_36
-  ];
+  ] ++ lib.optionals stdenv.isDarwin [ darwin.cctools ];
 
   phases = ["unpackPhase" "patchPhase" "configurePhase" "buildPhase"];
 
@@ -65,8 +66,7 @@ in pkgs.buildGoModule {
   buildPhase = ''
     # this line removes a bug where value of $HOME is set to a non-writable /homeless-shelter dir
     export HOME=$TMPDIR
-    ${optionalString withTokenLists ''NIM_TKL_INC_DIR="${pkgs.libtkl}/include" NIM_TKL_LIB_DIR="${pkgs.libtkl}/lib" bash scripts/tkl_env.sh''} make statusgo-library \
-        ${optionalString withTokenLists "BUILD_TAGS='gowaku_no_rln tkl'"} \
+    make statusgo-library \
         USE_LOGOS_STORAGE=true \
         NIM_SDS_INC_DIR="${pkgs.libsds}/include" \
         NIM_SDS_LIB_DIR="${pkgs.libsds}/lib" \

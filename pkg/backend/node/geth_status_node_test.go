@@ -5,6 +5,9 @@ import (
 	"path"
 	"testing"
 
+	types "github.com/status-im/status-go/pkg/services/wallet/token/tokenlist"
+	tokentypes "github.com/status-im/status-go/pkg/services/wallet/token/types"
+
 	"github.com/ethereum/go-ethereum/common"
 	"go.uber.org/zap"
 
@@ -17,31 +20,26 @@ import (
 )
 
 func TestStatusNodeStart(t *testing.T) {
-	testStatusNodeStart(t, false)
+	testStatusNodeStart(t)
 }
 
 func TestStatusNodeStopAfterCatalogueSetupFailure(t *testing.T) {
-	testStatusNodeStopAfterCatalogueSetupFailure(t, false)
+	testStatusNodeStopAfterCatalogueSetupFailure(t)
 }
 
-func testStatusNodeStopAfterCatalogueSetupFailure(t *testing.T, useNim bool) {
+func testStatusNodeStopAfterCatalogueSetupFailure(t *testing.T) {
 	config, err := params.NewNodeConfig("", walletcommon.EthereumSepolia)
 	require.NoError(t, err)
 	config.Networks = testutil.MinimalActiveNetworks()
-	// Reject before initServices, in both tagged and ordinary builds.
-	config.WalletConfig.TokenListsShadow = true
-	config.WalletConfig.TokenListsUseNim = useNim
+	// An invalid persisted custom must fail before initServices.
+	config.WalletConfig.CustomTokens = []*tokentypes.Token{{Token: &types.Token{ChainID: 1, Decimals: 256}}}
 	n := New(nil, nil, testutils.MustCreateTestLogger())
 	app, wallet, cleanup, err := setupTestDBs()
 	require.NoError(t, err)
 	defer func() { require.NoError(t, cleanup()) }()
 	n.appDB, n.walletDB = app, wallet
 	defer func() { require.NoError(t, n.StopMediaServer()) }()
-	if useNim {
-		require.ErrorContains(t, n.Start(config), "TokenListsUseNim requires a build with the tkl tag")
-	} else {
-		require.ErrorContains(t, n.Start(config), "TokenListsShadow requires TokenListsUseNim")
-	}
+	require.Error(t, n.Start(config))
 	require.Nil(t, n.timeSourceSrvc)
 	require.NotPanics(t, func() { require.NoError(t, n.Stop()) })
 	require.False(t, n.IsRunning())
@@ -49,11 +47,9 @@ func testStatusNodeStopAfterCatalogueSetupFailure(t *testing.T, useNim bool) {
 	require.Equal(t, ErrNoRunningNode, n.Stop())
 }
 
-func testStatusNodeStart(t *testing.T, useNim bool) {
+func testStatusNodeStart(t *testing.T) {
 	config, err := params.NewNodeConfig("", walletcommon.EthereumSepolia)
 	require.NoError(t, err)
-	config.WalletConfig.TokenListsUseNim = useNim
-	config.WalletConfig.TokenListsShadow = useNim
 
 	// StatusNode startup creates TokenManager, which requires at least one active network.
 	config.Networks = testutil.MinimalActiveNetworks()
@@ -87,10 +83,8 @@ func testStatusNodeStart(t *testing.T, useNim bool) {
 	nativeToken, err := n.TokenManager().GetTokenByChainAddress(walletcommon.EthereumMainnet, common.Address{})
 	require.NoError(t, err)
 	require.NotNil(t, nativeToken)
-	if useNim {
-		require.NoError(t, n.serviceRegistry.Pause("token-lists"))
-		require.NoError(t, n.serviceRegistry.Resume("token-lists"))
-	}
+	require.NoError(t, n.serviceRegistry.Pause("token-lists"))
+	require.NoError(t, n.serviceRegistry.Resume("token-lists"))
 
 	// try to start already started node
 	require.EqualError(t, n.Start(config), ErrNodeRunning.Error())
