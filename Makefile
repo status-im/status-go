@@ -70,7 +70,8 @@ endif
 ifeq ($(MAKECMDGOALS),statusgo-ios-library)
     ARCH ?= arm64
     IPHONE_SDK ?= iphoneos
-    IOS_TARGET ?= 13.0
+    # Apple Silicon simulators require iOS 14; devices and Intel retain iOS 13.
+    IOS_TARGET ?= $(if $(filter iphonesimulator-arm64,$(IPHONE_SDK)-$(ARCH)),14.0,13.0)
     ifeq ($(ARCH),x86_64)
         MOBILE_GOARCH := amd64
     else
