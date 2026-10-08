@@ -1,6 +1,6 @@
 //go:build tkl
 
-// Package tklmanager adapts the C token catalogue to the wallet SDK read interface.
+// Package tklmanager adapts the C token catalogue to the wallet read interface.
 package tklmanager
 
 import (
@@ -14,9 +14,9 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/status-im/go-wallet-sdk/pkg/tokens/manager"
-	"github.com/status-im/go-wallet-sdk/pkg/tokens/types"
 	"github.com/status-im/nim-token-lists/go/tkl"
+
+	types "github.com/status-im/status-go/pkg/services/wallet/token/tokenlist"
 )
 
 var ErrRefreshUnavailable = errors.New("token catalogue refresh is not integrated")
@@ -59,7 +59,7 @@ type Manager struct {
 	notify           chan struct{}
 }
 
-var _ manager.Manager = (*Manager)(nil)
+var _ types.Catalogue = (*Manager)(nil)
 
 func New(config tkl.Config, load func(context.Context) (tkl.Bootstrap, error), options ...RefreshOptions) (*Manager, error) {
 	if load == nil {

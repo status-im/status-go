@@ -10,7 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
-	"github.com/status-im/go-wallet-sdk/pkg/tokens/types"
+	types "github.com/status-im/status-go/pkg/services/wallet/token/tokenlist"
 
 	walletcommon "github.com/status-im/status-go/pkg/services/wallet/common"
 	tokentypes "github.com/status-im/status-go/pkg/services/wallet/token/types"

@@ -9,8 +9,7 @@ import (
 
 	"golang.org/x/exp/maps"
 
-	"github.com/status-im/go-wallet-sdk/pkg/tokens/builder"
-	"github.com/status-im/go-wallet-sdk/pkg/tokens/types"
+	types "github.com/status-im/status-go/pkg/services/wallet/token/tokenlist"
 
 	"github.com/status-im/status-go/pkg/security"
 	walletcommon "github.com/status-im/status-go/pkg/services/wallet/common"
@@ -105,16 +104,16 @@ func (c *Client) getCoingeckoTokensByTokenKey() (map[string]GeckoToken, error) {
 		if chainID == walletcommon.BSCMainnet || chainID == walletcommon.BSCTestnet {
 			coingeckoTokensByTokenKey[token.Key()] = GeckoToken{
 				ID:     nativeBNBTokenID,
-				Name:   builder.BinanceSmartChainNativeName,
-				Symbol: builder.BinanceSmartChainNativeSymbol,
+				Name:   walletcommon.BNBName,
+				Symbol: walletcommon.BNBSymbol,
 			}
 			continue
 		}
 
 		coingeckoTokensByTokenKey[token.Key()] = GeckoToken{
 			ID:     nativeEthTokenID,
-			Name:   builder.EthereumNativeName,
-			Symbol: builder.EthereumNativeSymbol,
+			Name:   walletcommon.EthName,
+			Symbol: walletcommon.EthSymbol,
 		}
 	}
 

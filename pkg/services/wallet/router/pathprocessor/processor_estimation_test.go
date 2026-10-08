@@ -15,7 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
-	sdktypes "github.com/status-im/go-wallet-sdk/pkg/tokens/types"
+	sdktypes "github.com/status-im/status-go/pkg/services/wallet/token/tokenlist"
 
 	mock_ethclient "github.com/status-im/status-go/internal/rpc/chain/ethclient/mock/client/ethclient"
 	mock_rpcclient "github.com/status-im/status-go/internal/rpc/mock/client"

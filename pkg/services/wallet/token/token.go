@@ -16,11 +16,7 @@ import (
 
 	"golang.org/x/exp/maps"
 
-	"github.com/status-im/go-wallet-sdk/pkg/tokens/autofetcher"
-	"github.com/status-im/go-wallet-sdk/pkg/tokens/fetcher"
-	"github.com/status-im/go-wallet-sdk/pkg/tokens/manager"
-	"github.com/status-im/go-wallet-sdk/pkg/tokens/parsers"
-	"github.com/status-im/go-wallet-sdk/pkg/tokens/types"
+	types "github.com/status-im/status-go/pkg/services/wallet/token/tokenlist"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -92,7 +88,7 @@ type Manager struct {
 	accountsPublisher          *pubsub.Publisher
 	tokenBalancesStorage       balanceStorage
 
-	tokensManager    manager.Manager
+	tokensManager    types.Catalogue
 	shadowComparison bool
 
 	stopCh      chan struct{}
@@ -230,49 +226,6 @@ func initialListProviderFromEmbedded(id string) ([]byte, error) {
 
 func initialListIDsFromEmbedded() []string {
 	return maps.Keys(defaulttokenlists.TokensSources)
-}
-
-func setUpTokenListsManager(mng *Manager, walletDB *sql.DB, enabledChains []uint64, lastUpdate time.Time,
-	autoRefreshInterval time.Duration, autoRefreshCheckInterval time.Duration) (manager.Manager, error) {
-
-	wsdkFetcher := fetcher.New(fetcher.DefaultConfig())
-
-	contentStore := NewContentStore(walletDB)
-
-	customTokenStore := NewCustomTokenStore(mng)
-
-	config := &manager.Config{
-		AutoFetcherConfig: &autofetcher.ConfigRemoteListOfTokenLists{
-			Config: autofetcher.Config{
-				LastUpdate:               lastUpdate,
-				AutoRefreshInterval:      autoRefreshInterval,
-				AutoRefreshCheckInterval: autoRefreshCheckInterval,
-			},
-			RemoteListOfTokenListsFetchDetails: types.ListDetails{
-				ID:        remoteListOfTokenListsID,
-				SourceURL: remoteListOfTokenLists,
-				Schema:    fetcher.ListOfTokenListsSchema,
-			},
-			RemoteListOfTokenListsParser: &parsers.StatusListOfTokenListsParser{},
-		},
-
-		MainListID: walletcommon.StatusTokenListID,
-
-		InitialListIDs:      initialListIDsFromEmbedded(),
-		InitialListProvider: initialListProviderFromEmbedded,
-
-		CustomParsers: map[string]parsers.TokenListParser{
-			walletcommon.StatusTokenListID: &parsers.StatusTokenListParser{},
-		},
-
-		Chains: enabledChains,
-
-		SkippedTokenKeys: walletcommon.SkippedTokenKeys(),
-
-		AdditionalAddressesForNativeToken: walletcommon.AdditionalNativeTokenAddresses(),
-	}
-
-	return manager.New(config, wsdkFetcher, contentStore, customTokenStore)
 }
 
 func (tm *Manager) Start(ctx context.Context) error {

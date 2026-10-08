@@ -6,10 +6,10 @@ import (
 	"errors"
 	"time"
 
-	"github.com/status-im/go-wallet-sdk/pkg/tokens/manager"
+	"github.com/status-im/status-go/pkg/services/wallet/token/tokenlist"
 )
 
-func selectTokenListsManager(m *Manager, chains []uint64, last time.Time, refresh, check time.Duration, useNim bool) (manager.Manager, error) {
+func selectTokenListsManager(m *Manager, chains []uint64, last time.Time, refresh, check time.Duration, useNim bool) (tokenlist.Catalogue, error) {
 	if useNim {
 		return nil, errors.New("TokenListsUseNim requires a build with the tkl tag")
 	}

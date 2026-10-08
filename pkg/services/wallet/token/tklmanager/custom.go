@@ -6,8 +6,9 @@ import (
 	"context"
 	"errors"
 
-	"github.com/status-im/go-wallet-sdk/pkg/tokens/types"
 	"github.com/status-im/nim-token-lists/go/tkl"
+
+	types "github.com/status-im/status-go/pkg/services/wallet/token/tokenlist"
 )
 
 // UpsertCustom validates in the core before invoking persist. Persistence must

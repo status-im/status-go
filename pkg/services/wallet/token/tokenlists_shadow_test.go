@@ -8,9 +8,10 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/status-im/go-wallet-sdk/pkg/tokens/types"
 	"github.com/status-im/nim-token-lists/go/tkl"
 	"github.com/stretchr/testify/require"
+
+	types "github.com/status-im/status-go/pkg/services/wallet/token/tokenlist"
 
 	"github.com/status-im/status-go/pkg/services/wallet/token/tklmanager"
 	tokentypes "github.com/status-im/status-go/pkg/services/wallet/token/types"

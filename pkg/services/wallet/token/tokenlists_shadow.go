@@ -17,6 +17,8 @@ import (
 	"github.com/status-im/nim-token-lists/go/tkl"
 	"go.uber.org/zap"
 
+	"github.com/status-im/status-go/pkg/services/wallet/token/tokenlist"
+
 	"github.com/status-im/status-go/internal/logutils"
 	"github.com/status-im/status-go/pkg/services/wallet/token/tklmanager"
 )
@@ -130,7 +132,7 @@ func compareShadow(ctx context.Context, s tklmanager.ShadowSnapshot) shadowRepor
 			expectedCustom[row.Key()] = true
 		}
 	}
-	actual := make(map[string]types.Token, len(s.Tokens))
+	actual := make(map[string]tokenlist.Token, len(s.Tokens))
 	for _, row := range s.Tokens {
 		actual[row.Key()] = row
 	}
@@ -161,7 +163,7 @@ func compareShadow(ctx context.Context, s tklmanager.ShadowSnapshot) shadowRepor
 			}
 			continue
 		}
-		normalized := *want
+		normalized := tokenlist.Token(*want)
 		if expectedCustom[key] && got.CustomToken && !want.CustomToken {
 			normalized.CustomToken = true
 			result.ExpectedCustomMarkers++
@@ -181,7 +183,7 @@ func compareShadow(ctx context.Context, s tklmanager.ShadowSnapshot) shadowRepor
 	return result
 }
 
-func shadowTokenFields(a, b types.Token) []string {
+func shadowTokenFields(a, b tokenlist.Token) []string {
 	fields := make([]string, 0, 6)
 	if a.Name != b.Name {
 		fields = append(fields, "name")

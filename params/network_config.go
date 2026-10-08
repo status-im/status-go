@@ -5,7 +5,7 @@ import (
 
 	"github.com/status-im/status-go/pkg/security"
 
-	"github.com/status-im/go-wallet-sdk/pkg/tokens/types"
+	types "github.com/status-im/status-go/pkg/services/wallet/token/tokenlist"
 )
 
 // RpcProviderAuthType defines the different types of authentication for RPC providers
