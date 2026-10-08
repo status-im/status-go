@@ -7,8 +7,9 @@ import (
 	"slices"
 	"time"
 
-	"github.com/status-im/go-wallet-sdk/pkg/tokens/types"
 	"github.com/status-im/nim-token-lists/go/tkl"
+
+	types "github.com/status-im/status-go/pkg/services/wallet/token/tokenlist"
 
 	"github.com/status-im/status-go/internal/panics"
 )
