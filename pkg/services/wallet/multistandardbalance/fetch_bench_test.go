@@ -28,6 +28,7 @@ import (
 	"github.com/status-im/go-wallet-sdk/pkg/balance/multistandardfetcher"
 	"github.com/status-im/go-wallet-sdk/pkg/contracts/multicall3"
 
+	"github.com/status-im/status-go/internal/panics"
 	"github.com/status-im/status-go/internal/rpc/chain/ethclient"
 	"github.com/status-im/status-go/pkg/services/wallet/puzzleauth"
 )
@@ -174,7 +175,10 @@ func TestFakeMulticallRPCProcess(t *testing.T) {
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)
 	server := &http.Server{Handler: http.HandlerFunc(serveFakeMulticallRPC), ReadHeaderTimeout: time.Minute}
-	go func() { _ = server.Serve(ln) }()
+	go func() {
+		defer panics.LogOnPanic()
+		_ = server.Serve(ln)
+	}()
 	fmt.Printf("FAKE_RPC_URL=http://%s\n", ln.Addr())
 	_, _ = io.Copy(io.Discard, os.Stdin)
 }
@@ -194,7 +198,10 @@ func startFakeMulticallRPC(tb testing.TB) string {
 	scanner := bufio.NewScanner(stdout)
 	for scanner.Scan() {
 		if url, ok := strings.CutPrefix(scanner.Text(), "FAKE_RPC_URL="); ok {
-			go func() { _, _ = io.Copy(io.Discard, stdout) }()
+			go func() {
+				defer panics.LogOnPanic()
+				_, _ = io.Copy(io.Discard, stdout)
+			}()
 			return url
 		}
 	}
