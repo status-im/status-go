@@ -31,9 +31,14 @@
     nim-sds.url = "git+https://github.com/logos-messaging/nim-sds?submodules=1&rev=4b08d508dbfa69c0e2e3883db67adf1fe5a0c994";
     # nimble 0.20.1 in the nixpkgs above cannot resolve nim-sds through the bindings.
     nixpkgs-nimble.url = "github:NixOS/nixpkgs/34ab99075ac4f7e40cf037eef32cb1c360bb85e9";
+    # logos-delivery pins the same nixpkgs rev as we do, so following is safe.
+    logos-delivery = {
+      url = "git+https://github.com/logos-messaging/logos-delivery?submodules=1&rev=2025acaacd3d2f25e229d87180976320d3586dea";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
-  outputs = { self, nixpkgs, logos-storage-nim, nim-sds, nixpkgs-nimble }:
+  outputs = { self, nixpkgs, logos-storage-nim, nim-sds, nixpkgs-nimble, logos-delivery }:
   let
     stableSystems = [
       "x86_64-linux" "aarch64-linux"
@@ -60,6 +65,11 @@
             libsds     = useTmpdirForNimCache nim-sds.packages.${system}.libsds;
             libstorage = useTmpdirForNimCache logos-storage-nim.packages.${system}.libstorage;
             nimble = nixpkgs-nimble.legacyPackages.${system}.nimble;
+            # Postgres is only used by fleet store nodes; without this the
+            # library dlopens libpq at startup and a client node fails to start.
+            liblogosdelivery = logos-delivery.packages.${system}.liblogosdelivery.override {
+              enablePostgres = false;
+            };
           })
         ];
       }
