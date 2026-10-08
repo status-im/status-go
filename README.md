@@ -81,8 +81,8 @@ still happen at the final application link.
 `scripts/test_tkl_link.sh` verifies a small Go shared-library consumer on Linux,
 macOS, Android and Windows. The Token library integration workflow checks native
 consumers and DLL exports. `scripts/test_tkl_static.sh` links a C application to
-the bundled Go archive on Linux, macOS and iOS, checks private exports, and runs
-it on the native host. With an existing SDS library on the compiler/linker
+the bundled Go archive on Linux, macOS, iOS and Windows, checks private exports,
+and runs it on the native host. With an existing SDS library on the compiler/linker
 paths, `bash scripts/tkl_env.sh go test -tags 'tkl tkl_coexistence' ./internal/tklbuild`
 also checks that both Nim runtimes can coexist. Full application packaging and
 device runtime checks are still required before removing the SDK backend.
