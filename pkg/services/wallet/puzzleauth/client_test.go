@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	netUrl "net/url"
-	"runtime"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -371,10 +370,12 @@ func TestTransport_Do_ContextCancelled(t *testing.T) {
 type bodyRecordingTransport struct {
 	statuses  []int
 	bodies    [][]byte
+	readers   []io.ReadCloser
 	consumeFn func(io.Reader) ([]byte, error)
 }
 
 func (t *bodyRecordingTransport) RoundTrip(r *http.Request) (*http.Response, error) {
+	t.readers = append(t.readers, r.Body)
 	body, err := t.consumeFn(r.Body)
 	if err != nil {
 		return nil, err
@@ -423,20 +424,17 @@ func TestTransport_RoundTrip_DoesNotCopyRequestBody(t *testing.T) {
 	defer server.Close()
 
 	payload := bytes.Repeat([]byte{'x'}, 1<<20)
-	discard := func(r io.Reader) ([]byte, error) {
-		_, err := io.Copy(io.Discard, r)
-		return nil, err
-	}
-	transport := NewTransport(server.URL, &bodyRecordingTransport{consumeFn: discard})
+	base := &bodyRecordingTransport{consumeFn: io.ReadAll}
+	var getBodyCalls int32
+	req := newGethLikeRequest(t, server.URL+"/resource", payload, &getBodyCalls)
+	resp, err := NewTransport(server.URL, base).RoundTrip(req)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
 
-	var before, after runtime.MemStats
-	runtime.ReadMemStats(&before)
-	for i := 0; i < 10; i++ {
-		_, err := transport.RoundTrip(newGethLikeRequest(t, server.URL+"/resource", payload, nil))
-		require.NoError(t, err)
-	}
-	runtime.ReadMemStats(&after)
-	require.Less(t, after.TotalAlloc-before.TotalAlloc, uint64(len(payload)), "the request body must not be read into memory")
+	require.Len(t, base.readers, 1)
+	require.True(t, req.Body == base.readers[0], "the request's own body is sent, not a buffered copy")
+	require.Zero(t, atomic.LoadInt32(&getBodyCalls), "GetBody is for retries only")
+	require.Equal(t, payload, base.bodies[0])
 }
 
 func BenchmarkTransport_RoundTrip_1MBBody(b *testing.B) {
