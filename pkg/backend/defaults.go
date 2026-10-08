@@ -163,8 +163,6 @@ func buildWalletConfig(walletRequest *requests.WalletConfig, request *requests.W
 
 		TokensListsAutoRefreshCheckInterval: walletRequest.TokensListsAutoRefreshCheckInterval,
 		TokensListsAutoRefreshInterval:      walletRequest.TokensListsAutoRefreshInterval,
-		TokenListsUseNim:                    walletRequest.TokenListsUseNim,
-		TokenListsShadow:                    walletRequest.TokenListsShadow,
 	}
 
 	if request.StatusProxyStageName != "" {

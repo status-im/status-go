@@ -66,7 +66,7 @@ type TokenList struct {
 	Tokens           []*Token               `json:"tokens"`
 }
 
-// Catalogue is implemented by the native facade and the temporary SDK adapter.
+// Catalogue is implemented by the native facade.
 type Catalogue interface {
 	Start(context.Context, bool, chan struct{}) error
 	Stop() error

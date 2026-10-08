@@ -119,7 +119,8 @@ fi
 [ -f "$source_dir/abi/tkl.h" ] || fail "Incomplete checkout; run make clean and rebuild"
 git -C "$source_dir" diff --quiet HEAD -- || fail "Modified managed sources; run make clean and rebuild"
 
-nim="${NIM:-nim}"
+# A token-only compiler override leaves other Nim dependencies' toolchains alone.
+nim="${TKL_NIM:-${NIM:-nim}}"
 command -v "$cc" >/dev/null || fail "CC must name one compiler executable: $cc"
 case "$(basename "$cc")" in
   *clang*) nim_cc=clang ;;

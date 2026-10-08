@@ -1,4 +1,4 @@
-//go:build tkl && tkl_coexistence
+//go:build tkl_coexistence
 
 package tklbuild
 

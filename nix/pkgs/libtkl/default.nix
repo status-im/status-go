@@ -19,6 +19,9 @@ stdenv.mkDerivation {
   version = "2238b179f78d";
   inherit src;
   nativeBuildInputs = [ compiler ] ++ lib.optionals stdenv.isDarwin [ darwin.cctools ];
+  postPatch = ''
+    patchShebangs --build scripts
+  '';
   buildPhase = ''
     export HOME="$TMPDIR"
     export NIM=nim

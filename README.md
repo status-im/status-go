@@ -15,7 +15,7 @@ A comprehensive list of `status-go` functionality can be found in [Brief overvie
 
 # Nim token-library dependency
 
-The optional `tkl` build uses the public
+Status-go uses the public
 [nim-token-lists](https://github.com/status-im/nim-token-lists) Go wrapper and
 native library pinned to the same revision. `make build-libtkl` prepares one
 checkout under `build/deps/nim-token-lists`, including its pinned submodules.
@@ -35,12 +35,12 @@ and iOS (arm64 device, arm64/amd64 simulator). Archives are kept separately unde
 `build/deps/nim-token-lists/build/<target>/link`; device and simulator archives
 are never reused for one another. All targets share the same source checkout.
 
-Use the existing mobile targets with `USE_NIM_TOKEN_LISTS=true`, for example:
+Use the existing mobile targets, for example:
 
 ```sh
-make statusgo-android-library USE_NIM_TOKEN_LISTS=true ARCH=arm64 \
+make statusgo-android-library ARCH=arm64 \
   ANDROID_NDK_ROOT="$ANDROID_NDK_ROOT" HOST_OS=darwin ANDROID_API=28
-make statusgo-ios-library USE_NIM_TOKEN_LISTS=true ARCH=arm64 \
+make statusgo-ios-library ARCH=arm64 \
   IPHONE_SDK=iphonesimulator IOS_TARGET=14.0
 ```
 
@@ -51,36 +51,35 @@ consumer. The existing SDS build remains unchanged. For Linux cross builds,
 supply the target `CC`, `TKL_LD`, `TKL_OBJCOPY` and `TKL_AR`; native builds use
 the host tools. Windows builds run in a MinGW64 shell with `CC=gcc`.
 
-# Optional token catalogue
+# Token catalogue
 
-The optional `tkl` build supports the C-backed Nim token catalogue. Set
-`tokenListsUseNim` in the login wallet configuration to select it. The separate
-`tokenListsShadow` option compares its committed catalogue with the SDK builder
-using the same inputs, without another fetcher or storage writer. Both options
-default to false; shadow comparison requires the Nim catalogue.
+The C-backed Nim catalogue is the sole token backend. Normal executable,
+shared/static library, mobile, test and lint Make targets prepare its native
+dependency automatically. The `tkl` build tag is no longer needed. For direct
+Go commands, use `bash scripts/tkl_env.sh go test ...` or source that script
+in the same shell first (it enables strict shell mode).
 
-Wallet consumers and the native facade use status-go's token/list DTOs and
-catalogue interface in `pkg/services/wallet/token/tokenlist`. Their JSON fields
-and token-key format remain unchanged. SDK types are translated at the rollback
-adapter and shadow-comparison boundary; the offline list analyzer still uses the
-SDK parser.
+Wallet consumers and the native facade use status-go's token/list DTOs in
+`pkg/services/wallet/token/tokenlist`. Their JSON fields, token-key format and
+database schema remain unchanged. The offline list analyzer uses the same C
+facade. No packages under `go-wallet-sdk/pkg/tokens` are used; unrelated SDK
+packages remain dependencies.
 
-Comparison logs include revision, token differences, parser failures and timing.
-They compare unique token metadata; list metadata and query behavior are outside
-this comparison. Work is bounded per login to 64 snapshots or 24 hours, with
-input limits and a coalescing queue. Known custom-token marker differences are
-counted separately. Live development runs are still needed to assess parity.
+The `tokenListsUseNim` and `tokenListsShadow` configuration fields have been
+removed. Older JSON containing those names is decoded with them ignored. There is no runtime SDK
+rollback or shadow comparison. A rollback requires rebuilding an earlier version.
 
-For a shared-library build, run `make statusgo-shared-library-tkl`.
-Build libsds first; the target accepts
-the existing `NIM_SDS_LIB_DIR` and `NIM_SDS_INC_DIR` overrides. Set `NIM` if the
-compiler is not on PATH. The target prepares the pinned native library and
+For a shared-library build, run `make statusgo-shared-library`.
+The target retains the existing libsds preparation and accepts
+the `NIM_SDS_LIB_DIR` and `NIM_SDS_INC_DIR` overrides for prebuilt inputs. Set `TKL_NIM` to
+select a compiler for token lists only, or `NIM` when sharing the compiler with
+other dependencies. The target prepares the pinned native library and
 reuses both its archive and libstatus when their inputs match. Native changes
 invalidate Go's cgo cache; source, build-option or output changes invalidate
 the backend cache. Shared-library builds keep `tkl_*` symbols private. On Windows,
 managed archives also have explicit DLL export directives removed. A supplied
 Windows prebuilt archive must likewise omit `.drectve` when hiding exports.
-Tagged static-library builds bundle libtkl into libstatus.a, so the application
+Static-library builds bundle libtkl into libstatus.a, so the application
 does not need a separate token-library linker input. Export hiding and verification
 still happen at the final application link.
 
@@ -89,9 +88,9 @@ macOS, Android and Windows. The Token library integration workflow checks native
 consumers and DLL exports. `scripts/test_tkl_static.sh` links a C application to
 the bundled Go archive on Linux, macOS, iOS and Windows, checks private exports,
 and runs it on the native host. With an existing SDS library on the compiler/linker
-paths, `bash scripts/tkl_env.sh go test -tags 'tkl tkl_coexistence' ./internal/tklbuild`
+paths, `bash scripts/tkl_env.sh go test -tags tkl_coexistence ./internal/tklbuild`
 also checks that both Nim runtimes can coexist. Full application packaging and
-device runtime checks are still required before removing the SDK backend.
+device runtime checks remain part of release validation.
 
 # License
 

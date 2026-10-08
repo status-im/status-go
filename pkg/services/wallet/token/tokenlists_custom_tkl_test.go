@@ -1,5 +1,3 @@
-//go:build tkl
-
 package token
 
 import (
@@ -94,9 +92,9 @@ func TestTKLIneligibleCustomPersistsWithoutStaleCatalogueEntry(t *testing.T) {
 	require.Equal(t, uint(24), stored[0].Decimals)
 }
 
-func TestConfigCustomMetadataParity(t *testing.T) {
-	for _, useNim := range []bool{false, true} {
-		m, _, cleanup := setupTestTokenManager(t, ManagerOptions{UseNim: useNim})
+func TestConfigCustomMetadataMatchesPersistence(t *testing.T) {
+	{
+		m, _, cleanup := setupTestTokenManager(t)
 		row := tokentypes.Token{Token: &types.Token{ChainID: 1, Address: common.HexToAddress("0x1234"), Symbol: "CUSTOM", Decimals: 18, LogoURI: "https://example.org/icon.png", CrossChainID: "custom-id"}}
 		require.NoError(t, m.UpsertCustom(row))
 		require.NoError(t, m.Start(context.Background()))
@@ -108,14 +106,11 @@ func TestConfigCustomMetadataParity(t *testing.T) {
 	}
 }
 
-func TestTKLRuntimeSelection(t *testing.T) {
+func TestNativeCatalogueNetworkGate(t *testing.T) {
 	m, _, cleanup := setupTestTokenManager(t)
 	defer cleanup()
-	selected, err := selectTokenListsManager(m, []uint64{1}, time.Time{}, time.Hour, time.Minute, true)
-	require.NoError(t, err)
-	defer func() { _ = selected.Stop() }()
+	selected := m.tokensManager
 	require.IsType(t, &tklmanager.Manager{}, selected)
-	m.tokensManager = selected
 	require.NotNil(t, m.CataloguePausable())
 	networks := json.RawMessage(`{}`)
 	require.NoError(t, m.settings.CreateSettings(settings.Settings{Networks: &networks, ThirdpartyServicesEnabled: false}, params.NodeConfig{}))
@@ -128,9 +123,9 @@ func TestTKLRuntimeSelection(t *testing.T) {
 }
 
 func TestTKLExistingWalletRegressions(t *testing.T) {
-	t.Run("AccountCleanup", func(t *testing.T) { testRemoveTokenBalanceOnEventAccountRemoved(t, ManagerOptions{UseNim: true}) })
-	t.Run("TokenLists", func(t *testing.T) { testTokenListsValidity(t, ManagerOptions{UseNim: true}) })
-	t.Run("TokensOfInterest", func(t *testing.T) { testTokensOfInterest(t, ManagerOptions{UseNim: true}) })
+	t.Run("AccountCleanup", func(t *testing.T) { testRemoveTokenBalanceOnEventAccountRemoved(t) })
+	t.Run("TokenLists", func(t *testing.T) { testTokenListsValidity(t) })
+	t.Run("TokensOfInterest", func(t *testing.T) { testTokensOfInterest(t) })
 }
 
 func TestTKLDiscoveredCommunityLeavesCatalogue(t *testing.T) {
@@ -162,9 +157,7 @@ func TestTKLStopCancelsPrestartCustomBootstrap(t *testing.T) {
 func testTKLStopCancelsCustomSQL(t *testing.T, start bool) {
 	m, _, cleanup := setupTestTokenManager(t)
 	defer cleanup()
-	selected, err := selectTokenListsManager(m, []uint64{1}, time.Time{}, time.Hour, time.Minute, true)
-	require.NoError(t, err)
-	m.tokensManager = selected
+	selected := m.tokensManager
 	if start {
 		require.NoError(t, m.Start(context.Background()))
 	}

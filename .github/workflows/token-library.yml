@@ -24,16 +24,31 @@ jobs:
       - uses: jiro4989/setup-nim-action@189b145833368cc92f1e7b3e166a25a3e057a693
         with:
           nim-version: '2.2.10'
-      - name: Dependency lifecycle and mobile build selection
+      - name: Dependency lifecycle and mandatory mobile integration
         run: |
           python3 scripts/test_tkl_native.py
           python3 scripts/test_tkl_backend.py
           python3 scripts/test_tkl_mobile_make.py
       - name: Public ABI and private shared-library symbols
         run: |
-          bash scripts/tkl_env.sh go test -tags tkl ./internal/tklbuild
+          bash scripts/tkl_env.sh go test ./internal/tklbuild
           bash scripts/test_tkl_link.sh
           bash scripts/test_tkl_static.sh
+      - name: Setup Protocol Buffer Compiler
+        uses: arduino/setup-protoc@v3
+        with:
+          version: '36.0'
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Generate metadata, migrations and mocks
+        run: make generate
+      - name: Native catalogue without optional build tags
+        run: |
+          bash scripts/tkl_env.sh go test -race ./pkg/services/wallet/token/tklmanager/... ./pkg/services/wallet/token/tokenlist/...
+          deps=$(go list -deps ./pkg/services/wallet/token/...)
+          if printf '%s\n' "$deps" | grep '^github.com/status-im/go-wallet-sdk/pkg/tokens'; then
+            echo 'SDK token packages must not return to the wallet dependency graph' >&2
+            exit 1
+          fi
   windows:
     runs-on: windows-2022
     timeout-minutes: 20
@@ -54,7 +69,7 @@ jobs:
       - name: Public ABI and private DLL symbols
         shell: msys2 {0}
         run: |
-          CC=gcc bash scripts/tkl_env.sh go test -tags tkl ./internal/tklbuild
+          CC=gcc bash scripts/tkl_env.sh go test ./internal/tklbuild
           CC=gcc bash scripts/test_tkl_link.sh
       - name: Bundled static library and C application
         shell: msys2 {0}
