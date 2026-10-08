@@ -37,11 +37,6 @@ func (h *Hasher) IDKey(password, salt []byte, time, memory uint32, threads uint8
 	return h.deriveKey(argon2id, password, salt, nil, nil, time, memory, threads, keyLen)
 }
 
-// Release drops the block memory so it can be collected.
-func (h *Hasher) Release() {
-	h.blocks = nil
-}
-
 func (h *Hasher) deriveKey(mode int, password, salt, secret, data []byte, time, memory uint32, threads uint8, keyLen uint32) []byte {
 	if time < 1 {
 		panic("argon2: number of rounds too small")

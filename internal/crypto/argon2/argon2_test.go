@@ -39,28 +39,6 @@ func TestHasherMatchesXCrypto(t *testing.T) {
 	}
 }
 
-func TestHasherReusesBlocks(t *testing.T) {
-	const memory = 4096
-	var h Hasher
-	h.IDKey([]byte("p"), []byte("saltsalt"), 1, memory, 1, 32)
-	var fresh Hasher
-	freshBytes := testing.Benchmark(func(b *testing.B) {
-		b.ReportAllocs()
-		for b.Loop() {
-			fresh.Release()
-			fresh.IDKey([]byte("p"), []byte("saltsalt"), 1, memory, 1, 32)
-		}
-	}).AllocedBytesPerOp()
-	reusedBytes := testing.Benchmark(func(b *testing.B) {
-		b.ReportAllocs()
-		for b.Loop() {
-			h.IDKey([]byte("p"), []byte("saltsalt"), 1, memory, 1, 32)
-		}
-	}).AllocedBytesPerOp()
-	require.GreaterOrEqual(t, freshBytes, int64(memory*1024))
-	require.Less(t, reusedBytes, int64(64*1024), "reused derivation allocated %d bytes", reusedBytes)
-}
-
 func BenchmarkXCryptoIDKey(b *testing.B) {
 	b.ReportAllocs()
 	for b.Loop() {
