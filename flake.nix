@@ -71,7 +71,7 @@
     in {
       status-go-library = statusGo.library;
       libtkl = pkgs.libtkl;
-      status-go-library-tkl = statusGo.library.override { withTokenLists = true; };
+      status-go-library-tkl = statusGo.library;
       status-go-mobile-android = statusGo.mobile.android {};
       status-go-mobile-ios = statusGo.mobile.ios {};
     });
