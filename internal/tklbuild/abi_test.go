@@ -1,5 +1,3 @@
-//go:build tkl
-
 package tklbuild
 
 import (

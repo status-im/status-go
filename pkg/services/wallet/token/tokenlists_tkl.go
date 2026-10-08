@@ -1,5 +1,3 @@
-//go:build tkl
-
 package token
 
 import (
@@ -14,13 +12,6 @@ import (
 	walletcommon "github.com/status-im/status-go/pkg/services/wallet/common"
 	"github.com/status-im/status-go/pkg/services/wallet/token/tklmanager"
 )
-
-func selectTokenListsManager(m *Manager, chains []uint64, last time.Time, refresh, check time.Duration, useNim bool) (types.Catalogue, error) {
-	if !useNim {
-		return setUpTokenListsManager(m, m.walletDB, chains, last, refresh, check)
-	}
-	return newTKLRefreshManager(m, chains, last, nil, refresh, check)
-}
 
 // newTKLReadManager constructs the C-backed catalogue and its SQL bootstrap.
 func newTKLReadManager(mng *Manager, chains []uint64, lastSuccess time.Time, options ...tklmanager.RefreshOptions) (*tklmanager.Manager, error) {
@@ -91,7 +82,7 @@ func newTKLReadManager(mng *Manager, chains []uint64, lastSuccess time.Time, opt
 			if err := rows.Scan(&token.Address, &token.Name, &token.Symbol, &token.Decimals, &token.ChainID); err != nil {
 				return bootstrap, err
 			}
-			// Invalid customs are skipped by the SDK and core. Values outside
+			// Invalid customs are skipped by the core. Values outside
 			// the ABI's uint8 field must be skipped before narrowing as well.
 			if token.Decimals > 255 {
 				continue
