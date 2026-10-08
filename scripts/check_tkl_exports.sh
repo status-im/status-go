@@ -2,9 +2,10 @@
 # libtkl is an implementation detail of the Go facade, not a public libstatus ABI.
 set -euo pipefail
 library="${1:?Usage: check_tkl_exports.sh <libstatus>}"
-case "$(uname -s)" in
-  Darwin) symbols="$(nm -gU "$library")" ;;
-  Linux) symbols="$(nm -D --defined-only "$library")" ;;
+case "${TKL_TARGET_OS:-$(uname -s)}" in
+  Darwin|darwin|ios) symbols="$("${NM:-nm}" -gU "$library")" ;;
+  Linux|linux|android) symbols="$("${NM:-nm}" -D --defined-only "$library")" ;;
+  Windows*|windows|MINGW*|MSYS*) symbols="$("${OBJDUMP:-objdump}" -p "$library")" ;;
   *) echo "Unsupported export audit platform" >&2; exit 1 ;;
 esac
 leaked="$(printf '%s\n' "$symbols" | awk '$NF ~ /^_?tkl_/ {print $NF}')"
