@@ -178,6 +178,11 @@ func (m *Messenger) advanceHistoryCursors(through time.Time) {
 		m.messaging.ConnectionStatus().State != messagingtypes.ConnectionStateConnected {
 		return
 	}
+	if !m.historicCatchUpDone.Load() {
+		m.logger.Debug("advance history cursors skipped: session catch-up not completed yet",
+			zap.Time("through", through))
+		return
+	}
 	m.historicSyncQueueMu.Lock()
 	hasPending := len(m.historicSyncQueue) > 0
 	m.historicSyncQueueMu.Unlock()
@@ -238,6 +243,29 @@ func (m *Messenger) takeHistoricSync() (historicSyncRequest, bool) {
 	request := m.historicSyncQueue[0]
 	m.historicSyncQueue = m.historicSyncQueue[1:]
 	return request, true
+}
+
+// prepareHistoricSyncRun widens a bounded request into a cursor-based catch-up
+// until one has succeeded in this session. A bounded run floors each topic's
+// start to the window and then persists the window end as its cursor, which
+// would otherwise permanently skip any gap since the cursor was last saved
+// (e.g. while the app was closed).
+func (m *Messenger) prepareHistoricSyncRun(request historicSyncRequest) historicSyncRequest {
+	if !request.bounded() || m.historicCatchUpDone.Load() {
+		return request
+	}
+	m.logger.Info("bounded historic sync widened to cursor-based catch-up: session catch-up not completed yet",
+		zap.Time("from", request.From), zap.Time("to", request.To))
+	return historicSyncRequest{To: request.To}
+}
+
+func (m *Messenger) recordHistoricSyncSuccess(request historicSyncRequest) {
+	if request.bounded() {
+		return
+	}
+	if !m.historicCatchUpDone.Swap(true) {
+		m.logger.Info("historic sync session catch-up completed", zap.Time("to", request.To))
+	}
 }
 
 func (m *Messenger) requeueHistoricSync(request historicSyncRequest) {
@@ -310,8 +338,10 @@ func (m *Messenger) startHistoricSyncWorker() {
 					}
 					previousAttempt := lastAttempt
 					lastAttempt = time.Now()
+					request = m.prepareHistoricSyncRun(request)
 					executed, err := m.runAutomaticHistoricSync(request)
 					if err == nil && executed {
+						m.recordHistoricSyncSuccess(request)
 						break
 					}
 					if err == nil {
