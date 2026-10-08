@@ -10,6 +10,7 @@ import (
 	"math/big"
 	"net"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"os/exec"
 	"strings"
@@ -215,8 +216,7 @@ func (noopLastBlockManager) SetLatestBlockNumber(uint64, uint64) {}
 
 // newFakeFetchController wires the production fetch path (status-go RPC client
 // behind the puzzleauth transport, Fetcher, storage) against the fake node.
-func newFakeFetchController(tb testing.TB) (*Controller, multistandardfetcher.FetchConfig) {
-	url := startFakeMulticallRPC(tb)
+func newFakeFetchController(tb testing.TB, url string) (*Controller, multistandardfetcher.FetchConfig) {
 	httpClient := &http.Client{Timeout: time.Minute, Transport: puzzleauth.NewTransport(url, nil)}
 	rpcClient, err := rpc.DialOptions(context.Background(), url, rpc.WithHTTPClient(httpClient))
 	require.NoError(tb, err)
@@ -240,7 +240,7 @@ func runFakeFetch(tb testing.TB, c *Controller, config multistandardfetcher.Fetc
 	resultsCh, err := c.fetcher.FetchBalances(ctx, fakeChainID, config)
 	require.NoError(tb, err)
 	for result := range resultsCh {
-		c.handleFetchResult(ctx, fakeChainID, result)
+		c.handleFetchResult(ctx, fakeChainID, config, result)
 	}
 }
 
@@ -251,11 +251,13 @@ func cpuTime() time.Duration {
 }
 
 func TestFetchStoresNonZeroERC20Balances(t *testing.T) {
-	c, config := newFakeFetchController(t)
+	server := httptest.NewServer(http.HandlerFunc(serveFakeMulticallRPC))
+	t.Cleanup(server.Close)
+	c, config := newFakeFetchController(t, server.URL)
 	runFakeFetch(t, c, config)
 
-	for account := range config.ERC20 {
-		balances, state, err := c.storage.GetERC20Balances(context.Background(), BalancesKey{Account: account, ChainID: fakeChainID})
+	for account, asked := range config.ERC20 {
+		stored, state, err := c.storage.GetERC20Balances(context.Background(), BalancesKey{Account: account, ChainID: fakeChainID})
 		require.NoError(t, err)
 		require.NotEqual(t, NeverFetched, state.FetchedAt)
 		require.Equal(t, int64(21_000_000), state.AtBlockNumber.Int64())
@@ -263,15 +265,14 @@ func TestFetchStoresNonZeroERC20Balances(t *testing.T) {
 		nonZero, failed := fakeExpectedERC20Balances(account)
 		require.NotEmpty(t, nonZero)
 		require.NotEmpty(t, failed)
-		// Zero balances are not stored; the unanswered tokens are stored as unknown (nil).
-		require.Len(t, balances, len(nonZero)+len(failed))
+		// Only non-zero balances are stored; every answered token is recorded.
+		require.Len(t, stored.Balances, len(nonZero))
 		for token, expected := range nonZero {
-			require.Zero(t, expected.Cmp(balances[token]), token.Hex())
+			require.Zero(t, expected.Cmp(stored.Balances[token]), token.Hex())
 		}
+		require.Len(t, stored.Answered, len(asked)-len(failed))
 		for token := range failed {
-			value, present := balances[token]
-			require.True(t, present, token.Hex())
-			require.Nil(t, value, token.Hex())
+			require.NotContains(t, stored.Answered, token, token.Hex())
 		}
 	}
 }
@@ -280,7 +281,7 @@ func TestFetchStoresNonZeroERC20Balances(t *testing.T) {
 // 8500 tokens = 17000 calls, 7 requests) as the controller runs it, from building
 // the calls to storing the result. cpu-ms/op is this process only.
 func BenchmarkFetchERC20Balances(b *testing.B) {
-	c, config := newFakeFetchController(b)
+	c, config := newFakeFetchController(b, startFakeMulticallRPC(b))
 	runFakeFetch(b, c, config) // warm up connections and caches
 
 	b.ReportAllocs()
