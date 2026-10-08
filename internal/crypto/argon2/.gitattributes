@@ -1,0 +1,7 @@
+# Unmodified copies of golang.org/x/crypto/argon2, checked by scripts/check_argon2_fork.sh.
+blake2b.go linguist-vendored
+blamka_amd64.go linguist-vendored
+blamka_amd64.s linguist-vendored
+blamka_generic.go linguist-vendored
+blamka_ref.go linguist-vendored
+LICENSE linguist-vendored
