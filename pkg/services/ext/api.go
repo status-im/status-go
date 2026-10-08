@@ -558,6 +558,10 @@ func (api *PublicAPI) ChatMessagesV2(chatID, threadID, cursor string, limit int)
 	}, nil
 }
 
+func (api *PublicAPI) ChatMessagesWithThreadSummaries(chatID, cursor string, limit, participantsPreviewLimit int) (*protocol.MessagePageWithThreadSummaries, error) {
+	return api.service.messenger.MessagesWithThreadSummaries(chatID, cursor, limit, participantsPreviewLimit)
+}
+
 func (api *PublicAPI) CreateThread(chatID string, parentMessageID string) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.CreateThread(chatID, parentMessageID)
 }
@@ -1053,6 +1057,10 @@ func (api *PublicAPI) EmojiReactionsByChatID(chatID string, cursor string, limit
 
 func (api *PublicAPI) EmojiReactionsByChatIDV2(chatID, threadID, cursor string, limit int) ([]*protocol.EmojiReaction, error) {
 	return api.service.messenger.EmojiReactionsByChatID(chatID, threadID, cursor, limit)
+}
+
+func (api *PublicAPI) EmojiReactionsByChatIDMessageIDs(chatID string, messageIDs []string) ([]*protocol.EmojiReaction, error) {
+	return api.service.messenger.EmojiReactionsByChatIDMessageIDs(chatID, messageIDs)
 }
 
 func (api *PublicAPI) EmojiReactionsByChatIDMessageID(chatID string, messageID string) ([]*protocol.EmojiReaction, error) {

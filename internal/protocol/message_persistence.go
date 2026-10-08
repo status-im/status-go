@@ -76,10 +76,10 @@ type ThreadLastMessage struct {
 	Timestamp uint64 `json:"timestamp"`
 }
 
-// populateThreadsSummaries enriches an already loaded, bounded set of threads in
+// queryThreadsSummaries enriches an already loaded, bounded set of threads in
 // one query. Callers should pass threads associated with a message page or event,
 // rather than every thread in a chat.
-func (db sqlitePersistence) populateThreadsSummaries(threads []*Thread, participantPreviewLimit int) error {
+func (db sqlitePersistence) queryThreadsSummaries(queryer threadSummaryQuerier, threads []*Thread, participantPreviewLimit int) error {
 	if len(threads) == 0 {
 		return nil
 	}
@@ -101,7 +101,8 @@ func (db sqlitePersistence) populateThreadsSummaries(threads []*Thread, particip
 	summaryArgs = append(summaryArgs, args...)
 	summaryArgs = append(summaryArgs, args...)
 	summaryArgs = append(summaryArgs, participantPreviewLimit)
-	// Derive counts, recent participants, and the latest message in one query.
+	// The latest-message key uses the same clock/id ordering as message pagination.
+	// Aggregate its ID instead of ranking and carrying every message's text.
 	// nolint: gosec
 	summaryQuery := fmt.Sprintf(`
 		WITH candidates AS (
@@ -109,15 +110,13 @@ func (db sqlitePersistence) populateThreadsSummaries(threads []*Thread, particip
 				threads.thread_id AS summary_thread_id,
 				user_messages.id,
 				user_messages.source,
-				user_messages.text,
-				user_messages.timestamp,
 				user_messages.clock_value,
 				1 AS is_thread_creator
 			FROM threads
 			JOIN user_messages ON user_messages.id = threads.parent_message_id
 			WHERE threads.thread_id IN (%s)
 			UNION ALL
-			SELECT thread_id, id, source, text, timestamp, clock_value, 0
+			SELECT thread_id, id, source, clock_value, 0
 			FROM user_messages
 			WHERE thread_id IN (%s)
 				AND NOT deleted
@@ -126,7 +125,15 @@ func (db sqlitePersistence) populateThreadsSummaries(threads []*Thread, particip
 			SELECT
 				summary_thread_id,
 				COUNT(1) AS messages_count,
-				COUNT(DISTINCT CASE WHEN source <> '' THEN source END) AS participants_count
+				substr(
+					MAX(
+						substr(
+							'0000000000000000000000000000000000000000000000000000000000000000' || clock_value,
+							-64, 64
+						) || id
+					),
+					65
+				) AS latest_message_id
 			FROM candidates
 			GROUP BY summary_thread_id
 		), participants AS (
@@ -138,6 +145,10 @@ func (db sqlitePersistence) populateThreadsSummaries(threads []*Thread, particip
 			FROM candidates
 			WHERE source <> ''
 			GROUP BY summary_thread_id, source
+		), participant_counts AS (
+			SELECT summary_thread_id, COUNT(1) AS participants_count
+			FROM participants
+			GROUP BY summary_thread_id
 		), ranked_participants AS (
 			SELECT
 				summary_thread_id,
@@ -149,37 +160,25 @@ func (db sqlitePersistence) populateThreadsSummaries(threads []*Thread, particip
 					ORDER BY is_thread_creator DESC, latest_clock DESC, source
 				) AS row_number
 			FROM participants
-		), ranked_messages AS (
-			SELECT
-				summary_thread_id,
-				source,
-				text,
-				timestamp,
-				ROW_NUMBER() OVER (
-					PARTITION BY summary_thread_id
-					ORDER BY clock_value DESC, id DESC
-				) AS row_number
-			FROM candidates
 		)
 		SELECT
 			aggregates.summary_thread_id,
 			aggregates.messages_count,
-			aggregates.participants_count,
+			COALESCE(participant_counts.participants_count, 0),
 			COALESCE(ranked_participants.source, ''),
-			ranked_messages.source,
-			ranked_messages.text,
-			ranked_messages.timestamp
+			latest_message.source,
+			latest_message.text,
+			latest_message.timestamp
 		FROM aggregates
-		JOIN ranked_messages
-			ON ranked_messages.summary_thread_id = aggregates.summary_thread_id
-			AND ranked_messages.row_number = 1
+		JOIN user_messages latest_message ON latest_message.id = aggregates.latest_message_id
+		LEFT JOIN participant_counts ON participant_counts.summary_thread_id = aggregates.summary_thread_id
 		LEFT JOIN ranked_participants
 			ON ranked_participants.summary_thread_id = aggregates.summary_thread_id
 			AND ranked_participants.row_number <= ?
 		ORDER BY
 			aggregates.summary_thread_id,
 			ranked_participants.row_number`, placeholders, placeholders)
-	rows, err := db.db.Query(summaryQuery, summaryArgs...)
+	rows, err := queryer.QueryContext(context.Background(), summaryQuery, summaryArgs...)
 	if err != nil {
 		return err
 	}
@@ -1056,8 +1055,12 @@ func (db sqlitePersistence) UpsertThread(threadID string, chatID string, parentM
 }
 
 func (db sqlitePersistence) ThreadByID(chatID string, threadID string) (*Thread, error) {
+	return db.threadByID(db.db, chatID, threadID)
+}
+
+func (db sqlitePersistence) threadByID(queryer threadSummaryQuerier, chatID, threadID string) (*Thread, error) {
 	var thread Thread
-	err := db.db.QueryRow(`
+	err := queryer.QueryRowContext(context.Background(), `
 		SELECT
 			threads.thread_id,
 			threads.chat_id,
@@ -1088,14 +1091,18 @@ func (db sqlitePersistence) ThreadByID(chatID string, threadID string) (*Thread,
 
 // ThreadWithSummaryByID returns one thread with the data required by a thread card.
 func (db sqlitePersistence) ThreadWithSummaryByID(chatID string, threadID string) (*Thread, error) {
-	thread, err := db.ThreadByID(chatID, threadID)
+	threads, err := db.readThreadsWithSummaries(defaultThreadParticipantPreviewLimit,
+		func(queryer threadSummaryQuerier) ([]*Thread, error) {
+			thread, err := db.threadByID(queryer, chatID, threadID)
+			if err != nil {
+				return nil, err
+			}
+			return []*Thread{thread}, nil
+		})
 	if err != nil {
 		return nil, err
 	}
-	if err := db.populateThreadsSummaries([]*Thread{thread}, defaultThreadParticipantPreviewLimit); err != nil {
-		return nil, err
-	}
-	return thread, nil
+	return threads[0], nil
 }
 
 func (db sqlitePersistence) ThreadsByChatID(chatID string) ([]*Thread, error) {
@@ -1226,14 +1233,20 @@ func (db sqlitePersistence) ThreadsByChatIDs(chatIDs []string) ([]*Thread, error
 // ThreadsWithSummariesByParentMessageIDs returns enriched threads whose parent
 // messages belong to the requested message page.
 func (db sqlitePersistence) ThreadsWithSummariesByParentMessageIDs(chatID string, parentMessageIDs []string, participantPreviewLimit int) ([]*Thread, error) {
-	threads := make([]*Thread, 0)
 	if len(parentMessageIDs) == 0 {
-		return threads, nil
+		return []*Thread{}, nil
 	}
 	if participantPreviewLimit < 0 {
 		participantPreviewLimit = 0
 	}
+	return db.readThreadsWithSummaries(participantPreviewLimit,
+		func(queryer threadSummaryQuerier) ([]*Thread, error) {
+			return db.threadsByParentMessageIDs(queryer, chatID, parentMessageIDs)
+		})
+}
 
+func (db sqlitePersistence) threadsByParentMessageIDs(queryer threadSummaryQuerier, chatID string, parentMessageIDs []string) ([]*Thread, error) {
+	threads := make([]*Thread, 0)
 	args := make([]interface{}, 0, len(parentMessageIDs)+2)
 	args = append(args, ChatTypeOneToOne, chatID)
 	for _, parentMessageID := range parentMessageIDs {
@@ -1253,7 +1266,7 @@ func (db sqlitePersistence) ThreadsWithSummariesByParentMessageIDs(chatID string
 		LEFT JOIN chats ON chats.id = threads.chat_id
 		WHERE threads.chat_id = ? AND threads.parent_message_id IN (%s)`, strings.Repeat(",?", len(parentMessageIDs))[1:])
 
-	rows, err := db.db.Query(query, args...)
+	rows, err := queryer.QueryContext(context.Background(), query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -1270,9 +1283,6 @@ func (db sqlitePersistence) ThreadsWithSummariesByParentMessageIDs(chatID string
 		return nil, err
 	}
 	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := db.populateThreadsSummaries(threads, participantPreviewLimit); err != nil {
 		return nil, err
 	}
 	return threads, nil
@@ -1314,11 +1324,16 @@ func (db sqlitePersistence) MessageByChatID(chatID string, threadID string, curr
 	if err != nil {
 		return nil, "", err
 	}
-	defer rows.Close()
-
 	result, cursors, err := getMessagesAndCursorsFromScanRows(db, rows)
+	if err == nil {
+		err = rows.Err()
+	}
+	closeErr := rows.Close()
 	if err != nil {
 		return nil, "", err
+	}
+	if closeErr != nil {
+		return nil, "", closeErr
 	}
 
 	var newCursor string
@@ -1326,7 +1341,45 @@ func (db sqlitePersistence) MessageByChatID(chatID string, threadID string, curr
 		newCursor = cursors[limit]
 		result = result[:limit]
 	}
+	if threadsEnabled && threadID == "" {
+		// This optional hint must not discard messages on a metadata failure.
+		_ = db.populateMessageThreadPresence(chatID, result)
+	}
 	return result, newCursor, nil
+}
+
+func (db sqlitePersistence) populateMessageThreadPresence(chatID string, messages []*common.Message) error {
+	if len(messages) == 0 {
+		return nil
+	}
+	args := make([]interface{}, 0, len(messages)+1)
+	args = append(args, chatID)
+	for _, message := range messages {
+		args = append(args, message.ID)
+	}
+	query := sqlutil.In(`SELECT parent_message_id FROM threads
+		WHERE chat_id = ? AND parent_message_id IN (%s)`, len(messages))
+	rows, err := db.db.Query(query, args...)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	parents := make(map[string]bool)
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return err
+		}
+		parents[id] = true
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	for _, message := range messages {
+		hasThread := parents[message.ID]
+		message.HasThread = &hasThread
+	}
+	return nil
 }
 
 func (db sqlitePersistence) FirstUnseenMessageID(chatID string) (string, error) {
@@ -2358,6 +2411,42 @@ func (db sqlitePersistence) EmojiReactionsByChatID(chatID string, threadID strin
 	}
 	defer rows.Close()
 
+	return scanEmojiReactions(rows)
+}
+
+// emojiReactionsByChatIDsMessageIDs reuses the message page selected by the caller.
+func (db sqlitePersistence) emojiReactionsByChatIDsMessageIDs(chatIDs, messageIDs []string) ([]*EmojiReaction, error) {
+	if len(chatIDs) == 0 || len(messageIDs) == 0 {
+		return nil, nil
+	}
+	args := make([]interface{}, 0, len(chatIDs)+len(messageIDs))
+	for _, id := range chatIDs {
+		args = append(args, id)
+	}
+	for _, id := range messageIDs {
+		args = append(args, id)
+	}
+	// Keep chat authorization and visibility checks even when IDs are supplied.
+	// nolint: gosec
+	query := fmt.Sprintf(`
+		SELECT e.clock_value, e.source, e.emoji_id, e.message_id,
+			e.chat_id, e.local_chat_id, e.retracted, e.emoji
+		FROM emoji_reactions e
+		WHERE NOT(e.retracted)
+			AND e.local_chat_id IN (%s)
+			AND e.message_id IN (%s)
+			AND EXISTS (SELECT 1 FROM user_messages m
+				WHERE m.id = e.message_id AND m.local_chat_id = e.local_chat_id AND NOT(m.hide))
+		LIMIT 1000`, strings.Repeat(",?", len(chatIDs))[1:], strings.Repeat(",?", len(messageIDs))[1:])
+	rows, err := db.db.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	return scanEmojiReactions(rows)
+}
+
+func scanEmojiReactions(rows *sql.Rows) ([]*EmojiReaction, error) {
 	var result []*EmojiReaction
 	for rows.Next() {
 		emojiReaction := NewEmojiReaction()
@@ -2377,7 +2466,7 @@ func (db sqlitePersistence) EmojiReactionsByChatID(chatID string, threadID strin
 		result = append(result, emojiReaction)
 	}
 
-	return result, nil
+	return result, rows.Err()
 }
 
 // EmojiReactionsByChatIDMessageID returns the emoji reactions for the queried message.
