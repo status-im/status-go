@@ -2,6 +2,7 @@ package defaulttokenlists
 
 import (
 	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -15,15 +16,28 @@ func allLists() []*DownloadedTokenList {
 }
 
 // The embedded lists are megabytes of JSON; they must stay in the binary's data section, not be copied to the heap.
+// The default heap profile samples about every 512KiB, so heap copies made by this package's init would show up.
 func TestEmbeddedListsAreNotOnHeap(t *testing.T) {
 	total := 0
 	for _, l := range allLists() {
 		require.NotEmpty(t, l.JsonData, l.ID)
 		total += len(l.JsonData)
 	}
+	require.Greater(t, total, 2<<20)
 
-	var m runtime.MemStats
 	runtime.GC()
-	runtime.ReadMemStats(&m)
-	require.Less(t, m.HeapAlloc, uint64(total/2), "heap %d KiB holds the %d KiB of embedded lists", m.HeapAlloc>>10, total>>10)
+	records := make([]runtime.MemProfileRecord, 4096)
+	n, ok := runtime.MemProfile(records, false)
+	require.True(t, ok)
+	for _, r := range records[:n] {
+		frames := runtime.CallersFrames(r.Stack())
+		for {
+			f, more := frames.Next()
+			require.False(t, strings.Contains(f.Function, "default-lists.init"),
+				"%d bytes allocated by %s are still on the heap", r.InUseBytes(), f.Function)
+			if !more {
+				break
+			}
+		}
+	}
 }
