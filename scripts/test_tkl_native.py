@@ -26,7 +26,7 @@ class NativeDependencyTest(unittest.TestCase):
         (source / "abi").mkdir(parents=True)
         (source / "abi/tkl.h").write_text("fixture header\n")
         (source / "Makefile").write_text(
-            "isolate:\n\tmkdir -p $(OUT)\n"
+            "isolate:\n\t$(NIM) --version >/dev/null\n\tmkdir -p $(OUT)\n"
             "\t@if [ -n \"$$TKL_TEST_BUILD_GATE\" ]; then \\\n"
             "\t  touch \"$$TKL_TEST_BUILD_GATE.ready\"; \\\n"
             "\t  while [ ! -f \"$$TKL_TEST_BUILD_GATE\" ]; do sleep 0.05; done; fi\n"
@@ -52,7 +52,7 @@ class NativeDependencyTest(unittest.TestCase):
         self.env.update(GIT_CONFIG_COUNT="1", GIT_CONFIG_KEY_0=
                         f"url.{source}.insteadOf", GIT_CONFIG_VALUE_0=
                         "https://github.com/status-im/nim-token-lists.git", NIM="true")
-        for key in ("NIM_TKL_INC_DIR", "NIM_TKL_LIB_DIR", "GOOS", "GOARCH", "OUT",
+        for key in ("NIM_TKL_INC_DIR", "NIM_TKL_LIB_DIR", "TKL_NIM", "GOOS", "GOARCH", "OUT",
                     "CGO_CFLAGS", "CGO_LDFLAGS", "TKL_BASE_CGO_CFLAGS",
                     "TKL_BASE_CGO_LDFLAGS", "TKL_LOCK_TIMEOUT", "TKL_TEST_BUILD_GATE"):
             self.env.pop(key, None)
@@ -111,6 +111,10 @@ class NativeDependencyTest(unittest.TestCase):
         self.helper("clean")
         self.assertFalse(self.source.exists())
         self.helper()
+        self.assertTrue((self.out / "link/libtkl.a").is_file())
+
+    def test_token_compiler_override_does_not_use_other_nim_toolchain(self):
+        self.helper(TKL_NIM="true", NIM="false")
         self.assertTrue((self.out / "link/libtkl.a").is_file())
 
     def test_changed_flags_rebuild_and_missing_archive_rebuild(self):
