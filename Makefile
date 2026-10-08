@@ -434,6 +434,24 @@ statusgo-library: statusgo-c-bindings $(LIBSDS)  ##@cross-compile Build status-g
 		"$(STATUS_GO_BINDINGS_PATH)/main.go"
 	@echo "Static library built: $(STATUS_GO_LIBRARY_OUT)/libstatus.a"
 
+.PHONY: statusgo-shared-library-tkl
+# Reuse matching native and backend artifacts. Preserve the existing prebuilt
+# SDS inputs; this target does not prepare or change the SDS checkout.
+statusgo-shared-library-tkl:
+	$(GOBIN_SHARED_LIB_CFLAGS) TKL_HIDE_EXPORTS=1 \
+		CGO_CFLAGS='$(CGO_CFLAGS)' CGO_LDFLAGS='$(CGO_LDFLAGS) -Wl,-rpath,$(NIM_SDS_LIB_DIR)' \
+		bash scripts/tkl_env.sh bash scripts/tkl_backend.sh build/bin/libstatus.$(GOBIN_SHARED_LIB_EXT) \
+		$(MAKE) statusgo-shared-library \
+		BUILD_TAGS='$(BUILD_TAGS) tkl' \
+		NIM_SDS_LIB_DIR='$(NIM_SDS_LIB_DIR)' NIM_SDS_INC_DIR='$(NIM_SDS_INC_DIR)' \
+		LIBSDS='$(firstword $(wildcard $(LIBSDS) $(NIM_SDS_LIB_DIR)/libsds.a))'
+	bash scripts/check_tkl_exports.sh build/bin/libstatus.$(GOBIN_SHARED_LIB_EXT)
+
+.PHONY: test-tkl-backend
+test-libtkl: test-tkl-backend
+test-tkl-backend:
+	python3 scripts/test_tkl_backend.py
+
 statusgo-shared-library: generate
 statusgo-shared-library: statusgo-c-bindings $(LIBSDS) ##@cross-compile Build status-go as shared library for current platform
 	@echo "Building shared library..."

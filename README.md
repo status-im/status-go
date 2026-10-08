@@ -46,6 +46,15 @@ this comparison. Work is bounded per login to 64 snapshots or 24 hours, with
 input limits and a coalescing queue. Known custom-token marker differences are
 counted separately. Live development runs are still needed to assess parity.
 
+For a shared-library build, run `make statusgo-shared-library-tkl`.
+Build libsds first; the target accepts
+the existing `NIM_SDS_LIB_DIR` and `NIM_SDS_INC_DIR` overrides. Set `NIM` if the
+compiler is not on PATH. The target prepares the pinned native library and
+reuses both its archive and libstatus when their inputs match. Native changes
+invalidate Go's cgo cache; source, build-option or output changes invalidate
+the backend cache. The final library keeps `tkl_*` symbols private.
+Mobile packaging remains outside this host build.
+
 # License
 
 [Mozilla Public License 2.0](https://github.com/status-im/status-go/blob/develop/LICENSE.md)
