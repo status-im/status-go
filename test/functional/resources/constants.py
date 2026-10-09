@@ -135,6 +135,7 @@ gas_fee_mode_custom = 3
 processor_name_transfer = "Transfer"
 
 ANVIL_NETWORK_ID = 31337
+ANVIL_RPC_URL = "http://anvil:8545"
 
 STATUS_CONNECTOR_WS_PORT = 8586
 STATUS_MEDIA_SERVER_PORT = 8587
