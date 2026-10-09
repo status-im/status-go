@@ -291,3 +291,89 @@ func TestThreadMetadataQueryUsesThreadIndex(t *testing.T) {
 	require.NoError(t, rows.Err())
 	require.True(t, indexedThreadLookup, "bulk metadata query must use indexed thread lookups")
 }
+
+func TestPendingThreadCreatorClaims(t *testing.T) {
+	db, err := openTestDB()
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, db.Close()) })
+	p := newSQLitePersistence(db)
+
+	chat := CreatePublicChat("pending-creator-chat", &testTimeSource{})
+	require.NoError(t, p.SaveChats([]*Chat{chat}))
+
+	t.Run("legacy thread cannot be claimed", func(t *testing.T) {
+		require.NoError(t, p.UpsertThread("legacy", chat.ID, "legacy", "Legacy"))
+		claimed, err := p.ClaimPendingThreadCreator(chat.ID, "legacy", "creator")
+		require.NoError(t, err)
+		require.False(t, claimed)
+
+		thread, err := p.ThreadByID(chat.ID, "legacy")
+		require.NoError(t, err)
+		require.Empty(t, thread.CreatorID)
+		require.False(t, thread.CreatorPending)
+	})
+
+	t.Run("first claim wins", func(t *testing.T) {
+		require.NoError(t, p.UpsertPendingCreatorThread("pending", chat.ID, "pending", ""))
+		thread, err := p.ThreadByID(chat.ID, "pending")
+		require.NoError(t, err)
+		require.True(t, thread.CreatorPending)
+
+		claimed, err := p.ClaimPendingThreadCreator(chat.ID, "pending", "creator")
+		require.NoError(t, err)
+		require.True(t, claimed)
+		claimed, err = p.ClaimPendingThreadCreator(chat.ID, "pending", "rival")
+		require.NoError(t, err)
+		require.False(t, claimed)
+
+		thread, err = p.ThreadByID(chat.ID, "pending")
+		require.NoError(t, err)
+		require.Equal(t, "creator", thread.CreatorID)
+		require.False(t, thread.CreatorPending)
+	})
+
+	t.Run("existing thread stays non-pending", func(t *testing.T) {
+		require.NoError(t, p.UpsertPendingCreatorThread("legacy", chat.ID, "legacy", ""))
+		thread, err := p.ThreadByID(chat.ID, "legacy")
+		require.NoError(t, err)
+		require.False(t, thread.CreatorPending)
+	})
+
+	t.Run("backup round trip", func(t *testing.T) {
+		require.NoError(t, p.UpsertPendingCreatorThread("backed-up-pending", chat.ID, "backed-up-pending", ""))
+		backedUp, err := p.AllThreadsForBackup()
+		require.NoError(t, err)
+		byID := make(map[string]*protobuf.BackedUpThread, len(backedUp))
+		for _, thread := range backedUp {
+			byID[thread.ThreadId] = thread
+		}
+		require.True(t, byID["backed-up-pending"].CreatorPending)
+		require.False(t, byID["legacy"].CreatorPending)
+		require.False(t, byID["pending"].CreatorPending)
+
+		restoredDB, err := openTestDB()
+		require.NoError(t, err)
+		t.Cleanup(func() { require.NoError(t, restoredDB.Close()) })
+		restored := newSQLitePersistence(restoredDB)
+		require.NoError(t, restored.SaveChats([]*Chat{chat}))
+		// A local legacy thread stays protected unless the backup knows the creator.
+		require.NoError(t, restored.UpsertThread("legacy", chat.ID, "legacy", "Legacy"))
+		require.NoError(t, restored.SaveBackedUpThreads(backedUp))
+
+		for threadID, wantPending := range map[string]bool{"backed-up-pending": true, "legacy": false, "pending": false} {
+			thread, err := restored.ThreadByID(chat.ID, threadID)
+			require.NoError(t, err)
+			require.Equal(t, wantPending, thread.CreatorPending, threadID)
+		}
+
+		// A backed-up creator resolves a local pending placeholder.
+		require.NoError(t, restored.UpsertPendingCreatorThread("resolved", chat.ID, "resolved", ""))
+		require.NoError(t, restored.SaveBackedUpThreads([]*protobuf.BackedUpThread{
+			{ChatId: chat.ID, ThreadId: "resolved", ParentMessageId: "resolved", CreatorId: "creator", MetadataClock: 1},
+		}))
+		thread, err := restored.ThreadByID(chat.ID, "resolved")
+		require.NoError(t, err)
+		require.Equal(t, "creator", thread.CreatorID)
+		require.False(t, thread.CreatorPending)
+	})
+}

@@ -139,7 +139,8 @@ func TestNormalizeThreadNameDoesNotSplitGraphemeClusters(t *testing.T) {
 	const familyEmoji = "👨‍👩‍👧‍👦"
 	input := strings.Repeat("a", 49) + familyEmoji + "x"
 
-	require.Equal(t, strings.Repeat("a", 49)+familyEmoji, normalizeThreadName(input))
+	name, _ := common.NormalizeThreadName(input, true)
+	require.Equal(t, strings.Repeat("a", 49)+familyEmoji, name)
 }
 
 func TestSaveMessages(t *testing.T) {
@@ -1076,7 +1077,8 @@ func TestSaveMessagesUpdatesEmptyThreadNameOnlyWhenEnabled(t *testing.T) {
 
 	thread, err = p.ThreadByID(testPublicChatID, threadID)
 	require.NoError(t, err)
-	require.Equal(t, normalizeThreadName(parentText), thread.Name)
+	expectedName, _ := common.NormalizeThreadName(parentText, true)
+	require.Equal(t, expectedName, thread.Name)
 }
 
 func TestMessagesByThreadID(t *testing.T) {
@@ -1116,6 +1118,21 @@ func TestMessagesByThreadID(t *testing.T) {
 	for _, msg := range msgs {
 		require.Equal(t, threadID, msg.GetThreadId())
 	}
+
+}
+
+func TestSetThreadCreatorDoesNotReplaceExistingCreator(t *testing.T) {
+	db, err := openTestDB()
+	require.NoError(t, err)
+	p := newSQLitePersistence(db)
+
+	require.NoError(t, p.UpsertThread("thread-id", testPublicChatID, "parent-id", "Thread"))
+	require.NoError(t, p.SetThreadCreator("thread-id", testPublicChatID, "first-creator"))
+	require.NoError(t, p.SetThreadCreator("thread-id", testPublicChatID, "later-creator"))
+
+	thread, err := p.ThreadByID(testPublicChatID, "thread-id")
+	require.NoError(t, err)
+	require.Equal(t, "first-creator", thread.CreatorID)
 }
 
 func TestCreateThreadFromExistingParent(t *testing.T) {
@@ -1144,7 +1161,8 @@ func TestCreateThreadFromExistingParent(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, parentID, thread.ThreadID)
 	require.Equal(t, parentID, thread.ParentMessageID)
-	require.Equal(t, normalizeThreadName(parentText), thread.Name)
+	expectedName, _ := common.NormalizeThreadName(parentText, true)
+	require.Equal(t, expectedName, thread.Name)
 }
 
 func TestCreateThreadFailsWhenParentMessageMissing(t *testing.T) {

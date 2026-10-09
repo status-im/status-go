@@ -509,6 +509,9 @@ class WakuextService(Service):
     def create_thread(self, chat_id: str, parent_message_id: str):
         return self.rpc_request("createThread", [chat_id, parent_message_id])
 
+    def edit_thread(self, chat_id: str, thread_id: str, name: str):
+        return self.rpc_request("editThread", [{"chatId": chat_id, "threadId": thread_id, "name": name}])
+
     def chat_threads(self, chat_id: str):
         return self.rpc_request("chatThreads", [chat_id])
 
