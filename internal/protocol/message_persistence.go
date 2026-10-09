@@ -1187,6 +1187,7 @@ func (db sqlitePersistence) ThreadsByChatIDs(chatIDs []string) ([]*Thread, error
 				threads.chat_id,
 				threads.parent_message_id,
 				threads.name,
+				threads.read_messages_at_clock_value,
 				(SELECT COUNT(1) FROM user_messages WHERE local_chat_id = threads.chat_id AND thread_id = threads.thread_id AND seen = 0 AND NOT(hide) AND NOT(deleted) AND NOT(deleted_for_me)),
 				(SELECT COUNT(1) FROM user_messages WHERE local_chat_id = threads.chat_id AND thread_id = threads.thread_id AND seen = 0 AND NOT(hide) AND NOT(deleted) AND NOT(deleted_for_me) AND (mentioned OR replied OR chats.type = ?))
 			FROM threads
@@ -1200,7 +1201,7 @@ func (db sqlitePersistence) ThreadsByChatIDs(chatIDs []string) ([]*Thread, error
 
 		for rows.Next() {
 			thread := &Thread{}
-			err = rows.Scan(&thread.ThreadID, &thread.ChatID, &thread.ParentMessageID, &thread.Name, &thread.UnviewedMessagesCount, &thread.UnviewedMentionsCount)
+			err = rows.Scan(&thread.ThreadID, &thread.ChatID, &thread.ParentMessageID, &thread.Name, &thread.ReadMessagesAtClockValue, &thread.UnviewedMessagesCount, &thread.UnviewedMentionsCount)
 			if err != nil {
 				rows.Close()
 				return nil, err
@@ -3126,7 +3127,22 @@ func (db sqlitePersistence) MarkAllReadMultiple(chatIDs []string) (err error) {
 
 	inVector := strings.Repeat("?, ", len(chatIDs)-1) + "?"
 
-	q := "UPDATE user_messages SET seen = 1 WHERE local_chat_id IN (%s) AND seen != 1 AND (thread_id IS NULL OR thread_id = '')"
+	q := "UPDATE user_messages SET seen = 1 WHERE local_chat_id IN (%s) AND seen != 1"
+	q = fmt.Sprintf(q, inVector)
+	_, err = tx.Exec(q, idsArgs...)
+	if err != nil {
+		return err
+	}
+
+	q = `UPDATE threads SET read_messages_at_clock_value = MAX(
+		read_messages_at_clock_value,
+		COALESCE((
+			SELECT MAX(clock_value) FROM user_messages
+			WHERE local_chat_id = threads.chat_id
+				AND thread_id = threads.thread_id
+				AND outgoing_status = ''
+		), 0)
+	) WHERE chat_id IN (%s)`
 	q = fmt.Sprintf(q, inVector)
 	_, err = tx.Exec(q, idsArgs...)
 	if err != nil {
