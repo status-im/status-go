@@ -25,6 +25,7 @@ import (
 	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/internal/testutils/nativeheap"
 	"github.com/status-im/status-go/params"
+	walletcommon "github.com/status-im/status-go/pkg/services/wallet/common"
 	"github.com/status-im/status-go/pkg/services/wallet/token/tklmanager"
 	tokentypes "github.com/status-im/status-go/pkg/services/wallet/token/types"
 )
@@ -307,11 +308,86 @@ func BenchmarkTKLLookups(b *testing.B) {
 			}
 		}
 	})
+	// Market and currency paths add every token sharing a used token's cross-chain id.
+	b.Run("marketCrossChain50/legacy", func(b *testing.B) {
+		b.ReportAllocs()
+		for b.Loop() {
+			used := make(map[string]interface{}, len(keys))
+			for _, key := range keys {
+				used[key] = nil
+			}
+			if err := legacyAddTokensSharingCrossChainIDs(tm, used, false); err != nil || len(used) <= len(keys) {
+				b.Fatal(err, len(used))
+			}
+		}
+	})
+	b.Run("marketCrossChain50", func(b *testing.B) {
+		b.ReportAllocs()
+		for b.Loop() {
+			used := make(map[string]interface{}, len(keys))
+			for _, key := range keys {
+				used[key] = nil
+			}
+			if err := tm.addTokensSharingCrossChainIDsToUsedTokenKeys(used, false); err != nil || len(used) <= len(keys) {
+				b.Fatal(err, len(used))
+			}
+		}
+	})
+	// Legacy payment requests resolve their token by symbol.
+	b.Run("symbolOnChain/legacy", func(b *testing.B) {
+		b.ReportAllocs()
+		for b.Loop() {
+			tokens, err := tm.GetTokensByChain(1)
+			if err != nil || clientTokenBySymbolOnChain(tokens, "usdc") == nil {
+				b.Fatal(err)
+			}
+		}
+	})
+	b.Run("symbolOnChain", func(b *testing.B) {
+		b.ReportAllocs()
+		for b.Loop() {
+			token, err := tm.GetTokenBySymbolOnChain(1, "usdc")
+			if err != nil || token == nil {
+				b.Fatal(err)
+			}
+		}
+	})
 	b.Run("getAllTokens", func(b *testing.B) {
 		b.ReportAllocs()
 		for b.Loop() {
 			tokens, err := tm.GetAllTokens()
 			if err != nil || len(tokens) == 0 {
+				b.Fatal(err)
+			}
+		}
+	})
+}
+
+// BenchmarkTKLTestnetMarketData reads the market tokens of 50 test tokens:
+// the tokens themselves plus the mainnet tokens sharing their cross-chain ids.
+func BenchmarkTKLTestnetMarketData(b *testing.B) {
+	tm := setupMarketTestManager(b, true)
+	all, err := tm.GetAllTokens()
+	require.NoError(b, err)
+	keys := make([]string, 0, 50)
+	for _, token := range all {
+		if !walletcommon.ChainID(token.ChainID).IsMainnet() && len(keys) < 50 {
+			keys = append(keys, token.Key())
+		}
+	}
+	require.NotEmpty(b, keys)
+	b.Run("legacy", func(b *testing.B) {
+		b.ReportAllocs()
+		for b.Loop() {
+			if tokens, err := legacyTestnetTokensForMarketData(tm, keys); err != nil || len(tokens) <= len(keys) {
+				b.Fatal(err)
+			}
+		}
+	})
+	b.Run("narrow", func(b *testing.B) {
+		b.ReportAllocs()
+		for b.Loop() {
+			if tokens, err := tm.GetTokensByKeysForFetchingMarketData(keys); err != nil || len(tokens) <= len(keys) {
 				b.Fatal(err)
 			}
 		}
