@@ -161,6 +161,7 @@ type Messenger struct {
 	ratchetNotFoundDelay time.Duration
 
 	connectionState       connection.State
+	connectionStateMu     sync.RWMutex
 	contractMaker         *contracts.ContractMaker
 	verificationDatabase  *verification.Persistence
 	savedAddressesManager *wallet.SavedAddressesManager
