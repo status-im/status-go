@@ -225,8 +225,6 @@ func sentEntryDataToEntriesV2(deps FilterDependencies, data []*sentEntryDataV2) 
 			entry.chainIDIn = &chainID
 		}
 
-		entry.symbolOut, entry.symbolIn = lookupAndFillInTokens(deps, entry.tokenOut, entry.tokenIn)
-
 		if entry.transferType == nil || ac.TokenType(*entry.transferType) != ac.Native {
 			var interactedAddress eth.Address
 			if d.Tx.To() != nil {
@@ -241,6 +239,7 @@ func sentEntryDataToEntriesV2(deps FilterDependencies, data []*sentEntryDataV2) 
 
 		ret = append(ret, entry)
 	}
+	fillInTokenSymbols(deps, ret)
 
 	return ret, nil
 }

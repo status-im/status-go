@@ -64,6 +64,7 @@ type CommunityTokenImageBuilder interface {
 
 type ManagerInterface interface {
 	GetTokenByChainAddress(chainID uint64, address common.Address) (*tokentypes.Token, error)
+	GetTokensByChainAddresses(ids []types.ChainAddress) ([]*tokentypes.Token, error)
 	GetTokensByChains(chainIDs []uint64) ([]*tokentypes.Token, error)
 	GetTokensByKeys(tokenKeys []string) ([]*tokentypes.Token, error)
 	GetCachedBalances() (map[common.Address][]tokentypes.StorageToken, error)
@@ -340,6 +341,35 @@ func (tm *Manager) GetTokenByChainAddress(chainID uint64, address common.Address
 		return nil, err
 	}
 	return communityToken, nil
+}
+
+// GetTokensByChainAddresses is a batch GetTokenByChainAddress: the result is
+// aligned with ids and nil where neither the catalogue nor a custom token matches.
+func (tm *Manager) GetTokensByChainAddresses(ids []types.ChainAddress) ([]*tokentypes.Token, error) {
+	found := tm.tokensManager.GetTokensByChainAddresses(ids)
+	result := make([]*tokentypes.Token, len(ids))
+	var customs []*tokentypes.Token
+	customsLoaded := false
+	for i, token := range found {
+		if token != nil {
+			result[i] = &tokentypes.Token{Token: token}
+			continue
+		}
+		if !customsLoaded {
+			var err error
+			if customs, err = tm.GetCustoms(true); err != nil {
+				return nil, err
+			}
+			customsLoaded = true
+		}
+		for _, custom := range customs {
+			if custom.Address == ids[i].Address && custom.ChainID == ids[i].ChainID {
+				result[i] = custom
+				break
+			}
+		}
+	}
+	return result, nil
 }
 
 func (tm *Manager) GetTokensByKeys(tokenKeys []string) ([]*tokentypes.Token, error) {
@@ -827,15 +857,25 @@ func (tm *Manager) GetPreviouslyOwnedTokens() (map[common.Address][]*tokentypes.
 		return nil, err
 	}
 
-	tokens := make(map[common.Address][]*tokentypes.Token)
+	// Map iteration order is not stable; remember each lookup's account.
+	var ids []types.ChainAddress
+	var owners []common.Address
 	for account, balances := range balancesPerAccount {
 		for _, balance := range balances {
-			token, err := tm.GetTokenByChainAddress(balance.TokenChainID, balance.TokenAddress)
-			if err != nil {
-				return nil, err
-			}
-			tokens[account] = append(tokens[account], token)
+			ids = append(ids, types.ChainAddress{ChainID: balance.TokenChainID, Address: balance.TokenAddress})
+			owners = append(owners, account)
 		}
+	}
+	found, err := tm.GetTokensByChainAddresses(ids)
+	if err != nil {
+		return nil, err
+	}
+	tokens := make(map[common.Address][]*tokentypes.Token)
+	for i, token := range found {
+		if token == nil {
+			return nil, fmt.Errorf("custom token not found: chainID %d, address %s", ids[i].ChainID, ids[i].Address)
+		}
+		tokens[owners[i]] = append(tokens[owners[i]], token)
 	}
 
 	return tokens, nil
