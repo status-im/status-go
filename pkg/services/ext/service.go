@@ -194,6 +194,7 @@ func (s *Service) InitProtocol(params InitProtocolParams) error {
 			Mode:           messaging.ModeFromLightClient(s.config.WakuV2Config.LightClient),
 			InstallationID: s.config.ShhextConfig.InstallationID,
 			TimeSource:     params.TimeSource,
+			DataDir:        filepath.Join(dataDir, "logos-delivery", params.Account.KeyUID),
 		},
 		messaging.WithSQLitePersistence(params.AppDB),
 		messaging.WithLogger(s.logger),
