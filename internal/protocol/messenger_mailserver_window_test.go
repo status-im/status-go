@@ -73,15 +73,29 @@ func TestTranslateHistoryReconcileWindowIgnoresMonotonicReadings(t *testing.T) {
 	require.Equal(t, 59*time.Minute, got.To.Sub(got.From))
 }
 
-func TestTickedAfterSuspend(t *testing.T) {
-	last := time.Unix(1_000, 0)
-	require.False(t, tickedAfterSuspend(last, last.Add(time.Minute), time.Minute))
-	require.False(t, tickedAfterSuspend(last, last.Add(90*time.Second), time.Minute))
-	require.False(t, tickedAfterSuspend(last, last.Add(2*time.Minute), time.Minute),
-		"a tick exactly two intervals late is not a suspend")
-	require.True(t, tickedAfterSuspend(last, last.Add(2*time.Minute+time.Nanosecond), time.Minute),
-		"a tick just over two intervals late is a suspend")
-	require.True(t, tickedAfterSuspend(last, last.Add(10*time.Hour), time.Minute))
+func TestHistoryCursorMonitorThrough(t *testing.T) {
+	syncNow := time.Unix(100_000, 0)
+	lastTick := time.Unix(1_000, 0)
+	minBehind := time.Duration(tolerance) * time.Second
+
+	through, ok := historyCursorMonitorThrough(syncNow, lastTick, lastTick.Add(time.Minute))
+	require.True(t, ok)
+	require.Equal(t, syncNow.Add(-minBehind), through,
+		"an on-time tick stays one tolerance window behind")
+
+	through, ok = historyCursorMonitorThrough(syncNow, lastTick, lastTick.Add(10*time.Second))
+	require.True(t, ok)
+	require.Equal(t, syncNow.Add(-minBehind), through)
+
+	// A late tick, e.g. after a suspend the monotonic clock did not see,
+	// never claims history past the previous tick.
+	through, ok = historyCursorMonitorThrough(syncNow, lastTick, lastTick.Add(90*time.Second))
+	require.True(t, ok)
+	require.Equal(t, syncNow.Add(-90*time.Second), through)
+
+	through, ok = historyCursorMonitorThrough(syncNow, lastTick, lastTick.Add(10*time.Hour))
+	require.True(t, ok)
+	require.Equal(t, syncNow.Add(-10*time.Hour), through)
 }
 
 func TestCoalesceHistoricSyncRequests(t *testing.T) {

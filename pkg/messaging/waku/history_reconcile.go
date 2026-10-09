@@ -5,6 +5,7 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/status-im/status-go/internal/timesource"
 	"github.com/status-im/status-go/pkg/messaging/waku/types"
 )
 
@@ -18,23 +19,25 @@ const (
 	// historyObservationMaxGap is the longest wall-clock gap between two
 	// connectivity observations that is still considered continuous. While
 	// running, connectivity is observed at least every few seconds, so a longer
-	// gap means the process was suspended (e.g. the computer slept) or paused,
-	// and nothing was received live in the meantime.
+	// gap means the process was paused or the system suspended, and nothing was
+	// received live in the meantime. Suspends are also detected directly, so
+	// this mainly bounds pauses.
 	historyObservationMaxGap = 30 * time.Second
 )
 
 type historyReconcileTracker struct {
-	reliable       bool
-	checkedAt      time.Time
+	reliable  bool
+	checkedAt time.Time
+	// observedAt is checkedAt with its monotonic reading, to detect suspends.
+	observedAt     time.Time
 	unreliableFrom time.Time
 	lastReconcile  time.Time
 }
 
 func newHistoryReconcileTracker(reliable bool, now time.Time) historyReconcileTracker {
-	now = now.Round(0)
-	tracker := historyReconcileTracker{reliable: reliable, checkedAt: now}
+	tracker := historyReconcileTracker{reliable: reliable, checkedAt: now.Round(0), observedAt: now}
 	if !reliable {
-		tracker.unreliableFrom = now
+		tracker.unreliableFrom = tracker.checkedAt
 	}
 	return tracker
 }
@@ -43,9 +46,12 @@ func (t *historyReconcileTracker) observe(reliable bool, now time.Time, minInter
 	// Keep wall clock readings only: the monotonic clock does not advance while
 	// the system is suspended, so durations computed from it (here and by the
 	// consumers of the windows) would hide a sleep.
+	observedAt := now
 	now = now.Round(0)
 	wasReliable := t.reliable
-	unobservedGap := !t.checkedAt.IsZero() && now.Sub(t.checkedAt) > historyObservationMaxGap
+	unobservedGap := !t.checkedAt.IsZero() &&
+		(now.Sub(t.checkedAt) > historyObservationMaxGap || timesource.SuspendedBetween(t.observedAt, observedAt))
+	t.observedAt = observedAt
 	if unobservedGap {
 		// Connectivity looking fine on both sides of the gap says nothing about
 		// the gap itself, so treat it as unreliable from the last observation.
