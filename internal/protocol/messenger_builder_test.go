@@ -185,6 +185,7 @@ func newTestMessenger(t *testing.T, messagingEnv *messaging.TestMessagingEnviron
 	if err != nil {
 		return nil, err
 	}
+	t.Cleanup(tokenManager.Stop)
 
 	options := []Option{
 		WithCustomLogger(config.logger.Named("messenger")),
