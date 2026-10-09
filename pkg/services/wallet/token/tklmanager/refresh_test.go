@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -15,6 +16,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/nim-token-lists/go/tkl"
 	"github.com/stretchr/testify/require"
+
+	types "github.com/status-im/status-go/pkg/services/wallet/token/tokenlist"
 )
 
 func TestRefreshPersistsBeforePublication(t *testing.T) {
@@ -531,4 +534,74 @@ func TestRefreshInFlightLimitValidation(t *testing.T) {
 	require.Equal(t, int64(defaultMaxInFlightBytes), r.options.MaxInFlightBytes)
 	_, err = newRefreshRuntime(RefreshOptions{Persist: persist, MaxBodyBytes: 64, MaxInFlightBytes: 63})
 	require.Error(t, err)
+}
+
+func TestReadersRaceRefreshCommitAndStop(t *testing.T) {
+	var version atomic.Int32
+	var server *httptest.Server
+	server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/registry" {
+			fmt.Fprintf(w, `{"timestamp":"2026-01-01T00:00:00Z","version":{"major":1,"minor":0,"patch":0},"tokenLists":[{"id":"list","sourceUrl":%q}]}`, server.URL+"/list")
+			return
+		}
+		// Every fetch changes the list, so every refresh commits a new revision.
+		n := version.Add(1)
+		fmt.Fprintf(w, `{"name":"Tokens","timestamp":"2026-01-01T00:00:00Z","version":{"major":1,"minor":0,"patch":0},"tokens":[{"chainId":1,"address":"0x0000000000000000000000000000000000000001","name":"One","symbol":"ONE","decimals":18},{"chainId":1,"address":"0x00000000000000000000000000000000000000%02x","name":"V","symbol":"V%d","decimals":6}]}`, 16+n%200, n)
+	}))
+	defer server.Close()
+	const list = `{"name":"Tokens","timestamp":"2026-01-01T00:00:00Z","version":{"major":1,"minor":0,"patch":0},"tokens":[{"chainId":1,"address":"0x0000000000000000000000000000000000000001","name":"One","symbol":"ONE","decimals":18}]}`
+	m, err := New(tkl.Config{Chains: []uint64{1}, RegistryID: "registry", RegistryURL: server.URL + "/registry", InitialLists: []tkl.ListContent{{ID: "list", Format: tkl.StandardFormat}}},
+		withBodies(tkl.ListBody{ID: "list", Origin: tkl.Bundled, Data: []byte(list)}),
+		RefreshOptions{Persist: func(context.Context, []Write) error { return nil }})
+	require.NoError(t, err)
+	require.NoError(t, m.Start(context.Background(), false, nil))
+
+	one := common.HexToAddress("0x1")
+	var stopped atomic.Bool
+	done := make(chan struct{})
+	var readers sync.WaitGroup
+	for range 4 {
+		readers.Add(1)
+		go func() {
+			defer readers.Done()
+			var buf []types.ChainToken
+			for {
+				select {
+				case <-done:
+					return
+				default:
+				}
+				live := !stopped.Load()
+				token, ok := m.GetTokenByChainAddress(1, one)
+				batch := m.GetTokensByChainAddresses([]types.ChainAddress{{ChainID: 1, Address: one}, {ChainID: 1}})
+				buf = m.GetChainTokens([]uint64{1}, buf)
+				byKeys, _ := m.GetTokensByKeys([]string{types.TokenKey(1, one)})
+				all := m.UniqueTokens()
+				chain := m.GetTokensByChains([]uint64{1})
+				lists := m.TokenLists()
+				_, _ = m.TokenList("list")
+				if live && !stopped.Load() {
+					// Nothing ran Stop around these reads: each sees a whole revision.
+					if !ok || token.Symbol != "ONE" || batch[0] == nil || batch[0].Symbol != "ONE" ||
+						len(byKeys) != 1 || len(buf) < 2 || len(all) < 2 || len(chain) < 2 || len(lists) == 0 {
+						t.Errorf("torn read: %v %v %v %d %d %d %d %d", ok, token, batch, len(byKeys), len(buf), len(all), len(chain), len(lists))
+						return
+					}
+				}
+			}
+		}()
+	}
+	start := m.handle.Revision()
+	for range 20 {
+		require.NoError(t, m.TriggerRefresh(context.Background()))
+	}
+	require.GreaterOrEqual(t, m.handle.Revision(), start+20)
+	stopped.Store(true)
+	require.NoError(t, m.Stop())
+	_, ok := m.GetTokenByChainAddress(1, one)
+	require.False(t, ok)
+	require.Equal(t, make([]*types.Token, 1), m.GetTokensByChainAddresses([]types.ChainAddress{{ChainID: 1, Address: one}}))
+	require.Nil(t, m.UniqueTokens())
+	close(done)
+	readers.Wait()
 }
