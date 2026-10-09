@@ -1,5 +1,3 @@
-//go:build tkl
-
 package token
 
 import (
@@ -7,20 +5,13 @@ import (
 	"sort"
 	"time"
 
-	"github.com/status-im/go-wallet-sdk/pkg/tokens/manager"
-	"github.com/status-im/go-wallet-sdk/pkg/tokens/types"
 	"github.com/status-im/nim-token-lists/go/tkl"
+
+	types "github.com/status-im/status-go/pkg/services/wallet/token/tokenlist"
 
 	walletcommon "github.com/status-im/status-go/pkg/services/wallet/common"
 	"github.com/status-im/status-go/pkg/services/wallet/token/tklmanager"
 )
-
-func selectTokenListsManager(m *Manager, chains []uint64, last time.Time, refresh, check time.Duration, useNim bool) (manager.Manager, error) {
-	if !useNim {
-		return setUpTokenListsManager(m, m.walletDB, chains, last, refresh, check)
-	}
-	return newTKLRefreshManager(m, chains, last, nil, refresh, check)
-}
 
 // newTKLReadManager constructs the C-backed catalogue and its SQL bootstrap.
 func newTKLReadManager(mng *Manager, chains []uint64, lastSuccess time.Time, options ...tklmanager.RefreshOptions) (*tklmanager.Manager, error) {
@@ -32,7 +23,7 @@ func newTKLReadManager(mng *Manager, chains []uint64, lastSuccess time.Time, opt
 	for _, chain := range []uint64{walletcommon.BSCMainnet, walletcommon.BSCTestnet} {
 		config.Policy.NativeTokens = append(config.Policy.NativeTokens, tkl.Token{
 			ChainID: chain, Address: "0x0000000000000000000000000000000000000000",
-			CrossChainID: "bsc-native", Name: "BNB", Symbol: "BNB", Decimals: 18,
+			CrossChainID: "bsc-native", Name: walletcommon.BNBName, Symbol: walletcommon.BNBSymbol, Decimals: 18,
 			LogoURI: "https://assets.coingecko.com/coins/images/825/thumb/bnb-icon2_2x.png?1696501970",
 		})
 	}
@@ -47,7 +38,7 @@ func newTKLReadManager(mng *Manager, chains []uint64, lastSuccess time.Time, opt
 		if id == config.MainListID {
 			format = tkl.StatusFormat
 		}
-		config.InitialLists = append(config.InitialLists, tkl.ListContent{ID: id, Body: string(data), Format: format, Source: manager.LocalSourceURL, FetchedTimestamp: (time.Time{}).Format(time.RFC3339)})
+		config.InitialLists = append(config.InitialLists, tkl.ListContent{ID: id, Body: string(data), Format: format, Source: types.LocalSourceURL, FetchedTimestamp: (time.Time{}).Format(time.RFC3339)})
 	}
 	for chain, addresses := range walletcommon.AdditionalNativeTokenAddresses() {
 		for _, address := range addresses {
@@ -91,7 +82,7 @@ func newTKLReadManager(mng *Manager, chains []uint64, lastSuccess time.Time, opt
 			if err := rows.Scan(&token.Address, &token.Name, &token.Symbol, &token.Decimals, &token.ChainID); err != nil {
 				return bootstrap, err
 			}
-			// Invalid customs are skipped by the SDK and core. Values outside
+			// Invalid customs are skipped by the core. Values outside
 			// the ABI's uint8 field must be skipped before narrowing as well.
 			if token.Decimals > 255 {
 				continue

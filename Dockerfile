@@ -48,6 +48,25 @@ RUN set -eu && \
 
 ENV PATH="/opt/nim/bin:${PATH}"
 
+# Keep the existing Nim toolchain for other dependencies. Token lists use the
+# compiler tested by the pinned library's CI.
+ARG TKL_NIM_VERSION=2.2.10
+RUN set -eu && \
+    case "$(dpkg --print-architecture)" in \
+    amd64) TKL_NIM_ARCH=x64 ;; \
+    arm64) TKL_NIM_ARCH=arm64 ;; \
+    *) echo "Unsupported token compiler architecture" >&2; exit 1 ;; \
+    esac && \
+    TKL_NIM_URL=$(curl -sSf https://nim-lang.org/releases.json \
+    | jq -er --arg ver "$TKL_NIM_VERSION" --arg arch "$TKL_NIM_ARCH" \
+    '.[$ver]["linux_" + $arch].github_url') && \
+    curl -sSfL "$TKL_NIM_URL" -o /tmp/tkl-nim.tar.xz && \
+    mkdir -p /opt/nim-tkl && \
+    tar -xJf /tmp/tkl-nim.tar.xz -C /opt/nim-tkl --strip-components=1 && \
+    rm /tmp/tkl-nim.tar.xz && \
+    /opt/nim-tkl/bin/nim --version
+ENV TKL_NIM=/opt/nim-tkl/bin/nim
+
 ARG build_tags='gowaku_no_rln'
 ARG build_flags=''
 ARG build_target='cmd'

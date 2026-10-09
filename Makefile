@@ -104,17 +104,13 @@ GIT_COMMIT ?= $(shell git rev-parse --short HEAD)
 GIT_AUTHOR ?= $(shell git config user.email || echo $$USER)
 
 BUILD_TAGS ?= gowaku_no_rln
-TKL_COMMA := ,
 
-# Keep the existing backend available until the platform rollout is verified.
-USE_NIM_TOKEN_LISTS ?= false
+# Every wallet build uses the pinned native token catalogue.
+TOKEN_ENV = CGO_CFLAGS='$(CGO_CFLAGS)' CGO_LDFLAGS='$(CGO_LDFLAGS)' bash scripts/tkl_env.sh
 MOBILE_BUILD_TAGS := gowaku_no_rln nowatchdog disable_torrent
-ifeq ($(USE_NIM_TOKEN_LISTS),true)
-MOBILE_BUILD_TAGS += tkl
 ANDROID_TOKEN_ENV = ANDROID_NDK_ROOT="$(ANDROID_NDK_ROOT)" ANDROID_API="$(ANDROID_API)" TKL_HIDE_EXPORTS=1 bash scripts/tkl_env.sh
 IOS_TOKEN_ENV = IPHONE_SDK="$(IPHONE_SDK)" IOS_TARGET="$(IOS_TARGET)" bash scripts/tkl_env.sh
 IOS_TOKEN_ARCHIVE = bash scripts/tkl_bundle_archive.sh build/bin/libstatus.a
-endif
 
 # `nim-sds` variables
 
@@ -228,9 +224,9 @@ STORAGE_TEST_ENV := LD_LIBRARY_PATH="$(LOGOS_STORAGE_LIB_DIR):$(RUNTIME_LIB_DIRS
 STORAGE_TEST_TAGS := use_logos_storage $(BUILD_TAGS) gowaku_skip_migrations
 
 test-storage: build-storage $(LIBSDS) generate ##@tests Run logosstorage package tests via gotestsum
-	$(STORAGE_TEST_ENV) gotestsum --packages="./pkg/services/logosstorage" -f testname -- -count 1 -tags "$(STORAGE_TEST_TAGS)"
-	$(STORAGE_TEST_ENV) gotestsum --packages="./internal/protocol/communities/archive/logosstorage" -f testname -- -count 1 -tags "$(STORAGE_TEST_TAGS)"
-	$(STORAGE_TEST_ENV) gotestsum --packages="./internal/protocol" -f testname -- -count 1 -tags "$(STORAGE_TEST_TAGS)" \
+	$(STORAGE_TEST_ENV) bash scripts/tkl_env.sh gotestsum --packages="./pkg/services/logosstorage" -f testname -- -count 1 -tags "$(STORAGE_TEST_TAGS)"
+	$(STORAGE_TEST_ENV) bash scripts/tkl_env.sh gotestsum --packages="./internal/protocol/communities/archive/logosstorage" -f testname -- -count 1 -tags "$(STORAGE_TEST_TAGS)"
+	$(STORAGE_TEST_ENV) bash scripts/tkl_env.sh gotestsum --packages="./internal/protocol" -f testname -- -count 1 -tags "$(STORAGE_TEST_TAGS)" \
 	-run TestMessengerCommunitiesTokenPermissionsSuite/TestUploadDownloadLogosStorageHistoryArchives
 
 TORRENT_TEST_ENV := LD_LIBRARY_PATH="$(RUNTIME_LIB_DIRS)" \
@@ -239,8 +235,8 @@ TORRENT_TEST_ENV := LD_LIBRARY_PATH="$(RUNTIME_LIB_DIRS)" \
 TORRENT_TEST_TAGS := $(BUILD_TAGS) use_torrent gowaku_skip_migrations
 
 test-torrent: $(LIBSDS) generate ##@tests Run torrent archive package tests via gotestsum
-	$(TORRENT_TEST_ENV) gotestsum --packages="./internal/protocol/communities/archive/torrent" -f testname -- -count 1 -tags "$(TORRENT_TEST_TAGS)"
-	$(TORRENT_TEST_ENV) gotestsum --packages="./internal/protocol" -f testname -- -count 1 -tags "$(TORRENT_TEST_TAGS)" \
+	$(TORRENT_TEST_ENV) bash scripts/tkl_env.sh gotestsum --packages="./internal/protocol/communities/archive/torrent" -f testname -- -count 1 -tags "$(TORRENT_TEST_TAGS)"
+	$(TORRENT_TEST_ENV) bash scripts/tkl_env.sh gotestsum --packages="./internal/protocol" -f testname -- -count 1 -tags "$(TORRENT_TEST_TAGS)" \
 	-run TestMessengerCommunitiesTokenPermissionsSuite/TestImportDecryptedArchiveMessages
 
 history-archive-help: ##@build Show history archive build/test toggles and env vars
@@ -327,7 +323,7 @@ all: $(GO_CMD_NAMES)
 $(GO_CMD_BUILDS): generate $(LOGOS_STORAGE_BUILD_DEPS) $(LIBSDS)
 $(GO_CMD_BUILDS): ##@build Build any Go project from cmd folder
 	CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
-	go build -v \
+	$(TOKEN_ENV) go build -v \
 		-tags '$(BUILD_TAGS)' $(BUILD_FLAGS) \
 		-o ./$@ ./cmd/$(notdir $@)
 	@echo "Compilation done."
@@ -402,7 +398,7 @@ run-status-backend: $(LIBSDS)
 run-status-backend: generate
 run-status-backend: ##@run Start status-backend server listening to localhost:PORT
 	LD_LIBRARY_PATH="$(NIM_SDS_LIB_DIR)" CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
-	go run -mod=mod ./cmd/status-backend --address localhost:${PORT}
+	$(TOKEN_ENV) go run -mod=mod ./cmd/status-backend --address localhost:${PORT}
 
 push-notification-server: ##@build Build push-notification-server
 push-notification-server: build/bin/push-notification-server
@@ -434,7 +430,7 @@ statusgo-stub-bindings:
 
 statusgo-library: STATUS_GO_BINDINGS_PATH ?= build/bin/statusgo-lib
 statusgo-library: STATUS_GO_LIBRARY_OUT ?= build/bin
-statusgo-library: TOKEN_STATIC_BUILD = $(if $(filter tkl,$(subst $(TKL_COMMA), ,$(BUILD_TAGS))),bash scripts/tkl_bundle_archive.sh "$(STATUS_GO_LIBRARY_OUT)/libstatus.a",)
+statusgo-library: TOKEN_STATIC_BUILD = $(TOKEN_ENV) bash scripts/tkl_bundle_archive.sh "$(STATUS_GO_LIBRARY_OUT)/libstatus.a"
 statusgo-library: generate
 statusgo-library: statusgo-c-bindings $(LIBSDS)  ##@cross-compile Build status-go as static library for current platform
 	@echo "Building static library..."
@@ -447,15 +443,17 @@ statusgo-library: statusgo-c-bindings $(LIBSDS)  ##@cross-compile Build status-g
 		"$(STATUS_GO_BINDINGS_PATH)/main.go"
 	@echo "Static library built: $(STATUS_GO_LIBRARY_OUT)/libstatus.a"
 
-.PHONY: statusgo-shared-library-tkl
-# Reuse matching native and backend artifacts. Preserve the existing prebuilt
-# SDS inputs; this target does not prepare or change the SDS checkout.
-statusgo-shared-library-tkl:
+.PHONY: statusgo-shared-library statusgo-shared-library-tkl statusgo-shared-library-build
+# Reuse matching native and backend artifacts. Preserve the normal SDS
+# prerequisite, including support for supplied prebuilt SDS inputs.
+statusgo-shared-library-tkl: statusgo-shared-library
+
+statusgo-shared-library: $(LIBSDS)
 	$(GOBIN_SHARED_LIB_CFLAGS) TKL_HIDE_EXPORTS=1 \
 		CGO_CFLAGS='$(CGO_CFLAGS)' CGO_LDFLAGS='$(CGO_LDFLAGS) -Wl,-rpath,$(NIM_SDS_LIB_DIR)' \
 		bash scripts/tkl_env.sh bash scripts/tkl_backend.sh build/bin/libstatus.$(GOBIN_SHARED_LIB_EXT) \
-		$(MAKE) statusgo-shared-library \
-		BUILD_TAGS='$(BUILD_TAGS) tkl' \
+		$(MAKE) statusgo-shared-library-build \
+		BUILD_TAGS='$(BUILD_TAGS)' \
 		NIM_SDS_LIB_DIR='$(NIM_SDS_LIB_DIR)' NIM_SDS_INC_DIR='$(NIM_SDS_INC_DIR)' \
 		LIBSDS='$(firstword $(wildcard $(LIBSDS) $(NIM_SDS_LIB_DIR)/libsds.a))'
 	bash scripts/check_tkl_exports.sh build/bin/libstatus.$(GOBIN_SHARED_LIB_EXT)
@@ -465,8 +463,8 @@ test-libtkl: test-tkl-backend
 test-tkl-backend:
 	python3 scripts/test_tkl_backend.py
 
-statusgo-shared-library: generate
-statusgo-shared-library: statusgo-c-bindings $(LIBSDS) ##@cross-compile Build status-go as shared library for current platform
+statusgo-shared-library-build: generate
+statusgo-shared-library-build: statusgo-c-bindings $(LIBSDS) ##@cross-compile Build status-go as shared library for current platform
 	@echo "Building shared library..."
 	@echo "Tags: $(BUILD_TAGS)"
 	CGO_LDFLAGS='$(CGO_LDFLAGS)' CGO_CFLAGS='$(CGO_CFLAGS)' \
@@ -474,13 +472,13 @@ statusgo-shared-library: statusgo-c-bindings $(LIBSDS) ##@cross-compile Build st
 		-tags '$(BUILD_TAGS)' \
 		$(BUILD_FLAGS) \
 		-buildmode=c-shared \
-		-o build/bin/libstatus.$(GOBIN_SHARED_LIB_EXT) \
+		-o build/bin/libstatus.$(GOBIN_SHARED_LIB_EXT)$(if $(filter Linux,$(detected_OS)),.0) \
 		./build/bin/statusgo-lib
 ifeq ($(detected_OS),Linux)
-	cd build/bin && \
-	ls -lah . && \
-	mv ./libstatus.$(GOBIN_SHARED_LIB_EXT) ./libstatus.$(GOBIN_SHARED_LIB_EXT).0 && \
-	ln -s ./libstatus.$(GOBIN_SHARED_LIB_EXT).0 ./libstatus.$(GOBIN_SHARED_LIB_EXT)
+	# Build the versioned file directly, including when the public symlink exists.
+	# Go replaces the final extension with .h; retain the public header name.
+	mv build/bin/libstatus.$(GOBIN_SHARED_LIB_EXT).h build/bin/libstatus.h
+	ln -sfn libstatus.$(GOBIN_SHARED_LIB_EXT).0 build/bin/libstatus.$(GOBIN_SHARED_LIB_EXT)
 endif
 	@echo "Shared library built:"
 	@ls -la build/bin/libstatus.*
@@ -493,10 +491,8 @@ statusgo-android-library: generate statusgo-c-bindings build-libsds-android ##@c
 		-o "build/bin/libstatus.so" ./build/bin/statusgo-lib
 	@echo "Android library built"
 	@file build/bin/libstatus.so
-ifeq ($(USE_NIM_TOKEN_LISTS),true)
 	TKL_TARGET_OS=android NM="$(ANDROID_NDK_ROOT)/toolchains/llvm/prebuilt/$(HOST_OS)-x86_64/bin/llvm-nm" \
 		bash scripts/check_tkl_exports.sh build/bin/libstatus.so
-endif
 
 statusgo-ios-library: generate statusgo-c-bindings build-libsds-ios ##@cross-compile Build status-go as iOS mobile library
 	@echo "Building iOS mobile library..."
@@ -560,7 +556,7 @@ download-tokens:
 	echo "token list downloaded successfully"
 
 analyze-token-stores:
-	go run -mod=mod ./pkg/services/wallet/token/local-token-lists/analyzer/main.go
+	$(TOKEN_ENV) go run -mod=mod ./pkg/services/wallet/token/local-token-lists/analyzer/main.go
 
 prepare-release: clean-release
 	mkdir -p $(RELEASE_DIR)
@@ -593,17 +589,17 @@ test-unit: export UNIT_TEST_PACKAGES ?= $(call sh, go list -tags '$(BUILD_TAGS)'
 	grep -v /test/unit-network)
 test-unit: ##@tests Run unit and integration tests
 	LD_LIBRARY_PATH="$(RUNTIME_LIB_DIRS)" CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
-	./scripts/run_unit_tests.sh
+	$(TOKEN_ENV) ./scripts/run_unit_tests.sh
 
 test-single: test-unit-prep
 	LD_LIBRARY_PATH="$(RUNTIME_LIB_DIRS)" CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
-	go test -v -tags '$(strip $(BUILD_TAGS) test_fast_kdf)' $(PKG) -run '$(TEST)' $(if $(TESTIFY_M),-testify.m '$(TESTIFY_M)')
+	$(TOKEN_ENV) go test -v -tags '$(strip $(BUILD_TAGS) test_fast_kdf)' $(PKG) -run '$(TEST)' $(if $(TESTIFY_M),-testify.m '$(TESTIFY_M)')
 
 test-unit-network: test-unit-prep
 test-unit-network: export UNIT_TEST_RERUN_FAILS ?= false
 test-unit-network: export UNIT_TEST_PACKAGES ?= $(call sh, go list ./test/unit-network/...)
 test-unit-network: ##@tests Run unit and integration tests with network access
-	./scripts/run_unit_tests.sh
+	$(TOKEN_ENV) ./scripts/run_unit_tests.sh
 
 test-unit-race: export GOTEST_EXTRAFLAGS=-race
 test-unit-race: test-unit ##@tests Run unit and integration tests with -race flag
@@ -635,14 +631,14 @@ comma := ,
 
 lint-panics: generate
 	GOFLAGS=-tags='$(subst $(space),$(comma),$(strip $(BUILD_TAGS) lint))' \
-	go tool goroutine-defer-guard -test=false -target github.com/status-im/status-go/internal/panics.LogOnPanic ./...
+	$(TOKEN_ENV) go tool goroutine-defer-guard -test=false -target github.com/status-im/status-go/internal/panics.LogOnPanic ./...
 
 lint: generate lint-panics
 lint:
-	golangci-lint --build-tags '$(BUILD_TAGS) lint' run ./...
+	$(TOKEN_ENV) golangci-lint --build-tags '$(BUILD_TAGS) lint' run ./...
 
 lint-fix: generate
-	golangci-lint --build-tags '$(BUILD_TAGS) lint' run --fix ./...
+	$(TOKEN_ENV) golangci-lint --build-tags '$(BUILD_TAGS) lint' run --fix ./...
 
 clean: clean-storage clean-libtkl ##@other Cleanup
 	rm -fr build/bin/*

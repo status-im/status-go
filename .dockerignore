@@ -2,7 +2,7 @@
 .ethereumtest
 .github
 **/*.vscode
-build/bin
+build/
 statusd-data
 wnode-data
 _assets/ci

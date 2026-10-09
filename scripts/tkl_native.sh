@@ -74,6 +74,10 @@ case "$goos" in
     ;;
   ios)
     mobile=true
+    # Clang accepts "17", but ld -platform_version requires "17.0".
+    if [[ "${IOS_TARGET:-}" =~ ^[0-9]+$ ]]; then
+      export IOS_TARGET="$IOS_TARGET.0"
+    fi
     case "${IPHONE_SDK:-iphoneos}" in
       iphoneos)
         [ "$arch" = arm64 ] || fail "iOS devices require arm64"
@@ -119,7 +123,8 @@ fi
 [ -f "$source_dir/abi/tkl.h" ] || fail "Incomplete checkout; run make clean and rebuild"
 git -C "$source_dir" diff --quiet HEAD -- || fail "Modified managed sources; run make clean and rebuild"
 
-nim="${NIM:-nim}"
+# A token-only compiler override leaves other Nim dependencies' toolchains alone.
+nim="${TKL_NIM:-${NIM:-nim}}"
 command -v "$cc" >/dev/null || fail "CC must name one compiler executable: $cc"
 case "$(basename "$cc")" in
   *clang*) nim_cc=clang ;;

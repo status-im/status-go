@@ -1,13 +1,12 @@
-//go:build tkl
-
 package tklmanager
 
 import (
 	"context"
 	"errors"
 
-	"github.com/status-im/go-wallet-sdk/pkg/tokens/types"
 	"github.com/status-im/nim-token-lists/go/tkl"
+
+	types "github.com/status-im/status-go/pkg/services/wallet/token/tokenlist"
 )
 
 // UpsertCustom validates in the core before invoking persist. Persistence must
@@ -20,7 +19,7 @@ func (m *Manager) UpsertCustom(ctx context.Context, row *types.Token, persist fu
 	token := tkl.Token{ChainID: row.ChainID, Address: row.Address.Hex(), Name: row.Name, Symbol: row.Symbol, Decimals: uint8(row.Decimals), Custom: true}
 	// The existing SQL schema stores these fields only. Do not publish metadata
 	// that would be lost on the next bootstrap.
-	return m.mutateCustom(ctx, row.Key(), &token, func() (tkl.Mutation, error) {
+	return m.mutateCustom(ctx, func() (tkl.Mutation, error) {
 		mutation, err := m.handle.CustomValidateUpsert(token)
 		if errors.Is(err, tkl.ValidationFailed) {
 			// Discovery stores metadata even when it is not catalogue-eligible.
@@ -40,10 +39,10 @@ func (m *Manager) DeleteCustom(ctx context.Context, key string, persist func(con
 	if persist == nil {
 		return tkl.InvalidArgument
 	}
-	return m.mutateCustom(ctx, key, nil, func() (tkl.Mutation, error) { return m.handle.CustomValidateDelete(key) }, func(ctx context.Context, _ tkl.Mutation) error { return persist(ctx) })
+	return m.mutateCustom(ctx, func() (tkl.Mutation, error) { return m.handle.CustomValidateDelete(key) }, func(ctx context.Context, _ tkl.Mutation) error { return persist(ctx) })
 }
 
-func (m *Manager) mutateCustom(ctx context.Context, key string, row *tkl.Token, prepare func() (tkl.Mutation, error), persist func(context.Context, tkl.Mutation) error) error {
+func (m *Manager) mutateCustom(ctx context.Context, prepare func() (tkl.Mutation, error), persist func(context.Context, tkl.Mutation) error) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if m.handle == nil || (m.refreshIO != nil && m.refreshIO.closing) {
@@ -70,7 +69,6 @@ func (m *Manager) mutateCustom(ctx context.Context, key string, row *tkl.Token, 
 		if err := persist(ctx, tkl.Mutation{}); err != nil {
 			return err
 		}
-		m.shadowCustom(key, row)
 		return nil
 	}
 	if err != nil {
@@ -91,7 +89,6 @@ func (m *Manager) mutateCustom(ctx context.Context, key string, row *tkl.Token, 
 	if err = m.rebuild(); err != nil {
 		return err
 	}
-	m.shadowCustom(key, row)
 	if m.started && change.Kind != "NoChange" {
 		m.notifyChange(change)
 	}

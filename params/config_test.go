@@ -235,14 +235,14 @@ func TestNodeConfigValidate(t *testing.T) {
 
 func TestMarshalWalletConfigJSON(t *testing.T) {
 	walletConfig := params.WalletConfig{
-		TokenListsUseNim:     true,
 		RaribleMainnetAPIKey: security.NewSensitiveString(gofakeit.LetterN(10)),
 	}
 	bytes, err := json.Marshal(walletConfig)
 	require.NoError(t, err)
 	// check if sensitive fields are not present
 	require.NotContains(t, string(bytes), "RaribleMainnetAPIKey")
-	require.Contains(t, string(bytes), `"TokenListsUseNim":true`)
+	require.NotContains(t, string(bytes), "TokenListsUseNim")
+	require.NotContains(t, string(bytes), "TokenListsShadow")
 
 	// check if deserializing are still working with sensitive fields
 	walletConfig = params.WalletConfig{}

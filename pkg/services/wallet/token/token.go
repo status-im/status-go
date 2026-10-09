@@ -16,11 +16,8 @@ import (
 
 	"golang.org/x/exp/maps"
 
-	"github.com/status-im/go-wallet-sdk/pkg/tokens/autofetcher"
-	"github.com/status-im/go-wallet-sdk/pkg/tokens/fetcher"
-	"github.com/status-im/go-wallet-sdk/pkg/tokens/manager"
-	"github.com/status-im/go-wallet-sdk/pkg/tokens/parsers"
-	"github.com/status-im/go-wallet-sdk/pkg/tokens/types"
+	"github.com/status-im/status-go/pkg/services/wallet/token/tklmanager"
+	types "github.com/status-im/status-go/pkg/services/wallet/token/tokenlist"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -35,7 +32,6 @@ import (
 	"github.com/status-im/status-go/internal/panics"
 	"github.com/status-im/status-go/internal/pausable"
 	"github.com/status-im/status-go/internal/rpc"
-	"github.com/status-im/status-go/internal/signal"
 	"github.com/status-im/status-go/pkg/pubsub"
 	"github.com/status-im/status-go/pkg/services/accounts/accountsevent"
 	"github.com/status-im/status-go/pkg/services/communitytokens/communitytokensdatabase"
@@ -44,7 +40,6 @@ import (
 	"github.com/status-im/status-go/pkg/services/wallet/community"
 	defaulttokenlists "github.com/status-im/status-go/pkg/services/wallet/token/local-token-lists/default-lists"
 	tokentypes "github.com/status-im/status-go/pkg/services/wallet/token/types"
-	"github.com/status-im/status-go/pkg/services/wallet/walletevent"
 )
 
 const (
@@ -92,26 +87,17 @@ type Manager struct {
 	accountsPublisher          *pubsub.Publisher
 	tokenBalancesStorage       balanceStorage
 
-	tokensManager    manager.Manager
-	shadowComparison bool
+	tokensManager *tklmanager.Manager
 
 	stopCh      chan struct{}
-	notifyCh    chan struct{}
 	lifecycleMu sync.Mutex
 	workers     sync.WaitGroup
 	stopped     bool // Stop is terminal; a new node/profile constructs a new Manager.
 }
 
-// ManagerOptions selects the optional C-backed catalogue. It remains off by default.
-type ManagerOptions struct {
-	UseNim bool
-	Shadow bool
-}
-
-// CataloguePausable exposes the optional refresh scheduler to the node registry.
+// CataloguePausable exposes the refresh scheduler to the node registry.
 func (tm *Manager) CataloguePausable() pausable.Pausable {
-	p, _ := tm.tokensManager.(pausable.Pausable)
-	return p
+	return tm.tokensManager
 }
 
 func NewTokenManager(
@@ -126,16 +112,7 @@ func NewTokenManager(
 	accountsDB *accounts.Database,
 	autoRefreshInterval time.Duration,
 	autoRefreshCheckInterval time.Duration,
-	options ...ManagerOptions,
 ) (*Manager, error) {
-	if len(options) > 1 {
-		return nil, errors.New("only one token manager configuration is allowed")
-	}
-	useNim := len(options) == 1 && options[0].UseNim
-	shadow := len(options) == 1 && options[0].Shadow
-	if shadow && !useNim {
-		return nil, errors.New("TokenListsShadow requires TokenListsUseNim")
-	}
 	maker := contracts.NewContractMaker(ethClientGetter)
 
 	settings, err := settings.MakeNewDB(appDB)
@@ -149,7 +126,6 @@ func NewTokenManager(
 	}
 
 	manager := &Manager{
-		shadowComparison:           shadow,
 		walletDB:                   walletDB,
 		settings:                   settings,
 		ethClientGetter:            ethClientGetter,
@@ -169,8 +145,7 @@ func NewTokenManager(
 		return nil, err
 	}
 
-	tokensManager, err := selectTokenListsManager(manager, enabledChains, lastTokensUpdate, autoRefreshInterval,
-		autoRefreshCheckInterval, useNim)
+	tokensManager, err := newTKLRefreshManager(manager, enabledChains, lastTokensUpdate, nil, autoRefreshInterval, autoRefreshCheckInterval)
 	if err != nil {
 		logutils.ZapLogger().Error("Failed to create token lists manager", zap.Error(err))
 		return nil, err
@@ -232,49 +207,6 @@ func initialListIDsFromEmbedded() []string {
 	return maps.Keys(defaulttokenlists.TokensSources)
 }
 
-func setUpTokenListsManager(mng *Manager, walletDB *sql.DB, enabledChains []uint64, lastUpdate time.Time,
-	autoRefreshInterval time.Duration, autoRefreshCheckInterval time.Duration) (manager.Manager, error) {
-
-	wsdkFetcher := fetcher.New(fetcher.DefaultConfig())
-
-	contentStore := NewContentStore(walletDB)
-
-	customTokenStore := NewCustomTokenStore(mng)
-
-	config := &manager.Config{
-		AutoFetcherConfig: &autofetcher.ConfigRemoteListOfTokenLists{
-			Config: autofetcher.Config{
-				LastUpdate:               lastUpdate,
-				AutoRefreshInterval:      autoRefreshInterval,
-				AutoRefreshCheckInterval: autoRefreshCheckInterval,
-			},
-			RemoteListOfTokenListsFetchDetails: types.ListDetails{
-				ID:        remoteListOfTokenListsID,
-				SourceURL: remoteListOfTokenLists,
-				Schema:    fetcher.ListOfTokenListsSchema,
-			},
-			RemoteListOfTokenListsParser: &parsers.StatusListOfTokenListsParser{},
-		},
-
-		MainListID: walletcommon.StatusTokenListID,
-
-		InitialListIDs:      initialListIDsFromEmbedded(),
-		InitialListProvider: initialListProviderFromEmbedded,
-
-		CustomParsers: map[string]parsers.TokenListParser{
-			walletcommon.StatusTokenListID: &parsers.StatusTokenListParser{},
-		},
-
-		Chains: enabledChains,
-
-		SkippedTokenKeys: walletcommon.SkippedTokenKeys(),
-
-		AdditionalAddressesForNativeToken: walletcommon.AdditionalNativeTokenAddresses(),
-	}
-
-	return manager.New(config, wsdkFetcher, contentStore, customTokenStore)
-}
-
 func (tm *Manager) Start(ctx context.Context) error {
 	tm.lifecycleMu.Lock()
 	defer tm.lifecycleMu.Unlock()
@@ -285,18 +217,16 @@ func (tm *Manager) Start(ctx context.Context) error {
 		return nil
 	}
 	stopCh := make(chan struct{})
-	notifyCh := make(chan struct{}, 1)
-	if err := tm.startTokenListsNotifier(ctx, stopCh, notifyCh); err != nil {
+	if err := tm.startTokenLists(ctx); err != nil {
 		return err
 	}
 	tm.stopCh = stopCh
-	tm.notifyCh = notifyCh
 	tm.startAccountsWatcher(stopCh)
 	tm.startNetworksWatcher(stopCh)
 	return nil
 }
 
-func (tm *Manager) startTokenListsNotifier(ctx context.Context, stopCh <-chan struct{}, notifyCh chan struct{}) error {
+func (tm *Manager) startTokenLists(ctx context.Context) error {
 	thirdpartyServicesEnabled, err := tm.settings.ThirdpartyServicesEnabled()
 	if err != nil {
 		logutils.ZapLogger().Error("failed to get if thirdparty services are enabled", zap.Error(err))
@@ -309,48 +239,10 @@ func (tm *Manager) startTokenListsNotifier(ctx context.Context, stopCh <-chan st
 	}
 
 	autoRefresh := thirdpartyServicesEnabled && autoRefreshEnabled
-	if catalogue, ok := tm.tokensManager.(interface{ SetNetworkAllowed(bool) error }); ok {
-		if err := catalogue.SetNetworkAllowed(thirdpartyServicesEnabled); err != nil {
-			return err
-		}
-		// This path owns its success timestamps and notifications directly.
-		return tm.tokensManager.Start(ctx, autoRefresh, nil)
-	}
-
-	err = tm.tokensManager.Start(ctx, autoRefresh, notifyCh)
-	if err != nil {
-		logutils.ZapLogger().Error("failed to start token lists notifier", zap.Error(err))
+	if err := tm.tokensManager.SetNetworkAllowed(thirdpartyServicesEnabled); err != nil {
 		return err
 	}
-
-	tm.workers.Add(1)
-	go func() {
-		defer panics.LogOnPanic()
-		defer tm.workers.Done()
-		for {
-			select {
-			case <-stopCh:
-				return
-			case <-notifyCh:
-				err := tm.setLastTokenListsRefreshTime(time.Now().UTC())
-				if err != nil {
-					logutils.ZapLogger().Error("failed to set last tokens update", zap.Error(err))
-				}
-				signal.SendWalletEvent(signal.TokenListsUpdated, nil)
-				if tm.walletFeed != nil {
-					// Send from a separate goroutine: Feed.Send blocks until every
-					// subscriber has consumed the value, and a stalled notifier loop
-					// would miss stopCh and drop follow-up notifications.
-					go func() {
-						defer panics.LogOnPanic()
-						tm.walletFeed.Send(walletevent.Event{Type: walletevent.EventTokenListsUpdated})
-					}()
-				}
-			}
-		}
-	}()
-
-	return nil
+	return tm.tokensManager.Start(ctx, autoRefresh, nil)
 }
 
 func (tm *Manager) startAccountsWatcher(stopCh <-chan struct{}) {
@@ -803,10 +695,6 @@ func (tm *Manager) GetCachedBalances() (map[common.Address][]tokentypes.StorageT
 
 func (tm *Manager) CacheBalances(balances map[common.Address][]tokentypes.StorageToken) error {
 	return tm.tokenBalancesStorage.saveBalances(balances)
-}
-
-func (tm *Manager) setLastTokenListsRefreshTime(time time.Time) error {
-	return tm.settings.SaveSettingField(settings.LastTokensUpdate, time)
 }
 
 func (tm *Manager) FindOrCreateTokenByAddress(ctx context.Context, chainID uint64, address common.Address) (*tokentypes.Token, error) {

@@ -24,13 +24,14 @@ class NativeDependencyTest(unittest.TestCase):
         (source / "abi").mkdir(parents=True)
         (source / "abi/tkl.h").write_text("fixture header\n")
         (source / "Makefile").write_text(
-            "isolate:\n\tmkdir -p $(OUT)\n"
+            "isolate:\n\t$(NIM) --version >/dev/null\n\tmkdir -p $(OUT)\n"
             "\tprintf archive > $(OUT)/libtkl_isolated.a\n"
             "\techo build >> $(CURDIR)/build-count\n")
         (source / "scripts").mkdir()
         (source / "scripts/build_mobile.sh").write_text(
             '#!/bin/bash\nset -eu\ncd "$(dirname "$0")/.."\n'
             'test "$TKL_BUILD_TESTS" = 0\nmkdir -p "$OUT/link"\n'
+            'printf "%s" "${IOS_TARGET:-}" > "$OUT/ios-target"\n'
             'printf "%s" "$1" > "$OUT/link/libtkl.a"\n'
             'echo "$1" >> build-count\n')
         self.run_cmd("git", "init", "-q", str(source))
@@ -46,7 +47,7 @@ class NativeDependencyTest(unittest.TestCase):
         self.env.update(GIT_CONFIG_COUNT="1", GIT_CONFIG_KEY_0=
                         f"url.{source}.insteadOf", GIT_CONFIG_VALUE_0=
                         "https://github.com/status-im/nim-token-lists.git", NIM="true")
-        for key in ("NIM_TKL_INC_DIR", "NIM_TKL_LIB_DIR", "GOOS", "GOARCH", "OUT"):
+        for key in ("NIM_TKL_INC_DIR", "NIM_TKL_LIB_DIR", "TKL_NIM", "GOOS", "GOARCH", "OUT"):
             self.env.pop(key, None)
         self.source = self.repo / "build/deps/nim-token-lists"
         target = self.run_cmd("go", "env", "GOHOSTOS", "GOHOSTARCH").stdout.split()
@@ -71,6 +72,10 @@ class NativeDependencyTest(unittest.TestCase):
         self.helper("clean")
         self.assertFalse(self.source.exists())
         self.helper()
+        self.assertTrue((self.out / "link/libtkl.a").is_file())
+
+    def test_token_compiler_override_does_not_use_other_nim_toolchain(self):
+        self.helper(TKL_NIM="true", NIM="false")
         self.assertTrue((self.out / "link/libtkl.a").is_file())
 
     def test_changed_flags_rebuild_and_missing_archive_rebuild(self):
@@ -163,6 +168,14 @@ class NativeDependencyTest(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("Unsupported", result.stderr)
         self.assertFalse(self.source.exists())
+
+    @unittest.skipUnless(shutil.which("xcrun"), "requires Xcode SDK discovery")
+    def test_ios_integer_deployment_target_is_normalized_and_reused(self):
+        env = dict(GOOS="ios", GOARCH="arm64", IPHONE_SDK="iphoneos")
+        self.helper(**dict(env, IOS_TARGET="17"))
+        self.assertEqual((self.source / "build/ios-arm64/ios-target").read_text(), "17.0")
+        self.helper(**dict(env, IOS_TARGET="17.0"))
+        self.assertEqual((self.source / "build-count").read_text().splitlines(), ["ios-arm64"])
 
     @unittest.skipUnless(shutil.which("xcrun"), "requires Xcode SDK discovery")
     def test_ios_device_and_simulator_keep_distinct_archives(self):

@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/status-im/go-wallet-sdk/pkg/tokens/types"
+	types "github.com/status-im/status-go/pkg/services/wallet/token/tokenlist"
 
 	"github.com/status-im/status-go/pkg/services/wallet/multistandardbalance"
 	tokentypes "github.com/status-im/status-go/pkg/services/wallet/token/types"

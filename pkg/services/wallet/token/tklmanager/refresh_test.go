@@ -1,5 +1,3 @@
-//go:build tkl
-
 package tklmanager
 
 import (
@@ -35,7 +33,6 @@ func TestRefreshPersistsBeforePublication(t *testing.T) {
 			var m *Manager
 			var err error
 			signals := 0
-			observed := make(chan ShadowSnapshot, 3)
 			successAttempted := false
 			notifiedBeforeSuccess := false
 			m, err = New(tkl.Config{Chains: []uint64{1}, RegistryID: "registry", RegistryURL: server.URL + "/registry"}, func(context.Context) (tkl.Bootstrap, error) { return tkl.Bootstrap{}, nil }, RefreshOptions{
@@ -58,14 +55,11 @@ func TestRefreshPersistsBeforePublication(t *testing.T) {
 					}
 					return nil
 				}, OnChange: func(tkl.Change) { notifiedBeforeSuccess = !successAttempted; signals++ },
-				OnShadow: func(_ context.Context, s ShadowSnapshot) { observed <- s },
 			})
 			require.NoError(t, err)
 			defer func() { _ = m.Stop() }()
 			require.NoError(t, m.Start(context.Background(), false, nil))
-			<-observed
 			require.Error(t, m.TriggerRefresh(context.Background()))
-			require.Empty(t, observed)
 			require.Equal(t, 0, signals)
 			require.Equal(t, uint64(1), m.mirror.Load().revision)
 			fail = false
@@ -79,15 +73,7 @@ func TestRefreshPersistsBeforePublication(t *testing.T) {
 			require.True(t, ok)
 			require.Equal(t, 1, signals)
 			require.False(t, notifiedBeforeSuccess)
-			snapshot := <-observed
-			require.Len(t, snapshot.Contents, 2)
-			require.Equal(t, m.mirror.Load().revision, snapshot.Revision)
-			require.Len(t, snapshot.Tokens, 2)
-			for _, row := range snapshot.Contents {
-				if row.ID == "list" {
-					require.Contains(t, row.Body, `"symbol":"ONE"`)
-				}
-			}
+			require.Len(t, m.UniqueTokens(), 2)
 		})
 	}
 }

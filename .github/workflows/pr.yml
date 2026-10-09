@@ -19,6 +19,10 @@ jobs:
       - name: Get dependencies
         run: go mod download
 
+      - uses: jiro4989/setup-nim-action@189b145833368cc92f1e7b3e166a25a3e057a693
+        with:
+          nim-version: '2.2.10'
+
       - name: Setup Protocol Buffer Compiler
         uses: arduino/setup-protoc@v3
         with:
@@ -39,6 +43,13 @@ jobs:
         run: |
           make generate
 
+      # Keep native linker flags out of the host-side code generators.
+      - name: Prepare native token catalogue
+        run: |
+          source scripts/tkl_env.sh
+          printf '%s\n' "CGO_CFLAGS=$CGO_CFLAGS" "CGO_LDFLAGS=$CGO_LDFLAGS" \
+            "NIM_TKL_INC_DIR=$NIM_TKL_INC_DIR" "NIM_TKL_LIB_DIR=$NIM_TKL_LIB_DIR" >> "$GITHUB_ENV"
+
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v8
         with:
@@ -47,7 +58,10 @@ jobs:
 
       - name: lint-panics
         run: |
-          make lint-panics USE_LOGOS_STORAGE=true USE_TORRENT=true
+          # SDS/storage use stubs under the lint tag; keep Make from adding
+          # their runtime libraries to the host analyzer's linker flags.
+          make lint-panics USE_LOGOS_STORAGE=true USE_TORRENT=true \
+            CGO_CFLAGS="$CGO_CFLAGS" CGO_LDFLAGS="$CGO_LDFLAGS"
 
       - name: go mod tidy
         run: go mod tidy && git diff --exit-code

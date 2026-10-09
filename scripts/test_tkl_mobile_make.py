@@ -6,6 +6,32 @@ import unittest
 
 
 class MobileBuildTest(unittest.TestCase):
+    def test_shared_build_keeps_sds_prerequisite(self):
+        repo = Path(__file__).resolve().parent.parent
+        result = subprocess.run(
+            ["make", "-qp", "statusgo-shared-library", "LIBSDS=/fixture/libsds.a"],
+            cwd=repo, text=True, capture_output=True)
+        self.assertIn(result.returncode, (0, 1), result.stderr)
+        rule = next(line for line in result.stdout.splitlines()
+                    if line.startswith("statusgo-shared-library:"))
+        self.assertIn("/fixture/libsds.a", rule)
+
+    def test_archive_tests_prepare_token_library_and_keep_storage_flags(self):
+        repo = Path(__file__).resolve().parent.parent
+        for target in ("test-storage", "test-torrent"):
+            with self.subTest(target=target):
+                result = subprocess.run(
+                    ["make", "-n", target, "-o", "generate", "-o", "build-storage",
+                     "LIBSDS=/fixture/libsds.a", "-o", "/fixture/libsds.a"],
+                    cwd=repo, text=True, capture_output=True)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                commands = [line for line in result.stdout.splitlines() if "gotestsum" in line]
+                self.assertTrue(commands)
+                for command in commands:
+                    self.assertIn("bash scripts/tkl_env.sh gotestsum", command)
+                    if target == "test-storage":
+                        self.assertIn("-lstorage", command)
+
     def test_ios_deployment_target_defaults_and_overrides(self):
         repo = Path(__file__).resolve().parent.parent
         for sdk, arch, minimum in (("iphoneos", "arm64", "13.0"),
@@ -25,19 +51,19 @@ class MobileBuildTest(unittest.TestCase):
                     self.assertIn(f'IPHONE_SDK="{sdk}" IOS_TARGET="{target}"', result.stdout)
                     self.assertIn(f'-miphoneos-version-min={target}', result.stdout)
 
-    def test_static_archive_bundling_accepts_both_go_tag_separators(self):
+    def test_static_archive_always_bundles_native_library(self):
         repo = Path(__file__).resolve().parent.parent
-        for tags, bundled in (("gowaku_no_rln", False), ("gowaku_no_rln tkl", True),
-                              ("gowaku_no_rln,tkl", True), ("not_tkl", False)):
+        for tags in ("gowaku_no_rln", "gowaku_no_rln tkl", "gowaku_no_rln,tkl"):
             with self.subTest(tags=tags):
                 result = subprocess.run(
                     ["make", "-n", "statusgo-library", "-o", "generate",
                      "-o", "statusgo-c-bindings", "LIBSDS=/fixture/libsds.a",
                      "-o", "/fixture/libsds.a", f"BUILD_TAGS={tags}"],
                     cwd=repo, text=True, capture_output=True, check=True)
-                self.assertEqual("scripts/tkl_bundle_archive.sh" in result.stdout, bundled)
+                self.assertIn("scripts/tkl_env.sh", result.stdout)
+                self.assertIn("scripts/tkl_bundle_archive.sh", result.stdout)
 
-    def test_opt_in_adds_native_preparation_and_go_tag(self):
+    def test_mobile_always_prepares_native_library(self):
         repo = Path(__file__).resolve().parent.parent
         for platform in ("android", "ios"):
             for enabled in ("false", "true"):
@@ -51,11 +77,10 @@ class MobileBuildTest(unittest.TestCase):
                          "IPHONE_SDK=iphonesimulator", "IOS_TARGET=14.0"],
                         cwd=repo, text=True, capture_output=True, check=True)
                     command = result.stdout
-                    self.assertEqual("bash scripts/tkl_env.sh" in command, enabled == "true")
-                    self.assertEqual("disable_torrent tkl'" in command, enabled == "true")
+                    self.assertIn("bash scripts/tkl_env.sh", command)
                     self.assertEqual("scripts/tkl_bundle_archive.sh" in command,
-                                     platform == "ios" and enabled == "true")
-                    if enabled == "true":
+                                     platform == "ios")
+                    if platform == "android" or platform == "ios":
                         if platform == "android":
                             self.assertIn("TKL_HIDE_EXPORTS=1", command)
                             self.assertIn("scripts/check_tkl_exports.sh", command)

@@ -11,7 +11,7 @@ in pkgs.mkShell {
     git jq which gcc rustc cargo openjdk openssl nim go
     golangci-lint go-junit-report gopls
     protobuf_36 gotestsum
-    libsds libstorage
+    libsds libstorage libtkl
   ] ++ lib.optionals (isDarwin) [
     pkgs.xcodeWrapper
   ] ++ lib.optionals (!(stdenv.isLinux && isAarch64)) [
@@ -19,6 +19,8 @@ in pkgs.mkShell {
   ];
 
   shellHook = ''
+    export NIM_TKL_INC_DIR="${pkgs.libtkl}/include"
+    export NIM_TKL_LIB_DIR="${pkgs.libtkl}/lib"
     export USE_SYSTEM_NIM=1
 
     export LIBSDS="$(echo ${pkgs.libsds}/lib/libsds.*)"
