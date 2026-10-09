@@ -74,6 +74,10 @@ case "$goos" in
     ;;
   ios)
     mobile=true
+    # Clang accepts "17", but ld -platform_version requires "17.0".
+    if [[ "${IOS_TARGET:-}" =~ ^[0-9]+$ ]]; then
+      export IOS_TARGET="$IOS_TARGET.0"
+    fi
     case "${IPHONE_SDK:-iphoneos}" in
       iphoneos)
         [ "$arch" = arm64 ] || fail "iOS devices require arm64"

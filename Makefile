@@ -472,13 +472,13 @@ statusgo-shared-library-build: statusgo-c-bindings $(LIBSDS) ##@cross-compile Bu
 		-tags '$(BUILD_TAGS)' \
 		$(BUILD_FLAGS) \
 		-buildmode=c-shared \
-		-o build/bin/libstatus.$(GOBIN_SHARED_LIB_EXT) \
+		-o build/bin/libstatus.$(GOBIN_SHARED_LIB_EXT)$(if $(filter Linux,$(detected_OS)),.0) \
 		./build/bin/statusgo-lib
 ifeq ($(detected_OS),Linux)
-	cd build/bin && \
-	ls -lah . && \
-	mv ./libstatus.$(GOBIN_SHARED_LIB_EXT) ./libstatus.$(GOBIN_SHARED_LIB_EXT).0 && \
-	ln -s ./libstatus.$(GOBIN_SHARED_LIB_EXT).0 ./libstatus.$(GOBIN_SHARED_LIB_EXT)
+	# Build the versioned file directly, including when the public symlink exists.
+	# Go replaces the final extension with .h; retain the public header name.
+	mv build/bin/libstatus.$(GOBIN_SHARED_LIB_EXT).h build/bin/libstatus.h
+	ln -sfn libstatus.$(GOBIN_SHARED_LIB_EXT).0 build/bin/libstatus.$(GOBIN_SHARED_LIB_EXT)
 endif
 	@echo "Shared library built:"
 	@ls -la build/bin/libstatus.*

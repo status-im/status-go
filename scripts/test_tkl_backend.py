@@ -81,6 +81,33 @@ class BackendCacheTest(unittest.TestCase):
         self.build()
         self.assertEqual(self.count(), 3)
 
+    def test_linux_shared_recipe_can_rebuild_its_existing_symlink(self):
+        shutil.copy(Path(__file__).resolve().parent.parent / "Makefile", self.root)
+        (self.root / "build/bin").mkdir(parents=True)
+        bindir = self.root / "tools"
+        bindir.mkdir()
+        go = bindir / "go"
+        go.write_text(
+            '#!/bin/sh\n'
+            'if [ "$1" != build ]; then exec "$REAL_GO" "$@"; fi\n'
+            'while [ "$1" != -o ]; do shift; done\n'
+            'printf "%s" "$BUILD_CONTENT" > "$2"\n'
+            'printf "%s" "$BUILD_CONTENT" > "${2%.*}.h"\n')
+        go.chmod(0o755)
+        env = dict(os.environ, PATH=str(bindir) + os.pathsep + os.environ["PATH"],
+                   REAL_GO=shutil.which("go"))
+        for content in ("first", "rebuilt"):
+            self.run_cmd(
+                "make", "statusgo-shared-library-build", "OS=Linux", "RELEASE_TAG=test",
+                "-o", "generate", "-o", "statusgo-c-bindings", "-o", "install-git-hooks",
+                "LIBSDS=/fixture/libsds.so", "-o", "/fixture/libsds.so",
+                env=dict(env, BUILD_CONTENT=content))
+            library = self.root / "build/bin/libstatus.so"
+            self.assertTrue(library.is_symlink())
+            self.assertEqual(library.read_text(), content)
+            self.assertEqual((self.root / "build/bin/libstatus.so.0").read_text(), content)
+            self.assertEqual((self.root / "build/bin/libstatus.h").read_text(), content)
+
 
 if __name__ == "__main__":
     unittest.main()

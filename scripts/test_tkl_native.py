@@ -31,6 +31,7 @@ class NativeDependencyTest(unittest.TestCase):
         (source / "scripts/build_mobile.sh").write_text(
             '#!/bin/bash\nset -eu\ncd "$(dirname "$0")/.."\n'
             'test "$TKL_BUILD_TESTS" = 0\nmkdir -p "$OUT/link"\n'
+            'printf "%s" "${IOS_TARGET:-}" > "$OUT/ios-target"\n'
             'printf "%s" "$1" > "$OUT/link/libtkl.a"\n'
             'echo "$1" >> build-count\n')
         self.run_cmd("git", "init", "-q", str(source))
@@ -167,6 +168,14 @@ class NativeDependencyTest(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("Unsupported", result.stderr)
         self.assertFalse(self.source.exists())
+
+    @unittest.skipUnless(shutil.which("xcrun"), "requires Xcode SDK discovery")
+    def test_ios_integer_deployment_target_is_normalized_and_reused(self):
+        env = dict(GOOS="ios", GOARCH="arm64", IPHONE_SDK="iphoneos")
+        self.helper(**dict(env, IOS_TARGET="17"))
+        self.assertEqual((self.source / "build/ios-arm64/ios-target").read_text(), "17.0")
+        self.helper(**dict(env, IOS_TARGET="17.0"))
+        self.assertEqual((self.source / "build-count").read_text().splitlines(), ["ios-arm64"])
 
     @unittest.skipUnless(shutil.which("xcrun"), "requires Xcode SDK discovery")
     def test_ios_device_and_simulator_keep_distinct_archives(self):
