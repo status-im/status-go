@@ -2,7 +2,10 @@ package token
 
 import (
 	"context"
+	"fmt"
 	"math/big"
+	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -12,6 +15,7 @@ import (
 	types "github.com/status-im/status-go/pkg/services/wallet/token/tokenlist"
 
 	walletcommon "github.com/status-im/status-go/pkg/services/wallet/common"
+	"github.com/status-im/status-go/pkg/services/wallet/token/tklmanager"
 )
 
 func TestTKLBootstrapExistingDatabase(t *testing.T) {
@@ -90,4 +94,165 @@ func TestTKLEmbeddedCatalogue(t *testing.T) {
 		require.Equal(t, types.LocalSourceURL, list.Source)
 		require.Equal(t, (time.Time{}).Format(time.RFC3339), list.FetchedTimestamp)
 	}
+}
+
+// referenceIndex answers queries the way the removed Go mirror did, from the
+// catalogue's full token page.
+type referenceIndex struct {
+	tokens    []*types.Token
+	byKey     map[string]*types.Token
+	byAddress map[[2]any]*types.Token
+	byChain   map[uint64][]*types.Token
+	aliases   map[[2]any][2]any
+}
+
+func newReferenceIndex(tokens []*types.Token) *referenceIndex {
+	ref := &referenceIndex{tokens: tokens, byKey: map[string]*types.Token{}, byAddress: map[[2]any]*types.Token{}, byChain: map[uint64][]*types.Token{}, aliases: map[[2]any][2]any{}}
+	for _, token := range tokens {
+		ref.byKey[token.Key()] = token
+		ref.byAddress[[2]any{token.ChainID, token.Address}] = token
+		ref.byChain[token.ChainID] = append(ref.byChain[token.ChainID], token)
+	}
+	skipped := map[string]bool{}
+	for _, key := range walletcommon.SkippedTokenKeys() {
+		skipped[strings.ToLower(key)] = true
+	}
+	for chain, addresses := range walletcommon.AdditionalNativeTokenAddresses() {
+		for _, address := range addresses {
+			if !skipped[types.TokenKey(chain, address)] {
+				ref.aliases[[2]any{chain, address}] = [2]any{chain, common.Address{}}
+			}
+		}
+	}
+	return ref
+}
+
+func (r *referenceIndex) byChainAddress(chain uint64, address common.Address) *types.Token {
+	key := [2]any{chain, address}
+	if canonical, ok := r.aliases[key]; ok {
+		key = canonical
+	}
+	return r.byAddress[key]
+}
+
+func (r *referenceIndex) byKeys(keys []string) []*types.Token {
+	result := make([]*types.Token, 0, len(keys))
+	for _, key := range keys {
+		key = strings.ToLower(key)
+		chain, address, ok := types.ChainAndAddressFromTokenKey(key)
+		if !ok {
+			continue
+		}
+		if token := r.byChainAddress(chain, address); token != nil {
+			result = append(result, token)
+		}
+	}
+	return result
+}
+
+func TestTKLQueriesMatchReferenceIndex(t *testing.T) {
+	manager, cleanup := setupTestTokenDB(t)
+	defer cleanup()
+	chains := append(walletcommon.AllChainIDsAsUint64(), 777)
+	facade := manager.tokensManager
+	require.NoError(t, facade.Start(context.Background(), false, nil))
+	all := facade.UniqueTokens()
+	require.Greater(t, len(all), 1000)
+	ref := newReferenceIndex(all)
+
+	for _, chain := range append(chains, 123456) {
+		got := facade.GetTokensByChain(chain)
+		require.NotNil(t, got)
+		require.Equal(t, len(ref.byChain[chain]), len(got), chain)
+		for i, token := range ref.byChain[chain] {
+			require.Equal(t, token, got[i])
+		}
+	}
+	subset := []uint64{walletcommon.EthereumMainnet, walletcommon.BSCMainnet, walletcommon.BaseMainnet}
+	var expected []*types.Token
+	for _, token := range all {
+		if slices.Contains(subset, token.ChainID) {
+			expected = append(expected, token)
+		}
+	}
+	require.Equal(t, expected, facade.GetTokensByChains(subset))
+
+	var keys []string
+	var ids []tklmanager.ChainAddress
+	for i, token := range all {
+		require.Equal(t, token, ref.byChainAddress(token.ChainID, token.Address))
+		got, ok := facade.GetTokenByChainAddress(token.ChainID, token.Address)
+		require.True(t, ok)
+		require.Equal(t, token, got)
+		if i%97 == 0 {
+			keys = append(keys, token.Key(), strings.ToUpper(token.Key()), fmt.Sprintf("0%d-%s", token.ChainID, token.Address.Hex()))
+			ids = append(ids, tklmanager.ChainAddress{ChainID: token.ChainID, Address: token.Address})
+		}
+	}
+	for chain, addresses := range walletcommon.AdditionalNativeTokenAddresses() {
+		for _, address := range addresses {
+			want := ref.byChainAddress(chain, address)
+			got, ok := facade.GetTokenByChainAddress(chain, address)
+			require.Equal(t, want != nil, ok)
+			require.Equal(t, want, got)
+			keys = append(keys, types.TokenKey(chain, address))
+			ids = append(ids, tklmanager.ChainAddress{ChainID: chain, Address: address})
+		}
+	}
+	for _, key := range walletcommon.SkippedTokenKeys() {
+		keys = append(keys, key)
+		chain, address, _ := types.ChainAndAddressFromTokenKey(key)
+		ids = append(ids, tklmanager.ChainAddress{ChainID: chain, Address: address})
+	}
+	keys = append(keys, "missing", "1-nothex", "1-0x1-extra", "", "1-0x0000000000000000000000000000000000000009", keys[0])
+	ids = append(ids, tklmanager.ChainAddress{ChainID: 1, Address: common.HexToAddress("0x9")}, ids[0])
+	got, err := facade.GetTokensByKeys(keys)
+	require.NoError(t, err)
+	require.Equal(t, ref.byKeys(keys), got)
+	batch := facade.GetTokensByChainAddresses(ids)
+	require.Len(t, batch, len(ids))
+	for i, id := range ids {
+		require.Equal(t, ref.byChainAddress(id.ChainID, id.Address), batch[i], id)
+	}
+	empty, err := facade.GetTokensByKeys(nil)
+	require.NoError(t, err)
+	require.NotNil(t, empty)
+	require.Empty(t, empty)
+
+	lists := facade.TokenLists()
+	require.Greater(t, len(lists), len(initialListIDsFromEmbedded())-1)
+	for _, list := range lists {
+		single, ok := facade.TokenList(list.ID)
+		require.True(t, ok)
+		require.Equal(t, list, single)
+	}
+	_, ok := facade.TokenList("missing")
+	require.False(t, ok)
+}
+
+func TestTKLRefreshPersistsFetchedBytesForNextLogin(t *testing.T) {
+	env := newBenchEnv(t, false)
+	defer env.close()
+	facade := env.start(t)
+	require.NoError(t, facade.TriggerRefresh(context.Background()))
+	stored, err := NewContentStore(env.manager.walletDB).GetAll()
+	require.NoError(t, err)
+	require.Len(t, stored, len(env.lists.bodies))
+	for id, body := range env.lists.bodies {
+		require.Equal(t, body, stored[id].Data, id)
+		require.Equal(t, fmt.Sprintf(`"%s-0"`, id), stored[id].Etag, id)
+		require.False(t, stored[id].Fetched.IsZero(), id)
+	}
+	before := facade.UniqueTokens()
+	list, ok := facade.TokenList(walletcommon.StatusTokenListID)
+	require.True(t, ok)
+	require.NotEqual(t, types.LocalSourceURL, list.Source)
+	env.stop(t)
+
+	// The next login loads the persisted bytes, not the bundled lists.
+	facade = env.start(t)
+	require.Equal(t, before, facade.UniqueTokens())
+	reloaded, ok := facade.TokenList(walletcommon.StatusTokenListID)
+	require.True(t, ok)
+	require.Equal(t, list, reloaded)
 }
