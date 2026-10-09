@@ -17,6 +17,7 @@ import (
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/messaging/common"
 	"github.com/status-im/status-go/pkg/messaging/controller"
+	"github.com/status-im/status-go/pkg/messaging/delivery"
 	"github.com/status-im/status-go/pkg/messaging/events"
 	"github.com/status-im/status-go/pkg/messaging/layers/encryption"
 	"github.com/status-im/status-go/pkg/messaging/layers/reliability"
@@ -87,6 +88,10 @@ type CoreParams struct {
 	Mode  Mode
 
 	TimeSource timesource.Provider
+
+	// DataDir is where a logos-delivery backend keeps its state. The go-waku
+	// backend keeps none.
+	DataDir string
 }
 
 func newCore(waku wakutypes.Waku, params CoreParams, config *config) (*Core, error) {
@@ -245,6 +250,14 @@ func NewCore(params CoreParams, options ...Options) (*Core, error) {
 
 	if config.persistence == nil {
 		return nil, errors.New("persistence is not configured")
+	}
+
+	if delivery.Available {
+		backend, err := newDeliveryBackend(params, config.logger)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to create logos-delivery backend")
+		}
+		return newCore(backend, params, config)
 	}
 
 	waku, err := newWaku(wakuParams{
@@ -439,7 +452,9 @@ func (c *Core) startWakuMetrics() error {
 		}
 
 		// TODO: Remove type assertion once Waku metrics are fully integrated into the Messaging module.
-		c.waku.(*waku.Waku).SetMetricsHandler(wakuMetricsHandler)
+		if w, ok := c.waku.(*waku.Waku); ok {
+			w.SetMetricsHandler(wakuMetricsHandler)
+		}
 
 		c.wakumetrics = wakuMetricsHandler
 	}
@@ -449,7 +464,10 @@ func (c *Core) startWakuMetrics() error {
 
 func (c *Core) metrics() string {
 	// TODO: Remove type assertion once Waku metrics are fully integrated into the Messaging module.
-	return c.waku.(*waku.Waku).Metrics()
+	if w, ok := c.waku.(*waku.Waku); ok {
+		return w.Metrics()
+	}
+	return ""
 }
 
 func (c *Core) generateHashRatchetKey(groupID []byte) error {
