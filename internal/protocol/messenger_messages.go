@@ -126,6 +126,9 @@ func (m *Messenger) EditMessage(ctx context.Context, request *requests.EditMessa
 		}
 
 		response.AddMessage(message)
+		if err := m.addAffectedThreadToResponse(response, message); err != nil {
+			return nil, err
+		}
 	}
 
 	// pull updated messages
@@ -253,6 +256,9 @@ func (m *Messenger) DeleteMessageAndSend(ctx context.Context, messageID string) 
 		}
 		response.AddMessage(messageToDelete)
 		response.AddRemovedMessage(&RemovedMessage{MessageID: messageToDelete.ID, ChatID: chat.ID, DeletedBy: deletedBy})
+		if err := m.addAffectedThreadToResponse(response, messageToDelete); err != nil {
+			return nil, err
+		}
 
 		if chat.LastMessage != nil && chat.LastMessage.ID == messageToDelete.ID {
 			chat.LastMessage = messageToDelete
@@ -323,6 +329,9 @@ func (m *Messenger) DeleteMessageForMeAndSync(ctx context.Context, localChatID s
 		}
 
 		response.AddMessage(messageToDelete)
+		if err := m.addAffectedThreadToResponse(response, messageToDelete); err != nil {
+			return nil, err
+		}
 
 		// pull updated messages
 		updatedMessages, err := m.persistence.MessagesByResponseTo(messageToDelete.ID)

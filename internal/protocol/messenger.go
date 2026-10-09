@@ -4375,7 +4375,7 @@ func (m *Messenger) MarkThreadRead(ctx context.Context, chatID string, threadID 
 		}
 	}
 
-	thread, err := m.persistence.ThreadByID(chatID, threadID)
+	thread, err := m.persistence.ThreadWithSummaryByID(chatID, threadID)
 	if err != nil {
 		return nil, err
 	}

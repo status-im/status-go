@@ -13,11 +13,60 @@ import (
 
 const adminOnlyThreadCreationError = "only admins can create threads in this community"
 
+type MessagePageWithThreadSummaries struct {
+	Messages             []*common.Message `json:"messages"`
+	Cursor               string            `json:"cursor"`
+	Threads              []*Thread         `json:"threads"`
+	ThreadSummariesError string            `json:"threadSummariesError,omitempty"`
+}
+
+// MessagesWithThreadSummaries keeps summary work bounded to the returned page.
+// Summary failures must not prevent the message page from loading.
+func (m *Messenger) MessagesWithThreadSummaries(chatID, cursor string, limit, participantPreviewLimit int) (*MessagePageWithThreadSummaries, error) {
+	messages, nextCursor, err := m.MessageByChatID(chatID, "", cursor, limit)
+	if err != nil {
+		return nil, err
+	}
+	page := &MessagePageWithThreadSummaries{
+		Messages: messages,
+		Cursor:   nextCursor,
+		Threads:  []*Thread{},
+	}
+	if len(messages) == 0 || !m.featureFlags.Threads {
+		return page, nil
+	}
+	parentIDs := make([]string, 0, len(messages))
+	for _, message := range messages {
+		if message.HasThread == nil || *message.HasThread {
+			parentIDs = append(parentIDs, message.ID)
+		}
+	}
+	if len(parentIDs) == 0 {
+		return page, nil
+	}
+	threads, err := m.ThreadSummariesByParentMessageIDs(chatID, parentIDs, participantPreviewLimit)
+	if err != nil {
+		page.ThreadSummariesError = err.Error()
+	} else {
+		page.Threads = threads
+	}
+	return page, nil
+}
+
 func (m *Messenger) ThreadsByChatID(chatID string) ([]*Thread, error) {
 	if !m.featureFlags.Threads {
 		return nil, ErrThreadFeatureDisabled
 	}
 	return m.persistence.ThreadsByChatID(chatID)
+}
+
+// ThreadSummariesByParentMessageIDs returns card data only for the requested
+// parent messages, keeping summary work aligned with message pagination.
+func (m *Messenger) ThreadSummariesByParentMessageIDs(chatID string, parentMessageIDs []string, participantPreviewLimit int) ([]*Thread, error) {
+	if !m.featureFlags.Threads {
+		return []*Thread{}, nil
+	}
+	return m.persistence.ThreadsWithSummariesByParentMessageIDs(chatID, parentMessageIDs, participantPreviewLimit)
 }
 
 func (m *Messenger) ThreadsByChatIDs(chatIDs []string) ([]*Thread, error) {
@@ -94,7 +143,7 @@ func (m *Messenger) CreateThread(chatID string, parentMessageID string) (*Messen
 		return nil, err
 	}
 
-	thread, err := m.persistence.ThreadByID(chatID, parentMessageID)
+	thread, err := m.persistence.ThreadWithSummaryByID(chatID, parentMessageID)
 	if err != nil {
 		return nil, err
 	}
@@ -208,7 +257,7 @@ func (m *Messenger) addThreadsToResponse(response *MessengerResponse, messages [
 		}
 		seen[key] = struct{}{}
 
-		thread, err := m.persistence.ThreadByID(chatID, threadID)
+		thread, err := m.persistence.ThreadWithSummaryByID(chatID, threadID)
 		if errors.Is(err, common.ErrRecordNotFound) {
 			continue
 		}
@@ -219,5 +268,33 @@ func (m *Messenger) addThreadsToResponse(response *MessengerResponse, messages [
 		response.AddThread(thread)
 	}
 
+	return nil
+}
+
+// addAffectedThreadToResponse includes the recalculated thread summary in the
+// same response as a message change, so clients do not need to refetch it.
+func (m *Messenger) addAffectedThreadToResponse(response *MessengerResponse, message *common.Message) error {
+	if !m.featureFlags.Threads || response == nil || message == nil {
+		return nil
+	}
+
+	if threadID := message.GetThreadId(); threadID != "" {
+		thread, err := m.persistence.ThreadWithSummaryByID(message.LocalChatID, threadID)
+		if errors.Is(err, common.ErrRecordNotFound) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		response.AddThread(thread)
+		return nil
+	}
+
+	threads, err := m.persistence.ThreadsWithSummariesByParentMessageIDs(
+		message.LocalChatID, []string{message.ID}, defaultThreadParticipantPreviewLimit)
+	if err != nil {
+		return err
+	}
+	response.AddThreads(threads)
 	return nil
 }

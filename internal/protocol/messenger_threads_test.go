@@ -358,6 +358,10 @@ func (s *MessengerThreadsSuite) TestThreadsByChatIDs() {
 	s.Require().Equal("parent-1", byChat[chat1.ID].ThreadID)
 	s.Require().Equal("parent-2", byChat[chat2.ID].ThreadID)
 	s.Require().NotContains(byChat, chatWithoutThreads.ID)
+	s.Require().Zero(byChat[chat1.ID].MessagesCount)
+	s.Require().Zero(byChat[chat1.ID].ParticipantsCount)
+	s.Require().Empty(byChat[chat1.ID].ParticipantsPreviewIDs)
+	s.Require().Nil(byChat[chat1.ID].LastMessage)
 
 	// A chat that was never requested must not leak in.
 	threads, err = s.m.ThreadsByChatIDs([]string{chat1.ID})
@@ -392,6 +396,7 @@ func (s *MessengerThreadsSuite) TestThreadsIncludeUnreadCounts() {
 
 	parentMsg := buildTestMessage(*chat)
 	parentMsg.ID = "parent-id"
+	parentMsg.From = "parent-author"
 	parentMsg.Text = "Parent"
 	parentMsg.ChatMessage.Text = "Parent"
 	s.Require().NoError(s.m.SaveMessages([]*common.Message{parentMsg}))
@@ -425,11 +430,315 @@ func (s *MessengerThreadsSuite) TestThreadsIncludeUnreadCounts() {
 	s.Require().Len(threads, 1)
 	s.Require().Equal(uint(1), threads[0].UnviewedMessagesCount)
 	s.Require().Equal(uint(1), threads[0].UnviewedMentionsCount)
+	s.Require().Zero(threads[0].MessagesCount)
+	s.Require().Empty(threads[0].ParticipantsPreviewIDs)
+	s.Require().Nil(threads[0].LastMessage)
 
-	thread, err := s.m.persistence.ThreadByID(chat.ID, threadID)
+	thread, err := s.m.persistence.ThreadWithSummaryByID(chat.ID, threadID)
 	s.Require().NoError(err)
 	s.Require().Equal(uint(1), thread.UnviewedMessagesCount)
 	s.Require().Equal(uint(1), thread.UnviewedMentionsCount)
+	s.Require().Equal(uint(3), thread.MessagesCount)
+	s.Require().NotEmpty(thread.ParticipantsPreviewIDs)
+	s.Require().NotNil(thread.LastMessage)
+}
+
+func (s *MessengerThreadsSuite) TestThreadSummariesByParentMessageIDsHonorsParticipantPreviewLimit() {
+	chat := CreateOneToOneChat("test-user", &s.m.identity.PublicKey, s.m.getTimesource())
+	s.Require().NoError(s.m.SaveChat(chat))
+
+	parentMsg := buildTestMessage(*chat)
+	parentMsg.ID = "parent-id"
+	parentMsg.From = "creator"
+	s.Require().NoError(s.m.SaveMessages([]*common.Message{parentMsg}))
+	s.Require().NoError(s.m.persistence.UpsertThread("thread-id", chat.ID, parentMsg.ID, "Thread"))
+
+	threadID := "thread-id"
+	var replies []*common.Message
+	for index, participant := range []string{"alice", "bob", "carol"} {
+		reply := buildTestMessage(*chat)
+		reply.ID = participant
+		reply.From = participant
+		reply.Clock = uint64(index + 1)
+		reply.ChatMessage.ThreadId = &threadID
+		replies = append(replies, reply)
+	}
+	s.Require().NoError(s.m.SaveMessages(replies))
+
+	threads, err := s.m.ThreadSummariesByParentMessageIDs(chat.ID, []string{parentMsg.ID}, 2)
+	s.Require().NoError(err)
+	s.Require().Len(threads, 1)
+	s.Require().Equal(uint(4), threads[0].ParticipantsCount)
+	s.Require().Equal([]string{"creator", "carol"}, threads[0].ParticipantsPreviewIDs)
+}
+
+func (s *MessengerThreadsSuite) TestMessagesWithThreadSummariesMatchesPaginatedReads() {
+	chat := CreateOneToOneChat("test-user", &s.m.identity.PublicKey, s.m.getTimesource())
+	s.Require().NoError(s.m.SaveChat(chat))
+	for i := 0; i < 5; i++ {
+		parent := buildTestMessage(*chat)
+		parent.ID = fmt.Sprintf("parent-%d", i)
+		parent.Clock = uint64(i + 1)
+		parent.From = "creator"
+		s.Require().NoError(s.m.SaveMessages([]*common.Message{parent}))
+		if i == 0 {
+			continue // Include a page with no threads.
+		}
+		threadID := fmt.Sprintf("thread-%d", i)
+		s.Require().NoError(s.m.persistence.UpsertThread(threadID, chat.ID, parent.ID, "Thread"))
+		for j := 0; j < 3; j++ {
+			reply := buildTestMessage(*chat)
+			reply.ID = fmt.Sprintf("reply-%d-%d", i, j)
+			reply.From = fmt.Sprintf("author-%d", j)
+			reply.Clock = uint64(10 + j)
+			reply.ChatMessage.ThreadId = &threadID
+			s.Require().NoError(s.m.SaveMessages([]*common.Message{reply}))
+		}
+	}
+
+	cursor := ""
+	seen := 0
+	for {
+		messages, nextCursor, err := s.m.MessageByChatID(chat.ID, "", cursor, 2)
+		s.Require().NoError(err)
+		page, err := s.m.MessagesWithThreadSummaries(chat.ID, cursor, 2, 2)
+		s.Require().NoError(err)
+		s.Require().Equal(messages, page.Messages)
+		s.Require().Equal(nextCursor, page.Cursor)
+		s.Require().Empty(page.ThreadSummariesError)
+		parentIDs := make([]string, 0, len(messages))
+		for _, message := range messages {
+			s.Require().NotNil(message.HasThread)
+			s.Require().Equal(message.ID != "parent-0", *message.HasThread)
+			parentIDs = append(parentIDs, message.ID)
+		}
+		threads, err := s.m.ThreadSummariesByParentMessageIDs(chat.ID, parentIDs, 2)
+		s.Require().NoError(err)
+		s.Require().Equal(threads, page.Threads)
+		for _, thread := range page.Threads {
+			s.Require().Equal(uint(4), thread.MessagesCount)
+			s.Require().Equal(uint(4), thread.ParticipantsCount)
+			s.Require().Len(thread.ParticipantsPreviewIDs, 2)
+		}
+		seen += len(page.Messages)
+		if nextCursor == "" {
+			break
+		}
+		cursor = nextCursor
+	}
+	s.Require().Equal(5, seen)
+}
+
+func (s *MessengerThreadsSuite) TestMessagesWithThreadSummariesEmptyAndDisabled() {
+	chat := CreateOneToOneChat("test-user", &s.m.identity.PublicKey, s.m.getTimesource())
+	s.Require().NoError(s.m.SaveChat(chat))
+	page, err := s.m.MessagesWithThreadSummaries(chat.ID, "", 20, 6)
+	s.Require().NoError(err)
+	s.Require().Empty(page.Messages)
+	s.Require().NotNil(page.Threads)
+	s.Require().Empty(page.Threads)
+	parent := buildTestMessage(*chat)
+	parent.ID = "parent"
+	s.Require().NoError(s.m.SaveMessages([]*common.Message{parent}))
+	s.Require().NoError(s.m.persistence.UpsertThread("thread", chat.ID, parent.ID, "Thread"))
+	s.m.featureFlags.Threads = false
+	page, err = s.m.MessagesWithThreadSummaries(chat.ID, "", 20, 6)
+	s.Require().NoError(err)
+	s.Require().Len(page.Messages, 1)
+	s.Require().Empty(page.Threads)
+	s.Require().Empty(page.ThreadSummariesError)
+	_, err = s.m.MessagesWithThreadSummaries("missing-chat", "", 20, 6)
+	s.Require().ErrorIs(err, ErrChatNotFound)
+}
+
+func (s *MessengerThreadsSuite) TestMessagesWithThreadSummariesPreservesMessagesOnSummaryFailure() {
+	chat := CreateOneToOneChat("test-user", &s.m.identity.PublicKey, s.m.getTimesource())
+	s.Require().NoError(s.m.SaveChat(chat))
+	parent := buildTestMessage(*chat)
+	parent.ID = "parent"
+	s.Require().NoError(s.m.SaveMessages([]*common.Message{parent}))
+	// Break only the summary query in this disposable test database.
+	_, err := s.m.persistence.db.Exec("DROP TABLE threads")
+	s.Require().NoError(err)
+	page, err := s.m.MessagesWithThreadSummaries(chat.ID, "", 20, 6)
+	s.Require().NoError(err)
+	s.Require().Len(page.Messages, 1)
+	s.Require().Equal(parent.ID, page.Messages[0].ID)
+	s.Require().Empty(page.Threads)
+	s.Require().NotEmpty(page.ThreadSummariesError)
+}
+
+func (s *MessengerThreadsSuite) TestMessagesWithThreadSummariesSkipsPagesWithoutThreads() {
+	chat := CreateOneToOneChat("test-user", &s.m.identity.PublicKey, s.m.getTimesource())
+	s.Require().NoError(s.m.SaveChat(chat))
+	parent := buildTestMessage(*chat)
+	parent.ID = "plain-parent"
+	s.Require().NoError(s.m.SaveMessages([]*common.Message{parent}))
+	// Presence still works, but any summary metadata query would fail.
+	_, err := s.m.persistence.db.Exec("ALTER TABLE threads RENAME COLUMN name TO unavailable_name")
+	s.Require().NoError(err)
+	page, err := s.m.MessagesWithThreadSummaries(chat.ID, "", 20, 6)
+	s.Require().NoError(err)
+	s.Require().Len(page.Messages, 1)
+	s.Require().NotNil(page.Messages[0].HasThread)
+	s.Require().False(*page.Messages[0].HasThread)
+	s.Require().Empty(page.Threads)
+	s.Require().Empty(page.ThreadSummariesError)
+}
+
+func (s *MessengerThreadsSuite) TestReactionsByMessageIDsSupportsTimeline() {
+	s.Require().NoError(s.m.SaveChat(&Chat{ID: "timeline", ChatType: ChatTypeTimeline}))
+	profileID := "@" + contacts.ContactIDFromPublicKey(&s.m.identity.PublicKey)
+	s.Require().NoError(s.m.SaveMessages([]*common.Message{{
+		ID: "profile-message", LocalChatID: profileID, From: testPK,
+		ChatMessage: &protobuf.ChatMessage{Text: "Profile", Clock: 1},
+	}}))
+	s.Require().NoError(s.m.persistence.SaveEmojiReaction(&EmojiReaction{
+		From: testPK, LocalChatID: profileID,
+		EmojiReaction: &protobuf.EmojiReaction{MessageId: "profile-message", ChatId: profileID, Emoji: "1f600"},
+	}))
+	s.Require().NoError(s.m.persistence.SaveEmojiReaction(&EmojiReaction{
+		From: "unrelated", LocalChatID: "unrelated-chat",
+		EmojiReaction: &protobuf.EmojiReaction{MessageId: "profile-message", ChatId: "unrelated-chat", Emoji: "1f600"},
+	}))
+	reactions, err := s.m.EmojiReactionsByChatIDMessageIDs("timeline", []string{"profile-message"})
+	s.Require().NoError(err)
+	s.Require().Len(reactions, 1)
+	s.Require().Equal(profileID, reactions[0].LocalChatID)
+	_, err = s.m.EmojiReactionsByChatIDMessageIDs("missing-chat", []string{"profile-message"})
+	s.Require().ErrorIs(err, ErrChatNotFound)
+}
+
+func (s *MessengerThreadsSuite) TestThreadSummaryUsesExplicitThreadAndParentIDs() {
+	chat := CreateOneToOneChat("test-user", &s.m.identity.PublicKey, s.m.getTimesource())
+	s.Require().NoError(s.m.SaveChat(chat))
+
+	parentMsg := buildTestMessage(*chat)
+	parentMsg.ID = "parent-id"
+	parentMsg.From = "parent-author"
+	parentMsg.Text = "Parent"
+	parentMsg.ChatMessage.Text = "Parent"
+	s.Require().NoError(s.m.SaveMessages([]*common.Message{parentMsg}))
+	s.Require().NoError(s.m.persistence.UpsertThread("thread-id", chat.ID, parentMsg.ID, "Thread"))
+
+	threadID := "thread-id"
+	reply := buildTestMessage(*chat)
+	reply.ID = "reply-id"
+	reply.From = "reply-author"
+	reply.Text = "Latest reply"
+	reply.ChatMessage.Text = "Latest reply"
+	reply.ChatMessage.ThreadId = &threadID
+	s.Require().NoError(s.m.SaveMessages([]*common.Message{reply}))
+
+	thread, err := s.m.persistence.ThreadWithSummaryByID(chat.ID, threadID)
+	s.Require().NoError(err)
+	s.Require().Equal(uint(2), thread.MessagesCount)
+	s.Require().Equal([]string{"parent-author", "reply-author"}, thread.ParticipantsPreviewIDs)
+	s.Require().NotNil(thread.LastMessage)
+	s.Require().Equal("reply-author", thread.LastMessage.From)
+	s.Require().Equal("Latest reply", thread.LastMessage.Text)
+}
+
+func (s *MessengerThreadsSuite) TestAffectedThreadSummaryReflectsLastMessageEditAndDelete() {
+	chat := CreateOneToOneChat("test-user", &s.m.identity.PublicKey, s.m.getTimesource())
+	s.Require().NoError(s.m.SaveChat(chat))
+
+	parent := buildTestMessage(*chat)
+	parent.ID = "parent-id"
+	parent.From = "creator"
+	parent.Clock = 1
+	s.Require().NoError(s.m.SaveMessages([]*common.Message{parent}))
+	s.Require().NoError(s.m.persistence.UpsertThread("thread-id", chat.ID, parent.ID, "Thread"))
+
+	threadID := "thread-id"
+	previousReply := buildTestMessage(*chat)
+	previousReply.ID = "previous-reply"
+	previousReply.From = "alice"
+	previousReply.Text = "Previous reply"
+	previousReply.ChatMessage.Text = "Previous reply"
+	previousReply.Clock = 2
+	previousReply.ChatMessage.ThreadId = &threadID
+
+	latestReply := buildTestMessage(*chat)
+	latestReply.ID = "latest-reply"
+	latestReply.From = "bob"
+	latestReply.Text = "Original text"
+	latestReply.ChatMessage.Text = "Original text"
+	latestReply.Clock = 3
+	latestReply.ChatMessage.ThreadId = &threadID
+	s.Require().NoError(s.m.SaveMessages([]*common.Message{previousReply, latestReply}))
+
+	latestReply.Text = "Edited text"
+	latestReply.ChatMessage.Text = "Edited text"
+	s.Require().NoError(s.m.SaveMessages([]*common.Message{latestReply}))
+
+	response := &MessengerResponse{}
+	s.Require().NoError(s.m.addAffectedThreadToResponse(response, latestReply))
+	s.Require().Len(response.Threads(), 1)
+	s.Require().Equal("Edited text", response.Threads()[0].LastMessage.Text)
+
+	latestReply.Deleted = true
+	s.Require().NoError(s.m.SaveMessages([]*common.Message{latestReply}))
+	response = &MessengerResponse{}
+	s.Require().NoError(s.m.addAffectedThreadToResponse(response, latestReply))
+	s.Require().Len(response.Threads(), 1)
+	s.Require().Equal(uint(2), response.Threads()[0].MessagesCount)
+	s.Require().Equal(uint(2), response.Threads()[0].ParticipantsCount)
+	s.Require().Equal("Previous reply", response.Threads()[0].LastMessage.Text)
+}
+
+func (s *MessengerThreadsSuite) TestThreadSummaryOrdersParticipantsByMostRecentParticipation() {
+	chat := CreateOneToOneChat("test-user", &s.m.identity.PublicKey, s.m.getTimesource())
+	s.Require().NoError(s.m.SaveChat(chat))
+
+	parentMsg := buildTestMessage(*chat)
+	parentMsg.ID = "parent-id"
+	parentMsg.From = "parent-author"
+	s.Require().NoError(s.m.SaveMessages([]*common.Message{parentMsg}))
+	s.Require().NoError(s.m.persistence.UpsertThread("thread-id", chat.ID, parentMsg.ID, "Thread"))
+
+	threadID := "thread-id"
+	olderReply := buildTestMessage(*chat)
+	olderReply.ID = "older-reply"
+	olderReply.From = "older-participant"
+	olderReply.Clock = 10
+	olderReply.ChatMessage.ThreadId = &threadID
+
+	recentReply := buildTestMessage(*chat)
+	recentReply.ID = "recent-reply"
+	recentReply.From = "recent-participant"
+	recentReply.Clock = 30
+	recentReply.ChatMessage.ThreadId = &threadID
+
+	latestOlderReply := buildTestMessage(*chat)
+	latestOlderReply.ID = "latest-older-reply"
+	latestOlderReply.From = "older-participant"
+	latestOlderReply.Clock = 20
+	latestOlderReply.ChatMessage.ThreadId = &threadID
+
+	replies := []*common.Message{olderReply, recentReply, latestOlderReply}
+	for index, participant := range []string{"participant-3", "participant-4", "participant-5", "participant-6", "participant-7"} {
+		reply := buildTestMessage(*chat)
+		reply.ID = participant
+		reply.From = participant
+		reply.Clock = uint64(19 - index)
+		reply.ChatMessage.ThreadId = &threadID
+		replies = append(replies, reply)
+	}
+
+	s.Require().NoError(s.m.SaveMessages(replies))
+
+	thread, err := s.m.persistence.ThreadWithSummaryByID(chat.ID, threadID)
+	s.Require().NoError(err)
+	s.Require().Equal(uint(8), thread.ParticipantsCount)
+	s.Require().Equal([]string{
+		"parent-author",
+		"recent-participant",
+		"older-participant",
+		"participant-3",
+		"participant-4",
+		"participant-5",
+	}, thread.ParticipantsPreviewIDs)
 }
 
 func (s *MessengerThreadsSuite) TestThreadUnreadCountsIgnoreInvisibleRepliesAndCountOneToOneRepliesAsMentions() {
@@ -475,6 +784,18 @@ func (s *MessengerThreadsSuite) TestThreadUnreadCountsIgnoreInvisibleRepliesAndC
 	s.Require().Len(threads, 1)
 	s.Require().Equal(uint(1), threads[0].UnviewedMessagesCount)
 	s.Require().Equal(uint(1), threads[0].UnviewedMentionsCount)
+
+	batchThreads, err := s.m.ThreadsByChatIDs([]string{chat.ID})
+	s.Require().NoError(err)
+	s.Require().Len(batchThreads, 1)
+	s.Require().Equal(uint(1), batchThreads[0].UnviewedMessagesCount)
+	s.Require().Equal(uint(1), batchThreads[0].UnviewedMentionsCount)
+
+	paginatedThreads, err := s.m.ThreadSummariesByParentMessageIDs(chat.ID, []string{parent.ID}, defaultThreadParticipantPreviewLimit)
+	s.Require().NoError(err)
+	s.Require().Len(paginatedThreads, 1)
+	s.Require().Equal(uint(1), paginatedThreads[0].UnviewedMessagesCount)
+	s.Require().Equal(uint(1), paginatedThreads[0].UnviewedMentionsCount)
 }
 
 func (s *MessengerThreadsSuite) TestAddThreadsToResponseUsesLocalChatIDForOneToOneChats() {
