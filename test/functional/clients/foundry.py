@@ -9,7 +9,7 @@ import docker.errors
 import os
 
 from utils.config import Config
-from resources.constants import user_1, ANVIL_NETWORK_ID
+from resources.constants import user_1, ANVIL_NETWORK_ID, ANVIL_RPC_URL
 from tenacity import retry, wait_fixed, stop_after_attempt
 
 
@@ -113,7 +113,7 @@ class Foundry:
         sender_address = kwargs.get("sender_address", user_1.address)
 
         cmd = f"""forge create {container_path}/{contract_path}:{contract_name}
-            --rpc-url 'http://anvil:8545'
+            --rpc-url '{ANVIL_RPC_URL}'
             --from {sender_address}
             --private-key {private_key}
             --broadcast"""
@@ -196,7 +196,7 @@ class Foundry:
 
         generate_cmd = (
             f"cast send {controller_address} 'generateTokens(address,uint256)' "
-            f"{to_address} {token_amount} --rpc-url http://anvil:8545 "
+            f"{to_address} {token_amount} --rpc-url {ANVIL_RPC_URL} "
             f"--private-key {private_key}"
         )
         result = self.container.exec_run(generate_cmd)
@@ -207,7 +207,18 @@ class Foundry:
         if not self.container:
             raise Exception("Container not found")
 
-        balance_cmd = f"cast call {token_address} 'balanceOf(address)' {owner_address} --rpc-url http://anvil:8545"
+        balance_cmd = f"cast call {token_address} 'balanceOf(address)' {owner_address} --rpc-url {ANVIL_RPC_URL}"
+        result = self.container.exec_run(balance_cmd)
+        if result.exit_code != 0:
+            raise RuntimeError(f"cast call failed with exit_code={result.exit_code}, output={result.output.decode().strip()}")
+        return result
+
+    @retry(stop=stop_after_attempt(10), wait=wait_fixed(0.1), reraise=True)
+    def get_erc1155_balance(self, token_address, owner_address, token_id):
+        if not self.container:
+            raise Exception("Container not found")
+
+        balance_cmd = f"cast call {token_address} 'balanceOf(address,uint256)' " f"{owner_address} {token_id} --rpc-url {ANVIL_RPC_URL}"
         result = self.container.exec_run(balance_cmd)
         if result.exit_code != 0:
             raise RuntimeError(f"cast call failed with exit_code={result.exit_code}, output={result.output.decode().strip()}")
@@ -218,7 +229,7 @@ class Foundry:
         if not self.container:
             raise Exception("Container not found")
 
-        owner_cmd = f"cast call {token_address} 'ownerOf(uint256)' {token_id} --rpc-url http://anvil:8545"
+        owner_cmd = f"cast call {token_address} 'ownerOf(uint256)' {token_id} --rpc-url {ANVIL_RPC_URL}"
         result = self.container.exec_run(owner_cmd)
         if result.exit_code != 0:
             raise RuntimeError(f"cast call failed with exit_code={result.exit_code}, output={result.output.decode().strip()}")
@@ -227,7 +238,7 @@ class Foundry:
     def check_contract_exists(self, address: str) -> bool:
         if not self.container:
             return False
-        result = self.container.exec_run(f"cast code {address} --rpc-url http://anvil:8545")
+        result = self.container.exec_run(f"cast code {address} --rpc-url {ANVIL_RPC_URL}")
         if result.exit_code != 0:
             return False
         code = result.output.decode().strip().lower()

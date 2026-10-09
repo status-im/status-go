@@ -1,5 +1,7 @@
 import json
 import logging
+import uuid as uuid_lib
+
 import resources.constants as constants
 from clients.signals import SignalType, WalletEventType
 
@@ -11,7 +13,16 @@ def get_token_key(chain_id, token_address):
 
 
 def get_suggested_routes(rpc_client, **kwargs):
-    required_params = ["uuid", "sendType", "addrFrom", "addrTo", "amountIn", "tokenKey", "toTokenKey", "gasFeeMode"]
+    required_params = [
+        "uuid",
+        "sendType",
+        "addrFrom",
+        "addrTo",
+        "amountIn",
+        "tokenKey",
+        "toTokenKey",
+        "gasFeeMode",
+    ]
     input_params = {}
 
     for key, new_value in kwargs.items():
@@ -117,7 +128,11 @@ def check_fees_for_path(path_name, gas_fee_mode, check_approval, route):
             )
             return
         check_fees(
-            gas_fee_mode, path_tx["TxBaseFee"], path_tx["TxPriorityFee"], path_tx["TxMaxFeesPerGas"], path_tx["SuggestedLevelsForMaxFeesPerGas"]
+            gas_fee_mode,
+            path_tx["TxBaseFee"],
+            path_tx["TxPriorityFee"],
+            path_tx["TxMaxFeesPerGas"],
+            path_tx["SuggestedLevelsForMaxFeesPerGas"],
         )
 
 
@@ -133,6 +148,35 @@ def send_router_transactions_with_signatures(rpc_client, uuid, tx_signatures):
     assert tx_status["status"] == "Success"
 
     return tx_status
+
+
+def collectible_token_key(chain_id, contract_address, token_id):
+    return f"{chain_id}-{contract_address}-{token_id}"
+
+
+def send_token_transfer(rpc_client, send_type, addr_from, token_key, amount_in):
+    """Route, sign, and broadcast a same-chain token transfer on Anvil."""
+    return send_router_transaction(
+        rpc_client,
+        uuid=str(uuid_lib.uuid4()),
+        sendType=int(send_type),
+        addrFrom=addr_from,
+        addrTo=constants.BURN_ADDRESS,
+        amountIn=amount_in,
+        amountOut="0x0",
+        tokenKey=token_key,
+        tokenIDIsOwnerToken=False,
+        toTokenKey=token_key,
+        fromChainID=constants.ANVIL_NETWORK_ID,
+        toChainID=constants.ANVIL_NETWORK_ID,
+        gasFeeMode=constants.gas_fee_mode_medium,
+    )
+
+
+def send_collectible_transfer(rpc_client, send_type, addr_from, contract_address, token_id, amount_in):
+    """Route, sign, and broadcast an ERC-721 or ERC-1155 transfer on Anvil."""
+    token_key = collectible_token_key(constants.ANVIL_NETWORK_ID, contract_address, token_id)
+    return send_token_transfer(rpc_client, send_type, addr_from, token_key, amount_in)
 
 
 def send_router_transaction(rpc_client, **kwargs):
