@@ -14,6 +14,13 @@ const (
 	// from the store nodes so silently missed messages are recovered. The node
 	// is confident only with a Connected relay mesh on every default shard.
 	historyReconcileMinInterval = 30 * time.Second
+
+	// historyObservationMaxGap is the longest wall-clock gap between two
+	// connectivity observations that is still considered continuous. While
+	// running, connectivity is observed at least every few seconds, so a longer
+	// gap means the process was suspended (e.g. the computer slept) or paused,
+	// and nothing was received live in the meantime.
+	historyObservationMaxGap = 30 * time.Second
 )
 
 type historyReconcileTracker struct {
@@ -33,13 +40,24 @@ func newHistoryReconcileTracker(reliable bool, now time.Time) historyReconcileTr
 
 func (t *historyReconcileTracker) observe(reliable bool, now time.Time, minInterval time.Duration) *types.HistoryReconcileWindow {
 	wasReliable := t.reliable
+	// Compare wall clocks: the monotonic clock does not advance while the
+	// system is suspended, so it would hide a sleep between observations.
+	unobservedGap := !t.checkedAt.IsZero() && now.Round(0).Sub(t.checkedAt.Round(0)) > historyObservationMaxGap
+	if unobservedGap {
+		// Connectivity looking fine on both sides of the gap says nothing about
+		// the gap itself, so treat it as unreliable from the last observation.
+		wasReliable = false
+		if t.unreliableFrom.IsZero() {
+			t.unreliableFrom = t.checkedAt
+		}
+	}
 	t.reliable = reliable
 	if wasReliable && !reliable {
 		t.unreliableFrom = t.checkedAt
 	}
 	t.checkedAt = now
 
-	if !shouldReconcileHistory(reliable, wasReliable, t.lastReconcile, now, minInterval) {
+	if !unobservedGap && !shouldReconcileHistory(reliable, wasReliable, t.lastReconcile, now, minInterval) {
 		return nil
 	}
 	if t.unreliableFrom.IsZero() {

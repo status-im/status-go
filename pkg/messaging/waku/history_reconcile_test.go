@@ -135,6 +135,70 @@ func TestHistoryReconcileTrackerPreservesDisjointWindows(t *testing.T) {
 	require.True(t, first.To.Before(second.From))
 }
 
+func TestHistoryReconcileTrackerCoversSuspendWhileReliable(t *testing.T) {
+	start := time.Unix(4_000, 0)
+	tracker := newHistoryReconcileTracker(true, start)
+
+	lastBeforeSleep := start.Add(5 * time.Second)
+	require.Nil(t, tracker.observe(true, lastBeforeSleep, historyReconcileMinInterval))
+
+	// After waking up the connection still looks reliable, but nothing was
+	// observed (or received) while suspended.
+	wokeAt := lastBeforeSleep.Add(4 * time.Hour)
+	window := tracker.observe(true, wokeAt, historyReconcileMinInterval)
+	require.NotNil(t, window)
+	require.Equal(t, lastBeforeSleep, window.From)
+	require.Equal(t, wokeAt, window.To)
+
+	require.Nil(t, tracker.observe(true, wokeAt.Add(5*time.Second), historyReconcileMinInterval))
+}
+
+func TestHistoryReconcileTrackerCoversSuspendWhenWakingUnreliable(t *testing.T) {
+	start := time.Unix(5_000, 0)
+	tracker := newHistoryReconcileTracker(true, start)
+
+	lastBeforeSleep := start.Add(5 * time.Second)
+	require.Nil(t, tracker.observe(true, lastBeforeSleep, historyReconcileMinInterval))
+
+	// On wake-up the first observation still reports the stale reliable state,
+	// and the drop is only noticed right after (the case seen in the field).
+	wokeAt := lastBeforeSleep.Add(4 * time.Hour)
+	window := tracker.observe(true, wokeAt, historyReconcileMinInterval)
+	require.NotNil(t, window)
+	require.Equal(t, lastBeforeSleep, window.From)
+
+	// The sleep is already covered, so the drop right after is rate-limited and
+	// reconciled from the wake-up time on the next interval.
+	require.Nil(t, tracker.observe(false, wokeAt.Add(time.Millisecond), historyReconcileMinInterval))
+	window = tracker.observe(false, wokeAt.Add(historyReconcileMinInterval), historyReconcileMinInterval)
+	require.NotNil(t, window)
+	require.Equal(t, wokeAt, window.From)
+
+	// Waking straight into an unreliable state also covers the whole sleep.
+	tracker = newHistoryReconcileTracker(true, start)
+	require.Nil(t, tracker.observe(true, lastBeforeSleep, historyReconcileMinInterval))
+	window = tracker.observe(false, wokeAt, historyReconcileMinInterval)
+	require.NotNil(t, window)
+	require.Equal(t, lastBeforeSleep, window.From)
+	require.Equal(t, wokeAt, window.To)
+}
+
+func TestHistoryReconcileTrackerKeepsEarlierUnreliableStartAcrossSuspend(t *testing.T) {
+	start := time.Unix(6_000, 0)
+	tracker := newHistoryReconcileTracker(true, start)
+
+	degradedAt := start.Add(5 * time.Second)
+	window := tracker.observe(false, degradedAt, historyReconcileMinInterval)
+	require.NotNil(t, window)
+	require.Equal(t, start, window.From)
+
+	wokeAt := degradedAt.Add(time.Hour)
+	window = tracker.observe(true, wokeAt, historyReconcileMinInterval)
+	require.NotNil(t, window)
+	require.Equal(t, start, window.From)
+	require.Equal(t, wokeAt, window.To)
+}
+
 func TestReliablyConnected(t *testing.T) {
 	core := &Waku{
 		cfg:       &Config{Mode: ModeCore},
