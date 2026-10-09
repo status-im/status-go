@@ -100,15 +100,13 @@ func setupTransactions(t *testing.T, state testState, txCount int, testTxs []pen
 		allAddresses = append(allAddresses, p.From, p.To)
 	}
 
-	state.tokenMock.EXPECT().GetTokenByChainAddress(gomock.Any(), gomock.Any()).Return(
-		&tokentypes.Token{
-			Token: &types.Token{
-				ChainID: 5,
-				Address: eth.Address{},
-				Symbol:  "ETH",
-			},
-		}, nil,
-	).AnyTimes()
+	state.tokenMock.EXPECT().GetTokensByChainAddresses(gomock.Any()).DoAndReturn(func(ids []types.ChainAddress) ([]*tokentypes.Token, error) {
+		tokens := make([]*tokentypes.Token, len(ids))
+		for i := range ids {
+			tokens[i] = &tokentypes.Token{Token: &types.Token{ChainID: 5, Address: eth.Address{}, Symbol: "ETH"}}
+		}
+		return tokens, nil
+	}).AnyTimes()
 
 	return allAddresses, pendings, ch, func() {
 		sub.Unsubscribe()

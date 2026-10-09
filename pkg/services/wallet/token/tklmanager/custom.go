@@ -86,9 +86,6 @@ func (m *Manager) mutateCustom(ctx context.Context, prepare func() (tkl.Mutation
 	if err != nil {
 		return err
 	}
-	if err = m.rebuild(); err != nil {
-		return err
-	}
 	if m.started && change.Kind != "NoChange" {
 		m.notifyChange(change)
 	}

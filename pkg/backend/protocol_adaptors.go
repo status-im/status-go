@@ -88,7 +88,7 @@ func (m *CommunitiesTokenBalanceManager) GetCachedBalancesByChain(ctx context.Co
 		return nil, fmt.Errorf("tokenBalancesStorage is nil")
 	}
 
-	balances, err := m.tokenBalancesStorage.GetBalances(ctx, tokens, accounts)
+	balances, err := m.tokenBalancesStorage.GetBalances(ctx, tokentypes.ChainTokens(tokens), accounts)
 	if err != nil {
 		return nil, err
 	}

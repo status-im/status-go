@@ -16,11 +16,11 @@ func NewStorageMultistandardBalance(multistandardbalanceStorage multistandardbal
 	return &StorageMultistandardBalance{multistandardbalanceStorage: multistandardbalanceStorage}
 }
 
-func (s *StorageMultistandardBalance) GetBalances(ctx context.Context, tokens []*tokentypes.Token, accountAddresses []AccountAddress) (
+func (s *StorageMultistandardBalance) GetBalances(ctx context.Context, tokens []tokentypes.ChainToken, accountAddresses []AccountAddress) (
 	map[uint64]map[AccountAddress]map[ContractAddress]*big.Int, error) {
 	ret := make(map[uint64]map[AccountAddress]map[ContractAddress]*big.Int)
 
-	tokensPerChain := make(map[uint64][]*tokentypes.Token)
+	tokensPerChain := make(map[uint64][]tokentypes.ChainToken)
 	for _, token := range tokens {
 		tokensPerChain[token.ChainID] = append(tokensPerChain[token.ChainID], token)
 	}

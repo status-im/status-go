@@ -2367,8 +2367,8 @@ github.com/status-im/migrate/v4 v4.6.2-status.3 h1:Khwjb59NzniloUr5i9s9AtkEyqBbQ
 github.com/status-im/migrate/v4 v4.6.2-status.3/go.mod h1:c/kc90n47GZu/58nnz1OMLTf7uE4Da4gZP5qmU+A/v8=
 github.com/status-im/mvds v0.0.27-0.20251219201002-7226facd5aaf h1:CKUQmbtf0fodAQRwAcORa8Fk2Ej6x6PMn/yKipK14Es=
 github.com/status-im/mvds v0.0.27-0.20251219201002-7226facd5aaf/go.mod h1:2fiAx0q9XYIPKYRq2B1oiO9zZESy/n4D32gWw6lMDsE=
-github.com/status-im/nim-token-lists/go/tkl v0.0.0-20261007182427-2238b179f78d h1:J26w6Q/laey4TEnrV43yNYtk82vjLexrp2tWi/KtPVQ=
-github.com/status-im/nim-token-lists/go/tkl v0.0.0-20261007182427-2238b179f78d/go.mod h1:d4xQErrfMen2+tZSXPT0ckaUwZwWHsZH9ddayOJUe/c=
+github.com/status-im/nim-token-lists/go/tkl v0.0.0-20261009135931-76163a3ca4b7 h1:H6WuG9JpFy0DQVz5Ibz/G7r5sosSyTBZV9hDd6kinq0=
+github.com/status-im/nim-token-lists/go/tkl v0.0.0-20261009135931-76163a3ca4b7/go.mod h1:d4xQErrfMen2+tZSXPT0ckaUwZwWHsZH9ddayOJUe/c=
 github.com/status-im/zxcvbn-go v0.0.0-20220311183720-5e8676676857 h1:sPkzT7Z7uLmejOsBRlZ0kwDWpqjpHJsp834o5nbhqho=
 github.com/status-im/zxcvbn-go v0.0.0-20220311183720-5e8676676857/go.mod h1:lq9I5ROto5tcua65GmCE6SIW7VE0ucdEBs1fn4z7uWU=
 github.com/stbenjam/no-sprintf-host-port v0.3.1 h1:AyX7+dxI4IdLBPtDbsGAyqiTSLpCP9hWRrXQDU4Cm/g=
