@@ -246,6 +246,40 @@ func TestBatchLookupAlignsWithRequests(t *testing.T) {
 	require.Empty(t, m.GetTokensByChainAddresses(nil))
 }
 
+func TestBatchLookupReadsAliasesWithItsQuery(t *testing.T) {
+	const document = `{"name":"Test","timestamp":"2026-01-01T00:00:00Z","version":{"major":1,"minor":0,"patch":0},"tokens":[{"chainId":1,"address":"0x0000000000000000000000000000000000000001","symbol":"ONE","name":"One","decimals":18}]}`
+	mainnet := tkl.Identity{ChainID: 1, Address: "0x0000000000000000000000000000000000000002"}
+	optimism := tkl.Identity{ChainID: 10, Address: "0x0000000000000000000000000000000000000002"}
+	skip := func(id tkl.Identity) string { return types.TokenKey(id.ChainID, common.HexToAddress(id.Address)) }
+	aliases := []tkl.Identity{mainnet, optimism}
+	m, err := New(tkl.Config{Chains: []uint64{1, 10}, InitialLists: []tkl.ListContent{{ID: "test", Format: tkl.StandardFormat}}, Policy: tkl.Policy{NativeAliases: aliases, SkippedKeys: []string{skip(optimism)}}}, withBodies(tkl.ListBody{ID: "test", Origin: tkl.Bundled, Data: []byte(document)}))
+	require.NoError(t, err)
+	defer func() { _ = m.Stop() }()
+	require.NoError(t, m.Start(context.Background(), false, nil))
+	ids := []types.ChainAddress{{ChainID: 1, Address: common.HexToAddress(mainnet.Address)}, {ChainID: 10, Address: common.HexToAddress(optimism.Address)}}
+	before := m.GetTokensByChainAddresses(ids)
+	require.True(t, before[0].IsNative())
+	require.Nil(t, before[1])
+
+	// Swap which alias is active between reading the aliases and querying.
+	switched := false
+	testHookBeforeBatchQuery = func() {
+		if switched {
+			return
+		}
+		switched = true
+		m.mu.Lock()
+		defer m.mu.Unlock()
+		require.NoError(t, m.setPolicy(tkl.Policy{NativeAliases: aliases, SkippedKeys: []string{skip(mainnet)}}))
+	}
+	defer func() { testHookBeforeBatchQuery = nil }()
+	after := m.GetTokensByChainAddresses(ids)
+	require.True(t, switched)
+	require.Nil(t, after[0])
+	require.NotNil(t, after[1])
+	require.True(t, after[1].IsNative())
+}
+
 func narrowTokens(tokens []*types.Token) []types.ChainToken {
 	result := make([]types.ChainToken, len(tokens))
 	for i, token := range tokens {
