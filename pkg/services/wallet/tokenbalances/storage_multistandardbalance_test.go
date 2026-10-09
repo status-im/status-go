@@ -25,7 +25,7 @@ func TestGetBalances_ERC20NeverFetched_MissingTokenNotInMap(t *testing.T) {
 	chainID := uint64(8453)
 	token := erc20Token(chainID, "0x820C137fA9D5348B4B9B2E229CBeD970E8e7E360")
 
-	balances, err := adapter.GetBalances(context.Background(), []*tokentypes.Token{token}, []common.Address{account})
+	balances, err := adapter.GetBalances(context.Background(), tokentypes.ChainTokens([]*tokentypes.Token{token}), []common.Address{account})
 	require.NoError(t, err)
 
 	_, ok := balances[chainID][account][token.Address]
@@ -51,7 +51,7 @@ func TestGetBalances_ERC20Fetched_AnsweredMissingTokenIsZero(t *testing.T) {
 		nil, fetchedState())
 	require.NoError(t, err)
 
-	balances, err := adapter.GetBalances(context.Background(), []*tokentypes.Token{knownToken, zeroToken}, []common.Address{account})
+	balances, err := adapter.GetBalances(context.Background(), tokentypes.ChainTokens([]*tokentypes.Token{knownToken, zeroToken}), []common.Address{account})
 	require.NoError(t, err)
 
 	knownBalance, ok := balances[chainID][account][knownToken.Address]
@@ -76,7 +76,7 @@ func TestGetBalances_ERC20Fetched_UnansweredTokenIsUnknown(t *testing.T) {
 	_, _, err := storage.UpdateERC20Balances(context.Background(), key, nil, nil, nil, fetchedState())
 	require.NoError(t, err)
 
-	balances, err := adapter.GetBalances(context.Background(), []*tokentypes.Token{unansweredToken}, []common.Address{account})
+	balances, err := adapter.GetBalances(context.Background(), tokentypes.ChainTokens([]*tokentypes.Token{unansweredToken}), []common.Address{account})
 	require.NoError(t, err)
 
 	balance, ok := balances[chainID][account][unansweredToken.Address]
@@ -92,7 +92,7 @@ func TestGetBalances_NativeNeverFetched_NotInMap(t *testing.T) {
 	chainID := uint64(8453)
 	nativeToken := nativeToken(chainID)
 
-	balances, err := adapter.GetBalances(context.Background(), []*tokentypes.Token{nativeToken}, []common.Address{account})
+	balances, err := adapter.GetBalances(context.Background(), tokentypes.ChainTokens([]*tokentypes.Token{nativeToken}), []common.Address{account})
 	require.NoError(t, err)
 
 	_, ok := balances[chainID][account][tokenbalances.NativeTokenAddress]
@@ -111,7 +111,7 @@ func TestGetBalances_NativeFetched_InMap(t *testing.T) {
 	_, _, err := storage.UpdateNativeBalance(context.Background(), key, big.NewInt(1000), fetchedState())
 	require.NoError(t, err)
 
-	balances, err := adapter.GetBalances(context.Background(), []*tokentypes.Token{nativeToken}, []common.Address{account})
+	balances, err := adapter.GetBalances(context.Background(), tokentypes.ChainTokens([]*tokentypes.Token{nativeToken}), []common.Address{account})
 	require.NoError(t, err)
 
 	nativeBalance, ok := balances[chainID][account][tokenbalances.NativeTokenAddress]

@@ -54,8 +54,21 @@ type ChainAddress struct {
 	Address common.Address
 }
 
+// ChainToken is a token narrowed to what balance fetching reads.
+type ChainToken struct {
+	ChainID  uint64
+	Address  common.Address
+	Decimals uint
+}
+
+func (t ChainToken) IsNative() bool { return t.Address == (common.Address{}) }
+
 func (t *Token) Key() string    { return TokenKey(t.ChainID, t.Address) }
 func (t *Token) IsNative() bool { return t.Address == (common.Address{}) }
+
+func (t *Token) ChainToken() ChainToken {
+	return ChainToken{ChainID: t.ChainID, Address: t.Address, Decimals: t.Decimals}
+}
 
 type Version struct {
 	Major int `json:"major"`

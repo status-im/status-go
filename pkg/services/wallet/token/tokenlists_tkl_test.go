@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	types "github.com/status-im/status-go/pkg/services/wallet/token/tokenlist"
+	tokentypes "github.com/status-im/status-go/pkg/services/wallet/token/types"
 
 	walletcommon "github.com/status-im/status-go/pkg/services/wallet/common"
 )
@@ -279,4 +280,33 @@ func TestTKLBatchLookupMatchesSingleLookups(t *testing.T) {
 	require.Equal(t, "COMM", tokens[1].Symbol)
 	require.Nil(t, tokens[2])
 	require.NotSame(t, tokens[0].Token, tokens[5].Token)
+}
+
+func TestTKLChainTokensMatchTokensByChains(t *testing.T) {
+	m, cleanup := setupTestTokenDB(t)
+	defer cleanup()
+	require.NoError(t, m.tokensManager.Start(context.Background(), false, nil))
+	community := common.HexToAddress("0xc0ffee")
+	_, err := m.walletDB.Exec("INSERT INTO tokens (network_id,address,name,symbol,decimals,community_id) VALUES (?,?,?,?,?,?)", walletcommon.BaseMainnet, community, "Community", "COMM", 6, "community")
+	require.NoError(t, err)
+	chains := walletcommon.AllChainIDsAsUint64()
+	sets := [][]uint64{nil, chains, {walletcommon.BaseMainnet}, {walletcommon.EthereumMainnet, walletcommon.BaseMainnet, 777}}
+	for _, chain := range chains {
+		sets = append(sets, []uint64{chain})
+	}
+	var dst []tokentypes.ChainToken
+	for _, set := range sets {
+		tokens, err := m.GetTokensByChains(set)
+		require.NoError(t, err)
+		dst, err = m.GetChainTokens(set, dst)
+		require.NoError(t, err)
+		if len(tokens) == 0 {
+			require.Empty(t, dst, set)
+			continue
+		}
+		require.Equal(t, tokentypes.ChainTokens(tokens), dst, set)
+	}
+	base, err := m.GetChainTokens([]uint64{walletcommon.BaseMainnet}, nil)
+	require.NoError(t, err)
+	require.Contains(t, base, tokentypes.ChainToken{ChainID: walletcommon.BaseMainnet, Address: community, Decimals: 6})
 }
