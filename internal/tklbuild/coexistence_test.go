@@ -33,7 +33,7 @@ func TestNimRuntimesCoexist(t *testing.T) {
 			t.Error(err)
 		}
 	})
-	if _, err := catalogue.LoadStored(tkl.Bootstrap{}); err != nil {
+	if _, err := catalogue.LoadStored(tkl.Bootstrap{}, nil); err != nil {
 		t.Fatal(err)
 	}
 	if err := manager.Cleanup(); err != nil {

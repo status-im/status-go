@@ -404,12 +404,10 @@ func (tm *Manager) GetTokensByChain(chainID uint64) ([]*tokentypes.Token, error)
 }
 
 func (tm *Manager) GetTokensByChains(chainIDs []uint64) ([]*tokentypes.Token, error) {
-	allWsdkTokens := tm.tokensManager.UniqueTokens()
-	tokens := make([]*tokentypes.Token, 0)
-	for _, token := range allWsdkTokens {
-		if slices.Contains(chainIDs, token.ChainID) {
-			tokens = append(tokens, &tokentypes.Token{Token: token})
-		}
+	catalogueTokens := tm.tokensManager.GetTokensByChains(chainIDs)
+	tokens := make([]*tokentypes.Token, 0, len(catalogueTokens))
+	for _, token := range catalogueTokens {
+		tokens = append(tokens, &tokentypes.Token{Token: token})
 	}
 
 	communityTokens, err := tm.GetCustoms(true)

@@ -3,8 +3,6 @@ package tklmanager
 import (
 	"context"
 	"errors"
-	"maps"
-	"slices"
 
 	"github.com/status-im/nim-token-lists/go/tkl"
 	"go.uber.org/zap"
@@ -97,11 +95,8 @@ func (m *Manager) mutateCustom(ctx context.Context, prepare func() (tkl.Mutation
 }
 
 func (m *Manager) publishCustom(mutation tkl.Mutation) error {
-	change, err := m.handle.CustomCommit(mutation.ID)
-	if err != nil {
-		return err
-	}
-	return m.updateCustomMirror(mutation.Key, change.Revision)
+	_, err := m.handle.CustomCommit(mutation.ID)
+	return err
 }
 
 // resyncCustom runs under mu. Replay only the already-durable operation. Calling
@@ -120,7 +115,7 @@ func (m *Manager) resyncCustom() error {
 	}
 	if errors.Is(err, tkl.NotFound) {
 		// A delete may already have committed before publication failed.
-		err = m.rebuild()
+		err = nil
 	} else if err == nil {
 		defer func() { _, _ = m.handle.CustomAbort(mutation.ID) }()
 		err = m.publishCustom(mutation)
@@ -129,67 +124,4 @@ func (m *Manager) resyncCustom() error {
 		m.customResync.Store(nil)
 	}
 	return err
-}
-
-// updateCustomMirror transfers just the affected token across the ABI. The
-// snapshot's containers are copied so concurrent readers keep an immutable view.
-func (m *Manager) updateCustomMirror(key string, revision uint64) error {
-	old := m.mirror.Load()
-	// Bootstrap, recovery, aliases and non-default priority can change ordering
-	// beyond this key. Preserve the core's complete ordering in those cases.
-	if old == nil || old.revision+1 != revision || old.aliases[key] != "" ||
-		(m.policy.Priority != "" && m.policy.Priority != "StatusPriority") {
-		return m.rebuild()
-	}
-	page, err := m.handle.GetByKeys([]string{key})
-	if err != nil {
-		return err
-	}
-	if page.Revision != revision || page.Total != len(page.Items) || len(page.Items) > 1 {
-		return errors.New("inconsistent custom token snapshot")
-	}
-	chain, address, ok := types.ChainAndAddressFromTokenKey(key)
-	if !ok {
-		return errors.New("invalid custom token key")
-	}
-	var token *types.Token
-	if len(page.Items) == 1 {
-		token = convertToken(page.Items[0])
-	}
-	next := *old
-	next.revision, next.lists = revision, nil
-	next.byKey = maps.Clone(old.byKey)
-	next.byAddress = maps.Clone(old.byAddress)
-	next.byChain = maps.Clone(old.byChain)
-	id := identity{chain, address}
-	if token == nil {
-		delete(next.byKey, key)
-		delete(next.byAddress, id)
-	} else {
-		next.byKey[key], next.byAddress[id] = token, token
-	}
-	next.tokens = replaceCustomToken(old.tokens, id, token)
-	next.byChain[chain] = replaceCustomToken(old.byChain[chain], id, token)
-	if len(next.byChain[chain]) == 0 {
-		delete(next.byChain, chain)
-	}
-	m.mirror.Store(&next)
-	return nil
-}
-
-func replaceCustomToken(tokens []*types.Token, id identity, replacement *types.Token) []*types.Token {
-	result := slices.Clone(tokens)
-	for i, token := range result {
-		if token.ChainID == id.chain && token.Address == id.address {
-			if replacement == nil {
-				return slices.Delete(result, i, i+1)
-			}
-			result[i] = replacement
-			return result
-		}
-	}
-	if replacement != nil {
-		result = append(result, replacement)
-	}
-	return result
 }
