@@ -29,7 +29,7 @@ pipeline {
     )
     choice(
       name: 'FUNCTIONAL_TESTS_LOG_LEVEL',
-      choices: ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
+      choices: ['INFO', 'DEBUG', 'WARNING', 'ERROR', 'CRITICAL'],
       description: 'pytest log level'
     )
   }
