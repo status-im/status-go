@@ -192,7 +192,7 @@ func TestFetchBatchBoundedConcurrency(t *testing.T) {
 		requests[i] = tkl.FetchRequest{ID: fmt.Sprint(i), URL: fmt.Sprintf("%s/%d", server.URL, i)}
 	}
 	done := make(chan []tkl.FetchResult, 1)
-	go func() { done <- runtime.fetchBatch(ctx, requests) }()
+	go func() { done <- runtime.fetchBatch(ctx, requests, runtime.options.MaxInFlightBytes) }()
 	for i := 0; i < 4; i++ {
 		select {
 		case <-entered:
@@ -470,4 +470,65 @@ func TestRefreshPersistsFetchedBytes(t *testing.T) {
 	token, ok := reloaded.GetTokenByChainAddress(1, common.HexToAddress("0x1"))
 	require.True(t, ok)
 	require.Equal(t, "ONE", token.Symbol)
+}
+
+func TestRefreshCapsInFlightBodies(t *testing.T) {
+	listBody := func(address, symbol string) string {
+		return fmt.Sprintf(`{"name":"Tokens","timestamp":"2026-01-01T00:00:00Z","version":{"major":1,"minor":0,"patch":0},"tokens":[{"chainId":1,"address":"0x000000000000000000000000000000000000000%s","name":"%s","symbol":"%s","decimals":18}]}`, address, symbol, symbol)
+	}
+	lists := map[string]string{"/a": listBody("1", "AAA"), "/b": listBody("2", "BBB")}
+	var registry string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Always 200 with a stable ETag: unchanged sources still arrive with bodies.
+		w.Header().Set("ETag", r.URL.Path)
+		if r.URL.Path == "/registry" {
+			fmt.Fprint(w, registry)
+			return
+		}
+		fmt.Fprint(w, lists[r.URL.Path])
+	}))
+	defer server.Close()
+	registry = fmt.Sprintf(`{"timestamp":"2026-01-01T00:00:00Z","version":{"major":1,"minor":0,"patch":0},"tokenLists":[{"id":"a","sourceUrl":%q},{"id":"b","sourceUrl":%q}]}`, server.URL+"/a", server.URL+"/b")
+	listLen := int64(len(lists["/a"]))
+	// Room for the registry and one list, not both lists.
+	limit := int64(len(registry)) + listLen + listLen/2
+	persisted := map[string]bool{}
+	m, err := New(tkl.Config{Chains: []uint64{1}, RegistryID: "registry", RegistryURL: server.URL + "/registry"}, noStored, RefreshOptions{
+		MaxBodyBytes:     max(int64(len(registry)), listLen),
+		MaxInFlightBytes: limit,
+		Persist: func(_ context.Context, writes []Write) error {
+			for _, write := range writes {
+				persisted[write.ID] = true
+			}
+			return nil
+		},
+	})
+	require.NoError(t, err)
+	defer func() { _ = m.Stop() }()
+	require.NoError(t, m.Start(context.Background(), false, nil))
+
+	require.NoError(t, m.TriggerRefresh(context.Background()))
+	require.Equal(t, map[string]bool{"registry": true, "a": true}, persisted)
+	_, ok := m.GetTokenByChainAddress(1, common.HexToAddress("0x2"))
+	require.False(t, ok)
+	state, err := m.handle.RefreshState()
+	require.NoError(t, err)
+	require.Equal(t, "Partial", state.LastOutcome)
+
+	// The unchanged registry body is dropped after its round, so both list
+	// bodies fit and the over-limit list is fetched on the next refresh.
+	require.NoError(t, m.TriggerRefresh(context.Background()))
+	require.True(t, persisted["b"])
+	token, ok := m.GetTokenByChainAddress(1, common.HexToAddress("0x2"))
+	require.True(t, ok)
+	require.Equal(t, "BBB", token.Symbol)
+}
+
+func TestRefreshInFlightLimitValidation(t *testing.T) {
+	persist := func(context.Context, []Write) error { return nil }
+	r, err := newRefreshRuntime(RefreshOptions{Persist: persist})
+	require.NoError(t, err)
+	require.Equal(t, int64(defaultMaxInFlightBytes), r.options.MaxInFlightBytes)
+	_, err = newRefreshRuntime(RefreshOptions{Persist: persist, MaxBodyBytes: 64, MaxInFlightBytes: 63})
+	require.Error(t, err)
 }

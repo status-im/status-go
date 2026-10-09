@@ -40,7 +40,15 @@ type RefreshOptions struct {
 	RefreshInterval time.Duration
 	CheckInterval   time.Duration
 	MaxBodyBytes    int64
+	// MaxInFlightBytes caps the fetched bodies held across one refresh, from
+	// download until persistence. A body past the cap fails as too large for
+	// this refresh and is fetched again on the next one.
+	MaxInFlightBytes int64
 }
+
+// The bundled lists total about 5 MiB of compact JSON; the cap leaves room for
+// formatted or grown lists changing together.
+const defaultMaxInFlightBytes = 24 << 20
 
 type refreshRuntime struct {
 	options      RefreshOptions
@@ -80,6 +88,12 @@ func newRefreshRuntime(options RefreshOptions) (*refreshRuntime, error) {
 	}
 	if options.MaxBodyBytes < 1 || options.MaxBodyBytes > 16<<20 {
 		return nil, errors.New("invalid HTTP body limit")
+	}
+	if options.MaxInFlightBytes == 0 {
+		options.MaxInFlightBytes = defaultMaxInFlightBytes
+	}
+	if options.MaxInFlightBytes < options.MaxBodyBytes {
+		return nil, errors.New("in-flight body limit is below the HTTP body limit")
 	}
 	r := &refreshRuntime{options: options, allowed: true, done: make(chan struct{}), pauseCh: make(chan bool, 1)}
 	r.ctx, r.stop = context.WithCancel(context.Background())
@@ -295,11 +309,13 @@ func (m *Manager) refresh(ctx context.Context, force bool) error {
 	requests := plan.Requests
 	// The core keeps no bodies; hold the fetched ones until they are persisted.
 	bodies := make(map[string][]byte)
+	var held int64
 	for {
-		results := r.fetchBatch(callCtx, requests)
+		results := r.fetchBatch(callCtx, requests, r.options.MaxInFlightBytes-held)
 		for _, result := range results {
 			if result.Status == http.StatusOK && result.Failure == nil {
 				bodies[result.ID] = result.Body
+				held += int64(len(result.Body))
 			}
 		}
 		m.mu.Lock()
@@ -312,6 +328,13 @@ func (m *Manager) refresh(ctx context.Context, force bool) error {
 		if err != nil {
 			m.mu.Unlock()
 			return err
+		}
+		// Only updated sources are written; release every other body now.
+		for _, source := range report.Sources {
+			if body, ok := bodies[source.ID]; ok && source.Outcome != "Updated" {
+				held -= int64(len(body))
+				delete(bodies, source.ID)
+			}
 		}
 		if report.Step == "NeedMore" {
 			requests = report.Requests
@@ -368,7 +391,9 @@ func (m *Manager) notifyChange(change tkl.Change) {
 	}
 }
 
-func (r *refreshRuntime) fetchBatch(ctx context.Context, requests []tkl.FetchRequest) []tkl.FetchResult {
+// fetchBatch fetches requests in source order, failing bodies past budget bytes
+// as too large.
+func (r *refreshRuntime) fetchBatch(ctx context.Context, requests []tkl.FetchRequest, budget int64) []tkl.FetchResult {
 	results := make([]tkl.FetchResult, 0, len(requests))
 	// Fetch in bounded windows so request concurrency stays bounded even for a
 	// large registry. Bodies travel to the core one at a time, never in an envelope.
@@ -385,7 +410,14 @@ func (r *refreshRuntime) fetchBatch(ctx context.Context, requests []tkl.FetchReq
 			}(i)
 		}
 		pending.Wait()
-		results = append(results, batch...)
+		for _, result := range batch {
+			if size := int64(len(result.Body)); size > budget {
+				result = tkl.FetchResult{ID: result.ID, Failure: &tkl.Diagnostic{Code: "InvalidContent", Detail: "tooLarge"}}
+			} else {
+				budget -= size
+			}
+			results = append(results, result)
+		}
 	}
 	return results
 }
