@@ -2282,6 +2282,19 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 			authorIcon, _ = identicon.GenerateBase64(authorID)
 		}
 		outgoingNotif := NewOutgoingMessageNotification(message.ID, message, chat, community, authorName, authorIcon, authorID)
+		if threadID := message.GetThreadId(); threadID != "" {
+			threadName := ""
+			if thread, err := m.persistence.ThreadByID(chat.ID, threadID); err == nil {
+				threadName = thread.Name
+			} else if !errors.Is(err, common.ErrRecordNotFound) {
+				return nil, err
+			}
+			messagePreview := messagePreviewNameAndMessage
+			if preview, err := m.settings.GetMessagePreview(); err == nil {
+				messagePreview = preview
+			}
+			setThreadNotificationMetadata(outgoingNotif, chat, message, threadName, messagePreview)
+		}
 		localnotifications.PushMessages([]*localnotifications.Notification{outgoingNotif})
 	}
 
@@ -3016,6 +3029,15 @@ func (r *ReceivedMessageState) addNewMessageNotification(messenger *Messenger, s
 			notification, err := NewMessageNotification(msg.ID, msg, chat, contact, community, r.ResolvePrimaryName, profilePicturesVisibility, messagePreview)
 			if err != nil {
 				return err
+			}
+			if threadID := msg.GetThreadId(); threadID != "" {
+				threadName := ""
+				if thread, err := messenger.persistence.ThreadByID(chat.ID, threadID); err == nil {
+					threadName = thread.Name
+				} else if !errors.Is(err, common.ErrRecordNotFound) {
+					return err
+				}
+				setThreadNotificationMetadata(notification, chat, msg, threadName, messagePreview)
 			}
 			r.Response.AddNotification(notification)
 		}
