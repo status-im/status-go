@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -34,11 +35,15 @@ func TestDownloadTokensSuccess(t *testing.T) {
 	require.NoError(t, err)
 	require.Contains(t, string(written), `StatusTokenList.ID = "status"`)
 	require.Contains(t, string(written), `StatusTokenList.SourceURL = "`+server.URL+`"`)
-	require.Contains(t, string(written), formatBytes(body))
+	require.Contains(t, string(written), "//go:embed status.json\n")
+	require.Contains(t, string(written), "StatusTokenList.JsonData = statusTokenListJSON")
+	embedded, err := os.ReadFile(filepath.Join(filepath.Dir(output), "status.json"))
+	require.NoError(t, err)
+	require.Equal(t, body, embedded)
 
 	entries, err := os.ReadDir(filepath.Dir(output))
 	require.NoError(t, err)
-	require.Len(t, entries, 1)
+	require.Len(t, entries, 2)
 
 	info, err := os.Stat(output)
 	require.NoError(t, err)
@@ -163,7 +168,7 @@ func TestDownloadTokensErrors(t *testing.T) {
 				SourceURL:  "http://example.test/tokens",
 				OutputFile: filepath.Join(t.TempDir(), "missing", "out.go"),
 			},
-			wantErr: "failed to create go file",
+			wantErr: "failed to create json file",
 		},
 		{
 			name: "write",
@@ -316,6 +321,70 @@ func TestMainDoesNotExitWhenEveryDownloadSucceeds(t *testing.T) {
 
 	osExit = func(int) { t.Fatal("os.Exit called") }
 	main()
+}
+
+// Regenerating every list from its embedded data must reproduce the committed .go and .json files.
+func TestWriteTokenListReproducesCommittedFiles(t *testing.T) {
+	lists := []defaulttokenlists.DownloadedTokenList{
+		defaulttokenlists.StatusTokenList, defaulttokenlists.UniswapTokenList,
+		defaulttokenlists.CoingeckoEthereumTokenList, defaulttokenlists.CoingeckoOptimismTokenList,
+		defaulttokenlists.CoingeckoArbitrumTokenList, defaulttokenlists.CoingeckoBaseTokenList,
+		defaulttokenlists.CoingeckoBscTokenList, defaulttokenlists.CoingeckoLineaTokenList,
+	}
+	require.Len(t, lists, len(defaulttokenlists.TokensSources))
+
+	dir := t.TempDir()
+	for _, l := range lists {
+		source, ok := defaulttokenlists.TokensSources[l.ID]
+		require.True(t, ok, l.ID)
+		base := filepath.Base(source.OutputFile)
+		require.NoError(t, writeTokenList(l.ID, l.SourceURL, filepath.Join(dir, base), l.JsonData, l.Fetched))
+
+		for _, name := range []string{base, base[:len(base)-len(".go")] + ".json"} {
+			want, err := os.ReadFile(filepath.Join("..", name))
+			require.NoError(t, err)
+			got, err := os.ReadFile(filepath.Join(dir, name))
+			require.NoError(t, err)
+			require.Equal(t, string(want), string(got), name)
+		}
+	}
+
+	require.NoError(t, writeManifest(dir))
+	want, err := os.ReadFile(filepath.Join("..", "SHA256SUMS"))
+	require.NoError(t, err)
+	got, err := os.ReadFile(filepath.Join(dir, "SHA256SUMS"))
+	require.NoError(t, err)
+	require.Equal(t, string(want), string(got))
+}
+
+func TestWriteTokenListLeavesNoOrphanJSON(t *testing.T) {
+	dir := t.TempDir()
+	outputFile := filepath.Join(dir, "list.go")
+	require.NoError(t, os.Mkdir(outputFile, 0o700)) // the .go cannot be written over a directory
+
+	require.Error(t, writeTokenList("list", "https://example.com/list.json", outputFile, []byte(`{}`), time.Unix(0, 0)))
+	_, err := os.Stat(filepath.Join(dir, "list.json"))
+	require.ErrorIs(t, err, os.ErrNotExist)
+}
+
+func TestWriteManifests(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "a.json"), []byte(`{"a":1}`), 0o600))
+	require.NoError(t, writeManifests(map[string]defaulttokenlists.TokensSource{"a": {OutputFile: filepath.Join(dir, "a.go")}}))
+	require.ErrorContains(t, writeManifests(map[string]defaulttokenlists.TokensSource{
+		"missing": {OutputFile: filepath.Join(dir, "missing", "b.go")},
+	}), "failed to write")
+	got, err := os.ReadFile(filepath.Join(dir, "SHA256SUMS"))
+	require.NoError(t, err)
+	require.Equal(t, "015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862  a.json\n", string(got))
+}
+
+func TestWriteTokenListFailsWithoutWritingWhenJSONCannotBeWritten(t *testing.T) {
+	dir := t.TempDir()
+	outputFile := filepath.Join(dir, "missing", "list.go")
+	require.Error(t, writeTokenList("list", "https://example.com/list.json", outputFile, []byte(`{}`), time.Unix(0, 0)))
+	_, err := os.Stat(outputFile)
+	require.ErrorIs(t, err, os.ErrNotExist)
 }
 
 func stubMainDeps(t *testing.T, sources map[string]defaulttokenlists.TokensSource) func() {
