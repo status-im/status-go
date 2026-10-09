@@ -31,6 +31,7 @@ type historyReconcileTracker struct {
 }
 
 func newHistoryReconcileTracker(reliable bool, now time.Time) historyReconcileTracker {
+	now = now.Round(0)
 	tracker := historyReconcileTracker{reliable: reliable, checkedAt: now}
 	if !reliable {
 		tracker.unreliableFrom = now
@@ -39,10 +40,12 @@ func newHistoryReconcileTracker(reliable bool, now time.Time) historyReconcileTr
 }
 
 func (t *historyReconcileTracker) observe(reliable bool, now time.Time, minInterval time.Duration) *types.HistoryReconcileWindow {
+	// Keep wall clock readings only: the monotonic clock does not advance while
+	// the system is suspended, so durations computed from it (here and by the
+	// consumers of the windows) would hide a sleep.
+	now = now.Round(0)
 	wasReliable := t.reliable
-	// Compare wall clocks: the monotonic clock does not advance while the
-	// system is suspended, so it would hide a sleep between observations.
-	unobservedGap := !t.checkedAt.IsZero() && now.Round(0).Sub(t.checkedAt.Round(0)) > historyObservationMaxGap
+	unobservedGap := !t.checkedAt.IsZero() && now.Sub(t.checkedAt) > historyObservationMaxGap
 	if unobservedGap {
 		// Connectivity looking fine on both sides of the gap says nothing about
 		// the gap itself, so treat it as unreliable from the last observation.

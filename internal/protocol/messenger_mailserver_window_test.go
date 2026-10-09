@@ -41,6 +41,49 @@ func TestTranslateHistoryReconcileWindowUsesMessengerClock(t *testing.T) {
 	require.Equal(t, time.Unix(950, 0), got.To)
 }
 
+func TestTranslateHistoryReconcileWindowSpansSuspend(t *testing.T) {
+	// A window spanning an overnight suspend; the transport emits wall clock
+	// times, so its length must survive the translation.
+	beforeSleep := time.Unix(1_000, 0)
+	wokeAt := beforeSleep.Add(10 * time.Hour)
+	syncNow := wokeAt.Add(2 * time.Second)
+
+	got := translateHistoryReconcileWindow(
+		messagingtypes.HistoryReconcileWindow{From: beforeSleep, To: wokeAt},
+		wokeAt.Add(time.Second),
+		syncNow,
+	)
+	require.Equal(t, syncNow.Add(-time.Second).Add(-10*time.Hour), got.From)
+	require.Equal(t, syncNow.Add(-time.Second), got.To)
+}
+
+func TestTranslateHistoryReconcileWindowIgnoresMonotonicReadings(t *testing.T) {
+	// Mixing a wall clock window with a monotonic "now" must give the same
+	// result as using wall clock times only.
+	now := time.Now()
+	window := messagingtypes.HistoryReconcileWindow{
+		From: now.Round(0).Add(-time.Hour),
+		To:   now.Round(0).Add(-time.Minute),
+	}
+
+	got := translateHistoryReconcileWindow(window, now, now)
+	want := translateHistoryReconcileWindow(window, now.Round(0), now.Round(0))
+	require.True(t, want.From.Equal(got.From))
+	require.True(t, want.To.Equal(got.To))
+	require.Equal(t, 59*time.Minute, got.To.Sub(got.From))
+}
+
+func TestTickedAfterSuspend(t *testing.T) {
+	last := time.Unix(1_000, 0)
+	require.False(t, tickedAfterSuspend(last, last.Add(time.Minute), time.Minute))
+	require.False(t, tickedAfterSuspend(last, last.Add(90*time.Second), time.Minute))
+	require.False(t, tickedAfterSuspend(last, last.Add(2*time.Minute), time.Minute),
+		"a tick exactly two intervals late is not a suspend")
+	require.True(t, tickedAfterSuspend(last, last.Add(2*time.Minute+time.Nanosecond), time.Minute),
+		"a tick just over two intervals late is a suspend")
+	require.True(t, tickedAfterSuspend(last, last.Add(10*time.Hour), time.Minute))
+}
+
 func TestCoalesceHistoricSyncRequests(t *testing.T) {
 	at := func(seconds int64) time.Time { return time.Unix(seconds, 0) }
 	requests := []historicSyncRequest{

@@ -46,13 +46,18 @@ func translateHistoryReconcileWindow(window messagingtypes.HistoryReconcileWindo
 	if window.From.IsZero() || window.To.IsZero() || !window.From.Before(window.To) {
 		return messagingtypes.HistoryReconcileWindow{}
 	}
-	age := observedNow.Sub(window.To)
+	// Use wall clock durations: the monotonic clock does not advance while the
+	// system is suspended, so it would shrink a window spanning a sleep.
+	observedWall := observedNow.Round(0)
+	fromWall := window.From.Round(0)
+	toWall := window.To.Round(0)
+	age := observedWall.Sub(toWall)
 	if age < 0 {
 		age = 0
 	}
 	to := syncNow.Add(-age)
 	return messagingtypes.HistoryReconcileWindow{
-		From: to.Add(-window.To.Sub(window.From)),
+		From: to.Add(-toWall.Sub(fromWall)),
 		To:   to,
 	}
 }
@@ -142,6 +147,13 @@ func (m *Messenger) startHistoryReconciliationLoop() {
 	}()
 }
 
+// tickedAfterSuspend reports whether a ticker with the given interval fired
+// much later than scheduled on the wall clock. Tickers run on the monotonic
+// clock, which does not advance while the system is suspended.
+func tickedAfterSuspend(lastTick, now time.Time, interval time.Duration) bool {
+	return now.Round(0).Sub(lastTick.Round(0)) > 2*interval
+}
+
 // startHistoryCursorMonitor advances initialized topic cursors while
 // a full node has a healthy relay mesh. This records reliable live delivery
 // without issuing store queries and bounds catch-up after a crash.
@@ -157,11 +169,22 @@ func (m *Messenger) startHistoryCursorMonitor() {
 
 		ticker := time.NewTicker(historyCursorMonitorInterval)
 		defer ticker.Stop()
+		lastTick := time.Now()
 		for {
 			select {
 			case <-m.quit:
 				return
 			case <-ticker.C:
+				// A tick arriving much later than scheduled (wall clock) means
+				// the system was suspended; the connection state may still be
+				// stale, and nothing was received in the meantime. Leave the
+				// cursors for the transport's reconcile window to cover.
+				now := time.Now()
+				suspended := tickedAfterSuspend(lastTick, now, historyCursorMonitorInterval)
+				lastTick = now
+				if suspended {
+					continue
+				}
 				// Stay one tolerance window behind the observation so a
 				// concurrent reliability transition cannot advance a cursor
 				// into the newly unreliable interval.
