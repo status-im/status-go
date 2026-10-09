@@ -245,3 +245,68 @@ func TestBatchLookupAlignsWithRequests(t *testing.T) {
 	require.NotSame(t, tokens[2], tokens[5])
 	require.Empty(t, m.GetTokensByChainAddresses(nil))
 }
+
+func narrowTokens(tokens []*types.Token) []types.ChainToken {
+	result := make([]types.ChainToken, len(tokens))
+	for i, token := range tokens {
+		result[i] = token.ChainToken()
+	}
+	return result
+}
+
+func TestChainTokensMatchTokensByChains(t *testing.T) {
+	const document = `{"name":"Test","timestamp":"2026-01-01T00:00:00Z","version":{"major":1,"minor":0,"patch":0},"tokens":[{"chainId":1,"address":"0x0000000000000000000000000000000000000001","symbol":"ONE","name":"One","decimals":18},{"chainId":10,"address":"0x00000000000000000000000000000000000000AB","symbol":"OPONE","name":"One","decimals":6},{"chainId":1,"address":"0x0000000000000000000000000000000000000003","symbol":"THREE","name":"Three","decimals":0}]}`
+	m, err := New(tkl.Config{
+		Chains:       []uint64{1, 10, 56},
+		InitialLists: []tkl.ListContent{{ID: "test", Format: tkl.StandardFormat}},
+		Policy:       tkl.Policy{NativeTokens: []tkl.Token{{ChainID: 1, Address: "0x0000000000000000000000000000000000000000", Symbol: "ETH", Name: "Ether", Decimals: 18}}},
+	}, func(context.Context) (tkl.Bootstrap, []tkl.ListBody, error) {
+		return tkl.Bootstrap{Customs: []tkl.Token{{ChainID: 56, Address: "0x0000000000000000000000000000000000000005", Symbol: "CUS", Decimals: 9}}},
+			[]tkl.ListBody{{ID: "test", Origin: tkl.Bundled, Data: []byte(document)}}, nil
+	})
+	require.NoError(t, err)
+	defer func() { _ = m.Stop() }()
+	dst := make([]types.ChainToken, 1, 16)
+	require.Empty(t, m.GetChainTokens([]uint64{1}, dst))
+	require.NoError(t, m.Start(context.Background(), false, nil))
+
+	check := func() {
+		for _, chains := range [][]uint64{nil, {1}, {10}, {56}, {1, 10, 56}, {56, 1}, {10, 10}, {999}} {
+			got := m.GetChainTokens(chains, dst)
+			require.Equal(t, narrowTokens(m.GetTokensByChains(chains)), got, chains)
+			if len(got) > 0 && len(got) <= cap(dst) {
+				require.Same(t, &dst[:1][0], &got[0], "fills dst when it has room")
+			}
+		}
+	}
+	check()
+	native := m.GetChainTokens([]uint64{1}, nil)
+	require.True(t, native[0].IsNative())
+	require.Equal(t, uint(18), native[0].Decimals)
+	require.Len(t, m.GetChainTokens([]uint64{1, 10, 56}, nil), 7)
+
+	m.mu.Lock()
+	err = m.setPolicy(tkl.Policy{SkippedKeys: []string{types.TokenKey(1, common.HexToAddress("0x1"))}})
+	m.mu.Unlock()
+	require.NoError(t, err)
+	check()
+	require.NoError(t, m.SetChains([]uint64{10}))
+	check()
+
+	var wg sync.WaitGroup
+	for range 8 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			var buf []types.ChainToken
+			for range 50 {
+				buf = m.GetChainTokens([]uint64{10}, buf)
+				if len(buf) != 2 || buf[1].Decimals != 6 {
+					t.Error(buf)
+					return
+				}
+			}
+		}()
+	}
+	wg.Wait()
+}

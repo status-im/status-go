@@ -47,6 +47,17 @@ type StorageToken struct {
 	MarketValuesPerCurrency map[string]TokenMarketValues `json:"marketValuesPerCurrency"`
 }
 
+type ChainToken = types.ChainToken
+
+// ChainTokens narrows tokens to what balance fetching reads.
+func ChainTokens(tokens []*Token) []ChainToken {
+	result := make([]ChainToken, len(tokens))
+	for i, token := range tokens {
+		result[i] = token.ChainToken()
+	}
+	return result
+}
+
 type TokenList struct {
 	*types.TokenList
 

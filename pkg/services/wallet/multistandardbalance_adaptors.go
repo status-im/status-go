@@ -20,14 +20,14 @@ func NewMultistandardBalanceTokenListProvider(tokenManager *token.Manager) *Mult
 }
 
 func (p *MultistandardBalanceTokenListProvider) GetTokenContractAddresses(chainID uint64) ([]common.Address, error) {
-	tokens, err := p.tokenManager.GetTokensByChain(chainID)
+	tokens, err := p.tokenManager.GetChainTokens([]uint64{chainID}, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	addresses := make([]common.Address, 0)
-	for _, token := range tokens {
-		addresses = append(addresses, token.Address)
+	addresses := make([]common.Address, len(tokens))
+	for i, token := range tokens {
+		addresses[i] = token.Address
 	}
 
 	return addresses, nil

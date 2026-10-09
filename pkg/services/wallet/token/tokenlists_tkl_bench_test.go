@@ -240,6 +240,31 @@ func BenchmarkTKLLookups(b *testing.B) {
 			}
 		}
 	})
+	b.Run("balanceChainTokens", func(b *testing.B) {
+		b.ReportAllocs()
+		for b.Loop() {
+			tokens, err := tm.GetChainTokens(benchChains, nil)
+			if err != nil || len(tokens) == 0 {
+				b.Fatal(err)
+			}
+		}
+	})
+	// The balance fetcher asks for each chain's contract addresses.
+	b.Run("contractAddresses", func(b *testing.B) {
+		b.ReportAllocs()
+		for b.Loop() {
+			for _, chain := range benchChains {
+				tokens, err := tm.GetChainTokens([]uint64{chain}, nil)
+				if err != nil || len(tokens) == 0 {
+					b.Fatal(err)
+				}
+				addresses := make([]common.Address, len(tokens))
+				for i, token := range tokens {
+					addresses[i] = token.Address
+				}
+			}
+		}
+	})
 	b.Run("balanceByKeys50", func(b *testing.B) {
 		b.ReportAllocs()
 		for b.Loop() {

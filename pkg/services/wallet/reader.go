@@ -233,7 +233,7 @@ func tokensToBalancesPerChain(cachedTokens map[common.Address][]tokentypes.Stora
 	return cachedBalancesPerChain, nil
 }
 
-func (r *Reader) balancesToTokensByAddress(addresses []common.Address, allTokens []*tokentypes.Token,
+func (r *Reader) balancesToTokensByAddress(addresses []common.Address, allTokens []tokentypes.ChainToken,
 	balances map[uint64]map[common.Address]map[common.Address]*big.Int, cachedTokens map[common.Address][]tokentypes.StorageToken,
 ) map[common.Address][]tokentypes.StorageToken {
 
@@ -261,7 +261,7 @@ func (r *Reader) balancesToTokensByAddress(addresses []common.Address, allTokens
 				)
 			}
 
-			isVisible := balance.Cmp(big.NewFloat(0.0)) > 0 || isCachedToken(cachedTokens, address, token)
+			isVisible := balance.Cmp(big.NewFloat(0.0)) > 0 || isCachedToken(cachedTokens, address, token.ChainID, token.Address)
 			if !isVisible && !isMandatoryToken {
 				continue
 			}
@@ -297,10 +297,10 @@ func (r *Reader) GetLastTokenUpdateTimestamps() map[common.Address]int64 {
 	return result
 }
 
-func isCachedToken(cachedTokens map[common.Address][]tokentypes.StorageToken, address common.Address, token *tokentypes.Token) bool {
+func isCachedToken(cachedTokens map[common.Address][]tokentypes.StorageToken, address common.Address, chainID uint64, tokenAddress common.Address) bool {
 	if tokens, ok := cachedTokens[address]; ok {
 		for _, t := range tokens {
-			if t.TokenChainID == token.ChainID && t.TokenAddress == token.Address {
+			if t.TokenChainID == chainID && t.TokenAddress == tokenAddress {
 				return true
 			}
 		}
@@ -327,7 +327,7 @@ func (r *Reader) refreshBalanceCache(ctx context.Context, chainIDs []uint64, add
 		return
 	}
 
-	allTokens, err := r.tokenManager.GetTokensByChains(chainIDs)
+	allTokens, err := r.tokenManager.GetChainTokens(chainIDs, nil)
 	if err != nil {
 		logutils.ZapLogger().Error("failed to get tokens list", zap.Error(err))
 		return
@@ -399,10 +399,11 @@ func (r *Reader) GetCachedBalances(chainIDs []uint64, addresses []common.Address
 		}
 	}
 
-	allTokens, err := r.tokenManager.GetTokensByKeys(maps.Keys(tokensOfInterest))
+	tokens, err := r.tokenManager.GetTokensByKeys(maps.Keys(tokensOfInterest))
 	if err != nil {
 		return nil, err
 	}
+	allTokens := tokentypes.ChainTokens(tokens)
 
 	if storageBalances, storageErr := r.tokenBalancesStorage.GetBalances(context.Background(), allTokens, addresses); storageErr != nil {
 		logutils.ZapLogger().Error("failed to get live storage balances", zap.Error(storageErr))

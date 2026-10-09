@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -312,6 +313,32 @@ func (m *Manager) GetTokensByChains(chains []uint64) []*types.Token {
 		return nil
 	}
 	return convertTokens(h.GetByChains(chains, 0, 0))
+}
+
+// packedTokens recycles the library's answer buffers between balance queries
+// without retaining them past a GC.
+var packedTokens = sync.Pool{New: func() any { return new([]tkl.ChainToken) }}
+
+// GetChainTokens answers GetTokensByChains narrowed to ChainTokens, without
+// JSON. It appends to dst[:0].
+func (m *Manager) GetChainTokens(chains []uint64, dst []types.ChainToken) []types.ChainToken {
+	dst = dst[:0]
+	h := m.reader.Load()
+	if h == nil || len(chains) == 0 {
+		return dst
+	}
+	buf := packedTokens.Get().(*[]tkl.ChainToken)
+	defer packedTokens.Put(buf)
+	packed, _, err := h.GetByChainsPacked(chains, *buf)
+	*buf = packed
+	if err != nil {
+		return dst
+	}
+	dst = slices.Grow(dst, len(packed))
+	for _, t := range packed {
+		dst = append(dst, types.ChainToken{ChainID: t.ChainID, Address: common.Address(t.Address), Decimals: uint(t.Decimals)})
+	}
+	return dst
 }
 
 // GetTokensByKeys returns the tokens of keys in request order, skipping unknown

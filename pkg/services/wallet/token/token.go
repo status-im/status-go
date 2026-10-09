@@ -65,7 +65,7 @@ type CommunityTokenImageBuilder interface {
 type ManagerInterface interface {
 	GetTokenByChainAddress(chainID uint64, address common.Address) (*tokentypes.Token, error)
 	GetTokensByChainAddresses(ids []types.ChainAddress) ([]*tokentypes.Token, error)
-	GetTokensByChains(chainIDs []uint64) ([]*tokentypes.Token, error)
+	GetChainTokens(chainIDs []uint64, dst []tokentypes.ChainToken) ([]tokentypes.ChainToken, error)
 	GetTokensByKeys(tokenKeys []string) ([]*tokentypes.Token, error)
 	GetCachedBalances() (map[common.Address][]tokentypes.StorageToken, error)
 	CacheBalances(balances map[common.Address][]tokentypes.StorageToken) error
@@ -449,6 +449,25 @@ func (tm *Manager) GetTokensByChains(chainIDs []uint64) ([]*tokentypes.Token, er
 			continue
 		}
 		tokens = append(tokens, token)
+	}
+
+	return tokens, nil
+}
+
+// GetChainTokens is GetTokensByChains narrowed to what balance fetching reads.
+// It appends to dst[:0].
+func (tm *Manager) GetChainTokens(chainIDs []uint64, dst []tokentypes.ChainToken) ([]tokentypes.ChainToken, error) {
+	tokens := tm.tokensManager.GetChainTokens(chainIDs, dst)
+
+	communityTokens, err := tm.GetCustoms(true)
+	if err != nil {
+		return nil, err
+	}
+	for _, token := range communityTokens {
+		if !slices.Contains(chainIDs, token.ChainID) {
+			continue
+		}
+		tokens = append(tokens, token.ChainToken())
 	}
 
 	return tokens, nil
