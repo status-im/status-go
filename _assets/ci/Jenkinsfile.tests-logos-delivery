@@ -1,23 +1,17 @@
 #!/usr/bin/env groovy
-library 'status-jenkins-lib@v1.9.39'
+library 'status-jenkins-lib@v1.9.53'
 
-// Dedicated Pipeline-from-SCM job targeting develop; no PR or push triggers.
 pipeline {
   agent {
     docker {
       label 'linuxcontainer'
-      image 'harbor.status.im/infra/ci-build-containers:linux-base-1.0.0'
+      image 'harbor.status.im/infra/ci-build-containers:linux-base-1.0.1'
       args '--volume=/nix:/nix ' +
            '--volume=/etc/nix:/etc/nix ' +
            '--volume=/var/run/docker.sock:/var/run/docker.sock ' +
            '--network=host ' +
            '--user jenkins'
     }
-  }
-
-  triggers {
-    // Once per night, at a stable minute between 04:00 and 04:59 UTC.
-    cron('TZ=Etc/UTC\nH 4 * * *')
   }
 
   options {
@@ -49,7 +43,6 @@ pipeline {
           passwordVariable: 'STATUS_BUILD_PROXY_PASSWORD',
         )]) {
           sh 'docker pull "$WAKU_IMAGE"'
-          // Same generation and test runner as the regular RPC job.
           nix.develop('make test-functional USE_LOGOS_STORAGE=true', pure: false)
         }
       } }
