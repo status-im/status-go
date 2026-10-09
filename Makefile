@@ -181,6 +181,7 @@ build-liblogosdelivery-ios: | nimble.paths
 		$(NIMBLE) liblogosdeliveryIOS
 
 # Temporary: folds into statusgo-library once the delivery backend is wired in.
+statusgo-nim-delivery: BUILD_TAGS += logos_delivery
 statusgo-nim-delivery: STATUS_GO_BINDINGS_PATH ?= build/bin/statusgo-lib
 statusgo-nim-delivery: STATUS_GO_LIBRARY_OUT ?= build/bin
 statusgo-nim-delivery: $(NIMBLE_LIB) generate statusgo-c-bindings $(LIBSDS) ##@build libstatus.a against the Nimble-built liblogosdelivery
