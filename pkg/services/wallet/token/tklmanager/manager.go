@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"runtime"
 	"slices"
 	"strings"
 	"sync"
@@ -37,7 +38,10 @@ type Manager struct {
 	// reader is the handle once a catalogue is loaded, nil before and after.
 	reader atomic.Pointer[tkl.Handle]
 	// aliases mirrors the policy's native aliases; change both via setPolicy.
-	aliases          atomic.Pointer[map[identity]identity]
+	aliases atomic.Pointer[map[identity]identity]
+	// policySeq is odd while setPolicy runs, so a reader can tell whether its
+	// aliases and its query saw the same policy.
+	policySeq        atomic.Uint64
 	load             Loader
 	refreshIO        *refreshRuntime
 	started          bool
@@ -48,6 +52,9 @@ type Manager struct {
 }
 
 var _ types.Catalogue = (*Manager)(nil)
+
+// testHookBeforeBatchQuery runs between a batch lookup's alias read and its query.
+var testHookBeforeBatchQuery func()
 
 func New(config tkl.Config, load Loader, options ...RefreshOptions) (*Manager, error) {
 	if load == nil {
@@ -183,6 +190,8 @@ func (m *Manager) SetChains(chains []uint64) error {
 
 // setPolicy replaces the catalogue policy; it is called with mu held.
 func (m *Manager) setPolicy(policy tkl.Policy) error {
+	m.policySeq.Add(1)
+	defer m.policySeq.Add(1)
 	if _, err := m.handle.SetPolicy(policy); err != nil {
 		return err
 	}
@@ -275,14 +284,29 @@ func (m *Manager) GetTokensByChainAddresses(ids []types.ChainAddress) []*types.T
 	if h == nil || len(ids) == 0 {
 		return result
 	}
-	aliases := *m.aliases.Load()
 	pairs := make([]tkl.Identity, len(ids))
 	for i, id := range ids {
 		pairs[i] = tkl.Identity{ChainID: id.ChainID, Address: hexAddress(id.Address)}
 	}
-	page, err := h.GetByChainAddresses(pairs)
-	if err != nil {
-		return result
+	var aliases map[identity]identity
+	var page tkl.Page[tkl.Token]
+	for {
+		seq := m.policySeq.Load()
+		if seq%2 == 1 {
+			runtime.Gosched()
+			continue
+		}
+		aliases = *m.aliases.Load()
+		if testHookBeforeBatchQuery != nil {
+			testHookBeforeBatchQuery()
+		}
+		var err error
+		if page, err = h.GetByChainAddresses(pairs); err != nil {
+			return result
+		}
+		if m.policySeq.Load() == seq {
+			break
+		}
 	}
 	found := make(map[identity]*types.Token, len(page.Items))
 	for _, t := range page.Items {
