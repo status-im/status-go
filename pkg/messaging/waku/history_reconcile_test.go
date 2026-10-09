@@ -199,6 +199,19 @@ func TestHistoryReconcileTrackerKeepsEarlierUnreliableStartAcrossSuspend(t *test
 	require.Equal(t, wokeAt, window.To)
 }
 
+func TestHistoryReconcileTrackerEmitsWallClockWindows(t *testing.T) {
+	start := time.Now()
+	tracker := newHistoryReconcileTracker(true, start)
+
+	window := tracker.observe(false, start.Add(time.Minute), historyReconcileMinInterval)
+	require.NotNil(t, window)
+	// Windows must not carry monotonic readings: consumers compute durations
+	// from them, and the monotonic clock does not advance during a suspend.
+	// == compares the monotonic reading too, so this only holds once stripped.
+	require.True(t, window.From == window.From.Round(0), "From carries a monotonic reading")
+	require.True(t, window.To == window.To.Round(0), "To carries a monotonic reading")
+}
+
 func TestReliablyConnected(t *testing.T) {
 	core := &Waku{
 		cfg:       &Config{Mode: ModeCore},
