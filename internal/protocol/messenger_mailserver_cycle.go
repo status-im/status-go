@@ -7,6 +7,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/internal/panics"
+	"github.com/status-im/status-go/internal/timesource"
 	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
 )
 
@@ -147,11 +148,25 @@ func (m *Messenger) startHistoryReconciliationLoop() {
 	}()
 }
 
-// tickedAfterSuspend reports whether a ticker with the given interval fired
-// much later than scheduled on the wall clock. Tickers run on the monotonic
-// clock, which does not advance while the system is suspended.
-func tickedAfterSuspend(lastTick, now time.Time, interval time.Duration) bool {
-	return now.Round(0).Sub(lastTick.Round(0)) > 2*interval
+// historyCursorMonitorThrough returns how far the cursor monitor may advance
+// the topic cursors on a tick at now, the previous tick being at lastTick, and
+// whether it may advance them at all.
+//
+// It never claims history past the previous tick: tickers run on the monotonic
+// clock, which does not advance while the system is suspended, so a tick can
+// arrive long after it was due, with nothing received in the meantime and a
+// connection state that may still be stale. A tick right after a detected
+// suspend advances nothing, leaving the gap to the transport's reconcile
+// window.
+func historyCursorMonitorThrough(syncNow, lastTick, now time.Time) (time.Time, bool) {
+	if timesource.SuspendedBetween(lastTick, now) {
+		return time.Time{}, false
+	}
+	// Stay at least one tolerance window behind the observation so a
+	// concurrent reliability transition cannot advance a cursor into the newly
+	// unreliable interval.
+	behind := max(time.Duration(tolerance)*time.Second, now.Round(0).Sub(lastTick.Round(0)))
+	return syncNow.Add(-behind), true
 }
 
 // startHistoryCursorMonitor advances initialized topic cursors while
@@ -175,22 +190,12 @@ func (m *Messenger) startHistoryCursorMonitor() {
 			case <-m.quit:
 				return
 			case <-ticker.C:
-				// A tick arriving much later than scheduled (wall clock) means
-				// the system was suspended; the connection state may still be
-				// stale, and nothing was received in the meantime. Leave the
-				// cursors for the transport's reconcile window to cover.
 				now := time.Now()
-				suspended := tickedAfterSuspend(lastTick, now, historyCursorMonitorInterval)
+				through, ok := historyCursorMonitorThrough(m.historicSyncNow(), lastTick, now)
 				lastTick = now
-				if suspended {
-					continue
+				if ok {
+					m.advanceHistoryCursors(through)
 				}
-				// Stay one tolerance window behind the observation so a
-				// concurrent reliability transition cannot advance a cursor
-				// into the newly unreliable interval.
-				m.advanceHistoryCursors(
-					m.historicSyncNow().Add(-time.Duration(tolerance) * time.Second),
-				)
 			}
 		}
 	}()
