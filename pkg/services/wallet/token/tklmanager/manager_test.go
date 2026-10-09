@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"sync"
 	"testing"
 
@@ -343,4 +344,51 @@ func TestChainTokensMatchTokensByChains(t *testing.T) {
 		}()
 	}
 	wg.Wait()
+}
+
+func TestCrossChainTokensMatchUniqueTokens(t *testing.T) {
+	const status = `{"name":"Status","timestamp":"2026-01-01T00:00:00Z","version":{"major":1,"minor":0,"patch":0},"tokens":[{"crossChainId":"one","name":"One","symbol":"ONE","decimals":18,"contracts":{"1":"0x0000000000000000000000000000000000000001","10":"0x00000000000000000000000000000000000000AB"}},{"crossChainId":"three","name":"Three","symbol":"THREE","decimals":0,"contracts":{"1":"0x0000000000000000000000000000000000000003"}}]}`
+	const standard = `{"name":"Test","timestamp":"2026-01-01T00:00:00Z","version":{"major":1,"minor":0,"patch":0},"tokens":[{"chainId":10,"address":"0x0000000000000000000000000000000000000004","symbol":"NOID","name":"None","decimals":2}]}`
+	m, err := New(tkl.Config{
+		Chains:       []uint64{1, 10, 56},
+		InitialLists: []tkl.ListContent{{ID: "status", Format: tkl.StatusFormat}, {ID: "test", Format: tkl.StandardFormat}},
+		Policy:       tkl.Policy{NativeTokens: []tkl.Token{{ChainID: 1, Address: "0x0000000000000000000000000000000000000000", Symbol: "ETH", Name: "Ether", Decimals: 18, CrossChainID: "eth"}, {ChainID: 10, Address: "0x0000000000000000000000000000000000000000", Symbol: "ETH", Name: "Ether", Decimals: 18, CrossChainID: "eth"}}},
+	}, func(context.Context) (tkl.Bootstrap, []tkl.ListBody, error) {
+		return tkl.Bootstrap{Customs: []tkl.Token{{ChainID: 56, Address: "0x0000000000000000000000000000000000000005", Symbol: "CUS", Decimals: 9}}},
+			[]tkl.ListBody{{ID: "status", Origin: tkl.Bundled, Data: []byte(status)}, {ID: "test", Origin: tkl.Bundled, Data: []byte(standard)}}, nil
+	})
+	require.NoError(t, err)
+	defer func() { _ = m.Stop() }()
+	dst := make([]types.ChainToken, 1, 16)
+	require.Empty(t, m.GetCrossChainTokens([]string{"one"}, dst))
+	require.NoError(t, m.Start(context.Background(), false, nil))
+
+	expected := func(ids []string) []types.ChainToken {
+		result := []types.ChainToken{}
+		for _, token := range m.UniqueTokens() {
+			if token.CrossChainID != "" && slices.Contains(ids, token.CrossChainID) {
+				result = append(result, token.ChainToken())
+			}
+		}
+		return result
+	}
+	check := func() {
+		for _, ids := range [][]string{nil, {""}, {"one"}, {"three", "one"}, {"eth"}, {"one", "one"}, {"unknown"}, {"one", "three", "eth"}} {
+			got := m.GetCrossChainTokens(ids, dst)
+			require.Equal(t, expected(ids), append([]types.ChainToken{}, got...), ids)
+			if len(got) > 0 {
+				require.Same(t, &dst[:1][0], &got[0], "fills dst when it has room")
+			}
+		}
+	}
+	check()
+	require.Len(t, m.GetCrossChainTokens([]string{"one", "three", "eth"}, nil), 5)
+
+	m.mu.Lock()
+	err = m.setPolicy(tkl.Policy{SkippedKeys: []string{types.TokenKey(1, common.HexToAddress("0x1"))}})
+	m.mu.Unlock()
+	require.NoError(t, err)
+	check()
+	require.NoError(t, m.SetChains([]uint64{10}))
+	check()
 }

@@ -351,9 +351,29 @@ func (m *Manager) GetChainTokens(chains []uint64, dst []types.ChainToken) []type
 	if h == nil || len(chains) == 0 {
 		return dst
 	}
+	return appendPacked(dst, func(buf []tkl.ChainToken) ([]tkl.ChainToken, uint64, error) {
+		return h.GetByChainsPacked(chains, buf)
+	})
+}
+
+// GetCrossChainTokens returns the catalogue tokens whose cross-chain id is one
+// of the non-empty ids, in UniqueTokens order, without JSON. It appends to
+// dst[:0].
+func (m *Manager) GetCrossChainTokens(ids []string, dst []types.ChainToken) []types.ChainToken {
+	dst = dst[:0]
+	h := m.reader.Load()
+	if h == nil || len(ids) == 0 {
+		return dst
+	}
+	return appendPacked(dst, func(buf []tkl.ChainToken) ([]tkl.ChainToken, uint64, error) {
+		return h.GetByCrossChainIDsPacked(ids, buf)
+	})
+}
+
+func appendPacked(dst []types.ChainToken, query func([]tkl.ChainToken) ([]tkl.ChainToken, uint64, error)) []types.ChainToken {
 	buf := packedTokens.Get().(*[]tkl.ChainToken)
 	defer packedTokens.Put(buf)
-	packed, _, err := h.GetByChainsPacked(chains, *buf)
+	packed, _, err := query(*buf)
 	*buf = packed
 	if err != nil {
 		return dst

@@ -510,29 +510,11 @@ func (tm *Manager) addTokensSharingCrossChainIDsToUsedTokenKeys(usedTokensKeys m
 		return nil
 	}
 
-	tokensByCrossChainIDs := make(map[string][]*tokentypes.Token)
-	wsdkTokens := tm.tokensManager.UniqueTokens()
-
-	for _, token := range wsdkTokens {
-		if token.CrossChainID == "" ||
-			testnetMode && walletcommon.ChainID(token.ChainID).IsMainnet() ||
-			!testnetMode && !walletcommon.ChainID(token.ChainID).IsMainnet() {
+	for _, token := range tm.tokensManager.GetCrossChainTokens(crossChainIDs, nil) {
+		if walletcommon.ChainID(token.ChainID).IsMainnet() == testnetMode {
 			continue
 		}
-		tokensByCrossChainIDs[token.CrossChainID] = append(tokensByCrossChainIDs[token.CrossChainID], &tokentypes.Token{Token: token})
-	}
-
-	for _, crossChainID := range crossChainIDs {
-		tokens, ok := tokensByCrossChainIDs[crossChainID]
-		if !ok {
-			continue
-		}
-		for _, token := range tokens {
-			if _, ok := usedTokensKeys[token.Key()]; ok {
-				continue
-			}
-			usedTokensKeys[token.Key()] = nil
-		}
+		usedTokensKeys[types.TokenKey(token.ChainID, token.Address)] = nil
 	}
 
 	return nil
@@ -623,22 +605,25 @@ func (tm *Manager) GetTokensByKeysForFetchingMarketData(tokenKeys []string) ([]*
 	}
 
 	// Test tokens handling...
-	// Use corresponding mainnet tokens for the test tokens that contains the same cross chain id
-	mainnetTokenKeysByCrossChainIDs := make(map[string][]string, 0) // keeps token keys of all mainnet tokens by cross chain id
-	allWsdkTokens := tm.tokensManager.UniqueTokens()
-	tokens := make([]*tokentypes.Token, 0)
-	for _, token := range allWsdkTokens {
-		if token.CrossChainID != "" && walletcommon.ChainID(token.ChainID).IsMainnet() {
-			mainnetTokenKeysByCrossChainIDs[token.CrossChainID] = append(mainnetTokenKeysByCrossChainIDs[token.CrossChainID], token.Key())
-		}
-		if !slices.Contains(tokenKeys, token.Key()) {
+	// Use corresponding mainnet tokens for the test tokens that contains the same cross chain id.
+	// Only catalogue tokens whose key is requested verbatim count, once each.
+	catalogueTokens, err := tm.tokensManager.GetTokensByKeys(tokenKeys)
+	if err != nil {
+		return nil, err
+	}
+	requested := make(map[string]bool, len(tokenKeys))
+	for _, key := range tokenKeys {
+		requested[key] = true
+	}
+	tokens := make([]*tokentypes.Token, 0, len(catalogueTokens))
+	crossChainIDs := make([]string, 0, len(catalogueTokens))
+	for _, token := range catalogueTokens {
+		key := token.Key()
+		if !requested[key] {
 			continue
 		}
+		delete(requested, key)
 		tokens = append(tokens, &tokentypes.Token{Token: token})
-	}
-
-	mainnetTokenKeys := make([]string, 0) // keeps token keys of mainnet tokens that have the same cross chain id as the test tokens
-	for _, token := range tokens {
 		crossChainID := token.CrossChainID
 		if crossChainID == "" {
 			continue
@@ -647,10 +632,14 @@ func (tm *Manager) GetTokensByKeysForFetchingMarketData(tokenKeys []string) ([]*
 		if crossChainID == walletcommon.StatusTestTokenCrossChainID {
 			crossChainID = walletcommon.StatusMainnetTokenCrossChainID
 		}
-		if _, ok := mainnetTokenKeysByCrossChainIDs[crossChainID]; !ok {
-			continue
+		crossChainIDs = append(crossChainIDs, crossChainID)
+	}
+
+	mainnetTokenKeys := make([]string, 0) // keeps token keys of mainnet tokens that have the same cross chain id as the test tokens
+	for _, token := range tm.tokensManager.GetCrossChainTokens(crossChainIDs, nil) {
+		if walletcommon.ChainID(token.ChainID).IsMainnet() {
+			mainnetTokenKeys = append(mainnetTokenKeys, types.TokenKey(token.ChainID, token.Address))
 		}
-		mainnetTokenKeys = append(mainnetTokenKeys, mainnetTokenKeysByCrossChainIDs[crossChainID]...)
 	}
 
 	mainnetTokens, err := tm.GetTokensByKeys(mainnetTokenKeys)
