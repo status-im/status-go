@@ -132,6 +132,9 @@ func TestDurableCustomWriteRecoversOnRead(t *testing.T) {
 			require.Len(t, lists, 2)
 			require.Len(t, lists[1].Tokens, 1)
 		},
+		"chain tokens": func(t *testing.T, m *Manager, _ *types.Token) {
+			require.Len(t, m.GetChainTokens([]uint64{1}, nil), 2)
+		},
 		"list": func(t *testing.T, m *Manager, _ *types.Token) {
 			list, ok := m.TokenList("custom")
 			require.True(t, ok)

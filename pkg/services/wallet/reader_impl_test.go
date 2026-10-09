@@ -177,17 +177,17 @@ func TestIsCachedToken(t *testing.T) {
 	}
 
 	// Test when the token is cached
-	result := isCachedToken(cachedTokens, testAccAddress1, token)
+	result := isCachedToken(cachedTokens, testAccAddress1, token.ChainID, token.Address)
 	assert.True(t, result)
 
 	// Test when the token is not cached
 	token.Address = testTokenAddress2
-	result = isCachedToken(cachedTokens, testAccAddress1, token)
+	result = isCachedToken(cachedTokens, testAccAddress1, token.ChainID, token.Address)
 	assert.False(t, result)
 
 	// Test when BalancesPerChain for token have no such a chainID
 	token.ChainID = 2
-	result = isCachedToken(cachedTokens, testAccAddress1, token)
+	result = isCachedToken(cachedTokens, testAccAddress1, token.ChainID, token.Address)
 	assert.False(t, result)
 
 }
@@ -287,7 +287,7 @@ func TestBalancesToTokensByAddress(t *testing.T) {
 	reader, _, _, mockCtrl := setupReader(t)
 	defer mockCtrl.Finish()
 
-	tokens := reader.balancesToTokensByAddress(addresses, allTokens, balances, cachedTokens)
+	tokens := reader.balancesToTokensByAddress(addresses, tokenTypes.ChainTokens(allTokens), balances, cachedTokens)
 
 	assert.Len(t, tokens, 2)
 	assert.Equal(t, len(expectedTokensPerAddress[addresses[0]]), len(tokens[addresses[0]]))
@@ -379,7 +379,7 @@ func TestGetCachedBalancesInternal(t *testing.T) {
 
 	tokenManager.EXPECT().GetCachedBalances().Return(cachedTokens, nil)
 	tokenManager.EXPECT().GetTokensByKeys(testutils.NewStringSliceElementsMatcher(tokensOfInterest)).Return(allTokens, nil)
-	tokenBalancesStorage.EXPECT().GetBalances(gomock.Any(), allTokens, addresses).Return(
+	tokenBalancesStorage.EXPECT().GetBalances(gomock.Any(), tokenTypes.ChainTokens(allTokens), addresses).Return(
 		map[uint64]map[common.Address]map[common.Address]*big.Int{}, nil,
 	)
 	tokens, err := reader.GetCachedBalances(chainIDs, addresses)
@@ -456,7 +456,7 @@ func TestGetCachedBalances_UsesStorageForMandatoryTokenWhenNotInUICache(t *testi
 	tokenManager.EXPECT().GetTokensByKeys(
 		testutils.NewStringSliceElementsMatcher(walletcommon.MandatoryTokensByChainID(walletcommon.OptimismMainnet)),
 	).Return(allTokens, nil)
-	tokenBalancesStorage.EXPECT().GetBalances(gomock.Any(), allTokens, addresses).Return(storageBalances, nil)
+	tokenBalancesStorage.EXPECT().GetBalances(gomock.Any(), tokenTypes.ChainTokens(allTokens), addresses).Return(storageBalances, nil)
 
 	tokens, err := reader.GetCachedBalances(chainIDs, addresses)
 	require.NoError(t, err)
@@ -492,7 +492,7 @@ func TestReader_RefreshesUICacheWhenFirstFetchCompletesWithoutBalanceChange(t *t
 	key := multistandardbalance.BalancesKey{ChainID: chainID, Account: account}
 
 	tokenManager.EXPECT().GetCachedBalances().Return(map[common.Address][]tokenTypes.StorageToken{}, nil)
-	tokenManager.EXPECT().GetTokensByChains([]uint64{chainID}).Return([]*tokenTypes.Token{}, nil)
+	tokenManager.EXPECT().GetChainTokens([]uint64{chainID}, gomock.Any()).Return([]tokenTypes.ChainToken{}, nil)
 	tokenBalancesStorage.EXPECT().GetBalances(gomock.Any(), gomock.Any(), []common.Address{account}).Return(
 		map[uint64]map[common.Address]map[common.Address]*big.Int{}, nil,
 	)
@@ -562,7 +562,7 @@ func TestReader_WarmBalanceRefreshStaysDebounced(t *testing.T) {
 	defer sub.Unsubscribe()
 
 	tokenManager.EXPECT().GetCachedBalances().Return(map[common.Address][]tokenTypes.StorageToken{}, nil).AnyTimes()
-	tokenManager.EXPECT().GetTokensByChains(gomock.Any()).Return([]*tokenTypes.Token{}, nil).AnyTimes()
+	tokenManager.EXPECT().GetChainTokens(gomock.Any(), gomock.Any()).Return([]tokenTypes.ChainToken{}, nil).AnyTimes()
 	tokenBalancesStorage.EXPECT().GetBalances(gomock.Any(), gomock.Any(), gomock.Any()).Return(
 		map[uint64]map[common.Address]map[common.Address]*big.Int{}, nil,
 	).AnyTimes()
@@ -601,7 +601,7 @@ func TestReader_NeverFetchedCompletionEmitsReloadImmediately(t *testing.T) {
 	defer sub.Unsubscribe()
 
 	tokenManager.EXPECT().GetCachedBalances().Return(map[common.Address][]tokenTypes.StorageToken{}, nil).AnyTimes()
-	tokenManager.EXPECT().GetTokensByChains(gomock.Any()).Return([]*tokenTypes.Token{}, nil).AnyTimes()
+	tokenManager.EXPECT().GetChainTokens(gomock.Any(), gomock.Any()).Return([]tokenTypes.ChainToken{}, nil).AnyTimes()
 	tokenBalancesStorage.EXPECT().GetBalances(gomock.Any(), gomock.Any(), gomock.Any()).Return(
 		map[uint64]map[common.Address]map[common.Address]*big.Int{}, nil,
 	).AnyTimes()
@@ -684,7 +684,7 @@ func TestReader_ColdReloadEdgeDoesNotSurviveRestart(t *testing.T) {
 	defer sub.Unsubscribe()
 
 	tokenManager.EXPECT().GetCachedBalances().Return(map[common.Address][]tokenTypes.StorageToken{}, nil).AnyTimes()
-	tokenManager.EXPECT().GetTokensByChains(gomock.Any()).Return([]*tokenTypes.Token{}, nil).AnyTimes()
+	tokenManager.EXPECT().GetChainTokens(gomock.Any(), gomock.Any()).Return([]tokenTypes.ChainToken{}, nil).AnyTimes()
 	tokenBalancesStorage.EXPECT().GetBalances(gomock.Any(), gomock.Any(), gomock.Any()).Return(
 		map[uint64]map[common.Address]map[common.Address]*big.Int{}, nil,
 	).AnyTimes()
@@ -768,7 +768,7 @@ func TestGetCachedBalances_UnansweredTokenKeepsCachedBalance(t *testing.T) {
 
 	tokenManager.EXPECT().GetCachedBalances().Return(cachedTokens, nil)
 	tokenManager.EXPECT().GetTokensByKeys(gomock.Any()).Return(allTokens, nil)
-	tokenBalancesStorage.EXPECT().GetBalances(gomock.Any(), allTokens, addresses).Return(storageBalances, nil)
+	tokenBalancesStorage.EXPECT().GetBalances(gomock.Any(), tokenTypes.ChainTokens(allTokens), addresses).Return(storageBalances, nil)
 
 	tokens, err := reader.GetCachedBalances(chainIDs, addresses)
 	require.NoError(t, err)
@@ -805,7 +805,7 @@ func TestGetCachedBalances_UnansweredNeverHeldMandatoryTokenReadsZero(t *testing
 
 	tokenManager.EXPECT().GetCachedBalances().Return(map[common.Address][]tokenTypes.StorageToken{account: {}}, nil)
 	tokenManager.EXPECT().GetTokensByKeys(gomock.Any()).Return(allTokens, nil)
-	tokenBalancesStorage.EXPECT().GetBalances(gomock.Any(), allTokens, addresses).Return(storageBalances, nil)
+	tokenBalancesStorage.EXPECT().GetBalances(gomock.Any(), tokenTypes.ChainTokens(allTokens), addresses).Return(storageBalances, nil)
 
 	tokens, err := reader.GetCachedBalances([]uint64{chainID}, addresses)
 	require.NoError(t, err)
@@ -848,7 +848,7 @@ func TestReader_RefreshKeepsCachedBalanceForUnansweredToken(t *testing.T) {
 	}
 
 	tokenManager.EXPECT().GetCachedBalances().Return(cachedTokens, nil)
-	tokenManager.EXPECT().GetTokensByChains([]uint64{chainID}).Return([]*tokenTypes.Token{heldToken}, nil)
+	tokenManager.EXPECT().GetChainTokens([]uint64{chainID}, gomock.Any()).Return(tokenTypes.ChainTokens([]*tokenTypes.Token{heldToken}), nil)
 	tokenBalancesStorage.EXPECT().GetBalances(gomock.Any(), gomock.Any(), []common.Address{account}).Return(
 		map[uint64]map[common.Address]map[common.Address]*big.Int{chainID: {account: {heldToken.Address: nil}}}, nil,
 	)
