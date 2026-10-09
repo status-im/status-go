@@ -385,6 +385,20 @@ func appendPacked(dst []types.ChainToken, query func([]tkl.ChainToken) ([]tkl.Ch
 	return dst
 }
 
+// GetTokenBySymbolOnChain returns the first catalogue token of chain, in
+// GetTokensByChain order, whose symbol or name equals symbol ignoring ASCII case.
+func (m *Manager) GetTokenBySymbolOnChain(chain uint64, symbol string) (*types.Token, bool) {
+	h := m.reader.Load()
+	if h == nil || symbol == "" {
+		return nil, false
+	}
+	page, err := h.GetBySymbolOnChain(chain, symbol)
+	if err != nil || len(page.Items) == 0 {
+		return nil, false
+	}
+	return convertToken(page.Items[0]), true
+}
+
 // GetTokensByKeys returns the tokens of keys in request order, skipping unknown
 // keys. Keys are parsed like ChainAndAddressFromTokenKey.
 func (m *Manager) GetTokensByKeys(keys []string) ([]*types.Token, error) {
