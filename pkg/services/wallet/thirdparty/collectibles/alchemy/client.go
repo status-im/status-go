@@ -13,6 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/status-im/status-go/internal/logutils"
+	"github.com/status-im/status-go/internal/traffic"
 	"github.com/status-im/status-go/pkg/security"
 	walletCommon "github.com/status-im/status-go/pkg/services/wallet/common"
 	"github.com/status-im/status-go/pkg/services/wallet/connection"
@@ -67,7 +68,7 @@ func NewClient(apiKey security.SensitiveString) *Client {
 	return &Client{
 		id:               AlchemyID,
 		urlResolver:      &directURLResolver{apiKey: apiKey},
-		authTransport:    thirdparty.NewAuthTransport(&http.Client{Timeout: time.Minute}, authParams, AlchemyID),
+		authTransport:    thirdparty.NewAuthTransport(&http.Client{Timeout: time.Minute, Transport: traffic.Transport}, authParams, AlchemyID),
 		connectionStatus: connection.NewStatus(),
 	}
 }
@@ -79,7 +80,7 @@ func NewClientWithParams(params Params) *Client {
 
 	httpClient := params.HttpClient
 	if httpClient == nil {
-		httpClient = &http.Client{Timeout: time.Minute}
+		httpClient = &http.Client{Timeout: time.Minute, Transport: traffic.Transport}
 	}
 
 	authParams := thirdparty.AuthParams{

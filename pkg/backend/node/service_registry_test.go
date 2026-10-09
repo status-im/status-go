@@ -138,3 +138,22 @@ func TestServiceRegistry_PauseAll_CollectsErrors(t *testing.T) {
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "pause failed")
 }
+
+func TestServiceRegistry_AllPaused(t *testing.T) {
+	r := newServiceRegistry()
+	require.False(t, r.AllPaused(), "no services, nothing paused")
+
+	wallet, waku := newFakePausable("wallet"), newFakePausable("waku")
+	r.Register(wallet)
+	r.Register(waku)
+	require.False(t, r.AllPaused())
+
+	require.NoError(t, r.Pause("wallet"))
+	require.False(t, r.AllPaused(), "pausing one service is not the background")
+
+	require.NoError(t, r.PauseAll())
+	require.True(t, r.AllPaused())
+
+	require.NoError(t, r.Resume("waku"))
+	require.False(t, r.AllPaused())
+}

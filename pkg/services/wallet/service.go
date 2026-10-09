@@ -18,6 +18,7 @@ import (
 	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
 	"github.com/status-im/status-go/internal/logutils"
 	"github.com/status-im/status-go/internal/rpc"
+	"github.com/status-im/status-go/internal/traffic"
 	"github.com/status-im/status-go/internal/transactions"
 	"github.com/status-im/status-go/pkg/services/wallet/common"
 	"github.com/status-im/status-go/pkg/services/wallet/multistandardbalance"
@@ -97,7 +98,7 @@ func createAlchemyProxyClient(config params.NftProxyConfig) *alchemy.Client {
 		origin := alchemy.GetNftProxyHost(config.UrlOverride.Reveal(), config.StageName)
 		alchemyHTTP = &http.Client{
 			Timeout:   time.Minute,
-			Transport: puzzleauth.NewTransport(origin, http.DefaultTransport),
+			Transport: puzzleauth.NewTransport(origin, traffic.Transport),
 		}
 	}
 

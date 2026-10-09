@@ -56,6 +56,7 @@ import (
 	"github.com/status-im/status-go/internal/protocol/requests"
 	"github.com/status-im/status-go/internal/rpc"
 	"github.com/status-im/status-go/internal/signal"
+	"github.com/status-im/status-go/internal/traffic"
 	"github.com/status-im/status-go/internal/transactions"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/backend/node"
@@ -2572,6 +2573,9 @@ func (b *StatusBackend) PauseServices(names []string) error {
 	if rpcClient := b.statusNode.RPCClient(); rpcClient != nil {
 		rpcClient.SetPaused(true)
 	}
+	// Clients pause every service when the app goes to the background; a
+	// partial pause, for a test or one service, is not that.
+	defer func() { traffic.Default.SetBackground(b.statusNode.ServiceRegistry().AllPaused()) }()
 
 	return b.statusNode.ServiceRegistry().PauseMultiple(names)
 }
@@ -2585,6 +2589,7 @@ func (b *StatusBackend) ResumeServices(names []string) error {
 	if rpcClient := b.statusNode.RPCClient(); rpcClient != nil {
 		rpcClient.SetPaused(false)
 	}
+	defer func() { traffic.Default.SetBackground(b.statusNode.ServiceRegistry().AllPaused()) }()
 
 	return b.statusNode.ServiceRegistry().ResumeMultiple(names)
 }

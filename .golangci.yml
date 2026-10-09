@@ -6,6 +6,7 @@ linters:
   default: none
   enable:
     - errcheck
+    - forbidigo
     - gosec
     - govet
     - ineffassign
@@ -14,6 +15,20 @@ linters:
   settings:
     dupl:
       threshold: 50
+    forbidigo:
+      analyze-types: true
+      forbid:
+        # HTTP clients go through traffic.Transport, so that their traffic is
+        # recorded; these helpers use http.DefaultTransport directly. The rule
+        # stops the named helpers only: an http.Client left without a
+        # Transport, rpc.DialOptions without rpc.WithHTTPClient and
+        # ethclient.Dial pass it. Tests, cmd/ and tests-functional/ are exempt.
+        - pattern: ^http\.(DefaultClient|DefaultTransport|Get|Head|Post|PostForm)$
+          pkg: ^net/http$
+          msg: goes around the HTTP traffic recorder; use an http.Client with traffic.Transport
+        - pattern: ^rpc\.(Dial|DialContext|DialHTTP)$
+          pkg: ^github.com/ethereum/go-ethereum/rpc$
+          msg: goes around the HTTP traffic recorder; use rpc.DialOptions with rpc.WithHTTPClient and traffic.Transport
     errcheck:
       check-type-assertions: false
       check-blank: false
@@ -43,6 +58,10 @@ linters:
     paths:
     - internal/contracts/
     rules:
+      # Tests and the push notification server are not the app's traffic.
+      - linters:
+          - forbidigo
+        path: (_test\.go$|^tests-functional/|^cmd/|^internal/protocol/pushnotificationserver/)
       - linters:
           - goconst
         path: eth-node/keystore/passphrase\.go

@@ -10,6 +10,8 @@ import (
 	"net/http"
 	"os"
 	"strings"
+
+	"github.com/status-im/status-go/internal/traffic"
 )
 
 const (
@@ -21,7 +23,7 @@ const (
 var DefaultBounds = FileSizeLimits{Ideal: idealTargetImageSize, Max: resizeTargetImageSize}
 
 func FetchAndStoreRemoteImage(url string) (string, error) {
-	resp, err := http.Get(url) //nolint
+	resp, err := (&http.Client{Transport: traffic.Transport}).Get(url) //nolint
 	if err != nil {
 		return "", fmt.Errorf("error fetching image from URL: %w", err)
 	}

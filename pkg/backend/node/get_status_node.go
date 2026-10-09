@@ -25,10 +25,12 @@ import (
 	"github.com/status-im/status-go/internal/db/multiaccounts"
 	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
 	"github.com/status-im/status-go/internal/ipfs"
+	"github.com/status-im/status-go/internal/logutils"
 	"github.com/status-im/status-go/internal/panics"
 	"github.com/status-im/status-go/internal/pausable"
 	"github.com/status-im/status-go/internal/rpc"
 	"github.com/status-im/status-go/internal/timesource"
+	"github.com/status-im/status-go/internal/traffic"
 	"github.com/status-im/status-go/internal/transactions"
 	"github.com/status-im/status-go/params"
 	noderpc "github.com/status-im/status-go/pkg/backend/node/rpc"
@@ -69,6 +71,12 @@ import (
 var (
 	ErrNodeRunning   = errors.New("node is already running")
 	ErrNoRunningNode = errors.New("there is no running node")
+)
+
+// The HTTP traffic stats keep one sample a minute and log every five samples.
+const (
+	httpTrafficSampleInterval = time.Minute
+	httpTrafficSamplesPerLog  = 5
 )
 
 // StatusNode abstracts contained geth node and provides helper methods to
@@ -116,6 +124,7 @@ type StatusNode struct {
 	localNotificationsSrvc *localnotifications.Service
 	personalSrvc           *personal.Service
 	timeSourceSrvc         timesource.Service
+	httpTrafficSampler     *traffic.Sampler
 	wakuV2ExtSrvc          *wakuv2ext.Service
 	ensSrvc                *ens.Service
 	communityTokensSrvc    *communitytokens.Service
@@ -408,6 +417,12 @@ func (n *StatusNode) startWithDB(config *params.NodeConfig) error {
 		return errorspkg.Wrap(err, "failed to start time source")
 	}
 
+	if n.httpTrafficSampler == nil {
+		n.httpTrafficSampler = traffic.NewSampler(traffic.Default, httpTrafficSampleInterval,
+			httpTrafficSamplesPerLog, logutils.ZapLogger())
+	}
+	n.httpTrafficSampler.Start()
+
 	for _, service := range n.services {
 		err := service.Start()
 		if err != nil {
@@ -557,6 +572,11 @@ func (n *StatusNode) Stop() error {
 		n.tokenManager.Stop()
 	}
 	n.timeSourceSrvc.Stop()
+	if n.httpTrafficSampler != nil {
+		n.httpTrafficSampler.Stop()
+	}
+	// The recorder outlives the node: the next one starts in the foreground.
+	traffic.Default.SetBackground(false)
 
 	for _, service := range n.services {
 		err := service.Stop()

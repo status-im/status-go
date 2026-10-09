@@ -24,6 +24,7 @@ import (
 	"github.com/status-im/status-go/internal/logutils"
 	"github.com/status-im/status-go/internal/panics"
 	"github.com/status-im/status-go/internal/rpc"
+	"github.com/status-im/status-go/internal/traffic"
 	"github.com/status-im/status-go/pkg/services/media"
 	"github.com/status-im/status-go/pkg/services/wallet/async"
 	"github.com/status-im/status-go/pkg/services/wallet/bigint"
@@ -106,8 +107,10 @@ func NewManager(
 	return &Manager{
 		ethClientGetter: ethClientGetter,
 		providers:       providers,
+		// Asks the hosts NFT metadata names for the type of their media.
 		httpClient: &http.Client{
-			Timeout: requestTimeout,
+			Timeout:   requestTimeout,
+			Transport: traffic.PrivateTransport,
 		},
 		collectiblesDataDB: NewCollectibleDataDB(db),
 		collectionsDataDB:  NewCollectionDataDB(db),

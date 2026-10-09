@@ -13,6 +13,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 
+	"github.com/status-im/status-go/internal/traffic"
 	"github.com/status-im/status-go/pkg/services/wallet/thirdparty"
 )
 
@@ -38,7 +39,7 @@ type Client struct {
 }
 
 func NewClient() *Client {
-	return &Client{Client: &http.Client{Timeout: time.Minute}, URL: "https://www.4byte.directory"}
+	return &Client{Client: &http.Client{Timeout: time.Minute, Transport: traffic.Transport}, URL: "https://www.4byte.directory"}
 }
 
 func (c *Client) DoQuery(url string) (*http.Response, error) {
