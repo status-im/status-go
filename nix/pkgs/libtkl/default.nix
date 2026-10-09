@@ -16,7 +16,7 @@ let
 in
 stdenv.mkDerivation {
   pname = "libtkl";
-  version = "9a9f2fb53515";
+  version = "adade105a53f";
   inherit src;
   nativeBuildInputs = [ compiler ] ++ lib.optionals stdenv.isDarwin [ darwin.cctools ];
   postPatch = ''
