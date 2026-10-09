@@ -4,6 +4,7 @@ package tokenlist
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"strconv"
 	"strings"
@@ -26,7 +27,12 @@ type Token struct {
 }
 
 func TokenKey(chainID uint64, address common.Address) string {
-	return fmt.Sprintf("%d-%s", chainID, strings.ToLower(address.Hex()))
+	// Plain lowercase hex: the same text as strings.ToLower(address.Hex()) without the keccak checksum.
+	buf := make([]byte, 0, 20+1+2+2*common.AddressLength)
+	buf = strconv.AppendUint(buf, chainID, 10)
+	buf = append(buf, "-0x"...)
+	buf = hex.AppendEncode(buf, address[:])
+	return string(buf)
 }
 
 // ChainAndAddressFromTokenKey preserves the wallet's existing key decoding.
