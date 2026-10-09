@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// Package argon2 is golang.org/x/crypto/argon2 (v0.46.0) reduced to Argon2id, with block memory
+// Package argon2 is golang.org/x/crypto/argon2 (version in UPSTREAM) reduced to Argon2id, with block memory
 // that a Hasher reuses across derivations instead of allocating it per call.
 //
 // Modified by Status: the first pass writes blocks instead of XOR-ing into zeroed memory, which is
