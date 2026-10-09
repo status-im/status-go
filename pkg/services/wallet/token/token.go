@@ -491,6 +491,57 @@ func (tm *Manager) GetTokensForActiveNetworksMode() ([]*tokentypes.Token, error)
 	return tm.GetTokensByChains(chainIDs)
 }
 
+// GetTokenBySymbolOnChain returns the first token of GetTokensByChain(chainID)
+// whose symbol or name equals symbol ignoring ASCII case, or nil. Legacy payment
+// requests name their token this way.
+func (tm *Manager) GetTokenBySymbolOnChain(chainID uint64, symbol string) (*tokentypes.Token, error) {
+	var candidates []*tokentypes.Token
+	if symbol == "" {
+		// The catalogue query rejects an empty symbol, yet some tokens lack one.
+		tokens, err := tm.GetTokensByChain(chainID)
+		if err != nil {
+			return nil, err
+		}
+		candidates = tokens
+	} else {
+		if token, ok := tm.tokensManager.GetTokenBySymbolOnChain(chainID, symbol); ok {
+			return &tokentypes.Token{Token: token}, nil
+		}
+		communityTokens, err := tm.GetCustoms(true)
+		if err != nil {
+			return nil, err
+		}
+		candidates = communityTokens
+	}
+
+	for _, token := range candidates {
+		if token.ChainID == chainID && (equalFoldASCII(token.Symbol, symbol) || equalFoldASCII(token.Name, symbol)) {
+			return token, nil
+		}
+	}
+
+	return nil, nil
+}
+
+func equalFoldASCII(a, b string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := 0; i < len(a); i++ {
+		x, y := a[i], b[i]
+		if 'A' <= x && x <= 'Z' {
+			x += 'a' - 'A'
+		}
+		if 'A' <= y && y <= 'Z' {
+			y += 'a' - 'A'
+		}
+		if x != y {
+			return false
+		}
+	}
+	return true
+}
+
 // addTokensSharingCrossChainIDsToUsedTokenKeys adds all tokens that share the same cross chain id to the used tokens keys.
 func (tm *Manager) addTokensSharingCrossChainIDsToUsedTokenKeys(usedTokensKeys map[string]interface{}, testnetMode bool) error {
 	tokens, err := tm.GetTokensByKeys(maps.Keys(usedTokensKeys))
