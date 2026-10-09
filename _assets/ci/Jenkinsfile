@@ -45,28 +45,47 @@ pipeline {
   stages {
     stage('Build') {
       parallel {
-        stage('iOS') { steps { script {
-          ios = jenkins.Build('status-go/platforms/ios')
-        } } }
-        stage('Android') { steps { script {
-          android = jenkins.Build('status-go/platforms/android')
-        } } }
-        stage('Linux') { steps { script {
-          linux = jenkins.Build('status-go/platforms/linux')
-        } } }
-        stage('MacOS') { steps { script {
-          linux = jenkins.Build('status-go/platforms/macos')
-        } } }
-        stage('Windows') { steps { script {
-          linux = jenkins.Build('status-go/platforms/windows')
-        } } }
-        stage('Docker') { steps { script {
-          dock = jenkins.Build('status-go/platforms/docker')
-        } } }
+        stage('iOS') {
+          options { timeout(time: 35, unit: 'MINUTES') }
+          steps { script {
+            ios = jenkins.Build('status-go/platforms/ios')
+          } }
+        }
+        stage('Android') {
+          options { timeout(time: 35, unit: 'MINUTES') }
+          steps { script {
+            android = jenkins.Build('status-go/platforms/android')
+          } }
+        }
+        stage('Linux') {
+          options { timeout(time: 35, unit: 'MINUTES') }
+          steps { script {
+            linux = jenkins.Build('status-go/platforms/linux')
+          } }
+        }
+        stage('MacOS') {
+          options { timeout(time: 35, unit: 'MINUTES') }
+          steps { script {
+            linux = jenkins.Build('status-go/platforms/macos')
+          } }
+        }
+        stage('Windows') {
+          options { timeout(time: 35, unit: 'MINUTES') }
+          steps { script {
+            linux = jenkins.Build('status-go/platforms/windows')
+          } }
+        }
+        stage('Docker') {
+          options { timeout(time: 35, unit: 'MINUTES') }
+          steps { script {
+            dock = jenkins.Build('status-go/platforms/docker')
+          } }
+        }
       } // parallel
     } // stage(Build)
 
     stage('Archive') {
+      options { timeout(time: 15, unit: 'MINUTES') }
       steps { script {
         sh "rm -fr ${env.RELEASE_DIR}"
         sh "mkdir ${env.RELEASE_DIR}"
@@ -82,6 +101,7 @@ pipeline {
     } // stage(Archive)
 
     stage('Release') {
+      options { timeout(time: 15, unit: 'MINUTES') }
       when { expression { params.RELEASE == true } }
       steps { script {
         dir (env.REPO) { version = utils.getVersion() }
