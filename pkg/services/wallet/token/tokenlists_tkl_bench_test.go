@@ -23,6 +23,7 @@ import (
 	"github.com/status-im/status-go/internal/db/multiaccounts/settings"
 	"github.com/status-im/status-go/internal/db/walletdb"
 	"github.com/status-im/status-go/internal/testutils"
+	"github.com/status-im/status-go/internal/testutils/nativeheap"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/services/wallet/token/tklmanager"
 	tokentypes "github.com/status-im/status-go/pkg/services/wallet/token/types"
@@ -127,26 +128,22 @@ func (e *benchEnv) stop(tb testing.TB) {
 	e.manager.tokensManager = nil
 }
 
-// nativeHeapInUse reports malloc'd bytes (Nim and SQLite) when a platform probe is linked in.
-var nativeHeapInUse func() int64
-
-// reportRetained reports the live heap a value keeps after a full GC.
+// reportRetained reports the live heap a value keeps after a full GC. Build
+// with -tags tklnativeheap to also report malloc'd bytes (Nim and SQLite).
 func reportRetained(b *testing.B, build func() func()) {
 	runtime.GC()
 	runtime.GC()
 	var before, after runtime.MemStats
 	runtime.ReadMemStats(&before)
-	var native int64
-	if nativeHeapInUse != nil {
-		native = nativeHeapInUse()
-	}
+	native, probed := nativeheap.InUse()
 	release := build()
 	runtime.GC()
 	runtime.GC()
 	runtime.ReadMemStats(&after)
 	b.ReportMetric(float64(int64(after.HeapAlloc)-int64(before.HeapAlloc)), "retained-B")
-	if nativeHeapInUse != nil {
-		b.ReportMetric(float64(nativeHeapInUse()-native), "native-B")
+	if probed {
+		inUse, _ := nativeheap.InUse()
+		b.ReportMetric(float64(inUse-native), "native-B")
 	}
 	release()
 }
