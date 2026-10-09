@@ -15,7 +15,6 @@ import (
 	types "github.com/status-im/status-go/pkg/services/wallet/token/tokenlist"
 
 	walletcommon "github.com/status-im/status-go/pkg/services/wallet/common"
-	"github.com/status-im/status-go/pkg/services/wallet/token/tklmanager"
 )
 
 func TestTKLBootstrapExistingDatabase(t *testing.T) {
@@ -178,7 +177,7 @@ func TestTKLQueriesMatchReferenceIndex(t *testing.T) {
 	require.Equal(t, expected, facade.GetTokensByChains(subset))
 
 	var keys []string
-	var ids []tklmanager.ChainAddress
+	var ids []types.ChainAddress
 	for i, token := range all {
 		require.Equal(t, token, ref.byChainAddress(token.ChainID, token.Address))
 		got, ok := facade.GetTokenByChainAddress(token.ChainID, token.Address)
@@ -186,7 +185,7 @@ func TestTKLQueriesMatchReferenceIndex(t *testing.T) {
 		require.Equal(t, token, got)
 		if i%97 == 0 {
 			keys = append(keys, token.Key(), strings.ToUpper(token.Key()), fmt.Sprintf("0%d-%s", token.ChainID, token.Address.Hex()))
-			ids = append(ids, tklmanager.ChainAddress{ChainID: token.ChainID, Address: token.Address})
+			ids = append(ids, types.ChainAddress{ChainID: token.ChainID, Address: token.Address})
 		}
 	}
 	for chain, addresses := range walletcommon.AdditionalNativeTokenAddresses() {
@@ -196,16 +195,16 @@ func TestTKLQueriesMatchReferenceIndex(t *testing.T) {
 			require.Equal(t, want != nil, ok)
 			require.Equal(t, want, got)
 			keys = append(keys, types.TokenKey(chain, address))
-			ids = append(ids, tklmanager.ChainAddress{ChainID: chain, Address: address})
+			ids = append(ids, types.ChainAddress{ChainID: chain, Address: address})
 		}
 	}
 	for _, key := range walletcommon.SkippedTokenKeys() {
 		keys = append(keys, key)
 		chain, address, _ := types.ChainAndAddressFromTokenKey(key)
-		ids = append(ids, tklmanager.ChainAddress{ChainID: chain, Address: address})
+		ids = append(ids, types.ChainAddress{ChainID: chain, Address: address})
 	}
 	keys = append(keys, "missing", "1-nothex", "1-0x1-extra", "", "1-0x0000000000000000000000000000000000000009", keys[0])
-	ids = append(ids, tklmanager.ChainAddress{ChainID: 1, Address: common.HexToAddress("0x9")}, ids[0])
+	ids = append(ids, types.ChainAddress{ChainID: 1, Address: common.HexToAddress("0x9")}, ids[0])
 	got, err := facade.GetTokensByKeys(keys)
 	require.NoError(t, err)
 	require.Equal(t, ref.byKeys(keys), got)
@@ -255,4 +254,29 @@ func TestTKLRefreshPersistsFetchedBytesForNextLogin(t *testing.T) {
 	reloaded, ok := facade.TokenList(walletcommon.StatusTokenListID)
 	require.True(t, ok)
 	require.Equal(t, list, reloaded)
+}
+
+func TestTKLBatchLookupMatchesSingleLookups(t *testing.T) {
+	m, cleanup := setupTestTokenDB(t)
+	defer cleanup()
+	require.NoError(t, m.tokensManager.Start(context.Background(), false, nil))
+	community := common.HexToAddress("0xc0ffee")
+	_, err := m.walletDB.Exec("INSERT INTO tokens (network_id,address,name,symbol,decimals,community_id) VALUES (?,?,?,?,?,?)", 1, community, "Community", "COMM", 18, "community")
+	require.NoError(t, err)
+	usdc := common.HexToAddress("0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48")
+	ids := []types.ChainAddress{{ChainID: 1, Address: usdc}, {ChainID: 1, Address: community}, {ChainID: 1, Address: common.HexToAddress("0x9")}, {ChainID: walletcommon.ZkSyncMainnet, Address: walletcommon.ZkSyncETHTokenAddress()}, {ChainID: 1}, {ChainID: 1, Address: usdc}}
+	tokens, err := m.GetTokensByChainAddresses(ids)
+	require.NoError(t, err)
+	require.Len(t, tokens, len(ids))
+	for i, id := range ids {
+		single, err := m.GetTokenByChainAddress(id.ChainID, id.Address)
+		if err != nil {
+			require.Nil(t, tokens[i], i)
+			continue
+		}
+		require.Equal(t, single, tokens[i], i)
+	}
+	require.Equal(t, "COMM", tokens[1].Symbol)
+	require.Nil(t, tokens[2])
+	require.NotSame(t, tokens[0].Token, tokens[5].Token)
 }

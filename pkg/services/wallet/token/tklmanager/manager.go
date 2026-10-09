@@ -28,12 +28,6 @@ type identity struct {
 	address common.Address
 }
 
-// ChainAddress identifies one token in a batch lookup.
-type ChainAddress struct {
-	ChainID uint64
-	Address common.Address
-}
-
 // Manager owns one C handle, which is the only token index: queries call it
 // directly and return caller-owned values. Writes are serialized by mu.
 type Manager struct {
@@ -274,7 +268,7 @@ func (m *Manager) GetTokenByChainAddress(chain uint64, address common.Address) (
 
 // GetTokensByChainAddresses looks up many tokens in one call. The result is
 // aligned with ids; unknown tokens are nil.
-func (m *Manager) GetTokensByChainAddresses(ids []ChainAddress) []*types.Token {
+func (m *Manager) GetTokensByChainAddresses(ids []types.ChainAddress) []*types.Token {
 	result := make([]*types.Token, len(ids))
 	h := m.reader.Load()
 	if h == nil || len(ids) == 0 {

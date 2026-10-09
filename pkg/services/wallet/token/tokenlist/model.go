@@ -42,6 +42,12 @@ func ChainAndAddressFromTokenKey(key string) (uint64, common.Address, bool) {
 	return chainID, common.HexToAddress(parts[1]), true
 }
 
+// ChainAddress identifies one token in a batch lookup.
+type ChainAddress struct {
+	ChainID uint64
+	Address common.Address
+}
+
 func (t *Token) Key() string    { return TokenKey(t.ChainID, t.Address) }
 func (t *Token) IsNative() bool { return t.Address == (common.Address{}) }
 

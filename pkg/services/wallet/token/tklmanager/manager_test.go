@@ -228,10 +228,10 @@ func TestBatchLookupAlignsWithRequests(t *testing.T) {
 	m, err := New(tkl.Config{Chains: []uint64{1, 10}, InitialLists: []tkl.ListContent{{ID: "test", Format: tkl.StandardFormat}}, Policy: tkl.Policy{NativeAliases: []tkl.Identity{{ChainID: 1, Address: alias.Hex()}}}}, withBodies(tkl.ListBody{ID: "test", Origin: tkl.Bundled, Data: []byte(document)}))
 	require.NoError(t, err)
 	defer func() { _ = m.Stop() }()
-	require.Equal(t, make([]*types.Token, 1), m.GetTokensByChainAddresses([]ChainAddress{{1, common.Address{}}}))
+	require.Equal(t, make([]*types.Token, 1), m.GetTokensByChainAddresses([]types.ChainAddress{{ChainID: 1}}))
 	require.NoError(t, m.Start(context.Background(), false, nil))
 	one := common.HexToAddress("0x1")
-	ids := []ChainAddress{{1, common.HexToAddress("0x9")}, {1, common.Address{}}, {10, one}, {1, alias}, {1, one}, {10, one}, {56, one}}
+	ids := []types.ChainAddress{{ChainID: 1, Address: common.HexToAddress("0x9")}, {ChainID: 1}, {ChainID: 10, Address: one}, {ChainID: 1, Address: alias}, {ChainID: 1, Address: one}, {ChainID: 10, Address: one}, {ChainID: 56, Address: one}}
 	tokens := m.GetTokensByChainAddresses(ids)
 	require.Len(t, tokens, len(ids))
 	for i, id := range ids {
