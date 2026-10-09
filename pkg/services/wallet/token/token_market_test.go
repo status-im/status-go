@@ -24,7 +24,7 @@ import (
 
 // setupMarketTestManager loads the embedded lists for every wallet chain, with
 // testnet mode as given.
-func setupMarketTestManager(t *testing.T, testnet bool) *Manager {
+func setupMarketTestManager(t testing.TB, testnet bool) *Manager {
 	appDB, err := testutils.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
 	require.NoError(t, err)
 	walletDB, err := testutils.SetupTestMemorySQLDB(walletdb.DbInitializer{})
