@@ -14,8 +14,8 @@ import (
 
 type FilterDependencies struct {
 	db *sql.DB
-	// use token.TokenType, token.ChainID and token.Address to find the available symbol
-	tokenSymbol func(token ac.Token) string
+	// tokenSymbols returns each token's symbol, "" when unknown, from token.ChainID and token.Address
+	tokenSymbols func(tokens []ac.Token) []string
 	// use to get current timestamp
 	currentTimestamp func() int64
 }
@@ -264,19 +264,35 @@ func getFinalizationPeriod(chainID wCommon.ChainID) int64 {
 	return ac.L2FinalizationDuration
 }
 
-// lookupAndFillInTokens ignores NFTs
-func lookupAndFillInTokens(deps FilterDependencies, tokenOut *ac.Token, tokenIn *ac.Token) (symbolOut *string, symbolIn *string) {
-	if tokenOut != nil && tokenOut.TokenID == nil {
-		symbol := deps.tokenSymbol(*tokenOut)
-		if len(symbol) > 0 {
-			symbolOut = wCommon.NewAndSet(symbol)
+// fillInTokenSymbols looks up the symbols of all entries in one call and ignores NFTs.
+func fillInTokenSymbols(deps FilterDependencies, entries []Entry) {
+	fungible := func(token *ac.Token) bool { return token != nil && token.TokenID == nil }
+	var tokens []ac.Token
+	for i := range entries {
+		for _, token := range []*ac.Token{entries[i].tokenOut, entries[i].tokenIn} {
+			if fungible(token) {
+				tokens = append(tokens, *token)
+			}
 		}
 	}
-	if tokenIn != nil && tokenIn.TokenID == nil {
-		symbol := deps.tokenSymbol(*tokenIn)
-		if len(symbol) > 0 {
-			symbolIn = wCommon.NewAndSet(symbol)
-		}
+	if len(tokens) == 0 {
+		return
 	}
-	return symbolOut, symbolIn
+	symbols := deps.tokenSymbols(tokens)
+	next := 0
+	symbolOf := func(token *ac.Token) *string {
+		if !fungible(token) {
+			return nil
+		}
+		symbol := symbols[next]
+		next++
+		if len(symbol) == 0 {
+			return nil
+		}
+		return wCommon.NewAndSet(symbol)
+	}
+	for i := range entries {
+		entries[i].symbolOut = symbolOf(entries[i].tokenOut)
+		entries[i].symbolIn = symbolOf(entries[i].tokenIn)
+	}
 }
