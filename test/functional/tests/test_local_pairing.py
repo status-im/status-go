@@ -186,6 +186,59 @@ async def login_paired_device(backend: AsyncStatusBackend, key_uid, password):
 @pytest.mark.asyncio
 class TestLocalPairing:
 
+    @pytest.mark.parametrize("message_sync_enabled", [False, True])
+    async def test_pairing_threads(self, async_backend_new_profile, async_backend_factory, message_sync_enabled):
+        alice, bob, bob_second_device = await asyncio.gather(
+            async_backend_new_profile("alice"),
+            async_backend_new_profile("bob"),
+            async_backend_factory("bob_second_device"),
+        )
+        bob_second_device.backend.init_status_backend()
+        await async_messenger.make_contacts(alice, bob)
+        bob.backend.settings_service.save_setting("messages-backup-enabled?", False)
+
+        response = alice.wakuext_service.send_one_to_one_message(bob.public_key, "Thread parent")
+        parent = async_messenger.get_message_by_content_type(response, content_type=MessageContentType.TEXT_PLAIN.value)[0]
+        await bob.wait_for_signal(SignalType.MESSAGES_NEW, pattern=parent["id"], timeout=60)
+        try:
+            bob.wakuext_service.create_thread(alice.public_key, parent["id"])
+        except ApiResponseError as error:
+            if "threads feature is disabled" in str(error):
+                pytest.skip("Requires a status-go backend built with the Threads feature enabled")
+            raise
+
+        response = alice.wakuext_service.send_chat_message(bob.public_key, "Thread reply", responseTo=parent["id"], thread_id=parent["id"])
+        reply = async_messenger.get_message_by_content_type(response, content_type=MessageContentType.TEXT_PLAIN.value)[0]
+        await bob.wait_for_signal(SignalType.MESSAGES_NEW, pattern=reply["id"], timeout=60)
+        bob.wakuext_service.mark_thread_read(alice.public_key, parent["id"])
+
+        response = bob.wakuext_service.send_one_to_one_message(alice.public_key, "Empty thread parent")
+        empty_parent = async_messenger.get_message_by_content_type(response, content_type=MessageContentType.TEXT_PLAIN.value)[0]
+        bob.wakuext_service.create_thread(alice.public_key, empty_parent["id"])
+        expected_threads = bob.wakuext_service.chat_threads(alice.public_key)["threads"]
+        assert len(expected_threads) == 2
+        expected_by_id = {thread["threadId"]: thread for thread in expected_threads}
+        assert expected_by_id[parent["id"]]["readMessagesAtClockValue"] >= reply["clock"]
+
+        await pair_server_as_sender(bob, bob_second_device, message_sync_enabled)
+        await login_paired_device(bob_second_device, bob.backend.key_uid, bob.backend.password)
+        restored_threads = bob_second_device.wakuext_service.chat_threads(alice.public_key)["threads"]
+        if not message_sync_enabled:
+            assert not restored_threads, "Thread metadata transferred without message-sync consent"
+            assert not bob_second_device.wakuext_service.chat_thread_messages(alice.public_key, parent["id"])["messages"]
+            return
+
+        restored_by_id = {thread["threadId"]: thread for thread in restored_threads}
+        assert restored_by_id.keys() == expected_by_id.keys()
+        for thread_id, expected in expected_by_id.items():
+            for field in ("threadId", "chatId", "parentMessageId", "name", "readMessagesAtClockValue"):
+                assert restored_by_id[thread_id][field] == expected[field]
+        restored_messages = bob_second_device.wakuext_service.chat_thread_messages(alice.public_key, parent["id"])["messages"]
+        restored_reply = next(message for message in restored_messages if message["id"] == reply["id"])
+        assert restored_reply["threadId"] == parent["id"]
+        assert restored_reply["responseTo"] == parent["id"]
+        assert restored_reply["text"] == "Thread reply"
+
     async def test_pairing_server_as_sender(self, async_backend_new_profile, async_backend_factory):
         alice, bob, bob_second_device = await asyncio.gather(
             async_backend_new_profile("alice"),

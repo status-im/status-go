@@ -14,4 +14,5 @@ message MessengerLocalBackup {
   repeated SyncChat chats = 4;
   BackedUpProfile profile = 5;
   repeated BackedUpMessage messages = 6;
+  repeated BackedUpThread threads = 7;
 }
