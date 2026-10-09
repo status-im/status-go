@@ -345,6 +345,7 @@ func (tm *Manager) GetTokenByChainAddress(chainID uint64, address common.Address
 
 // GetTokensByChainAddresses is a batch GetTokenByChainAddress: the result is
 // aligned with ids and nil where neither the catalogue nor a custom token matches.
+// A custom-token read error only leaves the catalogue misses nil.
 func (tm *Manager) GetTokensByChainAddresses(ids []types.ChainAddress) ([]*tokentypes.Token, error) {
 	found := tm.tokensManager.GetTokensByChainAddresses(ids)
 	result := make([]*tokentypes.Token, len(ids))
@@ -358,7 +359,7 @@ func (tm *Manager) GetTokensByChainAddresses(ids []types.ChainAddress) ([]*token
 		if !customsLoaded {
 			var err error
 			if customs, err = tm.GetCustoms(true); err != nil {
-				return nil, err
+				logutils.ZapLogger().Error("failed to get custom tokens", zap.Error(err))
 			}
 			customsLoaded = true
 		}

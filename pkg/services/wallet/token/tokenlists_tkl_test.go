@@ -282,6 +282,21 @@ func TestTKLBatchLookupMatchesSingleLookups(t *testing.T) {
 	require.NotSame(t, tokens[0].Token, tokens[5].Token)
 }
 
+func TestTKLBatchLookupKeepsCatalogueHitsWhenCustomsFail(t *testing.T) {
+	m, cleanup := setupTestTokenDB(t)
+	defer cleanup()
+	require.NoError(t, m.tokensManager.Start(context.Background(), false, nil))
+	_, err := m.walletDB.Exec("DROP TABLE tokens")
+	require.NoError(t, err)
+	usdc := common.HexToAddress("0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48")
+	tokens, err := m.GetTokensByChainAddresses([]types.ChainAddress{{ChainID: 1, Address: usdc}, {ChainID: 1, Address: common.HexToAddress("0x9")}})
+	require.NoError(t, err)
+	require.Len(t, tokens, 2)
+	require.NotNil(t, tokens[0])
+	require.Equal(t, "USDC", tokens[0].Symbol)
+	require.Nil(t, tokens[1])
+}
+
 func TestTKLChainTokensMatchTokensByChains(t *testing.T) {
 	m, cleanup := setupTestTokenDB(t)
 	defer cleanup()
