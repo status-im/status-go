@@ -29,58 +29,62 @@ func newTKLReadManager(mng *Manager, chains []uint64, lastSuccess time.Time, opt
 	}
 	ids := initialListIDsFromEmbedded()
 	sort.Strings(ids)
+	mainListID, registryID := config.MainListID, config.RegistryID
+	formatOf := func(id string) string {
+		switch id {
+		case mainListID:
+			return tkl.StatusFormat
+		case registryID:
+			return tkl.RegistryFormat
+		}
+		return tkl.StandardFormat
+	}
+	// Bundled bodies are the embedded lists themselves; the core only borrows them.
+	bundled := make([]tkl.ListBody, 0, len(ids))
 	for _, id := range ids {
 		data, err := initialListProviderFromEmbedded(id)
 		if err != nil {
 			return nil, err
 		}
-		format := tkl.StandardFormat
-		if id == config.MainListID {
-			format = tkl.StatusFormat
-		}
-		config.InitialLists = append(config.InitialLists, tkl.ListContent{ID: id, Body: string(data), Format: format, Source: types.LocalSourceURL, FetchedTimestamp: (time.Time{}).Format(time.RFC3339)})
+		config.InitialLists = append(config.InitialLists, tkl.ListContent{ID: id, Format: formatOf(id), Source: types.LocalSourceURL, FetchedTimestamp: (time.Time{}).Format(time.RFC3339)})
+		bundled = append(bundled, tkl.ListBody{ID: id, Origin: tkl.Bundled, Data: data})
 	}
 	for chain, addresses := range walletcommon.AdditionalNativeTokenAddresses() {
 		for _, address := range addresses {
 			config.Policy.NativeAliases = append(config.Policy.NativeAliases, tkl.Identity{ChainID: chain, Address: address.Hex()})
 		}
 	}
-	return tklmanager.New(config, func(ctx context.Context) (tkl.Bootstrap, error) {
+	return tklmanager.New(config, func(ctx context.Context) (tkl.Bootstrap, []tkl.ListBody, error) {
 		bootstrap := tkl.Bootstrap{}
 		if !lastSuccess.IsZero() {
 			bootstrap.State = tkl.RefreshState{LastSuccess: lastSuccess.Unix(), HasSuccess: true}
 		}
 		contents, err := (&contentStore{walletDb: mng.walletDB}).getAll(ctx)
 		if err != nil {
-			return bootstrap, err
+			return bootstrap, nil, err
 		}
+		bodies := append(make([]tkl.ListBody, 0, len(bundled)+len(contents)), bundled...)
 		for id, content := range contents {
-			format := tkl.StandardFormat
-			if id == config.MainListID {
-				format = tkl.StatusFormat
-			}
-			if id == config.RegistryID {
-				format = tkl.RegistryFormat
-			}
-			row := tkl.ListContent{ID: id, Body: string(content.Data), Source: content.SourceURL, ETag: content.Etag, Format: format}
+			row := tkl.ListContent{ID: id, Source: content.SourceURL, ETag: content.Etag, Format: formatOf(id)}
 			if !content.Fetched.IsZero() {
 				row.FetchedAt = content.Fetched.Unix()
 				row.FetchedTimestamp = content.Fetched.UTC().Format(time.RFC3339)
 			}
-			bootstrap.Contents = append(bootstrap.Contents, row)
+			bootstrap.Stored = append(bootstrap.Stored, row)
+			bodies = append(bodies, tkl.ListBody{ID: id, Origin: tkl.Stored, Data: content.Data})
 		}
-		sort.Slice(bootstrap.Contents, func(i, j int) bool { return bootstrap.Contents[i].ID < bootstrap.Contents[j].ID })
+		sort.Slice(bootstrap.Stored, func(i, j int) bool { return bootstrap.Stored[i].ID < bootstrap.Stored[j].ID })
 		// Load only persisted ordinary metadata; community enrichment belongs to
 		// the Go query layer and must not introduce uncancellable SQL here.
 		rows, err := mng.walletDB.QueryContext(ctx, "SELECT address,name,symbol,decimals,network_id FROM tokens WHERE community_id IS NULL OR community_id = ''")
 		if err != nil {
-			return bootstrap, err
+			return bootstrap, nil, err
 		}
 		defer rows.Close()
 		for rows.Next() {
 			var token types.Token
 			if err := rows.Scan(&token.Address, &token.Name, &token.Symbol, &token.Decimals, &token.ChainID); err != nil {
-				return bootstrap, err
+				return bootstrap, nil, err
 			}
 			// Invalid customs are skipped by the core. Values outside
 			// the ABI's uint8 field must be skipped before narrowing as well.
@@ -90,8 +94,8 @@ func newTKLReadManager(mng *Manager, chains []uint64, lastSuccess time.Time, opt
 			bootstrap.Customs = append(bootstrap.Customs, tkl.Token{ChainID: token.ChainID, Address: token.Address.Hex(), Decimals: uint8(token.Decimals), Name: token.Name, Symbol: token.Symbol, LogoURI: token.LogoURI, CrossChainID: token.CrossChainID, Custom: true})
 		}
 		if err := rows.Err(); err != nil {
-			return bootstrap, err
+			return bootstrap, nil, err
 		}
-		return bootstrap, ctx.Err()
+		return bootstrap, bodies, ctx.Err()
 	}, options...)
 }
