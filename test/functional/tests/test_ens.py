@@ -14,7 +14,6 @@ from utils.config import Config
 
 logger = logging.getLogger(__name__)
 
-ANVIL_RPC_URL = "http://anvil:8545"
 CHAIN_ID = constants.ANVIL_NETWORK_ID
 
 
@@ -24,7 +23,7 @@ def random_ens_username():
 
 def cast_send(foundry, to, sig, args, private_key=constants.DEPLOYER_ACCOUNT.private_key):
     args_str = " ".join(str(a) for a in args)
-    cmd = f"cast send {to} '{sig}' {args_str} --rpc-url {ANVIL_RPC_URL} --private-key {private_key}"
+    cmd = f"cast send {to} '{sig}' {args_str} --rpc-url {constants.ANVIL_RPC_URL} --private-key {private_key}"
     result = foundry.container.exec_run(cmd)
     if result.exit_code != 0:
         raise RuntimeError(f"cast send failed: {result.output.decode().strip()}")
@@ -33,7 +32,7 @@ def cast_send(foundry, to, sig, args, private_key=constants.DEPLOYER_ACCOUNT.pri
 
 def cast_call(foundry, to, sig, args=None):
     args_str = " ".join(str(a) for a in args) if args else ""
-    cmd = f"cast call {to} '{sig}' {args_str} --rpc-url {ANVIL_RPC_URL}"
+    cmd = f"cast call {to} '{sig}' {args_str} --rpc-url {constants.ANVIL_RPC_URL}"
     result = foundry.container.exec_run(cmd)
     if result.exit_code != 0:
         raise RuntimeError(f"cast call failed: {result.output.decode().strip()}")
@@ -70,7 +69,7 @@ def extract_pubkey_coordinates(public_key):
 
 def cast_rpc(foundry, method, params=None):
     params_str = " ".join(str(p) for p in params) if params else ""
-    cmd = f"cast rpc {method} {params_str} --rpc-url {ANVIL_RPC_URL}"
+    cmd = f"cast rpc {method} {params_str} --rpc-url {constants.ANVIL_RPC_URL}"
     result = foundry.container.exec_run(cmd)
     if result.exit_code != 0:
         raise RuntimeError(f"cast rpc {method} failed: {result.output.decode().strip()}")
@@ -78,7 +77,7 @@ def cast_rpc(foundry, method, params=None):
 
 
 def get_block_timestamp(foundry):
-    cmd = f"cast block latest --field timestamp --rpc-url {ANVIL_RPC_URL}"
+    cmd = f"cast block latest --field timestamp --rpc-url {constants.ANVIL_RPC_URL}"
     result = foundry.container.exec_run(cmd)
     if result.exit_code != 0:
         raise RuntimeError(f"get_block_timestamp failed: {result.output.decode().strip()}")
@@ -89,7 +88,7 @@ def sync_registry_to_well_known(foundry, registry_addr, username):
     """Sync deployed registry storage to well-known address so Go code can read it."""
     well_known = "0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e"
     user_namehash = f"$(cast namehash '{username}.stateofus.eth')"
-    cmd = f"/app/sync_ens_registry.sh {registry_addr} {well_known} {ANVIL_RPC_URL} {user_namehash}"
+    cmd = f"/app/sync_ens_registry.sh {registry_addr} {well_known} {constants.ANVIL_RPC_URL} {user_namehash}"
     result = foundry.container.exec_run(["sh", "-c", cmd])
     if result.exit_code != 0:
         raise RuntimeError(f"sync_registry failed: {result.output.decode().strip()}")
