@@ -1,5 +1,3 @@
-//go:build logos_delivery
-
 package messaging
 
 import (
@@ -64,7 +62,7 @@ type sharedTestBackend struct {
 func (sharedTestBackend) Start() error { return nil }
 func (sharedTestBackend) Stop() error  { return nil }
 
-func newTestBackend() (testBackend, error) {
+func newLogosDeliveryTestBackend() (testBackend, error) {
 	if os.Getenv(sharedTestNodeEnv) == "" {
 		return newDeliveryTestBackend()
 	}
