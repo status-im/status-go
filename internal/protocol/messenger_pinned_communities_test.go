@@ -1,6 +1,7 @@
 package protocol
 
 import (
+	"crypto/sha256"
 	"encoding/hex"
 	"os"
 	"path/filepath"
@@ -23,6 +24,10 @@ func TestBootstrapPinnedCommunitiesImportsIntoDB(t *testing.T) {
 	payloads, err := pinnedcommunities.LoadEmbedded()
 	require.NoError(t, err)
 	require.NotEmpty(t, payloads, "expected at least one pinned community payload")
+	embeddedHashes := make(map[string][32]byte, len(payloads))
+	for _, p := range payloads {
+		embeddedHashes[p.CommunityID] = sha256.Sum256(p.RawPayload)
+	}
 
 	m, err := newRunningTestMessenger(t, messagingEnv, testMessengerConfig{
 		extraOptions: []Option{WithEnablePinnedBootstrap(true)},
@@ -32,6 +37,7 @@ func TestBootstrapPinnedCommunitiesImportsIntoDB(t *testing.T) {
 	waitForPinnedCommunitiesInDB(t, m, payloads)
 
 	for _, p := range payloads {
+		require.Equal(t, embeddedHashes[p.CommunityID], sha256.Sum256(p.RawPayload), "import must not modify the embedded payload")
 		community, err := m.FindCommunityInfoFromDB(p.CommunityID)
 		require.NoError(t, err, "community should exist in db for %s", p.CommunityID)
 		require.NotNil(t, community, "community should be loaded for %s", p.CommunityID)
