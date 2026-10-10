@@ -74,9 +74,15 @@ func (c *Client) BaseURL() string {
 }
 
 func (c *Client) requestOptions() []thirdparty.RequestOption {
-	options := []thirdparty.RequestOption{}
-	if c.apiKey != "" {
-		options = append(options, thirdparty.WithHeader(apiKeyHeader, c.apiKey))
+	if !c.useAPIKey() {
+		return nil
 	}
-	return options
+	return []thirdparty.RequestOption{thirdparty.WithHeader(apiKeyHeader, c.apiKey)}
+}
+
+// useAPIKey reports whether requests to the current host should present the API key.
+// Testnet quotes succeed without one. The testnet host rejects the referrer that belongs
+// to the mainnet key, so a build that has a key must not send either on that host.
+func (c *Client) useAPIKey() bool {
+	return c.apiKey != "" && c.baseURL != TestnetBaseURL
 }
