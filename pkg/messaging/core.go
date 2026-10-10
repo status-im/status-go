@@ -17,7 +17,6 @@ import (
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/messaging/common"
 	"github.com/status-im/status-go/pkg/messaging/controller"
-	"github.com/status-im/status-go/pkg/messaging/delivery"
 	"github.com/status-im/status-go/pkg/messaging/events"
 	"github.com/status-im/status-go/pkg/messaging/layers/encryption"
 	"github.com/status-im/status-go/pkg/messaging/layers/reliability"
@@ -252,14 +251,19 @@ func NewCore(params CoreParams, options ...Options) (*Core, error) {
 		return nil, errors.New("persistence is not configured")
 	}
 
-	if delivery.Available {
+	switch DefaultBackend {
+	case BackendLogosDelivery:
 		backend, err := newDeliveryBackend(params, config.logger)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to create logos-delivery backend")
 		}
 		return newCore(backend, params, config)
+	default:
+		return newGoWakuCore(params, config)
 	}
+}
 
+func newGoWakuCore(params CoreParams, config *config) (*Core, error) {
 	waku, err := newWaku(wakuParams{
 		nodeKey:        params.NodeKey,
 		fleet:          params.Fleet,

@@ -1,5 +1,3 @@
-//go:build logos_delivery
-
 package delivery
 
 import (
