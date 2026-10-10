@@ -5,7 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 
-	"golang.org/x/crypto/argon2"
+	"github.com/status-im/status-go/internal/crypto/argon2"
 )
 
 const maxAttempts = 1000000
@@ -13,6 +13,10 @@ const maxAttempts = 1000000
 // Solve attempts to solve the puzzle by finding a nonce that produces
 // a hash with the required number of leading zeros
 func Solve(ctx context.Context, puzzle *Puzzle) (*Solution, error) {
+	return solve(ctx, puzzle, maxAttempts)
+}
+
+func solve(ctx context.Context, puzzle *Puzzle, attempts uint64) (*Solution, error) {
 	if puzzle == nil {
 		return nil, fmt.Errorf("puzzle cannot be nil")
 	}
@@ -43,8 +47,10 @@ func Solve(ctx context.Context, puzzle *Puzzle) (*Solution, error) {
 	threads := uint8(puzzle.Argon2Params.Threads)
 	keyLen := uint32(puzzle.Argon2Params.KeyLen)
 
+	var hasher argon2.Hasher
+
 	// Try different nonces until we find one that meets the difficulty requirement
-	for nonce := uint64(0); nonce < maxAttempts; nonce++ {
+	for nonce := uint64(0); nonce < attempts; nonce++ {
 		select {
 		case <-ctx.Done():
 			return nil, ctx.Err()
@@ -55,7 +61,7 @@ func Solve(ctx context.Context, puzzle *Puzzle) (*Solution, error) {
 		input := fmt.Sprintf("%s%s%d", puzzle.Challenge, puzzle.Salt, nonce)
 
 		// Compute Argon2id hash
-		hash := argon2.IDKey([]byte(input), saltBytes, time, memory, threads, keyLen)
+		hash := hasher.IDKey([]byte(input), saltBytes, time, memory, threads, keyLen)
 		argonHash := hex.EncodeToString(hash)
 
 		// Check if hash meets difficulty requirement
@@ -71,7 +77,7 @@ func Solve(ctx context.Context, puzzle *Puzzle) (*Solution, error) {
 		}
 	}
 
-	return nil, fmt.Errorf("failed to solve puzzle within %d attempts", maxAttempts)
+	return nil, fmt.Errorf("failed to solve puzzle within %d attempts", attempts)
 }
 
 // checkDifficulty checks if the hash has the required number of leading zeros

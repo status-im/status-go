@@ -1,0 +1,13 @@
+# internal/crypto/argon2 is a fork of golang.org/x/crypto/argon2.
+# scripts/check_argon2_fork.sh (make lint-argon2-fork) rebuilds it from the module cache: the files
+# below at this exact version, plus argon2.patch. The version must match go.mod.
+module golang.org/x/crypto
+version v0.46.0
+# <path in the module> <path in this directory>
+file argon2/argon2.go argon2.go
+file argon2/blake2b.go blake2b.go
+file argon2/blamka_amd64.go blamka_amd64.go
+file argon2/blamka_amd64.s blamka_amd64.s
+file argon2/blamka_generic.go blamka_generic.go
+file argon2/blamka_ref.go blamka_ref.go
+file LICENSE LICENSE
