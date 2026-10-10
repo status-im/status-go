@@ -377,6 +377,23 @@ endif
 
 build-liblogosdelivery: $(LIBLOGOSDELIVERY) ##@build Build liblogosdelivery through the Go bindings
 
+## Same ARCH values as build-libsds-android; logos-delivery builds only arm64 for Android so far.
+build-liblogosdelivery-android: DELIVERY_ABI = $(strip $(if $(filter arm64,$(ARCH)),arm64 arm64-v8a,\
+	$(if $(filter arm,$(ARCH)),arm armeabi-v7a,\
+	$(if $(filter amd64 x86_64,$(ARCH)),amd64 x86_64,\
+	$(error Unsupported ARCH '$(ARCH)'. Please set ARCH to one of: arm64, arm, amd64, x86_64)))))
+build-liblogosdelivery-android: | nimble.paths
+	@echo "Building liblogosdelivery for Android"
+	$(NIMBLE_DELIVERY_ENV) CPU="$(word 1,$(DELIVERY_ABI))" ABIDIR="$(word 2,$(DELIVERY_ABI))" \
+		ANDROID_NDK_ROOT="$(ANDROID_NDK_ROOT)" ANDROID_TARGET="$(ANDROID_API)" \
+		$(NIMBLE) liblogosdeliveryAndroid
+
+build-liblogosdelivery-ios: | nimble.paths
+	@echo "Building liblogosdelivery for iOS"
+	$(NIMBLE_DELIVERY_ENV) IOS_SDK="$(IPHONE_SDK)" IOS_ARCH="$(ARCH)" \
+		IOS_SDK_PATH="$$(xcrun --sdk $(IPHONE_SDK) --show-sdk-path)" IOS_DEPLOYMENT_TARGET="$(IOS_TARGET)" \
+		env -u SDKROOT -u CPATH -u LIBRARY_PATH $(NIMBLE) liblogosdeliveryIOS
+
 
 ## Target-specific architecture mapping for libsds Android build
 # Note: nim-sds uses 'amd64' for both x86 and x86_64
@@ -500,7 +517,7 @@ endif
 	@echo "Shared library built:"
 	@ls -la build/bin/libstatus.*
 
-statusgo-android-library: generate statusgo-c-bindings build-libsds-android ##@cross-compile Build status-go as Android mobile library
+statusgo-android-library: generate statusgo-c-bindings build-libsds-android build-liblogosdelivery-android ##@cross-compile Build status-go as Android mobile library
 	@echo "Building Android mobile library..."
 	$(ANDROID_BUILD_FLAGS) CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
 	$(ANDROID_TOKEN_ENV) go build -buildmode=c-shared -tags '$(MOBILE_BUILD_TAGS)' \
@@ -511,7 +528,7 @@ statusgo-android-library: generate statusgo-c-bindings build-libsds-android ##@c
 	TKL_TARGET_OS=android NM="$(ANDROID_NDK_ROOT)/toolchains/llvm/prebuilt/$(HOST_OS)-x86_64/bin/llvm-nm" \
 		bash scripts/check_tkl_exports.sh build/bin/libstatus.so
 
-statusgo-ios-library: generate statusgo-c-bindings build-libsds-ios ##@cross-compile Build status-go as iOS mobile library
+statusgo-ios-library: generate statusgo-c-bindings build-libsds-ios build-liblogosdelivery-ios ##@cross-compile Build status-go as iOS mobile library
 	@echo "Building iOS mobile library..."
 	DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" \
 	CC="$$(xcrun --sdk $(IPHONE_SDK) --find clang)" \

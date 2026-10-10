@@ -77,3 +77,9 @@ proc runDeliveryBindingsTask(taskName: string) =
 
 task liblogosdelivery, "Build the liblogosdelivery status-go links against":
   runDeliveryBindingsTask("liblogosdelivery")
+
+task liblogosdeliveryAndroid, "Build liblogosdelivery for Android; CPU and ABIDIR select the architecture":
+  runDeliveryBindingsTask("liblogosdeliveryAndroid")
+
+task liblogosdeliveryIOS, "Build liblogosdelivery for iOS; IOS_SDK, IOS_ARCH and IOS_SDK_PATH select the target":
+  runDeliveryBindingsTask("liblogosdeliveryIOS")
