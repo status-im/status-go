@@ -1,5 +1,3 @@
-//go:build !logos_delivery
-
 package messaging
 
 import (
@@ -8,6 +6,6 @@ import (
 	"github.com/status-im/status-go/pkg/messaging/waku"
 )
 
-func newTestBackend() (testBackend, error) {
+func newGoWakuTestBackend() (testBackend, error) {
 	return waku.New(nil, &waku.DefaultConfig, zap.NewNop(), &testTimeSource{})
 }

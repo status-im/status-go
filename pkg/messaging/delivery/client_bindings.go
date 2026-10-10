@@ -1,5 +1,3 @@
-//go:build logos_delivery
-
 package delivery
 
 import (
@@ -12,9 +10,6 @@ import (
 
 	"github.com/status-im/status-go/internal/panics"
 )
-
-// Available reports whether this build links liblogosdelivery.
-const Available = true
 
 // bindingsClient adapts the bindings' MessagingClient to Client, translating
 // its events into this package's.

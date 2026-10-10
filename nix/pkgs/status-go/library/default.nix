@@ -63,6 +63,8 @@ in pkgs.buildGoModule {
         USE_LOGOS_STORAGE=true \
         NIM_SDS_INC_DIR="${pkgs.libsds}/include" \
         NIM_SDS_LIB_DIR="${pkgs.libsds}/lib" \
+        LOGOS_DELIVERY_INC_DIR="${pkgs.liblogosdelivery}/include" \
+        LOGOS_DELIVERY_LIB_DIR="${pkgs.liblogosdelivery}/lib" \
         LOGOS_STORAGE_LIB_DIR="${pkgs.libstorage}/lib" \
         LOGOS_STORAGE_INC_DIR="${pkgs.libstorage}/include" \
         STATUS_GO_BINDINGS_PATH="$NIX_BUILD_TOP" \
