@@ -56,7 +56,16 @@ task libsdsAndroid, "Build libsds for Android; ARCH selects the architecture":
 task libsdsIOS, "Build libsds for iOS":
   runBindingsTask("libsdsIOS")
 
-task liblogosdelivery, "Build the liblogosdelivery status-go links against":
+proc runDeliveryBindingsTask(taskName: string) =
   ## LIBLOGOSDELIVERY_OUT and NIM_PARAMS come from the caller.
   withDir nimblePkgDir("logos_delivery_go_bindings"):
-    exec "nimble liblogosdelivery"
+    exec "nimble " & taskName
+
+task liblogosdelivery, "Build the liblogosdelivery status-go links against":
+  runDeliveryBindingsTask("liblogosdelivery")
+
+task liblogosdeliveryAndroid, "Build liblogosdelivery for Android; CPU and ABIDIR select the architecture":
+  runDeliveryBindingsTask("liblogosdeliveryAndroid")
+
+task liblogosdeliveryIOS, "Build liblogosdelivery for iOS; IOS_SDK, IOS_ARCH and IOS_SDK_PATH select the target":
+  runDeliveryBindingsTask("liblogosdeliveryIOS")
