@@ -55,3 +55,41 @@ jobs:
       - name: Check the built library
         shell: bash
         run: ls -l build/
+
+  liblogosdelivery-mobile:
+    name: 'liblogosdelivery / ${{ matrix.target }}'
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: android-arm64
+            os: ubuntu-22.04
+          - target: ios-arm64
+            os: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: nim-lang/setup-nimble-action@b2eed48dc4ff7b6c1c5704fe9237ab6736c561cb # master: arch detection (#16)
+        with:
+          nimble-version: ${{ env.NIMBLE_VERSION }}
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Android NDK
+        if: startsWith(matrix.target, 'android')
+        id: ndk
+        uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: r27c
+
+      - name: Build liblogosdelivery for Android
+        if: startsWith(matrix.target, 'android')
+        run: make build-liblogosdelivery-android ARCH=arm64 ANDROID_API=28 ANDROID_NDK_ROOT="${{ steps.ndk.outputs.ndk-path }}"
+
+      - name: Build liblogosdelivery for iOS
+        if: startsWith(matrix.target, 'ios')
+        run: make build-liblogosdelivery-ios ARCH=arm64 IPHONE_SDK=iphoneos IOS_TARGET=13.0
+
+      - name: Check the built library
+        run: ls -l build/
