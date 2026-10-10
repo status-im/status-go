@@ -165,7 +165,7 @@ LEOPARD_CC_ENV := CC=gcc CXX=g++ CMAKE_GENERATOR="MSYS Makefiles"
 LEOPARD_NIM_PARAMS := -d:LeopardCmakeFlags=-DENABLE_OPENMP=off -d:LeopardExtraCompilerFlags=-fno-openmp -d:LeopardExtraLinkerFlags=-fno-openmp
 endif
 
-.PHONY: liblogosdelivery-nimble statusgo-nim-delivery
+.PHONY: liblogosdelivery-nimble statusgo-nim-delivery build-liblogosdelivery-android build-liblogosdelivery-ios
 
 $(NIMBLE_LIB): | nimble.paths
 	$(LEOPARD_CC_ENV) LIBLOGOSDELIVERY_OUT="$(CURDIR)/build" \
@@ -174,6 +174,27 @@ $(NIMBLE_LIB): | nimble.paths
 	@test -f $@ || (echo "ERROR: $@ was not produced" && exit 1)
 
 liblogosdelivery-nimble: $(NIMBLE_LIB) ##@build Build liblogosdelivery via the Go bindings' Nimble task
+
+NIMBLE_DELIVERY_ENV = \
+	LIBLOGOSDELIVERY_OUT="$(CURDIR)/build" \
+	NIM_PARAMS="--skipParentCfg $$NIM_PARAMS -d:disable_rln $$(tr '\n' ' ' < $(CURDIR)/nimble.paths)"
+
+## Same ARCH values as build-libsds-android; logos-delivery builds only arm64 for Android so far.
+build-liblogosdelivery-android: DELIVERY_ABI = $(strip $(if $(filter arm64,$(ARCH)),arm64 arm64-v8a,\
+	$(if $(filter arm,$(ARCH)),arm armeabi-v7a,\
+	$(if $(filter amd64 x86_64,$(ARCH)),amd64 x86_64,\
+	$(error Unsupported ARCH '$(ARCH)'. Please set ARCH to one of: arm64, arm, amd64, x86_64)))))
+build-liblogosdelivery-android: | nimble.paths
+	@echo "Building liblogosdelivery for Android"
+	$(NIMBLE_DELIVERY_ENV) CPU="$(word 1,$(DELIVERY_ABI))" ABIDIR="$(word 2,$(DELIVERY_ABI))" \
+		ANDROID_NDK_ROOT="$(ANDROID_NDK_ROOT)" ANDROID_TARGET="$(ANDROID_API)" \
+		$(NIMBLE) liblogosdeliveryAndroid
+
+build-liblogosdelivery-ios: | nimble.paths
+	@echo "Building liblogosdelivery for iOS"
+	$(NIMBLE_DELIVERY_ENV) IOS_SDK="$(IPHONE_SDK)" IOS_ARCH="$(ARCH)" \
+		IOS_SDK_PATH="$$(xcrun --sdk $(IPHONE_SDK) --show-sdk-path)" IOS_DEPLOYMENT_TARGET="$(IOS_TARGET)" \
+		env -u SDKROOT -u CPATH -u LIBRARY_PATH $(NIMBLE) liblogosdeliveryIOS
 
 # Temporary: folds into statusgo-library once the delivery backend is wired in.
 statusgo-nim-delivery: STATUS_GO_BINDINGS_PATH ?= build/bin/statusgo-lib
@@ -518,7 +539,7 @@ endif
 	@echo "Shared library built:"
 	@ls -la build/bin/libstatus.*
 
-statusgo-android-library: generate statusgo-c-bindings build-libsds-android ##@cross-compile Build status-go as Android mobile library
+statusgo-android-library: generate statusgo-c-bindings build-libsds-android build-liblogosdelivery-android ##@cross-compile Build status-go as Android mobile library
 	@echo "Building Android mobile library..."
 	$(ANDROID_BUILD_FLAGS) CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
 	$(ANDROID_TOKEN_ENV) go build -buildmode=c-shared -tags '$(MOBILE_BUILD_TAGS)' \
@@ -529,7 +550,7 @@ statusgo-android-library: generate statusgo-c-bindings build-libsds-android ##@c
 	TKL_TARGET_OS=android NM="$(ANDROID_NDK_ROOT)/toolchains/llvm/prebuilt/$(HOST_OS)-x86_64/bin/llvm-nm" \
 		bash scripts/check_tkl_exports.sh build/bin/libstatus.so
 
-statusgo-ios-library: generate statusgo-c-bindings build-libsds-ios ##@cross-compile Build status-go as iOS mobile library
+statusgo-ios-library: generate statusgo-c-bindings build-libsds-ios build-liblogosdelivery-ios ##@cross-compile Build status-go as iOS mobile library
 	@echo "Building iOS mobile library..."
 	DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" \
 	CC="$$(xcrun --sdk $(IPHONE_SDK) --find clang)" \
