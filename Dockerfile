@@ -90,7 +90,7 @@ RUN --mount=type=cache,target="/root/.cache/go-build",id=statusgo-build-$cache_i
 
 # Stage runtime shared libraries required by built binaries.
 RUN mkdir -p /tmp/status-runtime-libs \
-    && cp /go/src/github.com/status-im/status-go/build/libsds.so /tmp/status-runtime-libs/ \
+    && cp /go/src/github.com/status-im/status-go/build/libsds.so /go/src/github.com/status-im/status-go/build/liblogosdelivery.so /tmp/status-runtime-libs/ \
     && if [ -f /go/src/github.com/status-im/logos-storage-nim/build/libstorage.so ]; then \
     cp /go/src/github.com/status-im/logos-storage-nim/build/libstorage.so /tmp/status-runtime-libs/; \
     fi
