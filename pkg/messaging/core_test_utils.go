@@ -12,8 +12,7 @@ import (
 )
 
 // testBackend is the messaging backend a TestMessagingEnvironment shares
-// between its cores. newTestBackend picks go-waku or, with the logos_delivery
-// build tag, logos-delivery.
+// between its cores, of the DefaultBackend kind.
 type testBackend interface {
 	types.Waku
 	transport.MessagingAPI
@@ -25,6 +24,15 @@ type TestMessagingEnvironment struct {
 	// To enable communication between multiple messaging core instances in tests,
 	// share a single Waku instance across them.
 	waku *testWakuWrapper
+}
+
+func newTestBackend() (testBackend, error) {
+	switch DefaultBackend {
+	case BackendLogosDelivery:
+		return newLogosDeliveryTestBackend()
+	default:
+		return newGoWakuTestBackend()
+	}
 }
 
 func NewTestMessagingEnvironment() (*TestMessagingEnvironment, error) {
