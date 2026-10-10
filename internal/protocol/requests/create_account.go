@@ -108,6 +108,8 @@ type WalletConfig struct {
 
 	CustomTokens []*tokentypes.Token `json:"customTokens"` // custom tokens, mainly used for registering custom tokens for functional tests
 
+	EFPBaseURL string `json:"efpBaseURL"`
+
 	// Swap provider toggles
 	EnableParaswapProvider *bool `json:"enableParaswapProvider,omitempty"` // default: false
 	EnableLiFiProvider     *bool `json:"enableLiFiProvider,omitempty"`     // default: false

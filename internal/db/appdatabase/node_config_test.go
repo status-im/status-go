@@ -29,7 +29,7 @@ func randomNodeConfig() *params.NodeConfig {
 		NetworkID:          uint64(int64(randomInt(math.MaxInt64))),
 		NodeKey:            randomString(),
 		APIModules:         randomString(),
-		WalletConfig:       params.WalletConfig{Enabled: randomBool()},
+		WalletConfig:       params.WalletConfig{Enabled: randomBool(), EFPBaseURL: randomString()},
 		BrowsersConfig:     params.BrowsersConfig{Enabled: randomBool()},
 		PermissionsConfig:  params.PermissionsConfig{Enabled: randomBool()},
 		ConnectorConfig:    params.ConnectorConfig{Enabled: randomBool()},

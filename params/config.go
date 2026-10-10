@@ -243,6 +243,8 @@ type WalletConfig struct {
 	CommunityTokenDeployerOverrides map[uint64]common.Address `json:"CommunityTokenDeployerOverrides"` // map[chainID]CommunityTokenDeployer contract address
 
 	CustomTokens []*tokentypes.Token `json:"CustomTokens"` // custom tokens, mainly used for registering custom tokens for functional tests
+
+	EFPBaseURL string `json:"EFPBaseURL"`
 }
 
 type MarketDataProxyConfig struct {

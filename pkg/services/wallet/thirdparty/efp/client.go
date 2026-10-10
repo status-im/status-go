@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
 
@@ -61,6 +62,10 @@ func NewClient(httpClient *thirdparty.HTTPClient) *Client {
 		httpClient: httpClient,
 		baseURL:    baseURL,
 	}
+}
+
+func (c *Client) SetBaseURL(raw string) {
+	c.baseURL = strings.TrimRight(raw, "/")
 }
 
 func (c *Client) ID() string {
