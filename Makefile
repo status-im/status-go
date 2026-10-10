@@ -136,42 +136,63 @@ LIBSDS ?= $(NIM_SDS_LIB_DIR)/libsds.$(LIB_EXT)
 CGO_CFLAGS+=-I$(NIM_SDS_INC_DIR)
 CGO_LDFLAGS+=-L$(NIM_SDS_LIB_DIR) -lsds
 
-# `logos-delivery` variables: LOGOS_DELIVERY_LIB_DIR/INC_DIR come from the Nix shell.
+# `logos-delivery` variables
+#
+# Option 1 (default): Nimble builds liblogosdelivery into build/.
+# Option 2: Provide LOGOS_DELIVERY_LIB_DIR and LOGOS_DELIVERY_INC_DIR (used by Nix).
+
 ifdef LOGOS_DELIVERY_LIB_DIR
 ifndef LOGOS_DELIVERY_INC_DIR
     $(error LOGOS_DELIVERY_INC_DIR must be provided when LOGOS_DELIVERY_LIB_DIR is set)
 endif
+else
+    LOGOS_DELIVERY_LIB_DIR := $(CURDIR)/build
+    LOGOS_DELIVERY_INC_DIR := $(CURDIR)/build
+    LOGOS_DELIVERY_BUILD_FROM_SOURCE := true
+    LOGOS_DELIVERY_NIMBLE_SETUP := nimble.paths
+endif
+
 LIBLOGOSDELIVERY ?= $(LOGOS_DELIVERY_LIB_DIR)/liblogosdelivery.$(LIB_EXT)
 CGO_CFLAGS+=-I$(LOGOS_DELIVERY_INC_DIR)
 CGO_LDFLAGS+=-L$(LOGOS_DELIVERY_LIB_DIR) -llogosdelivery
-endif
 
-# Built without Nix the same way libsds is.
-NIMBLE_LIB := $(CURDIR)/build/liblogosdelivery.$(LIB_EXT)
+.PHONY: build-liblogosdelivery statusgo-nim-delivery build-liblogosdelivery-android build-liblogosdelivery-ios
 
-.PHONY: liblogosdelivery-nimble statusgo-nim-delivery
-
-$(NIMBLE_LIB): | nimble.paths
-	LIBLOGOSDELIVERY_OUT="$(CURDIR)/build" \
+$(LIBLOGOSDELIVERY): | $(LOGOS_DELIVERY_NIMBLE_SETUP)
+ifeq ($(LOGOS_DELIVERY_BUILD_FROM_SOURCE),true)
+	LIBLOGOSDELIVERY_OUT="$(LOGOS_DELIVERY_LIB_DIR)" \
 		NIM_PARAMS="--skipParentCfg $$NIM_PARAMS -d:disable_rln $$(tr '\n' ' ' < $(CURDIR)/nimble.paths)" \
 		$(NIMBLE) liblogosdelivery
 	@test -f $@ || (echo "ERROR: $@ was not produced" && exit 1)
+else
+	@test -f $@ || (echo "ERROR: liblogosdelivery not found at $@" && exit 1)
+endif
 
-liblogosdelivery-nimble: $(NIMBLE_LIB) ##@build Build liblogosdelivery via the Go bindings' Nimble task
+build-liblogosdelivery: $(LIBLOGOSDELIVERY) ##@build Build liblogosdelivery via the Go bindings' Nimble task
 
-# Temporary: folds into statusgo-library once the delivery backend is wired in.
-statusgo-nim-delivery: STATUS_GO_BINDINGS_PATH ?= build/bin/statusgo-lib
-statusgo-nim-delivery: STATUS_GO_LIBRARY_OUT ?= build/bin
-statusgo-nim-delivery: $(NIMBLE_LIB) generate statusgo-c-bindings $(LIBSDS) ##@build libstatus.a against the Nimble-built liblogosdelivery
-	CGO_CFLAGS="$(CGO_CFLAGS) -I$(CURDIR)/build" \
-	CGO_LDFLAGS="$(CGO_LDFLAGS) -L$(CURDIR)/build -llogosdelivery -Wl,-rpath,$(CURDIR)/build" \
-	go build \
-		-tags '$(BUILD_TAGS)' \
-		$(BUILD_FLAGS) \
-		-buildmode=c-archive \
-		-o $(STATUS_GO_LIBRARY_OUT)/libstatus.a \
-		"$(STATUS_GO_BINDINGS_PATH)/main.go"
-	@echo "Static library built: $(STATUS_GO_LIBRARY_OUT)/libstatus.a"
+NIMBLE_DELIVERY_ENV = \
+	LIBLOGOSDELIVERY_OUT="$(CURDIR)/build" \
+	NIM_PARAMS="--skipParentCfg $$NIM_PARAMS -d:disable_rln $$(tr '\n' ' ' < $(CURDIR)/nimble.paths)"
+
+## Same ARCH values as build-libsds-android; logos-delivery builds only arm64 for Android so far.
+build-liblogosdelivery-android: DELIVERY_ABI = $(strip $(if $(filter arm64,$(ARCH)),arm64 arm64-v8a,\
+	$(if $(filter arm,$(ARCH)),arm armeabi-v7a,\
+	$(if $(filter amd64 x86_64,$(ARCH)),amd64 x86_64,\
+	$(error Unsupported ARCH '$(ARCH)'. Please set ARCH to one of: arm64, arm, amd64, x86_64)))))
+build-liblogosdelivery-android: | nimble.paths
+	@echo "Building liblogosdelivery for Android"
+	$(NIMBLE_DELIVERY_ENV) CPU="$(word 1,$(DELIVERY_ABI))" ABIDIR="$(word 2,$(DELIVERY_ABI))" \
+		ANDROID_NDK_ROOT="$(ANDROID_NDK_ROOT)" ANDROID_TARGET="$(ANDROID_API)" \
+		$(NIMBLE) liblogosdeliveryAndroid
+
+build-liblogosdelivery-ios: | nimble.paths
+	@echo "Building liblogosdelivery for iOS"
+	$(NIMBLE_DELIVERY_ENV) IOS_SDK="$(IPHONE_SDK)" IOS_ARCH="$(ARCH)" \
+		IOS_SDK_PATH="$$(xcrun --sdk $(IPHONE_SDK) --show-sdk-path)" IOS_DEPLOYMENT_TARGET="$(IOS_TARGET)" \
+		$(NIMBLE) liblogosdeliveryIOS
+
+statusgo-nim-delivery: BUILD_TAGS += logos_delivery
+statusgo-nim-delivery: statusgo-library ##@build libstatus.a with logos-delivery as the messaging backend
 
 # `logos-storage` variables (opt-in)
 USE_LOGOS_STORAGE ?= false
@@ -196,10 +217,7 @@ endif
 
 LIBSTORAGE ?= $(LOGOS_STORAGE_LIB_DIR)/libstorage.$(LIB_EXT)
 
-RUNTIME_LIB_DIRS := $(NIM_SDS_LIB_DIR)
-ifdef LOGOS_DELIVERY_LIB_DIR
-    RUNTIME_LIB_DIRS := $(LOGOS_DELIVERY_LIB_DIR):$(RUNTIME_LIB_DIRS)
-endif
+RUNTIME_LIB_DIRS := $(LOGOS_DELIVERY_LIB_DIR):$(NIM_SDS_LIB_DIR)
 LOGOS_STORAGE_BUILD_DEPS :=
 ifeq ($(USE_LOGOS_STORAGE),true)
 	override BUILD_TAGS += use_logos_storage
@@ -248,7 +266,7 @@ STORAGE_TEST_ENV := LD_LIBRARY_PATH="$(LOGOS_STORAGE_LIB_DIR):$(RUNTIME_LIB_DIRS
 	CGO_CFLAGS="$(CGO_CFLAGS) -I$(LOGOS_STORAGE_INC_DIR)"
 STORAGE_TEST_TAGS := use_logos_storage $(BUILD_TAGS) gowaku_skip_migrations
 
-test-storage: build-storage $(LIBSDS) generate ##@tests Run logosstorage package tests via gotestsum
+test-storage: build-storage $(LIBSDS) $(LIBLOGOSDELIVERY) generate ##@tests Run logosstorage package tests via gotestsum
 	$(STORAGE_TEST_ENV) gotestsum --packages="./pkg/services/logosstorage" -f testname -- -count 1 -tags "$(STORAGE_TEST_TAGS)"
 	$(STORAGE_TEST_ENV) gotestsum --packages="./internal/protocol/communities/archive/logosstorage" -f testname -- -count 1 -tags "$(STORAGE_TEST_TAGS)"
 	$(STORAGE_TEST_ENV) gotestsum --packages="./internal/protocol" -f testname -- -count 1 -tags "$(STORAGE_TEST_TAGS)" \
@@ -259,7 +277,7 @@ TORRENT_TEST_ENV := LD_LIBRARY_PATH="$(RUNTIME_LIB_DIRS)" \
 	CGO_CFLAGS="$(CGO_CFLAGS)"
 TORRENT_TEST_TAGS := $(BUILD_TAGS) use_torrent gowaku_skip_migrations
 
-test-torrent: $(LIBSDS) generate ##@tests Run torrent archive package tests via gotestsum
+test-torrent: $(LIBSDS) $(LIBLOGOSDELIVERY) generate ##@tests Run torrent archive package tests via gotestsum
 	$(TORRENT_TEST_ENV) gotestsum --packages="./internal/protocol/communities/archive/torrent" -f testname -- -count 1 -tags "$(TORRENT_TEST_TAGS)"
 	$(TORRENT_TEST_ENV) gotestsum --packages="./internal/protocol" -f testname -- -count 1 -tags "$(TORRENT_TEST_TAGS)" \
 	-run TestMessengerCommunitiesTokenPermissionsSuite/TestImportDecryptedArchiveMessages
@@ -345,7 +363,7 @@ nix-purge: ##@nix Completely remove Nix setup, including /nix directory
 all: $(GO_CMD_NAMES)
 
 .PHONY: $(GO_CMD_NAMES) $(GO_CMD_PATHS) $(GO_CMD_BUILDS)
-$(GO_CMD_BUILDS): generate $(LOGOS_STORAGE_BUILD_DEPS) $(LIBSDS)
+$(GO_CMD_BUILDS): generate $(LOGOS_STORAGE_BUILD_DEPS) $(LIBSDS) $(LIBLOGOSDELIVERY)
 $(GO_CMD_BUILDS): ##@build Build any Go project from cmd folder
 	CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
 	go build -v \
@@ -411,10 +429,10 @@ status-backend: ##@build Build status-backend to run status-go as HTTP server
 status-backend: build/bin/status-backend
 
 run-status-backend: PORT ?= 0
-run-status-backend: $(LIBSDS)
+run-status-backend: $(LIBSDS) $(LIBLOGOSDELIVERY)
 run-status-backend: generate
 run-status-backend: ##@run Start status-backend server listening to localhost:PORT
-	LD_LIBRARY_PATH="$(NIM_SDS_LIB_DIR)" CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
+	LD_LIBRARY_PATH="$(RUNTIME_LIB_DIRS)" CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
 	go run -mod=mod ./cmd/status-backend --address localhost:${PORT}
 
 push-notification-server: ##@build Build push-notification-server
@@ -448,7 +466,7 @@ statusgo-stub-bindings:
 statusgo-library: STATUS_GO_BINDINGS_PATH ?= build/bin/statusgo-lib
 statusgo-library: STATUS_GO_LIBRARY_OUT ?= build/bin
 statusgo-library: generate
-statusgo-library: statusgo-c-bindings $(LIBSDS)  ##@cross-compile Build status-go as static library for current platform
+statusgo-library: statusgo-c-bindings $(LIBSDS) $(LIBLOGOSDELIVERY)  ##@cross-compile Build status-go as static library for current platform
 	@echo "Building static library..."
 	CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
 	go build \
@@ -460,7 +478,7 @@ statusgo-library: statusgo-c-bindings $(LIBSDS)  ##@cross-compile Build status-g
 	@echo "Static library built: $(STATUS_GO_LIBRARY_OUT)/libstatus.a"
 
 statusgo-shared-library: generate
-statusgo-shared-library: statusgo-c-bindings $(LIBSDS) ##@cross-compile Build status-go as shared library for current platform
+statusgo-shared-library: statusgo-c-bindings $(LIBSDS) $(LIBLOGOSDELIVERY) ##@cross-compile Build status-go as shared library for current platform
 	@echo "Building shared library..."
 	@echo "Tags: $(BUILD_TAGS)"
 	CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
@@ -479,7 +497,7 @@ endif
 	@echo "Shared library built:"
 	@ls -la build/bin/libstatus.*
 
-statusgo-android-library: generate statusgo-c-bindings build-libsds-android ##@cross-compile Build status-go as Android mobile library
+statusgo-android-library: generate statusgo-c-bindings build-libsds-android build-liblogosdelivery-android ##@cross-compile Build status-go as Android mobile library
 	@echo "Building Android mobile library..."
 	$(ANDROID_BUILD_FLAGS) CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
 	go build -buildmode=c-shared -tags 'gowaku_no_rln nowatchdog disable_torrent' \
@@ -488,7 +506,7 @@ statusgo-android-library: generate statusgo-c-bindings build-libsds-android ##@c
 	@echo "Android library built"
 	@file build/bin/libstatus.so
 
-statusgo-ios-library: generate statusgo-c-bindings build-libsds-ios ##@cross-compile Build status-go as iOS mobile library
+statusgo-ios-library: generate statusgo-c-bindings build-libsds-ios build-liblogosdelivery-ios ##@cross-compile Build status-go as iOS mobile library
 	@echo "Building iOS mobile library..."
 	DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" \
 	CC="$$(xcrun --sdk $(IPHONE_SDK) --find clang)" \
@@ -565,7 +583,7 @@ docker-test: ##@tests Run tests in a docker container with golang.
 
 test: test-unit ##@tests Run basic, short tests during development
 
-test-unit-prep: $(LOGOS_STORAGE_BUILD_DEPS) $(LIBSDS)
+test-unit-prep: $(LOGOS_STORAGE_BUILD_DEPS) $(LIBSDS) $(LIBLOGOSDELIVERY)
 test-unit-prep: generate
 test-unit-prep: export BUILD_TAGS ?=
 test-unit-prep: export UNIT_TEST_DRY_RUN ?= false

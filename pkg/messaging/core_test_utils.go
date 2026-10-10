@@ -6,11 +6,18 @@ import (
 	"testing"
 	"time"
 
-	"go.uber.org/zap"
-
-	"github.com/status-im/status-go/pkg/messaging/waku"
+	"github.com/status-im/status-go/pkg/messaging/layers/transport"
 	"github.com/status-im/status-go/pkg/messaging/waku/types"
 )
+
+// testBackend is the messaging backend a TestMessagingEnvironment shares
+// between its cores, of the DefaultBackend kind.
+type testBackend interface {
+	types.Waku
+	transport.MessagingAPI
+	// SkipPublishToTopic makes sends fail while value is true.
+	SkipPublishToTopic(value bool)
+}
 
 type TestMessagingEnvironment struct {
 	// To enable communication between multiple messaging core instances in tests,
@@ -18,11 +25,21 @@ type TestMessagingEnvironment struct {
 	waku *testWakuWrapper
 }
 
+func newTestBackend() (testBackend, error) {
+	switch DefaultBackend {
+	case BackendLogosDelivery:
+		return newLogosDeliveryTestBackend()
+	default:
+		return newGoWakuTestBackend()
+	}
+}
+
 func NewTestMessagingEnvironment() (*TestMessagingEnvironment, error) {
-	waku, err := newTestWakuWrapper()
+	backend, err := newTestBackend()
 	if err != nil {
 		return nil, err
 	}
+	waku := &testWakuWrapper{testBackend: backend}
 
 	return &TestMessagingEnvironment{
 		waku: waku,
@@ -30,13 +47,13 @@ func NewTestMessagingEnvironment() (*TestMessagingEnvironment, error) {
 }
 
 func (f *TestMessagingEnvironment) Setup(t *testing.T) error {
-	err := f.waku.Waku.Start()
+	err := f.waku.testBackend.Start()
 	if err != nil {
 		return err
 	}
 
 	t.Cleanup(func() {
-		err = f.waku.Waku.Stop()
+		err = f.waku.testBackend.Stop()
 		if err != nil {
 			t.Error(err)
 		}
@@ -61,18 +78,18 @@ func (f *TestMessagingEnvironment) SetProcessMailserverBatchHook(hook func(ctx c
 }
 
 func (f *TestMessagingEnvironment) SimulateOffline() func() {
-	f.waku.Waku.SkipPublishToTopic(true)
+	f.waku.SkipPublishToTopic(true)
 	return func() {
-		f.waku.Waku.SkipPublishToTopic(false)
+		f.waku.SkipPublishToTopic(false)
 	}
 }
 
-// Wraps waku to provide ability to subscribe to post events. It embeds the
-// concrete *waku.Waku (not the types.Waku interface) so that the messaging
-// API methods that live on the backend — Send / Subscribe / Unsubscribe /
-// envelope events, i.e. transport.MessagingAPI — are promoted too.
+// Wraps the backend to provide ability to subscribe to post events. It embeds
+// testBackend (not just types.Waku) so that the messaging API methods that live
+// on the backend — Send / Subscribe / Unsubscribe / envelope events, i.e.
+// transport.MessagingAPI — are promoted too.
 type testWakuWrapper struct {
-	*waku.Waku
+	testBackend
 	postSubscriptions []chan *PostMessageSubscription
 
 	// processMailserverBatchHook, when set, intercepts every store (mailserver)
@@ -87,7 +104,7 @@ type testWakuWrapper struct {
 // Msg is nil because Send takes raw bytes, not a NewMessage; the only
 // consumer (MessagesOrderController) reads ID.
 func (tw *testWakuWrapper) Send(ctx context.Context, pubsubTopic, contentTopic string, payload []byte, ephemeral bool, priority *int) ([]byte, error) {
-	id, err := tw.Waku.Send(ctx, pubsubTopic, contentTopic, payload, ephemeral, priority)
+	id, err := tw.testBackend.Send(ctx, pubsubTopic, contentTopic, payload, ephemeral, priority)
 	if err != nil {
 		return nil, err
 	}
@@ -111,7 +128,7 @@ func (tw *testWakuWrapper) StoreQuery(
 	if tw.processMailserverBatchHook != nil {
 		return tw.processMailserverBatchHook(ctx, batch, pageLimit, shouldProcessNextPage, processEnvelopes)
 	}
-	return tw.Waku.StoreQuery(ctx, batch, pageLimit, shouldProcessNextPage, processEnvelopes)
+	return tw.testBackend.StoreQuery(ctx, batch, pageLimit, shouldProcessNextPage, processEnvelopes)
 }
 
 func (tw *testWakuWrapper) SubscribePostEvents() chan *PostMessageSubscription {
@@ -142,20 +159,6 @@ type testTimeSource struct {
 
 func (ts *testTimeSource) Now() time.Time {
 	return time.Now()
-}
-
-func newTestWakuWrapper() (*testWakuWrapper, error) {
-	w, err := waku.New(
-		nil,
-		&waku.DefaultConfig,
-		zap.NewNop(),
-		&testTimeSource{},
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	return &testWakuWrapper{Waku: w}, nil
 }
 
 type TestUtils struct {
