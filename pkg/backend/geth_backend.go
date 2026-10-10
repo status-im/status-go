@@ -106,6 +106,7 @@ type StatusBackend struct {
 	LocalPairingStateManager *statecontrol.ProcessStateManager
 	prometheusMetrics        *metrics.Server
 	pprof                    pprofServer
+	memRelease               *memoryReleaser
 	sentryDSN                string
 
 	logger            *zap.Logger
@@ -158,6 +159,7 @@ func NewStatusBackend(logger *zap.Logger) *StatusBackend {
 		logger:            logger,
 		preLoginLogConfig: logutils.NewPreLoginLogConfig(),
 		shutdownTasks:     []func() error{},
+		memRelease:        newMemoryReleaser(),
 	}
 	if err := backend.initialize(); err != nil {
 		logger.Error("failed to initialize backend", zap.Error(err))
@@ -1131,6 +1133,10 @@ func (b *StatusBackend) LoggedIn(keyUID string, err error) error {
 		}
 	}
 
+	// Armed before the signal: a client may pause synchronously from its LoggedIn handler.
+	if platform.IsMobilePlatform() {
+		b.memRelease.scheduleAfterLogin(releaseAfterLoginDelay)
+	}
 	signal.SendLoggedIn(acc, s, ensUsernamesJSON, nil)
 	b.statusNode.StartTokenManager()
 	return nil
@@ -2407,6 +2413,7 @@ func (b *StatusBackend) StopNode() error {
 }
 
 func (b *StatusBackend) stopNode() error {
+	b.memRelease.stop()
 	if b.statusNode == nil || !b.IsNodeRunning() {
 		return nil
 	}
@@ -2577,7 +2584,11 @@ func (b *StatusBackend) PauseServices(names []string) error {
 	// partial pause, for a test or one service, is not that.
 	defer func() { traffic.Default.SetBackground(b.statusNode.ServiceRegistry().AllPaused()) }()
 
-	return b.statusNode.ServiceRegistry().PauseMultiple(names)
+	err := b.statusNode.ServiceRegistry().PauseMultiple(names)
+	if platform.IsMobilePlatform() {
+		b.memRelease.releaseNow()
+	}
+	return err
 }
 
 // ResumeServices resumes a list of named services, collecting any errors.
