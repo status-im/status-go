@@ -160,7 +160,7 @@ func TestSendOutcomesBecomeEnvelopeEvents(t *testing.T) {
 	require.Equal(t, types.EventEnvelopeExpired, ev.Event)
 }
 
-func TestReceivedMessageIsReportedOnEverySubscribedPubsubTopic(t *testing.T) {
+func TestReceivedMessageIsReportedOnce(t *testing.T) {
 	a, client := startAdapter(t)
 	topic := types.BytesToTopic([]byte{1, 2, 3, 4})
 
@@ -174,16 +174,18 @@ func TestReceivedMessageIsReportedOnEverySubscribedPubsubTopic(t *testing.T) {
 
 	client.events <- ReceivedEvent{MessageHash: testHash, ContentTopic: topic.ContentTopic(), Payload: []byte("hi"), Timestamp: 7}
 
-	got := map[string]bool{}
-	for i := 0; i < 2; i++ {
-		ev := nextEvent(t, events)
-		require.Equal(t, types.EventEnvelopeAvailable, ev.Event)
-		msg := ev.Data.(*types.ReceivedMessage)
-		require.Equal(t, []byte("hi"), msg.Payload)
-		require.Equal(t, decodeHash(testHash), msg.Hash)
-		got[msg.PubsubTopic] = true
+	ev := nextEvent(t, events)
+	require.Equal(t, types.EventEnvelopeAvailable, ev.Event)
+	msg := ev.Data.(*types.ReceivedMessage)
+	require.Equal(t, []byte("hi"), msg.Payload)
+	require.Equal(t, decodeHash(testHash), msg.Hash)
+	require.Equal(t, "/waku/2/rs/16/32", msg.PubsubTopic)
+
+	select {
+	case ev := <-events:
+		t.Fatalf("unexpected second event: %+v", ev)
+	case <-time.After(100 * time.Millisecond):
 	}
-	require.Equal(t, map[string]bool{"/waku/2/rs/16/32": true, "/waku/2/rs/16/64": true}, got)
 }
 
 func TestUnsubscribeKeepsTopicWhileAnotherPubsubTopicWantsIt(t *testing.T) {
