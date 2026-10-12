@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -15,6 +16,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/nim-token-lists/go/tkl"
 	"github.com/stretchr/testify/require"
+
+	types "github.com/status-im/status-go/pkg/services/wallet/token/tokenlist"
 )
 
 func TestRefreshPersistsBeforePublication(t *testing.T) {
@@ -35,8 +38,8 @@ func TestRefreshPersistsBeforePublication(t *testing.T) {
 			signals := 0
 			successAttempted := false
 			notifiedBeforeSuccess := false
-			m, err = New(tkl.Config{Chains: []uint64{1}, RegistryID: "registry", RegistryURL: server.URL + "/registry"}, func(context.Context) (tkl.Bootstrap, error) { return tkl.Bootstrap{}, nil }, RefreshOptions{
-				Persist: func(ctx context.Context, writes []tkl.ListContent) error {
+			m, err = New(tkl.Config{Chains: []uint64{1}, RegistryID: "registry", RegistryURL: server.URL + "/registry"}, noStored, RefreshOptions{
+				Persist: func(ctx context.Context, writes []Write) error {
 					if len(writes) == 0 {
 						return errors.New("expected content writes")
 					}
@@ -61,7 +64,7 @@ func TestRefreshPersistsBeforePublication(t *testing.T) {
 			require.NoError(t, m.Start(context.Background(), false, nil))
 			require.Error(t, m.TriggerRefresh(context.Background()))
 			require.Equal(t, 0, signals)
-			require.Equal(t, uint64(1), m.mirror.Load().revision)
+			require.Equal(t, uint64(1), m.handle.Revision())
 			fail = false
 			err = m.TriggerRefresh(context.Background())
 			if settingsFail {
@@ -86,7 +89,7 @@ func TestConcurrentStopCancelsPersistence(t *testing.T) {
 	}))
 	defer server.Close()
 	var signals atomic.Int32
-	m, err := New(tkl.Config{Chains: []uint64{1}, RegistryID: "registry", RegistryURL: server.URL}, func(context.Context) (tkl.Bootstrap, error) { return tkl.Bootstrap{}, nil }, RefreshOptions{Persist: func(ctx context.Context, _ []tkl.ListContent) error {
+	m, err := New(tkl.Config{Chains: []uint64{1}, RegistryID: "registry", RegistryURL: server.URL}, noStored, RefreshOptions{Persist: func(ctx context.Context, _ []Write) error {
 		close(entered)
 		select {
 		case <-ctx.Done():
@@ -119,7 +122,7 @@ func TestConcurrentStopCancelsPersistence(t *testing.T) {
 }
 
 func TestReadOnlyPauseIsNoOp(t *testing.T) {
-	m, err := New(tkl.Config{Chains: []uint64{1}}, func(context.Context) (tkl.Bootstrap, error) { return tkl.Bootstrap{}, nil })
+	m, err := New(tkl.Config{Chains: []uint64{1}}, noStored)
 	require.NoError(t, err)
 	defer func() { _ = m.Stop() }()
 	require.NoError(t, m.Start(context.Background(), false, nil))
@@ -134,7 +137,7 @@ func TestStopCancelsSuccessWrite(t *testing.T) {
 		fmt.Fprint(w, `{"timestamp":"2026-01-01T00:00:00Z","version":{"major":1,"minor":0,"patch":0},"tokenLists":[]}`)
 	}))
 	defer server.Close()
-	m, err := New(tkl.Config{Chains: []uint64{1}, RegistryID: "registry", RegistryURL: server.URL}, func(context.Context) (tkl.Bootstrap, error) { return tkl.Bootstrap{}, nil }, RefreshOptions{Persist: func(context.Context, []tkl.ListContent) error { return nil }, OnSuccess: func(ctx context.Context, _ time.Time) error {
+	m, err := New(tkl.Config{Chains: []uint64{1}, RegistryID: "registry", RegistryURL: server.URL}, noStored, RefreshOptions{Persist: func(context.Context, []Write) error { return nil }, OnSuccess: func(ctx context.Context, _ time.Time) error {
 		close(entered)
 		select {
 		case <-ctx.Done():
@@ -182,7 +185,7 @@ func TestFetchBatchBoundedConcurrency(t *testing.T) {
 		fmt.Fprint(w, r.URL.Path)
 	}))
 	defer server.Close()
-	runtime, err := newRefreshRuntime(RefreshOptions{Persist: func(context.Context, []tkl.ListContent) error { return nil }})
+	runtime, err := newRefreshRuntime(RefreshOptions{Persist: func(context.Context, []Write) error { return nil }})
 	require.NoError(t, err)
 	defer runtime.stop()
 	ctx, cancel := context.WithCancel(context.Background())
@@ -192,7 +195,7 @@ func TestFetchBatchBoundedConcurrency(t *testing.T) {
 		requests[i] = tkl.FetchRequest{ID: fmt.Sprint(i), URL: fmt.Sprintf("%s/%d", server.URL, i)}
 	}
 	done := make(chan []tkl.FetchResult, 1)
-	go func() { done <- runtime.fetchBatch(ctx, requests) }()
+	go func() { done <- runtime.fetchBatch(ctx, requests, runtime.options.MaxInFlightBytes) }()
 	for i := 0; i < 4; i++ {
 		select {
 		case <-entered:
@@ -221,7 +224,7 @@ func TestAutomaticRefreshPausesAndResumes(t *testing.T) {
 		fmt.Fprint(w, `{"timestamp":"2026-01-01T00:00:00Z","version":{"major":1,"minor":0,"patch":0},"tokenLists":[]}`)
 	}))
 	defer server.Close()
-	m, err := New(tkl.Config{Chains: []uint64{1}, RegistryID: "registry", RegistryURL: server.URL}, func(context.Context) (tkl.Bootstrap, error) { return tkl.Bootstrap{}, nil }, RefreshOptions{RefreshInterval: time.Second, CheckInterval: time.Second, Persist: func(context.Context, []tkl.ListContent) error { return nil }})
+	m, err := New(tkl.Config{Chains: []uint64{1}, RegistryID: "registry", RegistryURL: server.URL}, noStored, RefreshOptions{RefreshInterval: time.Second, CheckInterval: time.Second, Persist: func(context.Context, []Write) error { return nil }})
 	require.NoError(t, err)
 	defer func() { _ = m.Stop() }()
 	require.NoError(t, m.Start(context.Background(), true, nil))
@@ -259,7 +262,7 @@ func TestPartialRefreshRetainsInvalidSource(t *testing.T) {
 	}))
 	defer server.Close()
 	initial := strings.ReplaceAll(strings.ReplaceAll(body, "0000000001", "0000000002"), "ONE", "OLD")
-	m, err := New(tkl.Config{Chains: []uint64{1}, RegistryID: "registry", RegistryURL: server.URL + "/registry", InitialLists: []tkl.ListContent{{ID: "bad", Format: tkl.StandardFormat, Body: initial}}}, func(context.Context) (tkl.Bootstrap, error) { return tkl.Bootstrap{}, nil }, RefreshOptions{Persist: func(_ context.Context, writes []tkl.ListContent) error {
+	m, err := New(tkl.Config{Chains: []uint64{1}, RegistryID: "registry", RegistryURL: server.URL + "/registry", InitialLists: []tkl.ListContent{{ID: "bad", Format: tkl.StandardFormat}}}, withBodies(tkl.ListBody{ID: "bad", Origin: tkl.Bundled, Data: []byte(initial)}), RefreshOptions{Persist: func(_ context.Context, writes []Write) error {
 		for _, row := range writes {
 			if row.ID == "bad" {
 				return errors.New("invalid source was persisted")
@@ -296,7 +299,7 @@ func TestRefreshCancellationAndSupersession(t *testing.T) {
 			}))
 			defer server.Close()
 			persists := 0
-			m, err := New(tkl.Config{Chains: []uint64{1}, RegistryID: "registry", RegistryURL: server.URL}, func(context.Context) (tkl.Bootstrap, error) { return tkl.Bootstrap{}, nil }, RefreshOptions{Persist: func(context.Context, []tkl.ListContent) error { persists++; return nil }})
+			m, err := New(tkl.Config{Chains: []uint64{1}, RegistryID: "registry", RegistryURL: server.URL}, noStored, RefreshOptions{Persist: func(context.Context, []Write) error { persists++; return nil }})
 			require.NoError(t, err)
 			defer func() { _ = m.Stop() }()
 			require.NoError(t, m.Start(context.Background(), false, nil))
@@ -353,7 +356,7 @@ func TestHTTPBounds(t *testing.T) {
 		}
 	}))
 	defer server.Close()
-	r, err := newRefreshRuntime(RefreshOptions{Persist: func(context.Context, []tkl.ListContent) error { return nil }, MaxBodyBytes: 64, Client: &http.Client{Timeout: 50 * time.Millisecond}})
+	r, err := newRefreshRuntime(RefreshOptions{Persist: func(context.Context, []Write) error { return nil }, MaxBodyBytes: 64, Client: &http.Client{Timeout: 50 * time.Millisecond}})
 	require.NoError(t, err)
 	for _, path := range []string{"/gzip", "/redirect", "/slow"} {
 		result := r.fetch(context.Background(), tkl.FetchRequest{ID: "x", URL: server.URL + path})
@@ -363,7 +366,7 @@ func TestHTTPBounds(t *testing.T) {
 	require.Nil(t, result.Failure)
 	require.Equal(t, 304, result.Status)
 	result = r.fetch(context.Background(), tkl.FetchRequest{ID: "x", URL: server.URL})
-	require.Equal(t, "valid", result.Body)
+	require.Equal(t, "valid", string(result.Body))
 }
 
 func TestUnchangedRefreshDoesNotSignal(t *testing.T) {
@@ -377,7 +380,7 @@ func TestUnchangedRefreshDoesNotSignal(t *testing.T) {
 	}))
 	defer server.Close()
 	signals, successes := 0, 0
-	m, err := New(tkl.Config{Chains: []uint64{1}, RegistryID: "registry", RegistryURL: server.URL}, func(context.Context) (tkl.Bootstrap, error) { return tkl.Bootstrap{}, nil }, RefreshOptions{Persist: func(context.Context, []tkl.ListContent) error { return nil }, OnSuccess: func(context.Context, time.Time) error { successes++; return nil }, OnChange: func(tkl.Change) { signals++ }})
+	m, err := New(tkl.Config{Chains: []uint64{1}, RegistryID: "registry", RegistryURL: server.URL}, noStored, RefreshOptions{Persist: func(context.Context, []Write) error { return nil }, OnSuccess: func(context.Context, time.Time) error { successes++; return nil }, OnChange: func(tkl.Change) { signals++ }})
 	require.NoError(t, err)
 	defer func() { _ = m.Stop() }()
 	require.NoError(t, m.Start(context.Background(), false, nil))
@@ -400,7 +403,7 @@ func TestSuccessful304UsesRefreshIntervalNotCheckInterval(t *testing.T) {
 	defer server.Close()
 	now := int64(100)
 	successes := 0
-	m, err := New(tkl.Config{Chains: []uint64{1}, RegistryID: "registry", RegistryURL: server.URL}, func(context.Context) (tkl.Bootstrap, error) { return tkl.Bootstrap{}, nil }, RefreshOptions{Now: func() time.Time { return time.Unix(now, 0) }, Persist: func(context.Context, []tkl.ListContent) error { return nil }, OnSuccess: func(context.Context, time.Time) error { successes++; return nil }})
+	m, err := New(tkl.Config{Chains: []uint64{1}, RegistryID: "registry", RegistryURL: server.URL}, noStored, RefreshOptions{Now: func() time.Time { return time.Unix(now, 0) }, Persist: func(context.Context, []Write) error { return nil }, OnSuccess: func(context.Context, time.Time) error { successes++; return nil }})
 	require.NoError(t, err)
 	defer func() { _ = m.Stop() }()
 	require.NoError(t, m.Start(context.Background(), false, nil))
@@ -418,4 +421,187 @@ func TestSuccessful304UsesRefreshIntervalNotCheckInterval(t *testing.T) {
 	now = 2080
 	require.ErrorIs(t, m.refresh(context.Background(), false), tkl.Unchanged)
 	require.Equal(t, 2, successes)
+}
+
+func TestRefreshPersistsFetchedBytes(t *testing.T) {
+	const list = `{"name":"Tokens","timestamp":"2026-01-01T00:00:00Z","version":{"major":1,"minor":0,"patch":0},"tokens":[{"chainId":1,"address":"0x0000000000000000000000000000000000000001","name":"One","symbol":"ONE","decimals":18}]}`
+	var registry string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/registry" {
+			w.Header().Set("ETag", "r1")
+			fmt.Fprint(w, registry)
+			return
+		}
+		w.Header().Set("ETag", "l1")
+		fmt.Fprint(w, list)
+	}))
+	defer server.Close()
+	registry = fmt.Sprintf(`{"timestamp":"2026-01-01T00:00:00Z","version":{"major":1,"minor":0,"patch":0},"tokenLists":[{"id":"list","sourceUrl":%q}]}`, server.URL+"/list")
+	config := tkl.Config{Chains: []uint64{1}, RegistryID: "registry", RegistryURL: server.URL + "/registry"}
+	var persisted []Write
+	m, err := New(config, noStored, RefreshOptions{Now: func() time.Time { return time.Unix(1000, 0) }, Persist: func(_ context.Context, writes []Write) error {
+		persisted = writes
+		return nil
+	}})
+	require.NoError(t, err)
+	defer func() { _ = m.Stop() }()
+	require.NoError(t, m.Start(context.Background(), false, nil))
+	require.NoError(t, m.TriggerRefresh(context.Background()))
+	require.Len(t, persisted, 2)
+	byID := map[string]Write{}
+	for _, write := range persisted {
+		byID[write.ID] = write
+	}
+	require.Equal(t, registry, string(byID["registry"].Body))
+	require.Equal(t, "r1", byID["registry"].ETag)
+	require.Equal(t, list, string(byID["list"].Body))
+	require.Equal(t, "l1", byID["list"].ETag)
+	require.Equal(t, server.URL+"/list", byID["list"].Source)
+	require.Equal(t, int64(1000), byID["list"].FetchedAt)
+
+	// The persisted bytes and metadata load back as the stored catalogue.
+	var bootstrap tkl.Bootstrap
+	var bodies []tkl.ListBody
+	for _, write := range persisted {
+		bootstrap.Stored = append(bootstrap.Stored, write.ListContent)
+		bodies = append(bodies, tkl.ListBody{ID: write.ID, Origin: tkl.Stored, Data: write.Body})
+	}
+	reloaded, err := New(config, func(context.Context) (tkl.Bootstrap, []tkl.ListBody, error) { return bootstrap, bodies, nil })
+	require.NoError(t, err)
+	defer func() { _ = reloaded.Stop() }()
+	require.NoError(t, reloaded.Start(context.Background(), false, nil))
+	token, ok := reloaded.GetTokenByChainAddress(1, common.HexToAddress("0x1"))
+	require.True(t, ok)
+	require.Equal(t, "ONE", token.Symbol)
+}
+
+func TestRefreshCapsInFlightBodies(t *testing.T) {
+	listBody := func(address, symbol string) string {
+		return fmt.Sprintf(`{"name":"Tokens","timestamp":"2026-01-01T00:00:00Z","version":{"major":1,"minor":0,"patch":0},"tokens":[{"chainId":1,"address":"0x000000000000000000000000000000000000000%s","name":"%s","symbol":"%s","decimals":18}]}`, address, symbol, symbol)
+	}
+	lists := map[string]string{"/a": listBody("1", "AAA"), "/b": listBody("2", "BBB")}
+	var registry string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Always 200 with a stable ETag: unchanged sources still arrive with bodies.
+		w.Header().Set("ETag", r.URL.Path)
+		if r.URL.Path == "/registry" {
+			fmt.Fprint(w, registry)
+			return
+		}
+		fmt.Fprint(w, lists[r.URL.Path])
+	}))
+	defer server.Close()
+	registry = fmt.Sprintf(`{"timestamp":"2026-01-01T00:00:00Z","version":{"major":1,"minor":0,"patch":0},"tokenLists":[{"id":"a","sourceUrl":%q},{"id":"b","sourceUrl":%q}]}`, server.URL+"/a", server.URL+"/b")
+	listLen := int64(len(lists["/a"]))
+	// Room for the registry and one list, not both lists.
+	limit := int64(len(registry)) + listLen + listLen/2
+	persisted := map[string]bool{}
+	m, err := New(tkl.Config{Chains: []uint64{1}, RegistryID: "registry", RegistryURL: server.URL + "/registry"}, noStored, RefreshOptions{
+		MaxBodyBytes:     max(int64(len(registry)), listLen),
+		MaxInFlightBytes: limit,
+		Persist: func(_ context.Context, writes []Write) error {
+			for _, write := range writes {
+				persisted[write.ID] = true
+			}
+			return nil
+		},
+	})
+	require.NoError(t, err)
+	defer func() { _ = m.Stop() }()
+	require.NoError(t, m.Start(context.Background(), false, nil))
+
+	require.NoError(t, m.TriggerRefresh(context.Background()))
+	require.Equal(t, map[string]bool{"registry": true, "a": true}, persisted)
+	_, ok := m.GetTokenByChainAddress(1, common.HexToAddress("0x2"))
+	require.False(t, ok)
+	state, err := m.handle.RefreshState()
+	require.NoError(t, err)
+	require.Equal(t, "Partial", state.LastOutcome)
+
+	// The unchanged registry body is dropped after its round, so both list
+	// bodies fit and the over-limit list is fetched on the next refresh.
+	require.NoError(t, m.TriggerRefresh(context.Background()))
+	require.True(t, persisted["b"])
+	token, ok := m.GetTokenByChainAddress(1, common.HexToAddress("0x2"))
+	require.True(t, ok)
+	require.Equal(t, "BBB", token.Symbol)
+}
+
+func TestRefreshInFlightLimitValidation(t *testing.T) {
+	persist := func(context.Context, []Write) error { return nil }
+	r, err := newRefreshRuntime(RefreshOptions{Persist: persist})
+	require.NoError(t, err)
+	require.Equal(t, int64(defaultMaxInFlightBytes), r.options.MaxInFlightBytes)
+	_, err = newRefreshRuntime(RefreshOptions{Persist: persist, MaxBodyBytes: 64, MaxInFlightBytes: 63})
+	require.Error(t, err)
+}
+
+func TestReadersRaceRefreshCommitAndStop(t *testing.T) {
+	var version atomic.Int32
+	var server *httptest.Server
+	server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/registry" {
+			fmt.Fprintf(w, `{"timestamp":"2026-01-01T00:00:00Z","version":{"major":1,"minor":0,"patch":0},"tokenLists":[{"id":"list","sourceUrl":%q}]}`, server.URL+"/list")
+			return
+		}
+		// Every fetch changes the list, so every refresh commits a new revision.
+		n := version.Add(1)
+		fmt.Fprintf(w, `{"name":"Tokens","timestamp":"2026-01-01T00:00:00Z","version":{"major":1,"minor":0,"patch":0},"tokens":[{"chainId":1,"address":"0x0000000000000000000000000000000000000001","name":"One","symbol":"ONE","decimals":18},{"chainId":1,"address":"0x00000000000000000000000000000000000000%02x","name":"V","symbol":"V%d","decimals":6}]}`, 16+n%200, n)
+	}))
+	defer server.Close()
+	const list = `{"name":"Tokens","timestamp":"2026-01-01T00:00:00Z","version":{"major":1,"minor":0,"patch":0},"tokens":[{"chainId":1,"address":"0x0000000000000000000000000000000000000001","name":"One","symbol":"ONE","decimals":18}]}`
+	m, err := New(tkl.Config{Chains: []uint64{1}, RegistryID: "registry", RegistryURL: server.URL + "/registry", InitialLists: []tkl.ListContent{{ID: "list", Format: tkl.StandardFormat}}},
+		withBodies(tkl.ListBody{ID: "list", Origin: tkl.Bundled, Data: []byte(list)}),
+		RefreshOptions{Persist: func(context.Context, []Write) error { return nil }})
+	require.NoError(t, err)
+	require.NoError(t, m.Start(context.Background(), false, nil))
+
+	one := common.HexToAddress("0x1")
+	var stopped atomic.Bool
+	done := make(chan struct{})
+	var readers sync.WaitGroup
+	for range 4 {
+		readers.Add(1)
+		go func() {
+			defer readers.Done()
+			var buf []types.ChainToken
+			for {
+				select {
+				case <-done:
+					return
+				default:
+				}
+				live := !stopped.Load()
+				token, ok := m.GetTokenByChainAddress(1, one)
+				batch := m.GetTokensByChainAddresses([]types.ChainAddress{{ChainID: 1, Address: one}, {ChainID: 1}})
+				buf = m.GetChainTokens([]uint64{1}, buf)
+				byKeys, _ := m.GetTokensByKeys([]string{types.TokenKey(1, one)})
+				all := m.UniqueTokens()
+				chain := m.GetTokensByChains([]uint64{1})
+				lists := m.TokenLists()
+				_, _ = m.TokenList("list")
+				if live && !stopped.Load() {
+					// Nothing ran Stop around these reads: each sees a whole revision.
+					if !ok || token.Symbol != "ONE" || batch[0] == nil || batch[0].Symbol != "ONE" ||
+						len(byKeys) != 1 || len(buf) < 2 || len(all) < 2 || len(chain) < 2 || len(lists) == 0 {
+						t.Errorf("torn read: %v %v %v %d %d %d %d %d", ok, token, batch, len(byKeys), len(buf), len(all), len(chain), len(lists))
+						return
+					}
+				}
+			}
+		}()
+	}
+	start := m.handle.Revision()
+	for range 20 {
+		require.NoError(t, m.TriggerRefresh(context.Background()))
+	}
+	require.GreaterOrEqual(t, m.handle.Revision(), start+20)
+	stopped.Store(true)
+	require.NoError(t, m.Stop())
+	_, ok := m.GetTokenByChainAddress(1, one)
+	require.False(t, ok)
+	require.Equal(t, make([]*types.Token, 1), m.GetTokensByChainAddresses([]types.ChainAddress{{ChainID: 1, Address: one}}))
+	require.Nil(t, m.UniqueTokens())
+	close(done)
+	readers.Wait()
 }

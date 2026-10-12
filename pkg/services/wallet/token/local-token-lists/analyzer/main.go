@@ -162,9 +162,10 @@ func rebuildTokensMap(fetchedLists []defaulttokenlists.DownloadedTokenList) (map
 			Chains:     walletcommon.AllChainIDsAsUint64(),
 			MainListID: walletcommon.StatusTokenListID,
 			InitialLists: []tkl.ListContent{{ID: fetchedTokenList.ID, Format: format,
-				Body: string(fetchedTokenList.JsonData), Source: fetchedTokenList.SourceURL,
-				FetchedTimestamp: fetchedTokenList.Fetched.Format(time.RFC3339)}},
-		}, func(context.Context) (tkl.Bootstrap, error) { return tkl.Bootstrap{}, nil })
+				Source: fetchedTokenList.SourceURL, FetchedTimestamp: fetchedTokenList.Fetched.Format(time.RFC3339)}},
+		}, func(context.Context) (tkl.Bootstrap, []tkl.ListBody, error) {
+			return tkl.Bootstrap{}, []tkl.ListBody{{ID: fetchedTokenList.ID, Origin: tkl.Bundled, Data: fetchedTokenList.JsonData}}, nil
+		})
 		if err != nil {
 			return nil, err
 		}

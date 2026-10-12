@@ -3,7 +3,6 @@ package tklmanager
 import (
 	"compress/gzip"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -17,6 +16,13 @@ import (
 	"github.com/status-im/status-go/internal/pausable"
 )
 
+// Write is one list the host persists after a refresh: the core's metadata and
+// the bytes the host fetched for it.
+type Write struct {
+	tkl.ListContent
+	Body []byte
+}
+
 // RefreshOptions supplies host I/O. Persist, OnSuccess and OnChange run under
 // the writer mutex and must not reenter mutating/list methods. OnError runs on
 // the scheduler outside that mutex. Persist must durably write the entire batch
@@ -24,7 +30,7 @@ import (
 // context cancellation; Stop cannot preempt a callback that ignores its context.
 type RefreshOptions struct {
 	Client  *http.Client
-	Persist func(context.Context, []tkl.ListContent) error
+	Persist func(context.Context, []Write) error
 	// Persist successful checks, including 304s, so restart preserves the next
 	// due time. Automatic successes are spaced by RefreshInterval, not CheckInterval.
 	OnSuccess       func(context.Context, time.Time) error
@@ -34,7 +40,15 @@ type RefreshOptions struct {
 	RefreshInterval time.Duration
 	CheckInterval   time.Duration
 	MaxBodyBytes    int64
+	// MaxInFlightBytes caps the fetched bodies held across one refresh, from
+	// download until persistence. A body past the cap fails as too large for
+	// this refresh and is fetched again on the next one.
+	MaxInFlightBytes int64
 }
+
+// The bundled lists total about 5 MiB of compact JSON; the cap leaves room for
+// formatted or grown lists changing together.
+const defaultMaxInFlightBytes = 24 << 20
 
 type refreshRuntime struct {
 	options      RefreshOptions
@@ -74,6 +88,12 @@ func newRefreshRuntime(options RefreshOptions) (*refreshRuntime, error) {
 	}
 	if options.MaxBodyBytes < 1 || options.MaxBodyBytes > 16<<20 {
 		return nil, errors.New("invalid HTTP body limit")
+	}
+	if options.MaxInFlightBytes == 0 {
+		options.MaxInFlightBytes = defaultMaxInFlightBytes
+	}
+	if options.MaxInFlightBytes < options.MaxBodyBytes {
+		return nil, errors.New("in-flight body limit is below the HTTP body limit")
 	}
 	r := &refreshRuntime{options: options, allowed: true, done: make(chan struct{}), pauseCh: make(chan bool, 1)}
 	r.ctx, r.stop = context.WithCancel(context.Background())
@@ -287,8 +307,17 @@ func (m *Manager) refresh(ctx context.Context, force bool) error {
 		r.workers.Done()
 	}()
 	requests := plan.Requests
+	// The core keeps no bodies; hold the fetched ones until they are persisted.
+	bodies := make(map[string][]byte)
+	var held int64
 	for {
-		results := r.fetchBatch(callCtx, requests)
+		results := r.fetchBatch(callCtx, requests, r.options.MaxInFlightBytes-held)
+		for _, result := range results {
+			if result.Status == http.StatusOK && result.Failure == nil {
+				bodies[result.ID] = result.Body
+				held += int64(len(result.Body))
+			}
+		}
 		m.mu.Lock()
 		if err := callCtx.Err(); err != nil {
 			m.mu.Unlock()
@@ -300,6 +329,13 @@ func (m *Manager) refresh(ctx context.Context, force bool) error {
 			m.mu.Unlock()
 			return err
 		}
+		// Only updated sources are written; release every other body now.
+		for _, source := range report.Sources {
+			if body, ok := bodies[source.ID]; ok && source.Outcome != "Updated" {
+				held -= int64(len(body))
+				delete(bodies, source.ID)
+			}
+		}
 		if report.Step == "NeedMore" {
 			requests = report.Requests
 			m.mu.Unlock()
@@ -309,17 +345,24 @@ func (m *Manager) refresh(ctx context.Context, force bool) error {
 			m.mu.Unlock()
 			return fmt.Errorf("token refresh failed: %s", report.Outcome)
 		}
+		writes := make([]Write, len(report.Writes))
+		for i, content := range report.Writes {
+			body, ok := bodies[content.ID]
+			if !ok {
+				_, _ = m.handle.RefreshAbort(plan.ID, tkl.StorageFailure)
+				m.mu.Unlock()
+				return fmt.Errorf("token refresh wrote %s without a fetched body", content.ID)
+			}
+			writes[i] = Write{ListContent: content, Body: body}
+		}
 		// The lock protects the prepare/persist/commit interval from all writers.
 		// Commit uses this transaction's logical timestamp after durable success.
-		if err = r.options.Persist(callCtx, report.Writes); err != nil {
+		if err = r.options.Persist(callCtx, writes); err != nil {
 			_, _ = m.handle.RefreshAbort(plan.ID, tkl.StorageFailure)
 			m.mu.Unlock()
 			return fmt.Errorf("persist token lists: %w", err)
 		}
 		change, err := m.handle.RefreshCommit(plan.ID, now)
-		if err == nil {
-			err = m.rebuild()
-		}
 		if err == nil {
 			if r.options.OnSuccess != nil {
 				err = r.options.OnSuccess(callCtx, time.Unix(now, 0).UTC())
@@ -348,13 +391,12 @@ func (m *Manager) notifyChange(change tkl.Change) {
 	}
 }
 
-func (r *refreshRuntime) fetchBatch(ctx context.Context, requests []tkl.FetchRequest) []tkl.FetchResult {
+// fetchBatch fetches requests in source order, failing bodies past budget bytes
+// as too large.
+func (r *refreshRuntime) fetchBatch(ctx context.Context, requests []tkl.FetchRequest, budget int64) []tkl.FetchResult {
 	results := make([]tkl.FetchResult, 0, len(requests))
-	// The C envelope includes JSON escaping; bound its encoded size, not just
-	// unescaped HTTP bodies. Leave room for plan/time fields and punctuation.
-	budget := 15 << 20
-	// Fetch in bounded windows: concurrency and retained decompressed bodies
-	// stay bounded even for a large registry. Account for bytes in source order.
+	// Fetch in bounded windows so request concurrency stays bounded even for a
+	// large registry. Bodies travel to the core one at a time, never in an envelope.
 	for start := 0; start < len(requests); start += 4 {
 		end := min(start+4, len(requests))
 		batch := make([]tkl.FetchResult, end-start)
@@ -369,12 +411,11 @@ func (r *refreshRuntime) fetchBatch(ctx context.Context, requests []tkl.FetchReq
 		}
 		pending.Wait()
 		for _, result := range batch {
-			encoded, _ := json.Marshal(result)
-			if len(encoded) > budget {
+			if size := int64(len(result.Body)); size > budget {
 				result = tkl.FetchResult{ID: result.ID, Failure: &tkl.Diagnostic{Code: "InvalidContent", Detail: "tooLarge"}}
-				encoded, _ = json.Marshal(result)
+			} else {
+				budget -= size
 			}
-			budget -= len(encoded) + 1
 			results = append(results, result)
 		}
 	}
@@ -427,6 +468,6 @@ func (r *refreshRuntime) fetch(ctx context.Context, request tkl.FetchRequest) tk
 		result.Failure = &tkl.Diagnostic{Code: "InvalidContent", Detail: "tooLarge"}
 		return result
 	}
-	result.Body = string(body)
+	result.Body = body
 	return result
 }

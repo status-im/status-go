@@ -23,6 +23,7 @@ import (
 	w_common "github.com/status-im/status-go/pkg/services/wallet/common"
 	"github.com/status-im/status-go/pkg/services/wallet/thirdparty"
 	"github.com/status-im/status-go/pkg/services/wallet/token"
+	"github.com/status-im/status-go/pkg/services/wallet/token/tokenlist"
 	"github.com/status-im/status-go/pkg/services/wallet/walletevent"
 )
 
@@ -329,12 +330,22 @@ func (s *Service) Stop() {
 func (s *Service) getDeps() FilterDependencies {
 	return FilterDependencies{
 		db: s.db,
-		tokenSymbol: func(t ac.Token) string {
-			info, err := s.tokenManager.GetTokenByChainAddress(uint64(t.ChainID), t.Address)
-			if err != nil {
-				return ""
+		tokenSymbols: func(tokens []ac.Token) []string {
+			ids := make([]tokenlist.ChainAddress, len(tokens))
+			for i, t := range tokens {
+				ids[i] = tokenlist.ChainAddress{ChainID: uint64(t.ChainID), Address: t.Address}
 			}
-			return info.Symbol
+			symbols := make([]string, len(tokens))
+			found, err := s.tokenManager.GetTokensByChainAddresses(ids)
+			if err != nil {
+				return symbols
+			}
+			for i, token := range found {
+				if token != nil {
+					symbols[i] = token.Symbol
+				}
+			}
+			return symbols
 		},
 		currentTimestamp: func() int64 {
 			return time.Now().Unix()

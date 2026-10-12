@@ -176,6 +176,13 @@ func (api *API) GetTokensByChain(chainID uint64) ([]*tokentypes.Token, error) {
 	return api.s.tokenManager.GetTokensByChain(chainID)
 }
 
+// GetTokenBySymbolOnChain returns the first token of GetTokensByChain(chainID)
+// whose symbol or name equals symbol ignoring ASCII case, or null. It resolves
+// the tokens of legacy payment requests.
+func (api *API) GetTokenBySymbolOnChain(ctx context.Context, chainID uint64, symbol string) (*tokentypes.Token, error) {
+	return api.s.tokenManager.GetTokenBySymbolOnChain(chainID, symbol)
+}
+
 // GetTokensByKeys returns tokens that match the given keys.
 func (api *API) GetTokensByKeys(keys []string) ([]*tokentypes.Token, error) {
 	return api.s.tokenManager.GetTokensByKeys(keys)

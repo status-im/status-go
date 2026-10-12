@@ -3,9 +3,12 @@ package tklmanager
 
 import (
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"runtime"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -18,35 +21,29 @@ import (
 
 var ErrRefreshUnavailable = errors.New("token catalogue refresh is not integrated")
 
+// Loader returns the host's persisted state with the bundled and stored list
+// bodies. Bodies are only borrowed while the catalogue loads.
+type Loader func(context.Context) (tkl.Bootstrap, []tkl.ListBody, error)
+
 type identity struct {
 	chain   uint64
 	address common.Address
 }
 
-type snapshot struct {
-	revision       uint64
-	tokens         []*types.Token
-	byKey          map[string]*types.Token
-	byAddress      map[identity]*types.Token
-	byChain        map[uint64][]*types.Token
-	aliases        map[string]string
-	addressAliases map[identity]identity
-	// Lazy list cache; accessed only with Manager.mu held.
-	lists []*types.TokenList
-}
-
-// Manager owns one C handle. Writes, mirror rebuilds and lazy list reads are
-// serialized; hot token reads only load an immutable Go index. All reads return
-// caller-owned values.
+// Manager owns one C handle, which is the only token index: queries call it
+// directly and return caller-owned values. Writes are serialized by mu.
 type Manager struct {
-	mu        sync.Mutex
-	handle    *tkl.Handle
-	load      func(context.Context) (tkl.Bootstrap, error)
-	mirror    atomic.Pointer[snapshot]
-	refreshIO *refreshRuntime
-	// Policy changes must go through this facade under mu, updating both the
-	// core and these inputs before rebuilding/publishing a new snapshot.
-	policy           tkl.Policy
+	mu     sync.Mutex
+	handle *tkl.Handle
+	// reader is the handle once a catalogue is loaded, nil before and after.
+	reader atomic.Pointer[tkl.Handle]
+	// aliases mirrors the policy's native aliases; change both via setPolicy.
+	aliases atomic.Pointer[map[identity]identity]
+	// policySeq is odd while setPolicy runs, so a reader can tell whether its
+	// aliases and its query saw the same policy.
+	policySeq        atomic.Uint64
+	load             Loader
+	refreshIO        *refreshRuntime
 	started          bool
 	loaded           bool
 	pendingChains    []uint64
@@ -56,7 +53,10 @@ type Manager struct {
 
 var _ types.Catalogue = (*Manager)(nil)
 
-func New(config tkl.Config, load func(context.Context) (tkl.Bootstrap, error), options ...RefreshOptions) (*Manager, error) {
+// testHookBeforeBatchQuery runs between a batch lookup's alias read and its query.
+var testHookBeforeBatchQuery func()
+
+func New(config tkl.Config, load Loader, options ...RefreshOptions) (*Manager, error) {
 	if load == nil {
 		return nil, errors.New("bootstrap loader is required")
 	}
@@ -75,12 +75,8 @@ func New(config tkl.Config, load func(context.Context) (tkl.Bootstrap, error), o
 	if err != nil {
 		return nil, err
 	}
-	policy := config.Policy
-	policy.SkippedKeys = append([]string(nil), policy.SkippedKeys...)
-	policy.NativeAliases = append([]tkl.Identity(nil), policy.NativeAliases...)
-	policy.NativeTokens = append([]tkl.Token(nil), policy.NativeTokens...)
-	m := &Manager{handle: h, load: load, policy: policy, refreshIO: refresh}
-
+	m := &Manager{handle: h, load: load, refreshIO: refresh}
+	m.storeAliases(config.Policy)
 	return m, nil
 }
 
@@ -102,9 +98,6 @@ func (m *Manager) Start(ctx context.Context, autoRefresh bool, notify chan struc
 	if err := m.ensureLoaded(ctx); err != nil {
 		return err
 	}
-	if err := m.rebuild(); err != nil {
-		return err
-	}
 	m.started, m.notify = true, notify
 	if err := m.startRefresh(ctx, autoRefresh); err != nil {
 		return err
@@ -115,14 +108,14 @@ func (m *Manager) Start(ctx context.Context, autoRefresh bool, notify chan struc
 // ensureLoaded runs under mu and is also used by configuration writes before Start.
 func (m *Manager) ensureLoaded(ctx context.Context) error {
 	if !m.loaded {
-		bootstrap, err := m.load(ctx)
+		bootstrap, bodies, err := m.load(ctx)
 		if err != nil {
 			return err
 		}
 		if err := ctx.Err(); err != nil {
 			return err
 		}
-		if _, err = m.handle.LoadStored(bootstrap); err != nil {
+		if _, err = m.handle.LoadStored(bootstrap, bodies); err != nil {
 			return err
 		}
 		m.loaded = true
@@ -133,6 +126,7 @@ func (m *Manager) ensureLoaded(ctx context.Context) error {
 		}
 		m.hasPendingChains = false
 	}
+	m.reader.Store(m.handle)
 	return nil
 }
 
@@ -166,9 +160,9 @@ func (m *Manager) Stop() error {
 		defer close(r.done)
 	}
 	defer m.mu.Unlock()
+	m.reader.Store(nil)
 	err := m.handle.Destroy()
 	m.handle = nil
-	m.mirror.Store(nil)
 	return err
 }
 
@@ -183,194 +177,283 @@ func (m *Manager) SetChains(chains []uint64) error {
 		m.hasPendingChains = true
 		return nil
 	}
-	before := m.mirror.Load()
+	before := m.handle.Revision()
 	change, err := m.handle.SetChains(chains)
 	if err != nil {
 		return err
 	}
-	if err := m.rebuild(); err != nil {
-		return err
-	}
-
-	if after := m.mirror.Load(); before == nil || before.revision != after.revision {
+	if m.handle.Revision() != before {
 		m.notifyChange(change)
 	}
 	return nil
 }
 
-// rebuild is called with mu held, so every bulk page belongs to one revision.
-func (m *Manager) rebuild() error {
-	revision := m.handle.Revision()
-	if old := m.mirror.Load(); old != nil && old.revision == revision {
-		return nil
-	}
-	page, err := m.handle.GetAll(0, 0)
-	if err != nil {
+// setPolicy replaces the catalogue policy; it is called with mu held.
+func (m *Manager) setPolicy(policy tkl.Policy) error {
+	m.policySeq.Add(1)
+	defer m.policySeq.Add(1)
+	if _, err := m.handle.SetPolicy(policy); err != nil {
 		return err
 	}
-	if page.Revision != revision || len(page.Items) != page.Total {
-		return errors.New("inconsistent catalogue snapshot")
-	}
-	next := &snapshot{revision: revision, tokens: make([]*types.Token, 0, len(page.Items)), byKey: make(map[string]*types.Token), byChain: make(map[uint64][]*types.Token)}
-	next.byAddress = make(map[identity]*types.Token, len(page.Items))
-	for _, token := range page.Items {
-		value := convertToken(token)
-		next.tokens = append(next.tokens, value)
-		next.byKey[value.Key()] = value
-		next.byAddress[identity{value.ChainID, value.Address}] = value
-		next.byChain[value.ChainID] = append(next.byChain[value.ChainID], value)
-	}
-	next.aliases = make(map[string]string)
-	next.addressAliases = make(map[identity]identity)
-	skipped := make(map[string]bool)
-	for _, key := range m.policy.SkippedKeys {
-		skipped[strings.ToLower(key)] = true
-	}
-	for _, alias := range m.policy.NativeAliases {
-		key := types.TokenKey(alias.ChainID, common.HexToAddress(alias.Address))
-		if !skipped[key] {
-			next.aliases[key] = types.TokenKey(alias.ChainID, common.Address{})
-			next.addressAliases[identity{alias.ChainID, common.HexToAddress(alias.Address)}] = identity{alias.ChainID, common.Address{}}
-		}
-	}
-	m.mirror.Store(next)
+	m.storeAliases(policy)
 	return nil
 }
 
-// loadLists runs under mu so revision changes and destruction cannot overlap
-// the fetch. Failures are not cached: the wallet read interface has no error return,
-// so this call reports no lists and a subsequent call can retry.
-func (m *Manager) loadLists() (*snapshot, error) {
-	s := m.mirror.Load()
-	if s == nil || m.handle == nil {
-		return nil, nil
+// storeAliases keeps the native aliases the core applies, so batch results
+// can be matched to the requested identities.
+func (m *Manager) storeAliases(policy tkl.Policy) {
+	skipped := make(map[string]bool, len(policy.SkippedKeys))
+	for _, key := range policy.SkippedKeys {
+		skipped[strings.ToLower(key)] = true
 	}
-	if s.lists != nil {
-		return s, nil
-	}
-	page, err := m.handle.GetLists()
-	if err != nil {
-		return nil, err
-	}
-	if page.Revision != s.revision || m.handle.Revision() != s.revision {
-		return nil, errors.New("inconsistent list snapshot")
-	}
-	lists := make([]*types.TokenList, 0, len(page.Items))
-	for _, list := range page.Items {
-		for _, part := range []int64{list.Version.Major, list.Version.Minor, list.Version.Patch} {
-			if int64(int(part)) != part {
-				return nil, fmt.Errorf("list %s version exceeds Go integer range", list.ID)
-			}
+	aliases := make(map[identity]identity, len(policy.NativeAliases))
+	for _, alias := range policy.NativeAliases {
+		address := common.HexToAddress(alias.Address)
+		if !skipped[types.TokenKey(alias.ChainID, address)] {
+			aliases[identity{alias.ChainID, address}] = identity{alias.ChainID, common.Address{}}
 		}
-		value := &types.TokenList{ID: list.ID, Name: list.Name, Timestamp: list.Timestamp, FetchedTimestamp: list.FetchedTimestamp, Source: list.Source, LogoURI: list.LogoURI, Keywords: list.Keywords, Version: types.Version{Major: int(list.Version.Major), Minor: int(list.Version.Minor), Patch: int(list.Version.Patch)}, Tokens: make([]*types.Token, 0, len(list.Tokens))}
-		if len(list.Tags) > 0 {
-			if err := json.Unmarshal(list.Tags, &value.Tags); err != nil {
-				return nil, fmt.Errorf("decode list %s tags: %w", list.ID, err)
-			}
-		}
-		for _, token := range list.Tokens {
-			value.Tokens = append(value.Tokens, convertToken(token))
-		}
-		lists = append(lists, value)
 	}
-	s.lists = lists
-	return s, nil
+	m.aliases.Store(&aliases)
 }
 
 func convertToken(t tkl.Token) *types.Token {
 	return &types.Token{ChainID: t.ChainID, Address: common.HexToAddress(t.Address), CrossChainID: t.CrossChainID, Decimals: uint(t.Decimals), Name: t.Name, Symbol: t.Symbol, LogoURI: t.LogoURI, CustomToken: t.Custom}
 }
-func cloneToken(t *types.Token) *types.Token {
-	if t == nil {
+
+func convertTokens(page tkl.Page[tkl.Token], err error) []*types.Token {
+	if err != nil {
 		return nil
 	}
-	value := *t
-	return &value
-}
-func cloneTokens(tokens []*types.Token) []*types.Token {
-	out := make([]*types.Token, len(tokens))
-	for i, t := range tokens {
-		out[i] = cloneToken(t)
+	out := make([]*types.Token, len(page.Items))
+	for i, t := range page.Items {
+		out[i] = convertToken(t)
 	}
 	return out
 }
+
+func convertList(list tkl.TokenList) (*types.TokenList, error) {
+	for _, part := range []int64{list.Version.Major, list.Version.Minor, list.Version.Patch} {
+		if int64(int(part)) != part {
+			return nil, fmt.Errorf("list %s version exceeds Go integer range", list.ID)
+		}
+	}
+	value := &types.TokenList{ID: list.ID, Name: list.Name, Timestamp: list.Timestamp, FetchedTimestamp: list.FetchedTimestamp, Source: list.Source, LogoURI: list.LogoURI, Keywords: list.Keywords, Version: types.Version{Major: int(list.Version.Major), Minor: int(list.Version.Minor), Patch: int(list.Version.Patch)}, Tokens: make([]*types.Token, 0, len(list.Tokens))}
+	if len(list.Tags) > 0 {
+		if err := json.Unmarshal(list.Tags, &value.Tags); err != nil {
+			return nil, fmt.Errorf("decode list %s tags: %w", list.ID, err)
+		}
+	}
+	for _, token := range list.Tokens {
+		value.Tokens = append(value.Tokens, convertToken(token))
+	}
+	return value, nil
+}
+
+// hexAddress is the lowercase hex form the core accepts, without a checksum.
+func hexAddress(address common.Address) string {
+	buf := make([]byte, 2, 2+2*common.AddressLength)
+	copy(buf, "0x")
+	return string(hex.AppendEncode(buf, address[:]))
+}
+
 func (m *Manager) UniqueTokens() []*types.Token {
-	if s := m.mirror.Load(); s != nil {
-		return cloneTokens(s.tokens)
-	}
-	return nil
-}
-func (m *Manager) GetTokenByChainAddress(chain uint64, address common.Address) (*types.Token, bool) {
-	s := m.mirror.Load()
-	if s == nil {
-		return nil, false
-	}
-	key := identity{chain, address}
-	if canonical, ok := s.addressAliases[key]; ok {
-		key = canonical
-	}
-	token, ok := s.byAddress[key]
-	return cloneToken(token), ok
-}
-func (m *Manager) GetTokensByChain(chain uint64) []*types.Token {
-	if s := m.mirror.Load(); s != nil {
-		return cloneTokens(s.byChain[chain])
-	}
-	return nil
-}
-func (m *Manager) GetTokensByKeys(keys []string) ([]*types.Token, error) {
-	s := m.mirror.Load()
-	if s == nil {
-		return nil, nil
-	}
-	result := make([]*types.Token, 0, len(keys))
-	for _, key := range keys {
-		key = strings.ToLower(key)
-		if chain, address, ok := types.ChainAndAddressFromTokenKey(key); ok {
-			key = types.TokenKey(chain, address)
-		}
-		if canonical, ok := s.aliases[key]; ok {
-			key = canonical
-		}
-		if token := s.byKey[key]; token != nil {
-			result = append(result, cloneToken(token))
-		}
-	}
-	return result, nil
-}
-func cloneList(list *types.TokenList) *types.TokenList {
-	value := *list
-	value.Tokens = cloneTokens(list.Tokens)
-	value.Keywords = append([]string(nil), list.Keywords...)
-	if list.Tags != nil {
-		data, _ := json.Marshal(list.Tags)
-		value.Tags = nil
-		_ = json.Unmarshal(data, &value.Tags)
-	}
-	return &value
-}
-func (m *Manager) TokenLists() []*types.TokenList {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	s, err := m.loadLists()
-	if err != nil || s == nil {
+	h := m.reader.Load()
+	if h == nil {
 		return nil
 	}
-	result := make([]*types.TokenList, 0, len(s.lists))
-	for _, list := range s.lists {
-		result = append(result, cloneList(list))
+	return convertTokens(h.GetAll(0, 0))
+}
+
+func (m *Manager) GetTokenByChainAddress(chain uint64, address common.Address) (*types.Token, bool) {
+	h := m.reader.Load()
+	if h == nil {
+		return nil, false
+	}
+	page, err := h.GetByChainAddress(chain, hexAddress(address))
+	if err != nil || len(page.Items) == 0 {
+		return nil, false
+	}
+	return convertToken(page.Items[0]), true
+}
+
+// GetTokensByChainAddresses looks up many tokens in one call. The result is
+// aligned with ids; unknown tokens are nil.
+func (m *Manager) GetTokensByChainAddresses(ids []types.ChainAddress) []*types.Token {
+	result := make([]*types.Token, len(ids))
+	h := m.reader.Load()
+	if h == nil || len(ids) == 0 {
+		return result
+	}
+	pairs := make([]tkl.Identity, len(ids))
+	for i, id := range ids {
+		pairs[i] = tkl.Identity{ChainID: id.ChainID, Address: hexAddress(id.Address)}
+	}
+	var aliases map[identity]identity
+	var page tkl.Page[tkl.Token]
+	for {
+		seq := m.policySeq.Load()
+		if seq%2 == 1 {
+			runtime.Gosched()
+			continue
+		}
+		aliases = *m.aliases.Load()
+		if testHookBeforeBatchQuery != nil {
+			testHookBeforeBatchQuery()
+		}
+		var err error
+		if page, err = h.GetByChainAddresses(pairs); err != nil {
+			return result
+		}
+		if m.policySeq.Load() == seq {
+			break
+		}
+	}
+	found := make(map[identity]*types.Token, len(page.Items))
+	for _, t := range page.Items {
+		token := convertToken(t)
+		found[identity{token.ChainID, token.Address}] = token
+	}
+	for i, id := range ids {
+		key := identity{id.ChainID, id.Address}
+		if canonical, ok := aliases[key]; ok {
+			key = canonical
+		}
+		if token := found[key]; token != nil {
+			value := *token
+			result[i] = &value
+		}
 	}
 	return result
 }
-func (m *Manager) TokenList(id string) (*types.TokenList, bool) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	if s, err := m.loadLists(); err == nil && s != nil {
-		for _, list := range s.lists {
-			if list.ID == id {
-				return cloneList(list), true
-			}
+
+func (m *Manager) GetTokensByChain(chain uint64) []*types.Token {
+	return m.GetTokensByChains([]uint64{chain})
+}
+
+// GetTokensByChains returns the catalogue tokens of chains in catalogue order.
+func (m *Manager) GetTokensByChains(chains []uint64) []*types.Token {
+	h := m.reader.Load()
+	if h == nil || len(chains) == 0 {
+		return nil
+	}
+	return convertTokens(h.GetByChains(chains, 0, 0))
+}
+
+// packedTokens recycles the library's answer buffers between balance queries
+// without retaining them past a GC.
+var packedTokens = sync.Pool{New: func() any { return new([]tkl.ChainToken) }}
+
+// GetChainTokens answers GetTokensByChains narrowed to ChainTokens, without
+// JSON. It appends to dst[:0].
+func (m *Manager) GetChainTokens(chains []uint64, dst []types.ChainToken) []types.ChainToken {
+	dst = dst[:0]
+	h := m.reader.Load()
+	if h == nil || len(chains) == 0 {
+		return dst
+	}
+	return appendPacked(dst, func(buf []tkl.ChainToken) ([]tkl.ChainToken, uint64, error) {
+		return h.GetByChainsPacked(chains, buf)
+	})
+}
+
+// GetCrossChainTokens returns the catalogue tokens whose cross-chain id is one
+// of the non-empty ids, in UniqueTokens order, without JSON. It appends to
+// dst[:0].
+func (m *Manager) GetCrossChainTokens(ids []string, dst []types.ChainToken) []types.ChainToken {
+	dst = dst[:0]
+	h := m.reader.Load()
+	if h == nil || len(ids) == 0 {
+		return dst
+	}
+	return appendPacked(dst, func(buf []tkl.ChainToken) ([]tkl.ChainToken, uint64, error) {
+		return h.GetByCrossChainIDsPacked(ids, buf)
+	})
+}
+
+func appendPacked(dst []types.ChainToken, query func([]tkl.ChainToken) ([]tkl.ChainToken, uint64, error)) []types.ChainToken {
+	buf := packedTokens.Get().(*[]tkl.ChainToken)
+	defer packedTokens.Put(buf)
+	packed, _, err := query(*buf)
+	*buf = packed
+	if err != nil {
+		return dst
+	}
+	dst = slices.Grow(dst, len(packed))
+	for _, t := range packed {
+		dst = append(dst, types.ChainToken{ChainID: t.ChainID, Address: common.Address(t.Address), Decimals: uint(t.Decimals)})
+	}
+	return dst
+}
+
+// GetTokenBySymbolOnChain returns the first catalogue token of chain, in
+// GetTokensByChain order, whose symbol or name equals symbol ignoring ASCII case.
+func (m *Manager) GetTokenBySymbolOnChain(chain uint64, symbol string) (*types.Token, bool) {
+	h := m.reader.Load()
+	if h == nil || symbol == "" {
+		return nil, false
+	}
+	page, err := h.GetBySymbolOnChain(chain, symbol)
+	if err != nil || len(page.Items) == 0 {
+		return nil, false
+	}
+	return convertToken(page.Items[0]), true
+}
+
+// GetTokensByKeys returns the tokens of keys in request order, skipping unknown
+// keys. Keys are parsed like ChainAndAddressFromTokenKey.
+func (m *Manager) GetTokensByKeys(keys []string) ([]*types.Token, error) {
+	h := m.reader.Load()
+	if h == nil {
+		return nil, nil
+	}
+	pairs := make([]tkl.Identity, 0, len(keys))
+	for _, key := range keys {
+		if chain, address, ok := types.ChainAndAddressFromTokenKey(strings.ToLower(key)); ok {
+			pairs = append(pairs, tkl.Identity{ChainID: chain, Address: hexAddress(address)})
 		}
 	}
-	return nil, false
+	if len(pairs) == 0 {
+		return make([]*types.Token, 0), nil
+	}
+	tokens := convertTokens(h.GetByChainAddresses(pairs))
+	if tokens == nil {
+		tokens = make([]*types.Token, 0)
+	}
+	return tokens, nil
+}
+
+func (m *Manager) TokenLists() []*types.TokenList {
+	h := m.reader.Load()
+	if h == nil {
+		return nil
+	}
+	page, err := h.GetLists()
+	if err != nil {
+		return nil
+	}
+	result := make([]*types.TokenList, 0, len(page.Items))
+	for _, list := range page.Items {
+		value, err := convertList(list)
+		if err != nil {
+			return nil
+		}
+		result = append(result, value)
+	}
+	return result
+}
+
+func (m *Manager) TokenList(id string) (*types.TokenList, bool) {
+	h := m.reader.Load()
+	if h == nil {
+		return nil, false
+	}
+	page, err := h.GetList(id)
+	if err != nil || len(page.Items) == 0 {
+		return nil, false
+	}
+	value, err := convertList(page.Items[0])
+	if err != nil {
+		return nil, false
+	}
+	return value, true
 }

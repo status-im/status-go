@@ -13,7 +13,7 @@ import (
 )
 
 func TestCustomWritesBeforeStartAndImmediateVisibility(t *testing.T) {
-	m, err := New(tkl.Config{Chains: []uint64{1}}, func(context.Context) (tkl.Bootstrap, error) { return tkl.Bootstrap{}, nil })
+	m, err := New(tkl.Config{Chains: []uint64{1}}, noStored)
 	require.NoError(t, err)
 	defer func() { _ = m.Stop() }()
 	row := &types.Token{ChainID: 1, Address: common.HexToAddress("0x1234"), Symbol: "CUSTOM", Decimals: 18}
@@ -42,7 +42,7 @@ func TestCustomWritesBeforeStartAndImmediateVisibility(t *testing.T) {
 }
 
 func TestCustomPersistenceFailureAndValidation(t *testing.T) {
-	m, err := New(tkl.Config{Chains: []uint64{1}}, func(context.Context) (tkl.Bootstrap, error) { return tkl.Bootstrap{}, nil })
+	m, err := New(tkl.Config{Chains: []uint64{1}}, noStored)
 	require.NoError(t, err)
 	defer func() { _ = m.Stop() }()
 	notify := make(chan struct{}, 10)
@@ -71,7 +71,7 @@ func TestCustomPersistenceFailureAndValidation(t *testing.T) {
 }
 
 func TestCustomCuratedPrecedenceAndCommitAfterCancellation(t *testing.T) {
-	m, err := New(tkl.Config{Chains: []uint64{1}}, func(context.Context) (tkl.Bootstrap, error) { return tkl.Bootstrap{}, nil })
+	m, err := New(tkl.Config{Chains: []uint64{1}}, noStored)
 	require.NoError(t, err)
 	defer func() { _ = m.Stop() }()
 	require.NoError(t, m.Start(context.Background(), false, nil))
