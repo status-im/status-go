@@ -11,12 +11,18 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/event"
+	"github.com/google/uuid"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"go.uber.org/zap"
+	"google.golang.org/protobuf/proto"
+
+	"github.com/waku-org/go-waku/waku/v2/protocol"
+	storepb "github.com/waku-org/go-waku/waku/v2/protocol/store/pb"
 
 	"github.com/status-im/status-go/internal/connection"
 	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/panics"
+	"github.com/status-im/status-go/pkg/messaging/waku"
 	"github.com/status-im/status-go/pkg/messaging/waku/types"
 )
 
@@ -32,10 +38,6 @@ const sendHashTimeout = 30 * time.Second
 // Most are for sends that already returned, so they are dropped unclaimed.
 const earlyResultTTL = time.Minute
 
-// ErrStoreQueryUnsupported is returned by StoreQuery: the Messaging API
-// recovers history itself and exposes no store query.
-var ErrStoreQueryUnsupported = errors.New("delivery: store queries are not exposed by the Messaging API")
-
 // sendResult is the outcome of a send, keyed by its request ID.
 type sendResult struct {
 	hash []byte
@@ -46,8 +48,9 @@ type sendResult struct {
 // Adapter is the messaging backend over the logos-delivery Messaging API.
 // It satisfies types.Waku and transport.MessagingAPI.
 type Adapter struct {
-	client Client
-	logger *zap.Logger
+	client      Client
+	logger      *zap.Logger
+	storeClient *waku.StoreClient
 
 	envelopeFeed event.Feed
 
@@ -73,9 +76,10 @@ type Adapter struct {
 	wg   sync.WaitGroup
 }
 
-// NewAdapter returns an Adapter driving client. The client must not be started.
-func NewAdapter(client Client, logger *zap.Logger) *Adapter {
-	return &Adapter{
+// NewAdapter returns an Adapter driving client. Store queries go to fleet's
+// storenodes. The client must not be started.
+func NewAdapter(client Client, fleet string, logger *zap.Logger) *Adapter {
+	a := &Adapter{
 		client:                 client,
 		logger:                 logger.Named("delivery"),
 		subscriptions:          make(map[string]map[string]struct{}),
@@ -85,6 +89,8 @@ func NewAdapter(client Client, logger *zap.Logger) *Adapter {
 		historyReconcileNeeded: make(chan types.HistoryReconcileWindow),
 		quit:                   make(chan struct{}),
 	}
+	a.storeClient = waku.NewFleetStoreClient(fleet, storeRequestor{client}, storeProcessor{a}, a.logger)
+	return a
 }
 
 var _ types.Waku = (*Adapter)(nil)
@@ -359,13 +365,38 @@ func (a *Adapter) ConnectionChanged(connection.State) {}
 // ConfirmMessageDelivered is a no-op: the node confirms its sends itself.
 func (a *Adapter) ConfirmMessageDelivered([]common.Hash) {}
 
-// Peers returns no peers: the Messaging API exposes none.
-func (a *Adapter) Peers() types.PeerStats { return types.PeerStats{} }
+// Peers returns the node's connected peers, or none when it cannot tell.
+func (a *Adapter) Peers() types.PeerStats {
+	peers, err := a.client.ConnectedPeers()
+	if err != nil {
+		a.logger.Debug("failed to list connected peers", zap.Error(err))
+		return types.PeerStats{}
+	}
+	return peers
+}
 
-// PeerID returns an empty ID: the Messaging API does not expose the node's.
-func (a *Adapter) PeerID() peer.ID { return "" }
+// PeerID returns the node's peer ID, or an empty one when it cannot tell.
+func (a *Adapter) PeerID() peer.ID {
+	id, err := a.client.PeerID()
+	if err != nil {
+		a.logger.Debug("failed to read the peer ID", zap.Error(err))
+		return ""
+	}
+	return id
+}
 
-// StoreQuery always fails with ErrStoreQueryUnsupported.
+// Metrics returns the node's metrics in the Prometheus text format.
+func (a *Adapter) Metrics() string {
+	metrics, err := a.client.Metrics()
+	if err != nil {
+		a.logger.Debug("failed to read metrics", zap.Error(err))
+		return ""
+	}
+	return metrics
+}
+
+// StoreQuery retrieves historic messages for a single batch from the fleet's
+// storenodes.
 func (a *Adapter) StoreQuery(
 	ctx context.Context,
 	batch types.MailserverBatch,
@@ -373,7 +404,92 @@ func (a *Adapter) StoreQuery(
 	shouldProcessNextPage func(int) (bool, uint64),
 	processEnvelopes bool,
 ) error {
-	return ErrStoreQueryUnsupported
+	return a.storeClient.Query(ctx, batch, pageLimit, shouldProcessNextPage, processEnvelopes)
+}
+
+// FetchMessagesByHashes retrieves the messages with the given hex hashes from
+// the fleet's storenodes, with the same failover as StoreQuery, and reports
+// each as received.
+func (a *Adapter) FetchMessagesByHashes(ctx context.Context, messageHashes []string) error {
+	hashes := make([][]byte, 0, len(messageHashes))
+	for _, h := range messageHashes {
+		decoded, err := hexutil.Decode(h)
+		if err != nil {
+			a.logger.Debug("invalid message hash for storenode fetch", zap.String("messageHash", h), zap.Error(err))
+			continue
+		}
+		hashes = append(hashes, decoded)
+	}
+	if len(hashes) == 0 {
+		return nil
+	}
+
+	return a.storeClient.FetchByHashes(ctx, func(storenode peer.AddrInfo) error {
+		request := &storepb.StoreQueryRequest{
+			RequestId:         uuid.NewString(),
+			IncludeData:       true,
+			MessageHashes:     hashes,
+			PaginationForward: true,
+			PaginationLimit:   proto.Uint64(uint64(len(hashes))),
+		}
+		for {
+			messages, cursor, err := a.client.StoreQuery(ctx, storenode, request)
+			if err != nil {
+				return err
+			}
+			for _, kv := range messages {
+				a.reportStored(kv)
+			}
+			if len(cursor) == 0 {
+				return nil
+			}
+			request.PaginationCursor = cursor
+		}
+	})
+}
+
+func (a *Adapter) reportStored(kv *storepb.WakuMessageKeyValue) {
+	msg := kv.GetMessage()
+	if msg == nil {
+		return
+	}
+	a.envelopeFeed.Send(types.EnvelopeEvent{
+		Event: types.EventEnvelopeAvailable,
+		Hash:  cryptotypes.BytesToHash(kv.GetMessageHash()),
+		Data: &types.ReceivedMessage{
+			Hash:         kv.GetMessageHash(),
+			ContentTopic: msg.ContentTopic,
+			Payload:      msg.Payload,
+			Ephemeral:    msg.GetEphemeral(),
+			Meta:         msg.Meta,
+			PubsubTopic:  kv.GetPubsubTopic(),
+			Version:      msg.GetVersion(),
+			Timestamp:    msg.GetTimestamp(),
+		},
+	})
+}
+
+// storeRequestor sends the store client's requests through the node.
+type storeRequestor struct {
+	client Client
+}
+
+func (r storeRequestor) Query(ctx context.Context, peerInfo peer.AddrInfo, request *storepb.StoreQueryRequest) ([]*storepb.WakuMessageKeyValue, []byte, error) {
+	return r.client.StoreQuery(ctx, peerInfo, request)
+}
+
+// storeProcessor reports the messages the store client fetched as received.
+type storeProcessor struct {
+	a *Adapter
+}
+
+func (p storeProcessor) OnEnvelope(env *protocol.Envelope, _ bool) error {
+	p.a.reportStored(&storepb.WakuMessageKeyValue{
+		MessageHash: env.Hash().Bytes(),
+		Message:     env.Message(),
+		PubsubTopic: proto.String(env.PubsubTopic()),
+	})
+	return nil
 }
 
 func decodeHash(s string) []byte {

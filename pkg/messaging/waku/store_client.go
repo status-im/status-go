@@ -40,6 +40,14 @@ func NewStoreClient(selector *storeSelector, pager *storePager, resolvePubsubTop
 	}
 }
 
+// NewFleetStoreClient returns a StoreClient over fleet's storenodes that sends
+// each store request through requestor and hands fetched envelopes to processor.
+func NewFleetStoreClient(fleet string, requestor StoreRequestor, processor EnvelopeProcessor, logger *zap.Logger) *StoreClient {
+	sc := NewStoreClient(newStoreSelector(), newStorePager(requestor, processor, logger), func(t string) string { return t }, logger)
+	sc.SetStorenodes(fleetStorenodes(fleet, logger))
+	return sc
+}
+
 // SetStorenodes sets the storenodes Query may use. Called once at startup.
 func (sc *StoreClient) SetStorenodes(nodes []peer.AddrInfo) {
 	sc.selector.setStorenodes(nodes)
