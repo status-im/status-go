@@ -139,6 +139,7 @@ def check_fees_for_path(path_name, gas_fee_mode, check_approval, route):
 def send_router_transactions_with_signatures(rpc_client, uuid, tx_signatures):
     with rpc_client.expect_signal(
         SignalType.WALLET,
+        timeout=60,
         accept_fn=lambda signal: signal["event"]["type"] == WalletEventType.TRANSACTIONS_PENDING_TRANSACTION_STATUS_CHANGED.value,
     ) as exp:
         _ = rpc_client.wallet_service.send_router_transactions_with_signatures(uuid, tx_signatures)

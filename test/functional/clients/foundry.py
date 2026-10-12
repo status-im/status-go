@@ -10,7 +10,21 @@ import os
 
 from utils.config import Config
 from resources.constants import user_1, ANVIL_NETWORK_ID, ANVIL_RPC_URL
-from tenacity import retry, wait_fixed, stop_after_attempt
+from tenacity import retry, retry_if_exception, stop_after_attempt, wait_fixed
+
+
+def _anvil_connect_failure(exc: BaseException) -> bool:
+    message = str(exc).lower()
+    return "client error (connect)" in message or "temporary failure in name resolution" in message
+
+
+retry_anvil_read = retry(stop=stop_after_attempt(15), wait=wait_fixed(1), reraise=True)
+_retry_anvil_connect = retry(
+    stop=stop_after_attempt(15),
+    wait=wait_fixed(1),
+    retry=retry_if_exception(_anvil_connect_failure),
+    reraise=True,
+)
 
 
 class Foundry:
@@ -190,19 +204,32 @@ class Foundry:
 
         return temp_dir
 
+    @_retry_anvil_connect
+    def ensure_anvil_reachable(self):
+        if not self.container:
+            raise Exception("Container not found")
+
+        result = self.container.exec_run(f"cast chain-id --rpc-url {ANVIL_RPC_URL}")
+        if result.exit_code != 0:
+            raise RuntimeError(result.output.decode().strip())
+        return result
+
     def generate_tokens(self, controller_address, to_address, token_amount, private_key):
         if not self.container:
             raise Exception("Container not found")
 
+        self.ensure_anvil_reachable()
         generate_cmd = (
             f"cast send {controller_address} 'generateTokens(address,uint256)' "
             f"{to_address} {token_amount} --rpc-url {ANVIL_RPC_URL} "
             f"--private-key {private_key}"
         )
         result = self.container.exec_run(generate_cmd)
+        if result.exit_code != 0:
+            raise RuntimeError(f"cast send failed with exit_code={result.exit_code}, output={result.output.decode().strip()}")
         return result
 
-    @retry(stop=stop_after_attempt(10), wait=wait_fixed(0.1), reraise=True)
+    @retry_anvil_read
     def get_erc20_balance(self, token_address, owner_address):
         if not self.container:
             raise Exception("Container not found")
@@ -213,7 +240,7 @@ class Foundry:
             raise RuntimeError(f"cast call failed with exit_code={result.exit_code}, output={result.output.decode().strip()}")
         return result
 
-    @retry(stop=stop_after_attempt(10), wait=wait_fixed(0.1), reraise=True)
+    @retry_anvil_read
     def get_erc1155_balance(self, token_address, owner_address, token_id):
         if not self.container:
             raise Exception("Container not found")
@@ -224,7 +251,7 @@ class Foundry:
             raise RuntimeError(f"cast call failed with exit_code={result.exit_code}, output={result.output.decode().strip()}")
         return result
 
-    @retry(stop=stop_after_attempt(10), wait=wait_fixed(0.1), reraise=True)
+    @retry_anvil_read
     def get_erc721_owner(self, token_address, token_id):
         if not self.container:
             raise Exception("Container not found")
