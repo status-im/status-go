@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"sync"
 	"time"
 
@@ -160,6 +161,8 @@ func (a *Adapter) handleEvent(ev Event) {
 	}
 }
 
+// handleReceived reports a message once, on the lowest pubsub topic its
+// content topic is subscribed on.
 func (a *Adapter) handleReceived(e ReceivedEvent) {
 	a.subscriptionsMu.Lock()
 	pubsubTopics := make([]string, 0, len(a.subscriptions[e.ContentTopic]))
@@ -167,24 +170,25 @@ func (a *Adapter) handleReceived(e ReceivedEvent) {
 		pubsubTopics = append(pubsubTopics, pubsubTopic)
 	}
 	a.subscriptionsMu.Unlock()
+	if len(pubsubTopics) == 0 {
+		return
+	}
 
 	hash := decodeHash(e.MessageHash)
-	for _, pubsubTopic := range pubsubTopics {
-		a.envelopeFeed.Send(types.EnvelopeEvent{
-			Event: types.EventEnvelopeAvailable,
-			Hash:  cryptotypes.BytesToHash(hash),
-			Data: &types.ReceivedMessage{
-				Hash:         hash,
-				ContentTopic: e.ContentTopic,
-				Payload:      e.Payload,
-				Ephemeral:    e.Ephemeral,
-				Meta:         e.Meta,
-				PubsubTopic:  pubsubTopic,
-				Version:      e.Version,
-				Timestamp:    e.Timestamp,
-			},
-		})
-	}
+	a.envelopeFeed.Send(types.EnvelopeEvent{
+		Event: types.EventEnvelopeAvailable,
+		Hash:  cryptotypes.BytesToHash(hash),
+		Data: &types.ReceivedMessage{
+			Hash:         hash,
+			ContentTopic: e.ContentTopic,
+			Payload:      e.Payload,
+			Ephemeral:    e.Ephemeral,
+			Meta:         e.Meta,
+			PubsubTopic:  slices.Min(pubsubTopics),
+			Version:      e.Version,
+			Timestamp:    e.Timestamp,
+		},
+	})
 }
 
 // settleSend hands result to the Send waiting on requestID, or keeps it for
