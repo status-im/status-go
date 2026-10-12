@@ -2585,7 +2585,7 @@ func (b *StatusBackend) PauseServices(names []string) error {
 	defer func() { traffic.Default.SetBackground(b.statusNode.ServiceRegistry().AllPaused()) }()
 
 	err := b.statusNode.ServiceRegistry().PauseMultiple(names)
-	if platform.IsMobilePlatform() {
+	if platform.IsMobilePlatform() && b.statusNode.ServiceRegistry().AllPaused() {
 		b.memRelease.releaseNow()
 	}
 	return err
