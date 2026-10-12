@@ -1,6 +1,20 @@
 name: Token library integration
 on:
   pull_request:
+    paths:
+      - '.github/workflows/token-library.yml'
+      - '.gitattributes'
+      - 'Makefile'
+      - 'go.mod'
+      - 'go.sum'
+      - 'flake.nix'
+      - 'flake.lock'
+      - 'nix/pkgs/libtkl/**'
+      - 'scripts/*tkl*'
+      - 'scripts/testdata/tkl-*/**'
+      - 'scripts/testdata/tkl-*'
+      - 'internal/tklbuild/**'
+      - 'pkg/services/wallet/token/**'
   workflow_dispatch:
 permissions:
   contents: read
