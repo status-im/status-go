@@ -1,20 +1,56 @@
 #!/usr/bin/env python3
 """Check the real mobile recipes without generating code or rebuilding SDS."""
 from pathlib import Path
+import os
+import shutil
 import subprocess
+import tempfile
 import unittest
 
 
 class MobileBuildTest(unittest.TestCase):
+    def test_mobile_recipes_discard_host_prebuilt_paths(self):
+        repo = Path(__file__).resolve().parent.parent
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            shutil.copy(repo / "Makefile", root)
+            (root / "scripts").mkdir()
+            # Exercise Make's actual environment handoff, without SDK downloads
+            # or native compilation. A leaked host path must fail the recipe.
+            (root / "scripts/tkl_env.sh").write_text(
+                '#!/bin/bash\n'
+                'test -z "${NIM_TKL_INC_DIR:-}${NIM_TKL_LIB_DIR:-}" || exit 42\n'
+                'printf "%s/%s" "$GOOS" "$GOARCH" > selected-target\n')
+            (root / "scripts/check_tkl_exports.sh").write_text('exit 0\n')
+            env = dict(os.environ, NIM_TKL_INC_DIR="/host/include", NIM_TKL_LIB_DIR="/host/lib")
+            for platform in ("android", "ios"):
+                with self.subTest(platform=platform):
+                    result = subprocess.run(
+                        ["make", f"statusgo-{platform}-library", "-o", "generate",
+                         "-o", "statusgo-c-bindings", "-o", f"build-libsds-{platform}",
+                         "-o", "install-git-hooks", "ARCH=arm64", "RELEASE_TAG=fixture",
+                         "ANDROID_NDK_ROOT=/fixture/ndk", "HOST_OS=linux",
+                         "IPHONE_SDK=iphoneos"],
+                        cwd=root, env=env, text=True, capture_output=True, timeout=15)
+                    self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                    self.assertEqual((root / "selected-target").read_text(), f"{platform}/arm64")
+
     def test_shared_build_keeps_sds_prerequisite(self):
         repo = Path(__file__).resolve().parent.parent
         result = subprocess.run(
-            ["make", "-qp", "statusgo-shared-library", "LIBSDS=/fixture/libsds.a"],
+            ["make", "-qp", "statusgo-shared-library", "LIBSDS=/fixture/libsds.a",
+             "NIM_SDS_BUILD_FROM_SOURCE=true"],
             cwd=repo, text=True, capture_output=True)
         self.assertIn(result.returncode, (0, 1), result.stderr)
-        rule = next(line for line in result.stdout.splitlines()
-                    if line.startswith("statusgo-shared-library:"))
-        self.assertIn("/fixture/libsds.a", rule)
+        # Newer Make versions also print target-specific variable assignments
+        # with this prefix. Only dependency rules describe prerequisites.
+        prerequisites = [
+            dependency
+            for line in result.stdout.splitlines()
+            if line.startswith("statusgo-shared-library:") and "=" not in line
+            for dependency in line.split()[1:]
+        ]
+        self.assertIn("/fixture/libsds.a", prerequisites)
 
     def test_archive_tests_prepare_token_library_and_keep_storage_flags(self):
         repo = Path(__file__).resolve().parent.parent
