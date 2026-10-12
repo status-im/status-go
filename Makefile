@@ -108,8 +108,9 @@ BUILD_TAGS ?= gowaku_no_rln
 # Every wallet build uses the pinned native token catalogue.
 TOKEN_ENV = CGO_CFLAGS='$(CGO_CFLAGS)' CGO_LDFLAGS='$(CGO_LDFLAGS)' bash scripts/tkl_env.sh
 MOBILE_BUILD_TAGS := gowaku_no_rln nowatchdog disable_torrent
-ANDROID_TOKEN_ENV = ANDROID_NDK_ROOT="$(ANDROID_NDK_ROOT)" ANDROID_API="$(ANDROID_API)" TKL_HIDE_EXPORTS=1 bash scripts/tkl_env.sh
-IOS_TOKEN_ENV = IPHONE_SDK="$(IPHONE_SDK)" IOS_TARGET="$(IOS_TARGET)" bash scripts/tkl_env.sh
+# The dev shell's prebuilt token library targets the host, not a mobile SDK.
+ANDROID_TOKEN_ENV = env -u NIM_TKL_INC_DIR -u NIM_TKL_LIB_DIR ANDROID_NDK_ROOT="$(ANDROID_NDK_ROOT)" ANDROID_API="$(ANDROID_API)" TKL_HIDE_EXPORTS=1 bash scripts/tkl_env.sh
+IOS_TOKEN_ENV = env -u NIM_TKL_INC_DIR -u NIM_TKL_LIB_DIR IPHONE_SDK="$(IPHONE_SDK)" IOS_TARGET="$(IOS_TARGET)" bash scripts/tkl_env.sh
 IOS_TOKEN_ARCHIVE = bash scripts/tkl_bundle_archive.sh build/bin/libstatus.a
 
 # `nim-sds` variables
