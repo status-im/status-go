@@ -468,8 +468,8 @@ func (c *Core) startWakuMetrics() error {
 
 func (c *Core) metrics() string {
 	// TODO: Remove type assertion once Waku metrics are fully integrated into the Messaging module.
-	if w, ok := c.waku.(*waku.Waku); ok {
-		return w.Metrics()
+	if m, ok := c.waku.(interface{ Metrics() string }); ok {
+		return m.Metrics()
 	}
 	return ""
 }

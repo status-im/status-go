@@ -58,5 +58,5 @@ func newDeliveryBackend(params CoreParams, logger *zap.Logger) (*delivery.Adapte
 	if err != nil {
 		return nil, err
 	}
-	return delivery.NewAdapter(client, logger), nil
+	return delivery.NewAdapter(client, params.Fleet, logger), nil
 }
