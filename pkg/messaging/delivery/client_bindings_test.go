@@ -44,7 +44,7 @@ func privateCluster(extra map[string]any) map[string]any {
 func newTestAdapter(t *testing.T, cfg Config) *Adapter {
 	client, err := NewClient(cfg)
 	require.NoError(t, err)
-	a := NewAdapter(client, zap.NewNop())
+	a := NewAdapter(client, "", zap.NewNop())
 	require.NoError(t, a.Start())
 	t.Cleanup(func() { require.NoError(t, a.Stop()) })
 	return a
