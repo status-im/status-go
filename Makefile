@@ -652,7 +652,7 @@ lint-fix: generate
 clean: clean-storage clean-libtkl ##@other Cleanup
 	rm -fr build/bin/*
 
-.PHONY: build-libtkl clean-libtkl test-libtkl
+.PHONY: build-libtkl clean-libtkl test-libtkl test-libtkl-coexistence
 build-libtkl: ##@build Prepare the pinned native token library
 	bash scripts/tkl_native.sh
 
@@ -663,6 +663,10 @@ test-libtkl: ##@test Check native dependency reuse and public ABI
 	python3 scripts/test_tkl_native.py
 	python3 scripts/test_tkl_mobile_make.py
 	bash scripts/tkl_env.sh go test -tags tkl ./internal/tklbuild
+
+test-libtkl-coexistence: $(LIBSDS) ##@test Check token-library and SDS runtimes in one process
+	LD_LIBRARY_PATH="$(NIM_SDS_LIB_DIR)" CGO_CFLAGS='$(CGO_CFLAGS)' CGO_LDFLAGS='$(CGO_LDFLAGS)' \
+		bash scripts/tkl_env.sh go test -v -count=1 -tags 'tkl tkl_coexistence' ./internal/tklbuild
 
 git-clean:
 	git clean -xf
