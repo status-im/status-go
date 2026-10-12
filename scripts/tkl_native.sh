@@ -48,12 +48,28 @@ case "$action" in
   *) fail "Usage: $0 [prepare|clean]" ;;
 esac
 
+goos="$(go env GOOS)"
+goarch="$(go env GOARCH)"
+archive_target="$goos/$goarch"
+if [ "$goos" = ios ]; then
+  archive_target="$archive_target/${IPHONE_SDK:-iphoneos}"
+fi
+
 if [ -n "${NIM_TKL_LIB_DIR:-}${NIM_TKL_INC_DIR:-}" ]; then
   [ -n "${NIM_TKL_LIB_DIR:-}" ] && [ -n "${NIM_TKL_INC_DIR:-}" ] ||
     fail "Supply both NIM_TKL_LIB_DIR and NIM_TKL_INC_DIR for prebuilt inputs"
   [ -f "$NIM_TKL_LIB_DIR/libtkl.a" ] && [ -f "$NIM_TKL_INC_DIR/tkl.h" ] ||
     fail "Prebuilt inputs require isolated libtkl.a and tkl.h"
-  if [ "${TKL_HIDE_EXPORTS:-0}" = 1 ] && [ "$(go env GOOS)" = windows ]; then
+  if [ -f "$NIM_TKL_LIB_DIR/libtkl.target" ]; then
+    prebuilt_target="$(<"$NIM_TKL_LIB_DIR/libtkl.target")"
+  else
+    # Preserve native prebuilt inputs predating target metadata. Cross builds
+    # must declare their target rather than silently assuming a host archive.
+    prebuilt_target="$(go env GOHOSTOS)/$(go env GOHOSTARCH)"
+  fi
+  [ "$prebuilt_target" = "$archive_target" ] ||
+    fail "Prebuilt libtkl target mismatch: inputs are for $prebuilt_target, requested $archive_target; unset NIM_TKL_INC_DIR and NIM_TKL_LIB_DIR to build for the target"
+  if [ "${TKL_HIDE_EXPORTS:-0}" = 1 ] && [ "$goos" = windows ]; then
     sections="$("${OBJDUMP:-objdump}" -h "$NIM_TKL_LIB_DIR/libtkl.a")"
     if printf '%s\n' "$sections" | grep '\.drectve' >/dev/null; then
       fail "Prebuilt Windows archive still contains DLL export directives; remove .drectve from a private copy first"
@@ -74,8 +90,6 @@ fi
 [[ "$pin" =~ ^[0-9a-f]{40}$ ]] || fail "Invalid native revision pin"
 grep -Eq "github.com/status-im/nim-token-lists/go/tkl v[^[:space:]]*-${pin:0:12}([[:space:]]|$)" "$repo/go.mod" ||
   fail "Go wrapper and native revision pins disagree"
-goos="$(go env GOOS)"
-goarch="$(go env GOARCH)"
 case "$goarch" in
   arm64) arch=arm64 ;;
   amd64) arch=x86_64 ;;
@@ -169,6 +183,7 @@ fingerprint="$(printf '%s\n' "$pin" "$goos/$goarch" "$(command -v "$nim")" \
   "${TKL_PLATFORM:-}" "${TKL_LD:-}" "${TKL_OBJCOPY:-}" "${TKL_AR:-}" \
   "$("${tkl_sha256[@]}" "$repo/scripts/tkl_native.sh")" | "${tkl_sha256[@]}" | awk '{print $1}')"
 if [ -f "$out/link/libtkl.a" ] && [ -f "$out/fingerprint" ] && [ -f "$out/archive.sha256" ] &&
+   [ -f "$out/link/libtkl.target" ] && [ "$(<"$out/link/libtkl.target")" = "$archive_target" ] &&
    [ "$(cat "$out/fingerprint")" = "$fingerprint" ] &&
    [ "$(cat "$out/archive.sha256")" = "$("${tkl_sha256[@]}" "$out/link/libtkl.a" | awk '{print $1}')" ]; then
   printf '%s\n' "$out/link"
@@ -195,6 +210,7 @@ else
     "${TKL_OBJCOPY:-objcopy}" --remove-section .drectve "$out/link/libtkl.a"
   fi
 fi
+printf '%s\n' "$archive_target" > "$out/link/libtkl.target"
 "${tkl_sha256[@]}" "$out/link/libtkl.a" | awk '{print $1}' > "$out/archive.sha256"
 printf '%s\n' "$fingerprint" > "$out/fingerprint"
 printf '%s\n' "$out/link"

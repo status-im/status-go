@@ -31,6 +31,7 @@ stdenv.mkDerivation {
   installPhase = ''
     mkdir -p "$out/lib" "$out/include" "$out/share/licenses/libtkl"
     cp build/libtkl_isolated.a "$out/lib/libtkl.a"
+    echo "${stdenv.hostPlatform.go.GOOS}/${stdenv.hostPlatform.go.GOARCH}" > "$out/lib/libtkl.target"
     cp abi/tkl.h "$out/include/"
     for dep in vendor/*; do
       mkdir -p "$out/share/licenses/libtkl/$(basename "$dep")"
