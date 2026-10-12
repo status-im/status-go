@@ -42,41 +42,8 @@ type deliveryTestBackend struct {
 	failedSends event.Feed
 }
 
-// sharedTestNodeEnv makes every environment in the process share one node
-// pair. A destroyed node leaks descriptors (logos-delivery#4498), so a long
-// run of fresh nodes eventually aborts the process.
-const sharedTestNodeEnv = "LOGOS_DELIVERY_SHARED_TEST_NODE"
-
-var sharedTestNode struct {
-	once    sync.Once
-	backend *deliveryTestBackend
-	err     error
-}
-
-// sharedTestBackend is the process-wide node pair; environments neither
-// start nor stop it.
-type sharedTestBackend struct {
-	*deliveryTestBackend
-}
-
-func (sharedTestBackend) Start() error { return nil }
-func (sharedTestBackend) Stop() error  { return nil }
-
 func newLogosDeliveryTestBackend() (testBackend, error) {
-	if os.Getenv(sharedTestNodeEnv) == "" {
-		return newDeliveryTestBackend()
-	}
-	sharedTestNode.once.Do(func() {
-		b, err := newDeliveryTestBackend()
-		if err == nil {
-			err = b.Start()
-		}
-		sharedTestNode.backend, sharedTestNode.err = b, err
-	})
-	if sharedTestNode.err != nil {
-		return nil, sharedTestNode.err
-	}
-	return sharedTestBackend{sharedTestNode.backend}, nil
+	return newDeliveryTestBackend()
 }
 
 func newDeliveryTestBackend() (*deliveryTestBackend, error) {
