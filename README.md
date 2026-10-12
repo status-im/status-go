@@ -29,7 +29,12 @@ remove the global Go module cache. `make test-libtkl` checks the dependency and 
 
 For controlled builds with prebuilt artifacts, supply both `NIM_TKL_INC_DIR`
 (containing `tkl.h`) and `NIM_TKL_LIB_DIR` (containing the isolated `libtkl.a`).
-Both must come from the recorded revision and target. The managed build supports
+Both must come from the recorded revision and target. Nix and managed builds
+include `libtkl.target` beside the archive, recording `GOOS/GOARCH` (plus
+`/iphoneos` or `/iphonesimulator` for iOS). Prebuilt target metadata must match
+the requested build; older archives without it are accepted only for the host
+target. Mobile Make targets discard inherited prebuilt paths and prepare their
+own target archive. The managed build supports
 Linux and macOS (amd64/arm64), Windows (amd64 with MinGW), Android (arm64/amd64)
 and iOS (arm64 device, arm64/amd64 simulator). Archives are kept separately under
 `build/deps/nim-token-lists/build/<target>/link`; device and simulator archives
