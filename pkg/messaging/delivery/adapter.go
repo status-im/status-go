@@ -53,7 +53,7 @@ type Adapter struct {
 
 	// subscriptions maps a content topic to the pubsub topics the transport
 	// subscribed it on. A received message carries no pubsub topic, so it is
-	// reported on each of them.
+	// reported on the lowest of them.
 	subscriptionsMu sync.Mutex
 	subscriptions   map[string]map[string]struct{}
 
