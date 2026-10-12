@@ -23,7 +23,7 @@ requires "https://github.com/logos-messaging/sds-go-bindings#63c87b4e"
 requires "chronos#0de7b335d0ad5557ad5ba71a4b7662f7b201750e"
 
 # Pins the logos-delivery revision whose C ABI the bindings match.
-requires "https://github.com/logos-messaging/logos-delivery-go-bindings#9a037d50"
+requires "https://github.com/logos-messaging/logos-delivery-go-bindings#31a55a70"
 
 
 ### Helpers
