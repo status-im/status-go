@@ -160,25 +160,28 @@ func rebuildTokensMap(fetchedLists []defaulttokenlists.DownloadedTokenList) (map
 		}
 		catalogue, err := tklmanager.New(tkl.Config{
 			Chains:     walletcommon.AllChainIDsAsUint64(),
-			MainListID: walletcommon.StatusTokenListID,
+			MainListID: fetchedTokenList.ID,
 			InitialLists: []tkl.ListContent{{ID: fetchedTokenList.ID, Format: format,
 				Body: string(fetchedTokenList.JsonData), Source: fetchedTokenList.SourceURL,
 				FetchedTimestamp: fetchedTokenList.Fetched.Format(time.RFC3339)}},
 		}, func(context.Context) (tkl.Bootstrap, error) { return tkl.Bootstrap{}, nil })
 		if err != nil {
-			return nil, err
+			fmt.Printf("Failed to parse token list %s: %v\n", fetchedTokenList.ID, err)
+			continue
 		}
 		err = catalogue.Start(context.Background(), false, nil)
 		if err != nil {
 			_ = catalogue.Stop()
-			return nil, err
+			fmt.Printf("Failed to parse token list %s: %v\n", fetchedTokenList.ID, err)
+			continue
 		}
 		list, ok := catalogue.TokenList(fetchedTokenList.ID)
 		if err := catalogue.Stop(); err != nil {
 			return nil, err
 		}
 		if !ok {
-			return nil, fmt.Errorf("failed to parse token list %s", fetchedTokenList.ID)
+			fmt.Printf("Failed to parse token list %s\n", fetchedTokenList.ID)
+			continue
 		}
 
 		tokensLists[fetchedTokenList.ID] = list

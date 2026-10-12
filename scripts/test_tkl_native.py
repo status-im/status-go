@@ -150,6 +150,7 @@ class NativeDependencyTest(unittest.TestCase):
         lib.mkdir()
         (lib / "libtkl.a").write_text("archive")
         (lib / "tkl.h").write_text("header")
+        (lib / "libtkl.target").write_text("windows/amd64\n")
         inspector = self.root / "objdump"
         cases = (
             ("exit 1", False),
@@ -162,8 +163,43 @@ class NativeDependencyTest(unittest.TestCase):
                 inspector.chmod(0o755)
                 result = self.helper(check=False, NIM_TKL_LIB_DIR=str(lib),
                                      NIM_TKL_INC_DIR=str(lib), TKL_HIDE_EXPORTS="1",
-                                     GOOS="windows", OBJDUMP=str(inspector))
+                                     GOOS="windows", GOARCH="amd64", OBJDUMP=str(inspector))
                 self.assertEqual(result.returncode == 0, accepted, result.stderr)
+
+    def test_unmarked_prebuilt_rejects_cross_targets(self):
+        lib = self.root / "prebuilt"
+        lib.mkdir()
+        (lib / "libtkl.a").write_text("archive")
+        (lib / "tkl.h").write_text("header")
+        host_os, host_arch = self.run_cmd("go", "env", "GOHOSTOS", "GOHOSTARCH").stdout.split()
+        other_arch = "amd64" if host_arch == "arm64" else "arm64"
+        for goos, goarch in (("android", "arm64"), ("ios", "arm64"), (host_os, other_arch)):
+            with self.subTest(goos=goos, goarch=goarch):
+                result = self.helper(check=False, GOOS=goos, GOARCH=goarch,
+                                     NIM_TKL_LIB_DIR=str(lib), NIM_TKL_INC_DIR=str(lib))
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("target mismatch", result.stderr)
+                self.assertFalse(self.source.exists())
+
+    def test_prebuilt_target_metadata_is_checked(self):
+        lib = self.root / "prebuilt"
+        lib.mkdir()
+        (lib / "libtkl.a").write_text("archive")
+        (lib / "tkl.h").write_text("header")
+        cases = (("android/arm64", "android", "arm64", "", True),
+                 ("linux/arm64", "android", "arm64", "", False),
+                 ("android/amd64", "android", "arm64", "", False),
+                 ("ios/arm64/iphoneos", "ios", "arm64", "iphoneos", True),
+                 ("ios/arm64/iphoneos", "ios", "arm64", "iphonesimulator", False))
+        for built, goos, goarch, sdk, accepted in cases:
+            with self.subTest(built=built, goos=goos, goarch=goarch, sdk=sdk):
+                (lib / "libtkl.target").write_text(built + "\n")
+                result = self.helper(check=False, GOOS=goos, GOARCH=goarch, IPHONE_SDK=sdk,
+                                     NIM_TKL_LIB_DIR=str(lib), NIM_TKL_INC_DIR=str(lib))
+                self.assertEqual(result.returncode == 0, accepted, result.stderr)
+                if not accepted:
+                    self.assertIn("target mismatch", result.stderr)
+                self.assertFalse(self.source.exists())
 
     def test_clean_cannot_remove_an_active_build(self):
         self.helper()
@@ -298,6 +334,15 @@ bash scripts/tkl_native.sh
         self.assertEqual(len((self.source / "build-count").read_text().splitlines()), 3)
         for target in ("android-arm64", "android-x86_64"):
             self.assertEqual((self.source / f"build/{target}/link/libtkl.a").read_text(), target)
+        # The environment wrapper's exported paths must remain usable on a
+        # second invocation, including for a managed cross-target archive.
+        result = subprocess.run(
+            ["bash", "-c", 'source "$1"; source "$1"', "fixture",
+             str(self.repo / "scripts/tkl_env.sh")],
+            env=dict(self.env, **env), text=True, capture_output=True, timeout=15)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual((self.source / "build/android-arm64/link/libtkl.target").read_text(),
+                         "android/arm64\n")
         self.helper("clean")
         self.assertFalse(self.source.exists())
 
