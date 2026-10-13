@@ -61,7 +61,6 @@ jobs:
           install: >-
             make
             unzip
-            mingw-w64-x86_64-gcc
 
       - name: Install protoc
         run: |
