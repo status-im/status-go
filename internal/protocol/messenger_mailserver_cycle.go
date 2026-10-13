@@ -7,6 +7,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/internal/panics"
+	"github.com/status-im/status-go/internal/timesource"
 	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
 )
 
@@ -46,13 +47,18 @@ func translateHistoryReconcileWindow(window messagingtypes.HistoryReconcileWindo
 	if window.From.IsZero() || window.To.IsZero() || !window.From.Before(window.To) {
 		return messagingtypes.HistoryReconcileWindow{}
 	}
-	age := observedNow.Sub(window.To)
+	// Use wall clock durations: the monotonic clock does not advance while the
+	// system is suspended, so it would shrink a window spanning a sleep.
+	observedWall := observedNow.Round(0)
+	fromWall := window.From.Round(0)
+	toWall := window.To.Round(0)
+	age := observedWall.Sub(toWall)
 	if age < 0 {
 		age = 0
 	}
 	to := syncNow.Add(-age)
 	return messagingtypes.HistoryReconcileWindow{
-		From: to.Add(-window.To.Sub(window.From)),
+		From: to.Add(-toWall.Sub(fromWall)),
 		To:   to,
 	}
 }
@@ -142,6 +148,27 @@ func (m *Messenger) startHistoryReconciliationLoop() {
 	}()
 }
 
+// historyCursorMonitorThrough returns how far the cursor monitor may advance
+// the topic cursors on a tick at now, the previous tick being at lastTick, and
+// whether it may advance them at all.
+//
+// It never claims history past the previous tick: tickers run on the monotonic
+// clock, which does not advance while the system is suspended, so a tick can
+// arrive long after it was due, with nothing received in the meantime and a
+// connection state that may still be stale. A tick right after a detected
+// suspend advances nothing, leaving the gap to the transport's reconcile
+// window.
+func historyCursorMonitorThrough(syncNow, lastTick, now time.Time) (time.Time, bool) {
+	if timesource.SuspendedBetween(lastTick, now) {
+		return time.Time{}, false
+	}
+	// Stay at least one tolerance window behind the observation so a
+	// concurrent reliability transition cannot advance a cursor into the newly
+	// unreliable interval.
+	behind := max(time.Duration(tolerance)*time.Second, now.Round(0).Sub(lastTick.Round(0)))
+	return syncNow.Add(-behind), true
+}
+
 // startHistoryCursorMonitor advances initialized topic cursors while
 // a full node has a healthy relay mesh. This records reliable live delivery
 // without issuing store queries and bounds catch-up after a crash.
@@ -157,17 +184,18 @@ func (m *Messenger) startHistoryCursorMonitor() {
 
 		ticker := time.NewTicker(historyCursorMonitorInterval)
 		defer ticker.Stop()
+		lastTick := time.Now()
 		for {
 			select {
 			case <-m.quit:
 				return
 			case <-ticker.C:
-				// Stay one tolerance window behind the observation so a
-				// concurrent reliability transition cannot advance a cursor
-				// into the newly unreliable interval.
-				m.advanceHistoryCursors(
-					m.historicSyncNow().Add(-time.Duration(tolerance) * time.Second),
-				)
+				now := time.Now()
+				through, ok := historyCursorMonitorThrough(m.historicSyncNow(), lastTick, now)
+				lastTick = now
+				if ok {
+					m.advanceHistoryCursors(through)
+				}
 			}
 		}
 	}()
@@ -176,6 +204,11 @@ func (m *Messenger) startHistoryCursorMonitor() {
 func (m *Messenger) advanceHistoryCursors(through time.Time) {
 	if through.IsZero() || m.mailserversDatabase == nil || m.messaging == nil ||
 		m.messaging.ConnectionStatus().State != messagingtypes.ConnectionStateConnected {
+		return
+	}
+	if !m.historicCatchUpDone.Load() {
+		m.logger.Debug("advance history cursors skipped: session catch-up not completed yet",
+			zap.Time("through", through))
 		return
 	}
 	m.historicSyncQueueMu.Lock()
@@ -238,6 +271,29 @@ func (m *Messenger) takeHistoricSync() (historicSyncRequest, bool) {
 	request := m.historicSyncQueue[0]
 	m.historicSyncQueue = m.historicSyncQueue[1:]
 	return request, true
+}
+
+// prepareHistoricSyncRun widens a bounded request into a cursor-based catch-up
+// until one has succeeded in this session. A bounded run floors each topic's
+// start to the window and then persists the window end as its cursor, which
+// would otherwise permanently skip any gap since the cursor was last saved
+// (e.g. while the app was closed).
+func (m *Messenger) prepareHistoricSyncRun(request historicSyncRequest) historicSyncRequest {
+	if !request.bounded() || m.historicCatchUpDone.Load() {
+		return request
+	}
+	m.logger.Info("bounded historic sync widened to cursor-based catch-up: session catch-up not completed yet",
+		zap.Time("from", request.From), zap.Time("to", request.To))
+	return historicSyncRequest{To: request.To}
+}
+
+func (m *Messenger) recordHistoricSyncSuccess(request historicSyncRequest) {
+	if request.bounded() {
+		return
+	}
+	if !m.historicCatchUpDone.Swap(true) {
+		m.logger.Info("historic sync session catch-up completed", zap.Time("to", request.To))
+	}
 }
 
 func (m *Messenger) requeueHistoricSync(request historicSyncRequest) {
@@ -310,8 +366,10 @@ func (m *Messenger) startHistoricSyncWorker() {
 					}
 					previousAttempt := lastAttempt
 					lastAttempt = time.Now()
+					request = m.prepareHistoricSyncRun(request)
 					executed, err := m.runAutomaticHistoricSync(request)
 					if err == nil && executed {
+						m.recordHistoricSyncSuccess(request)
 						break
 					}
 					if err == nil {

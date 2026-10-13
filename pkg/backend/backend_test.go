@@ -36,6 +36,7 @@ import (
 	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
 	settings "github.com/status-im/status-go/internal/db/multiaccounts/settings"
 	"github.com/status-im/status-go/internal/db/walletdb"
+	"github.com/status-im/status-go/internal/nodecfg"
 	"github.com/status-im/status-go/internal/protocol/requests"
 	"github.com/status-im/status-go/internal/signal"
 	"github.com/status-im/status-go/internal/testutils"
@@ -1213,6 +1214,61 @@ func TestSetFleet(t *testing.T) {
 	require.Equal(t, params.FleetStatusProd, testContext.backend.config.ClusterConfig.Fleet)
 
 	require.NoError(t, testContext.backend.Logout())
+}
+
+func TestSwitchFleetPreservesEFPBaseURL(t *testing.T) {
+	db, stop, err := setupTestDB()
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, stop()) })
+
+	const savedURL = "https://efp.example"
+	nodeConfig := params.NodeConfig{
+		NetworkID:     1,
+		WalletConfig:  params.WalletConfig{Enabled: true, EFPBaseURL: savedURL},
+		ClusterConfig: params.ClusterConfig{Enabled: true, Fleet: params.FleetStatusProd},
+	}
+	networks := json.RawMessage(`[]`)
+	settingsDB, err := settings.MakeNewDB(db)
+	require.NoError(t, err)
+	require.NoError(t, settingsDB.CreateSettings(settings.Settings{
+		Address:           types.HexToAddress("0xdC540f3745Ff2964AFC1171a5A0DD726d1F6B472"),
+		CurrentNetwork:    "mainnet_rpc",
+		DappsAddress:      types.HexToAddress("0xD1300f99fDF7346986CbC766903245087394ecd0"),
+		InstallationID:    "installation-id",
+		KeyUID:            "0x4e8129f3edfc004875be17bf468a784098a9f69b53c095be1f52deff286935ab",
+		Name:              "test",
+		Networks:          &networks,
+		PhotoPath:         "photo",
+		PublicKey:         "0x01",
+		WalletRootAddress: types.HexToAddress("0x3B591fd819F86D0A6a2EF2Bcb94f77807a7De1a6"),
+	}, nodeConfig))
+
+	backend := &StatusBackend{appDB: db}
+	require.NoError(t, backend.SwitchFleet(params.FleetStatusStaging, &params.NodeConfig{
+		NetworkID:     1,
+		ClusterConfig: params.ClusterConfig{Enabled: true, Fleet: params.FleetStatusStaging},
+	}))
+
+	saved, err := nodecfg.GetNodeConfigFromDB(db)
+	require.NoError(t, err)
+	require.Equal(t, savedURL, saved.WalletConfig.EFPBaseURL)
+	require.Equal(t, params.FleetStatusStaging, saved.ClusterConfig.Fleet)
+
+	const replacementURL = "https://efp.other"
+	require.NoError(t, backend.SwitchFleet(params.FleetStatusProd, &params.NodeConfig{
+		NetworkID:     1,
+		WalletConfig:  params.WalletConfig{EFPBaseURL: replacementURL},
+		ClusterConfig: params.ClusterConfig{Enabled: true, Fleet: params.FleetStatusProd},
+	}))
+	saved, err = nodecfg.GetNodeConfigFromDB(db)
+	require.NoError(t, err)
+	require.Equal(t, replacementURL, saved.WalletConfig.EFPBaseURL)
+
+	saved.WalletConfig.EFPBaseURL = ""
+	require.NoError(t, nodecfg.SaveNodeConfig(db, saved))
+	cleared, err := nodecfg.GetNodeConfigFromDB(db)
+	require.NoError(t, err)
+	require.Empty(t, cleared.WalletConfig.EFPBaseURL)
 }
 
 func fakeToken() security.SensitiveString {

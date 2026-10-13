@@ -710,8 +710,17 @@ func (b *StatusBackend) StartNodeWithKey(acc multiaccounts.Account, password str
 }
 
 func (b *StatusBackend) OverwriteNodeConfigValues(conf *params.NodeConfig, n *params.NodeConfig) (*params.NodeConfig, error) {
+	savedEFPBaseURL := ""
+	if conf != nil {
+		savedEFPBaseURL = conf.WalletConfig.EFPBaseURL
+	}
+
 	if err := mergo.Merge(conf, n, mergo.WithOverride); err != nil {
 		return nil, err
+	}
+
+	if n.WalletConfig.EFPBaseURL == "" && savedEFPBaseURL != "" {
+		conf.WalletConfig.EFPBaseURL = savedEFPBaseURL
 	}
 
 	conf.Networks = n.Networks
@@ -2880,6 +2889,16 @@ func (b *StatusBackend) SignHash(hexEncodedHash string) (string, error) {
 func (b *StatusBackend) SwitchFleet(fleet string, conf *params.NodeConfig) error {
 	if b.appDB == nil {
 		return ErrDBNotAvailable
+	}
+
+	if conf != nil && conf.WalletConfig.EFPBaseURL == "" {
+		saved, err := nodecfg.GetNodeConfigFromDB(b.appDB)
+		if err != nil {
+			return err
+		}
+		if saved != nil {
+			conf.WalletConfig.EFPBaseURL = saved.WalletConfig.EFPBaseURL
+		}
 	}
 
 	accountDB, err := accounts.NewDB(b.appDB)

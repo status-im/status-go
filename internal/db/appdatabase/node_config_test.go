@@ -11,6 +11,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/status-im/status-go/internal/db/dbsetup"
+	sqlite "github.com/status-im/status-go/internal/db/sqlite"
 	"github.com/status-im/status-go/internal/nodecfg"
 	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/params"
@@ -29,7 +31,7 @@ func randomNodeConfig() *params.NodeConfig {
 		NetworkID:          uint64(int64(randomInt(math.MaxInt64))),
 		NodeKey:            randomString(),
 		APIModules:         randomString(),
-		WalletConfig:       params.WalletConfig{Enabled: randomBool()},
+		WalletConfig:       params.WalletConfig{Enabled: randomBool(), EFPBaseURL: randomString()},
 		BrowsersConfig:     params.BrowsersConfig{Enabled: randomBool()},
 		PermissionsConfig:  params.PermissionsConfig{Enabled: randomBool()},
 		ConnectorConfig:    params.ConnectorConfig{Enabled: randomBool()},
@@ -116,6 +118,83 @@ func TestMigrateNodeConfig(t *testing.T) {
 	err := db.QueryRow("SELECT COALESCE(NULL, 'empty')").Scan(&result)
 	require.NoError(t, err)
 	require.Equal(t, "empty", result)
+}
+
+func TestMigrateNodeConfigBeforeEFPBaseURLColumn(t *testing.T) {
+	db, err := sqlite.OpenDB(sqlite.InMemoryPath, "1234567890", dbsetup.ReducedKDFIterationsNumber)
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, db.Close()) })
+
+	_, err = db.Exec(`
+		CREATE TABLE settings (
+			synthetic_id VARCHAR DEFAULT 'id' PRIMARY KEY,
+			node_config BLOB
+		);
+		CREATE TABLE node_config (
+			network_id UNSIGNED INT NOT NULL,
+			data_dir VARCHAR NOT NULL,
+			keystore_dir VARCHAR NOT NULL,
+			node_key VARCHAR NOT NULL DEFAULT "",
+			api_modules VARCHAR NOT NULL DEFAULT "",
+			enable_ntp_sync BOOLEAN DEFAULT false,
+			wallet_enabled BOOLEAN DEFAULT false,
+			browser_enabled BOOLEAN DEFAULT false,
+			permissions_enabled BOOLEAN DEFAULT false,
+			connector_enabled BOOLEAN DEFAULT false,
+			synthetic_id VARCHAR DEFAULT 'id' PRIMARY KEY
+		) WITHOUT ROWID;
+		CREATE TABLE log_config (
+			enabled BOOLEAN DEFAULT false,
+			log_dir VARCHAR NOT NULL DEFAULT "",
+			file VARCHAR NOT NULL DEFAULT "",
+			log_level VARCHAR NOT NULL DEFAULT "INFO",
+			log_namespaces VARCHAR DEFAULT '',
+			max_backups UNSIGNED INT,
+			max_size UNSIGNED INT,
+			compress_rotated BOOLEAN DEFAULT false,
+			log_to_stderr BOOLEAN DEFAULT false,
+			synthetic_id VARCHAR DEFAULT 'id' PRIMARY KEY
+		) WITHOUT ROWID;
+		CREATE TABLE cluster_config (
+			enabled BOOLEAN DEFAULT false,
+			fleet VARCHAR NOT NULL DEFAULT "",
+			synthetic_id VARCHAR DEFAULT 'id' PRIMARY KEY
+		) WITHOUT ROWID;
+		CREATE TABLE shhext_config (
+			pfs_enabled BOOLEAN DEFAULT false,
+			installation_id VARCHAR NOT NULL DEFAULT "",
+			mailserver_confirmations BOOLEAN DEFAULT false,
+			verify_ens_contract_address VARCHAR NOT NULL DEFAULT "",
+			bandwidth_stats_enabled BOOLEAN DEFAULT false,
+			synthetic_id VARCHAR DEFAULT 'id' PRIMARY KEY
+		) WITHOUT ROWID;
+		CREATE TABLE wakuv2_config (
+			light_client BOOLEAN DEFAULT false,
+			synthetic_id VARCHAR DEFAULT 'id' PRIMARY KEY
+		) WITHOUT ROWID;
+	`)
+	require.NoError(t, err)
+
+	_, err = db.Exec(`INSERT INTO settings (synthetic_id, node_config) VALUES ('id', ?)`,
+		`{"NetworkId":1,"NodeKey":"key","APIModules":"eth","WalletConfig":{"Enabled":true,"EFPBaseURL":"https://efp.example"},"BrowsersConfig":{"Enabled":true},"PermissionsConfig":{"Enabled":false},"ConnectorConfig":{"Enabled":true},"LogEnabled":true,"LogLevel":"INFO","ClusterConfig":{"Enabled":true,"Fleet":"status.prod"},"ShhextConfig":{"PFSEnabled":true,"InstallationID":"inst"},"WakuV2Config":{"LightClient":true}}`)
+	require.NoError(t, err)
+
+	require.NoError(t, nodecfg.MigrateNodeConfig(db))
+
+	var networkID int
+	var walletEnabled, browserEnabled, connectorEnabled bool
+	err = db.QueryRow(`SELECT network_id, wallet_enabled, browser_enabled, connector_enabled FROM node_config WHERE synthetic_id = 'id'`).
+		Scan(&networkID, &walletEnabled, &browserEnabled, &connectorEnabled)
+	require.NoError(t, err)
+	require.Equal(t, 1, networkID)
+	require.True(t, walletEnabled)
+	require.True(t, browserEnabled)
+	require.True(t, connectorEnabled)
+
+	var columnCount int
+	err = db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('node_config') WHERE name = 'efp_base_url'`).Scan(&columnCount)
+	require.NoError(t, err)
+	require.Equal(t, 0, columnCount)
 }
 
 func randomString() string {

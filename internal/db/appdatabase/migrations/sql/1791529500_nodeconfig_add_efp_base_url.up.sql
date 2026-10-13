@@ -1,0 +1,1 @@
+ALTER TABLE node_config ADD COLUMN efp_base_url VARCHAR NOT NULL DEFAULT "";

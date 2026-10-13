@@ -243,6 +243,8 @@ type WalletConfig struct {
 	CommunityTokenDeployerOverrides map[uint64]common.Address `json:"CommunityTokenDeployerOverrides"` // map[chainID]CommunityTokenDeployer contract address
 
 	CustomTokens []*tokentypes.Token `json:"CustomTokens"` // custom tokens, mainly used for registering custom tokens for functional tests
+
+	EFPBaseURL string `json:"EFPBaseURL"`
 }
 
 type MarketDataProxyConfig struct {
@@ -276,6 +278,7 @@ func (wc WalletConfig) MarshalJSON() ([]byte, error) {
 		MulticallOverrides                  map[uint64]common.Address `json:"MulticallOverrides"`
 		CommunityTokenDeployerOverrides     map[uint64]common.Address `json:"CommunityTokenDeployerOverrides"`
 		CustomTokens                        []*tokentypes.Token       `json:"CustomTokens"`
+		EFPBaseURL                          string                    `json:"EFPBaseURL"`
 	}{
 		Enabled:                             wc.Enabled,
 		EnableMercuryoProvider:              wc.EnableMercuryoProvider,
@@ -287,6 +290,7 @@ func (wc WalletConfig) MarshalJSON() ([]byte, error) {
 		MulticallOverrides:                  wc.MulticallOverrides,
 		CommunityTokenDeployerOverrides:     wc.CommunityTokenDeployerOverrides,
 		CustomTokens:                        wc.CustomTokens,
+		EFPBaseURL:                          wc.EFPBaseURL,
 	})
 }
 

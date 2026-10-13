@@ -227,6 +227,9 @@ func NewService(
 			thirdparty.WithMaxRetries(5),
 		)
 		efpClient := efp.NewClient(efpHTTPClient)
+		if config.WalletConfig.EFPBaseURL != "" {
+			efpClient.SetBaseURL(config.WalletConfig.EFPBaseURL)
+		}
 		followingManager = following.NewManager(efpClient, logutils.ZapLogger().Named("FollowingManager"))
 	}
 

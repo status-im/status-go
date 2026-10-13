@@ -558,12 +558,26 @@ func (api *PublicAPI) ChatMessagesV2(chatID, threadID, cursor string, limit int)
 	}, nil
 }
 
+func (api *PublicAPI) ChatMessagesWithThreadSummaries(chatID, cursor string, limit, participantsPreviewLimit int) (*protocol.MessagePageWithThreadSummaries, error) {
+	return api.service.messenger.MessagesWithThreadSummaries(chatID, cursor, limit, participantsPreviewLimit)
+}
+
 func (api *PublicAPI) CreateThread(chatID string, parentMessageID string) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.CreateThread(chatID, parentMessageID)
 }
 
 func (api *PublicAPI) StartThreadFromNewMessage(ctx context.Context, request *requests.StartThreadFromNewMessage) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.StartThreadFromNewMessage(ctx, request)
+}
+
+// ChatThreadSummariesByParentMessageIDs returns thread-card data for a page of parent messages.
+func (api *PublicAPI) ChatThreadSummariesByParentMessageIDs(chatID string, parentMessageIDs []string, participantsPreviewLimit int) (*ApplicationThreadsResponse, error) {
+	threads, err := api.service.messenger.ThreadSummariesByParentMessageIDs(chatID, parentMessageIDs, participantsPreviewLimit)
+	if err != nil {
+		return nil, err
+	}
+
+	return &ApplicationThreadsResponse{Threads: threads}, nil
 }
 
 func (api *PublicAPI) ChatThreads(chatID string) (*ApplicationThreadsResponse, error) {
@@ -1043,6 +1057,10 @@ func (api *PublicAPI) EmojiReactionsByChatID(chatID string, cursor string, limit
 
 func (api *PublicAPI) EmojiReactionsByChatIDV2(chatID, threadID, cursor string, limit int) ([]*protocol.EmojiReaction, error) {
 	return api.service.messenger.EmojiReactionsByChatID(chatID, threadID, cursor, limit)
+}
+
+func (api *PublicAPI) EmojiReactionsByChatIDMessageIDs(chatID string, messageIDs []string) ([]*protocol.EmojiReaction, error) {
+	return api.service.messenger.EmojiReactionsByChatIDMessageIDs(chatID, messageIDs)
 }
 
 func (api *PublicAPI) EmojiReactionsByChatIDMessageID(chatID string, messageID string) ([]*protocol.EmojiReaction, error) {
