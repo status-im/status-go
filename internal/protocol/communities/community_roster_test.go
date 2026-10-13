@@ -179,3 +179,18 @@ func (s *CommunitySuite) TestMergeKeepsMembersModified() {
 
 	s.Require().Contains(changes.MembersModified, s.member1Key)
 }
+
+func (s *CommunitySuite) TestMarshalJSONMembersCount() {
+	community := s.rosterCommunity()
+
+	bytes, err := json.Marshal(community)
+	s.Require().NoError(err)
+
+	var parsed struct {
+		MembersCount int                        `json:"membersCount"`
+		Members      map[string]json.RawMessage `json:"members"`
+	}
+	s.Require().NoError(json.Unmarshal(bytes, &parsed))
+	s.Require().Equal(2, parsed.MembersCount)
+	s.Require().Len(parsed.Members, 2)
+}
