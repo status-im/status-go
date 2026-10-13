@@ -16,7 +16,7 @@ in pkgs.buildGoModule {
   src = builtins.path { path = ./../../../..; name = "status-go-library"; };
 
   # WARNING: Needs to be updated when go.mod is changed.
-  vendorHash = "sha256-p5tEbEND63oMa566U3G4aP4f+Pymzvd+u4KG65VnQvI=";
+  vendorHash = "sha256-CPcumXkQAiglhv9aS25WWZfP3vE6KcPz4xN9MZ1sIS4=";
 
   inherit meta version;
 
@@ -46,6 +46,7 @@ in pkgs.buildGoModule {
   # Code generation should be run before buildPhase because buildGoModule
   # performs deps check before buildPhase, and will fail without generated files.
   preBuild = ''
+    patchShebangs scripts/
     make generate GO_GENERATE_CMD='go generate'
   '';
 

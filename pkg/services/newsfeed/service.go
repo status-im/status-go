@@ -3,6 +3,7 @@ package newsfeed
 import (
 	"context"
 	"errors"
+	"net/http"
 	"reflect"
 	"time"
 
@@ -17,6 +18,7 @@ import (
 	"github.com/status-im/status-go/internal/platform"
 	"github.com/status-im/status-go/internal/protocol"
 	"github.com/status-im/status-go/internal/signal"
+	"github.com/status-im/status-go/internal/traffic"
 )
 
 var (
@@ -65,7 +67,7 @@ func (s *Service) Start() error {
 	}
 	s.newsFeedManager = newsfeed.NewNewsFeedManager(
 		newsfeed.WithURL(feedUrl),
-		newsfeed.WithParser(gofeed.NewParser()),
+		newsfeed.WithParser(newFeedParser()),
 		newsfeed.WithHandler(s),
 		newsfeed.WithLogger(s.logger),
 		newsfeed.WithPollingInterval(30*time.Minute),
@@ -165,6 +167,12 @@ func (s *Service) HandleFeedItem(feedItem *gofeed.Item) (*protocol.MessengerResp
 	}
 
 	return response, nil
+}
+
+func newFeedParser() *gofeed.Parser {
+	parser := gofeed.NewParser()
+	parser.Client = &http.Client{Transport: traffic.Transport}
+	return parser
 }
 
 func getCustomField(feedItem *gofeed.Item, key string) string {

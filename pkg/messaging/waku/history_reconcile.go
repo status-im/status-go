@@ -5,6 +5,7 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/status-im/status-go/internal/timesource"
 	"github.com/status-im/status-go/pkg/messaging/waku/types"
 )
 
@@ -14,32 +15,58 @@ const (
 	// from the store nodes so silently missed messages are recovered. The node
 	// is confident only with a Connected relay mesh on every default shard.
 	historyReconcileMinInterval = 30 * time.Second
+
+	// historyObservationMaxGap is the longest wall-clock gap between two
+	// connectivity observations that is still considered continuous. While
+	// running, connectivity is observed at least every few seconds, so a longer
+	// gap means the process was paused or the system suspended, and nothing was
+	// received live in the meantime. Suspends are also detected directly, so
+	// this mainly bounds pauses.
+	historyObservationMaxGap = 30 * time.Second
 )
 
 type historyReconcileTracker struct {
-	reliable       bool
-	checkedAt      time.Time
+	reliable  bool
+	checkedAt time.Time
+	// observedAt is checkedAt with its monotonic reading, to detect suspends.
+	observedAt     time.Time
 	unreliableFrom time.Time
 	lastReconcile  time.Time
 }
 
 func newHistoryReconcileTracker(reliable bool, now time.Time) historyReconcileTracker {
-	tracker := historyReconcileTracker{reliable: reliable, checkedAt: now}
+	tracker := historyReconcileTracker{reliable: reliable, checkedAt: now.Round(0), observedAt: now}
 	if !reliable {
-		tracker.unreliableFrom = now
+		tracker.unreliableFrom = tracker.checkedAt
 	}
 	return tracker
 }
 
 func (t *historyReconcileTracker) observe(reliable bool, now time.Time, minInterval time.Duration) *types.HistoryReconcileWindow {
+	// Keep wall clock readings only: the monotonic clock does not advance while
+	// the system is suspended, so durations computed from it (here and by the
+	// consumers of the windows) would hide a sleep.
+	observedAt := now
+	now = now.Round(0)
 	wasReliable := t.reliable
+	unobservedGap := !t.checkedAt.IsZero() &&
+		(now.Sub(t.checkedAt) > historyObservationMaxGap || timesource.SuspendedBetween(t.observedAt, observedAt))
+	t.observedAt = observedAt
+	if unobservedGap {
+		// Connectivity looking fine on both sides of the gap says nothing about
+		// the gap itself, so treat it as unreliable from the last observation.
+		wasReliable = false
+		if t.unreliableFrom.IsZero() {
+			t.unreliableFrom = t.checkedAt
+		}
+	}
 	t.reliable = reliable
 	if wasReliable && !reliable {
 		t.unreliableFrom = t.checkedAt
 	}
 	t.checkedAt = now
 
-	if !shouldReconcileHistory(reliable, wasReliable, t.lastReconcile, now, minInterval) {
+	if !unobservedGap && !shouldReconcileHistory(reliable, wasReliable, t.lastReconcile, now, minInterval) {
 		return nil
 	}
 	if t.unreliableFrom.IsZero() {

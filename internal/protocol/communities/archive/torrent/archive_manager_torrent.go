@@ -841,7 +841,7 @@ func (m *ArchiveManagerTorrent) createHistoryArchiveTorrent(communityID cryptoty
 			}
 		}
 
-		err = os.WriteFile(indexPath, indexBytes, 0o644) // nolint: gosec
+		err = os.WriteFile(indexPath, indexBytes, 0o600)
 		if err != nil {
 			return archiveIDs, err
 		}
@@ -882,7 +882,7 @@ func (m *ArchiveManagerTorrent) createHistoryArchiveTorrent(communityID cryptoty
 			return archiveIDs, err
 		}
 
-		err = os.WriteFile(torrentFile(m.torrentConfig.TorrentDir, communityID.String()), metaInfoBytes, 0o644) // nolint: gosec
+		err = os.WriteFile(torrentFile(m.torrentConfig.TorrentDir, communityID.String()), metaInfoBytes, 0o600)
 		if err != nil {
 			return archiveIDs, err
 		}

@@ -12,6 +12,7 @@ import (
 	"github.com/status-im/go-wallet-sdk/pkg/tokens/builder"
 	"github.com/status-im/go-wallet-sdk/pkg/tokens/types"
 
+	"github.com/status-im/status-go/internal/traffic"
 	"github.com/status-im/status-go/pkg/security"
 	walletcommon "github.com/status-im/status-go/pkg/services/wallet/common"
 	"github.com/status-im/status-go/pkg/services/wallet/thirdparty"
@@ -91,7 +92,7 @@ func (c *Client) ID() string {
 
 // getCoingeckoTokensByTokenKey returns a map of token keys to coingecko tokens
 func (c *Client) getCoingeckoTokensByTokenKey() (map[string]GeckoToken, error) {
-	tokens, err := c.fetchTokens(context.Background())
+	tokens, err := c.fetchTokens(traffic.WithSource(context.Background(), traffic.MarketTokenList))
 	if err != nil {
 		return nil, err
 	}
@@ -191,7 +192,7 @@ func (c *Client) FetchPrices(tokens []*tokentypes.Token, currencies []string) (m
 	}
 
 	simplePrices, err := utils.ChunkMapFetcher[CurrencyPriceMap](
-		context.Background(),
+		traffic.WithSource(context.Background(), traffic.MarketPrices),
 		maps.Keys(mappedTokens),
 		pricesChunkLimit,
 		requestDelay,
@@ -247,7 +248,7 @@ func (c *Client) FetchTokenMarketValues(tokens []*tokentypes.Token, currency str
 	}
 
 	marketValues, err := utils.ChunkArrayFetcher[GeckoMarketValues](
-		context.Background(),
+		traffic.WithSource(context.Background(), traffic.MarketPrices),
 		maps.Keys(mappedTokens),
 		tokensChunkLimit,
 		requestDelay,
@@ -336,7 +337,7 @@ func (c *Client) FetchHistoricalDailyPrices(token *tokentypes.Token, currency st
 		days = fmt.Sprintf("%d", limit)
 	}
 
-	container, err := c.FetchHistoryMarketData(context.Background(), coingeckoToken.ID, currency, days)
+	container, err := c.FetchHistoryMarketData(traffic.WithSource(context.Background(), traffic.MarketPrices), coingeckoToken.ID, currency, days)
 	if err != nil {
 		return nil, err
 	}

@@ -145,8 +145,9 @@ func (c *Client) quoteRequestBody(p QuoteParams) map[string]interface{} {
 		body["slippageTolerance"] = strconv.Itoa(int(math.Round(float64(p.SlippagePercentage) * 100)))
 	}
 
-	// Relay rejects a referrer that isn't backed by an API key.
-	if c.apiKey != "" {
+	// Relay rejects a referrer that isn't backed by an API key. On the testnet host the
+	// mainnet key's referrer is rejected outright, so both are omitted there.
+	if c.useAPIKey() {
 		body["referrer"] = c.referrer
 	}
 

@@ -18,7 +18,7 @@ import (
 )
 
 func getRandomStatus() ac.TxStatus {
-	switch rand.Intn(3) { // nolint: gosec
+	switch rand.Intn(3) { //nolint:gosec // test data, weak randomness is fine
 	case 0:
 		return ac.Pending
 	case 1:
@@ -33,7 +33,7 @@ func getRandomStatus() ac.TxStatus {
 func getRandomTrackedTx() pendingtxtracker.TrackedTx {
 	tx := pendingtxtracker.TrackedTx{
 		ID: pendingtxtracker.TxIdentity{
-			ChainID: common.ChainID(rand.Uint64() % 10), // nolint: gosec
+			ChainID: common.ChainID(rand.Uint64() % 10), //nolint:gosec // test data, weak randomness is fine
 			Hash:    eth.Hash{},
 		},
 		Timestamp: 123,

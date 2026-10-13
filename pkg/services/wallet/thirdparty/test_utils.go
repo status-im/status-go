@@ -20,7 +20,7 @@ func generateContractType(seed int) w_common.ContractType {
 }
 
 func GenerateTestCollectiblesData(count int) (result []CollectibleData) {
-	base := rand.Intn(100) // nolint: gosec
+	base := rand.Intn(100) //nolint:gosec // test data, weak randomness is fine
 
 	result = make([]CollectibleData, 0, count)
 	for i := base; i < count+base; i++ {
@@ -78,7 +78,7 @@ func GenerateTestCollectiblesData(count int) (result []CollectibleData) {
 }
 
 func GenerateTestCollectiblesCommunityData(count int) []CollectibleCommunityInfo {
-	base := rand.Intn(100) // nolint: gosec
+	base := rand.Intn(100) //nolint:gosec // test data, weak randomness is fine
 
 	result := make([]CollectibleCommunityInfo, 0, count)
 	for i := base; i < count+base; i++ {
@@ -91,7 +91,7 @@ func GenerateTestCollectiblesCommunityData(count int) []CollectibleCommunityInfo
 }
 
 func GenerateTestCollectiblesOwnership(count int) []AccountBalance {
-	base := rand.Intn(100) // nolint: gosec
+	base := rand.Intn(100) //nolint:gosec // test data, weak randomness is fine
 
 	ret := make([]AccountBalance, 0, count)
 	for i := base; i < count+base; i++ {
@@ -104,7 +104,7 @@ func GenerateTestCollectiblesOwnership(count int) []AccountBalance {
 }
 
 func GenerateTestCollectionsData(count int) (result []CollectionData) {
-	base := rand.Intn(100) // nolint: gosec
+	base := rand.Intn(100) //nolint:gosec // test data, weak randomness is fine
 
 	result = make([]CollectionData, 0, count)
 	for i := base; i < count+base; i++ {
@@ -138,7 +138,7 @@ func GenerateTestCollectionsData(count int) (result []CollectionData) {
 }
 
 func GenerateTestCommunityInfo(count int) map[string]CommunityInfo {
-	base := rand.Intn(100) // nolint: gosec
+	base := rand.Intn(100) //nolint:gosec // test data, weak randomness is fine
 
 	result := make(map[string]CommunityInfo)
 	for i := base; i < count+base; i++ {
@@ -175,7 +175,7 @@ func GenerateTestFullCollectiblesData(count int) []FullCollectibleData {
 			CollectionData:           &collectionsData[i],
 			CommunityInfo:            &communityInfo[i],
 			CollectibleCommunityInfo: &communityData[i],
-			Ownership:                GenerateTestCollectiblesOwnership(rand.Intn(5) + 1), // nolint: gosec
+			Ownership:                GenerateTestCollectiblesOwnership(rand.Intn(5) + 1), //nolint:gosec // test data, weak randomness is fine
 		})
 	}
 	return ret

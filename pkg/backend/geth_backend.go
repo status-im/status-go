@@ -56,6 +56,7 @@ import (
 	"github.com/status-im/status-go/internal/protocol/requests"
 	"github.com/status-im/status-go/internal/rpc"
 	"github.com/status-im/status-go/internal/signal"
+	"github.com/status-im/status-go/internal/traffic"
 	"github.com/status-im/status-go/internal/transactions"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/backend/node"
@@ -707,8 +708,17 @@ func (b *StatusBackend) StartNodeWithKey(acc multiaccounts.Account, password str
 }
 
 func (b *StatusBackend) OverwriteNodeConfigValues(conf *params.NodeConfig, n *params.NodeConfig) (*params.NodeConfig, error) {
+	savedEFPBaseURL := ""
+	if conf != nil {
+		savedEFPBaseURL = conf.WalletConfig.EFPBaseURL
+	}
+
 	if err := mergo.Merge(conf, n, mergo.WithOverride); err != nil {
 		return nil, err
+	}
+
+	if n.WalletConfig.EFPBaseURL == "" && savedEFPBaseURL != "" {
+		conf.WalletConfig.EFPBaseURL = savedEFPBaseURL
 	}
 
 	conf.Networks = n.Networks
@@ -2572,6 +2582,9 @@ func (b *StatusBackend) PauseServices(names []string) error {
 	if rpcClient := b.statusNode.RPCClient(); rpcClient != nil {
 		rpcClient.SetPaused(true)
 	}
+	// Clients pause every service when the app goes to the background; a
+	// partial pause, for a test or one service, is not that.
+	defer func() { traffic.Default.SetBackground(b.statusNode.ServiceRegistry().AllPaused()) }()
 
 	return b.statusNode.ServiceRegistry().PauseMultiple(names)
 }
@@ -2585,6 +2598,7 @@ func (b *StatusBackend) ResumeServices(names []string) error {
 	if rpcClient := b.statusNode.RPCClient(); rpcClient != nil {
 		rpcClient.SetPaused(false)
 	}
+	defer func() { traffic.Default.SetBackground(b.statusNode.ServiceRegistry().AllPaused()) }()
 
 	return b.statusNode.ServiceRegistry().ResumeMultiple(names)
 }
@@ -2864,6 +2878,16 @@ func (b *StatusBackend) SignHash(hexEncodedHash string) (string, error) {
 func (b *StatusBackend) SwitchFleet(fleet string, conf *params.NodeConfig) error {
 	if b.appDB == nil {
 		return ErrDBNotAvailable
+	}
+
+	if conf != nil && conf.WalletConfig.EFPBaseURL == "" {
+		saved, err := nodecfg.GetNodeConfigFromDB(b.appDB)
+		if err != nil {
+			return err
+		}
+		if saved != nil {
+			conf.WalletConfig.EFPBaseURL = saved.WalletConfig.EFPBaseURL
+		}
 	}
 
 	accountDB, err := accounts.NewDB(b.appDB)

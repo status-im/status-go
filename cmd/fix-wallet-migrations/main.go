@@ -236,7 +236,7 @@ func knownVersions() []uint64 {
 // library stores dirty as the strings 'true'/'false'.
 func readMarker(db *sql.DB) (version uint64, dirty bool, err error) {
 	var dirtyText string
-	query := fmt.Sprintf("SELECT version, CAST(dirty AS TEXT) FROM %s LIMIT 1", sqlite.StatusMigrationTableName())
+	query := sqlite.TableQuery("SELECT version, CAST(dirty AS TEXT) FROM %s LIMIT 1", sqlite.StatusMigrationTableName())
 	if err := db.QueryRow(query).Scan(&version, &dirtyText); err != nil {
 		return 0, false, fmt.Errorf("reading %s: %w", sqlite.StatusMigrationTableName(), err)
 	}
@@ -251,11 +251,11 @@ func writeMarker(db *sql.DB, version uint64) error {
 		return err
 	}
 	table := sqlite.StatusMigrationTableName()
-	if _, err := tx.Exec("DELETE FROM " + table); err != nil {
+	if _, err := tx.Exec(sqlite.TableQuery("DELETE FROM %s", table)); err != nil {
 		_ = tx.Rollback()
 		return err
 	}
-	if _, err := tx.Exec(fmt.Sprintf("INSERT INTO %s (version, dirty) VALUES (?, 'false')", table), version); err != nil {
+	if _, err := tx.Exec(sqlite.TableQuery("INSERT INTO %s (version, dirty) VALUES (?, 'false')", table), version); err != nil {
 		_ = tx.Rollback()
 		return err
 	}

@@ -12,6 +12,7 @@ import (
 	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
 	"github.com/status-im/status-go/internal/db/multiaccounts/settings"
 	"github.com/status-im/status-go/internal/logutils"
+	"github.com/status-im/status-go/internal/traffic"
 )
 
 type Gif struct {
@@ -69,7 +70,7 @@ func (api *API) GetContentWithRetry(path string) (value string, err error) {
 
 		client := http.Client{
 			Timeout:   5 * time.Second,
-			Transport: transport,
+			Transport: traffic.Default.Instrument(transport),
 		}
 
 		// KLIPY URL format: {baseURL}{app_key}/gifs/{endpoint}?{query}

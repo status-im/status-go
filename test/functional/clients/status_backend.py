@@ -399,6 +399,8 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
         data = self._set_proxy_credentials(data)
         data = self._set_wallet_secrets(data)
         data = self._set_multicall_overrides(data, kwargs)
+        if kwargs.get("efp_base_url"):
+            data["efpBaseURL"] = kwargs["efp_base_url"]
         data = self._set_community_token_deployer_overrides(data, kwargs)
         data = self._set_custom_tokens(data, kwargs)
         return data

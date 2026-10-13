@@ -3,7 +3,8 @@ package transport
 import (
 	"context"
 	"database/sql"
-	"strings"
+
+	"github.com/status-im/status-go/internal/db/sqlutil"
 )
 
 type SQLiteKeysPersistence struct {
@@ -89,8 +90,7 @@ func (c *SQLiteProcessedMessageIDsCachePersistence) Hits(ids []string) (map[stri
 			idsArgs = append(idsArgs, id)
 		}
 
-		inVector := strings.Repeat("?, ", len(currentBatch)-1) + "?"
-		query := "SELECT id FROM transport_message_cache WHERE id IN (" + inVector + ")" // nolint: gosec
+		query := sqlutil.In("SELECT id FROM transport_message_cache WHERE id IN (%s)", len(currentBatch))
 
 		rows, err := c.db.Query(query, idsArgs...)
 		if err != nil {

@@ -79,7 +79,7 @@ func isLsofAvailable() bool {
 func logFileDescriptors(t *testing.T, label string) int {
 	pid := os.Getpid()
 	// pid comes from os.Getpid, safe for exec. Suppress gosec false-positive.
-	cmd := exec.Command("lsof", "-p", strconv.Itoa(pid)) //nolint:gosec
+	cmd := exec.Command("lsof", "-p", strconv.Itoa(pid)) //nolint:gosec // pid is this test process
 
 	output, err := cmd.Output()
 	assert.NoError(t, err)

@@ -16,7 +16,7 @@ import (
 )
 
 func TestNewHTTPClient(t *testing.T) {
-	c := NewHTTPClient("https://test.nft.status.im")
+	c := NewHTTPClient("https://test.nft.status.im", nil)
 	require.NotNil(t, c)
 	require.Equal(t, 60*time.Second, c.Timeout)
 	require.NotNil(t, c.Transport)
@@ -37,7 +37,7 @@ func TestTransport_Do_Success(t *testing.T) {
 	server := newPuzzleAuthServer(t)
 	defer server.Close()
 
-	client := NewHTTPClient(server.URL)
+	client := NewHTTPClient(server.URL, nil)
 	ctx := context.Background()
 
 	resourceHandler := func(w http.ResponseWriter, r *http.Request) {
@@ -153,7 +153,7 @@ func TestTransport_Do_AuthRetry(t *testing.T) {
 		withCounters(&puzzleReq, &solveReq))
 	defer server.Close()
 
-	client := NewHTTPClient(server.URL)
+	client := NewHTTPClient(server.URL, nil)
 	ctx := context.Background()
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, server.URL+"/resource", nil)
@@ -197,7 +197,7 @@ func TestTransport_Do_RetryStatusCodes(t *testing.T) {
 			server := newPuzzleAuthServer(t, withResourceHandler(resourceHandler))
 			defer server.Close()
 
-			client := NewHTTPClient(server.URL)
+			client := NewHTTPClient(server.URL, nil)
 			ctx := context.Background()
 
 			req, err := http.NewRequestWithContext(ctx, http.MethodGet, server.URL+"/resource", nil)
@@ -224,7 +224,7 @@ func TestTransport_Do_MaxRetriesExceeded(t *testing.T) {
 	server := newPuzzleAuthServer(t, withResourceHandler(resourceHandler))
 	defer server.Close()
 
-	client := NewHTTPClient(server.URL)
+	client := NewHTTPClient(server.URL, nil)
 	ctx := context.Background()
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, server.URL+"/resource", nil)
@@ -252,7 +252,7 @@ func TestTransport_Do_AuthFailure(t *testing.T) {
 		withPuzzleError(500))
 	defer server.Close()
 
-	client := NewHTTPClient(server.URL)
+	client := NewHTTPClient(server.URL, nil)
 	ctx := context.Background()
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, server.URL+"/resource", nil)
@@ -266,7 +266,7 @@ func TestTransport_Do_AuthFailure(t *testing.T) {
 }
 
 func TestTransport_Do_NetworkError(t *testing.T) {
-	client := NewHTTPClient("http://localhost:1")
+	client := NewHTTPClient("http://localhost:1", nil)
 	ctx := context.Background()
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://localhost:1/resource", nil)
@@ -314,7 +314,7 @@ func TestTransport_DoGet(t *testing.T) {
 			server := newPuzzleAuthServer(t, withResourceHandler(resourceHandler))
 			defer server.Close()
 
-			client := NewHTTPClient(server.URL)
+			client := NewHTTPClient(server.URL, nil)
 			ctx := context.Background()
 
 			u := server.URL + "/resource"
@@ -343,7 +343,7 @@ func TestTransport_DoGet_NonOK(t *testing.T) {
 	server := newPuzzleAuthServer(t, withResourceHandler(resourceHandler))
 	defer server.Close()
 
-	client := NewHTTPClient(server.URL)
+	client := NewHTTPClient(server.URL, nil)
 	ctx := context.Background()
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, server.URL+"/resource", nil)
@@ -358,7 +358,7 @@ func TestTransport_DoGet_NonOK(t *testing.T) {
 }
 
 func TestTransport_Do_ContextCancelled(t *testing.T) {
-	client := NewHTTPClient("https://test.nft.status.im")
+	client := NewHTTPClient("https://test.nft.status.im", nil)
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, "http://localhost:1", nil)

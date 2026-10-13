@@ -234,6 +234,9 @@ func buildWalletConfig(walletRequest *requests.WalletConfig, request *requests.W
 	if len(walletRequest.CustomTokens) > 0 {
 		walletConfig.CustomTokens = walletRequest.CustomTokens
 	}
+	if walletRequest.EFPBaseURL != "" {
+		walletConfig.EFPBaseURL = walletRequest.EFPBaseURL
+	}
 
 	if !request.EthRpcProxyUrl.Empty() {
 		walletConfig.EthRpcProxyUrl = request.EthRpcProxyUrl

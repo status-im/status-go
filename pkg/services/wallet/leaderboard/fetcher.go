@@ -15,6 +15,7 @@ import (
 
 	"github.com/status-im/status-go/internal/logutils"
 	"github.com/status-im/status-go/internal/panics"
+	"github.com/status-im/status-go/internal/traffic"
 	"github.com/status-im/status-go/pkg/services/wallet/thirdparty"
 )
 
@@ -289,6 +290,7 @@ func (f *ProxyFetcher) fetchData(ctx context.Context, endpoint string, etag stri
 }
 
 func (f *ProxyFetcher) doFetch(ctx context.Context, endpoint string, etag string, convertCurrency string) ([]byte, string, error) {
+	ctx = traffic.WithSource(ctx, traffic.MarketLeaderboard)
 	baseUrl := GetMarketProxyHost(f.config.UrlOverride.Reveal(), f.config.StageName)
 	url := f.client.BuildURL(baseUrl, endpoint)
 

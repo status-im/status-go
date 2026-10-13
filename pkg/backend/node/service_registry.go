@@ -102,6 +102,24 @@ func (r *ServiceRegistry) ListPausable() []PausableServiceInfo {
 	return result
 }
 
+// AllPaused tells whether every registered service that runs is paused, at
+// least one of them: the state the clients put the node in when the app goes
+// to the background. Stopped services do not count either way.
+func (r *ServiceRegistry) AllPaused() bool {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	paused := 0
+	for _, p := range r.pausables {
+		switch p.PausableState() {
+		case pausable.ServiceStatePaused:
+			paused++
+		case pausable.ServiceStateRunning:
+			return false
+		}
+	}
+	return paused > 0
+}
+
 // Pause pauses the named service. Returns an error if the service is not found.
 func (r *ServiceRegistry) Pause(name string) error {
 	r.mu.RLock()

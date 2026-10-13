@@ -1,5 +1,5 @@
 #!/usr/bin/env groovy
-library 'status-jenkins-lib@v1.9.39'
+library 'status-jenkins-lib@v1.10.1'
 
 def isPRBuild = utils.isPRBuild()
 
@@ -36,7 +36,7 @@ pipeline {
     )
     choice(
       name: 'FUNCTIONAL_TESTS_LOG_LEVEL',
-      choices: ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
+      choices: ['INFO', 'DEBUG', 'WARNING', 'ERROR', 'CRITICAL'],
       description: 'pytest log level'
     )
   }

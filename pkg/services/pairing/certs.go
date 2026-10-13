@@ -111,7 +111,7 @@ func verifyCert(cert *x509.Certificate, publicKey *ecdsa.PublicKey) error {
 // the function expects there to be only 1 certificate
 func getServerCert(URL *url.URL) (*x509.Certificate, error) {
 	conf := &tls.Config{
-		InsecureSkipVerify: true, // nolint: gosec // Only skip verify to get the server's TLS cert. DO NOT skip for any other reason.
+		InsecureSkipVerify: true, //nolint:gosec // only to fetch the server's self-signed cert, which is then pinned. DO NOT skip for any other reason.
 	}
 
 	// one second should be enough to get the server's TLS cert in LAN?

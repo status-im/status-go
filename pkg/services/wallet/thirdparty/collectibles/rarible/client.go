@@ -14,6 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/status-im/status-go/internal/logutils"
+	"github.com/status-im/status-go/internal/traffic"
 	"github.com/status-im/status-go/pkg/security"
 	walletCommon "github.com/status-im/status-go/pkg/services/wallet/common"
 	"github.com/status-im/status-go/pkg/services/wallet/connection"
@@ -103,7 +104,7 @@ func NewClient(mainnetAPIKey security.SensitiveString, testnetAPIKey security.Se
 	}
 
 	return &Client{
-		client:           &http.Client{Timeout: time.Minute},
+		client:           &http.Client{Timeout: time.Minute, Transport: traffic.Transport},
 		mainnetAPIKey:    mainnetAPIKey,
 		testnetAPIKey:    testnetAPIKey,
 		connectionStatus: connection.NewStatus(),

@@ -231,7 +231,7 @@ func randomInt(length int) int {
 func randomString(length int, runes []rune) string {
 	out := make([]rune, length)
 	for i := range out {
-		out[i] = runes[randomInt(len(runes))] // nolint: gosec
+		out[i] = runes[randomInt(len(runes))]
 	}
 	return string(out)
 }

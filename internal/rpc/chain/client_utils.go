@@ -8,8 +8,18 @@ import (
 
 	"github.com/ethereum/go-ethereum/rpc"
 
+	"github.com/status-im/status-go/internal/requestgzip"
+	"github.com/status-im/status-go/internal/traffic"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/services/wallet/puzzleauth"
+)
+
+// rpcTransport is shared by every RPC client so that which hosts take gzip
+// request bodies is learnt once per host; privateRPCTransport is the same for
+// the providers users added.
+var (
+	rpcTransport        = requestgzip.New(traffic.Transport)
+	privateRPCTransport = requestgzip.New(traffic.PrivateTransport)
 )
 
 // CreateEthClientFromProvider creates an Ethereum RPC client from the given RpcProvider.
@@ -37,9 +47,17 @@ func CreateEthClientFromProvider(provider params.RpcProvider, rpcUserAgentName s
 		if err != nil {
 			return nil, fmt.Errorf("puzzle auth: invalid provider URL for %s: %w", provider.Name, err)
 		}
-		opts = append(opts, rpc.WithHTTPClient(puzzleauth.NewHTTPClient(origin)))
+		opts = append(opts, rpc.WithHTTPClient(puzzleauth.NewHTTPClient(origin, rpcTransport)))
 	default:
 		return nil, fmt.Errorf("unknown auth type: %s", provider.AuthType)
+	}
+	if provider.AuthType != params.PuzzleAuth {
+		// A provider the user added is theirs: its host stays out of the report.
+		transport := rpcTransport
+		if provider.Type == params.UserProviderType {
+			transport = privateRPCTransport
+		}
+		opts = append(opts, rpc.WithHTTPClient(&http.Client{Transport: transport}))
 	}
 
 	opts = append(opts, rpc.WithHeaders(headers))

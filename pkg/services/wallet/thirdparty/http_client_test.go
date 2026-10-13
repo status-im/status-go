@@ -15,6 +15,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/status-im/go-wallet-sdk/pkg/httptraffic"
+
 	"github.com/status-im/status-go/pkg/security"
 )
 
@@ -462,4 +464,34 @@ func TestHTTPClient_PostRequestOptions(t *testing.T) {
 	require.Equal(t, "secret", receivedHeader)
 	require.Equal(t, "application/json", receivedContentType)
 	require.JSONEq(t, `{"message":"bad","errorCode":"AMOUNT_TOO_LOW"}`, string(body))
+}
+
+func TestHTTPClient_RecordsCompressedTraffic(t *testing.T) {
+	const path = "/traffic-stats"
+	payload := strings.Repeat("price ", 1000)
+	gzipped, err := gzipEncode([]byte(payload))
+	require.NoError(t, err)
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Encoding", "gzip")
+		_, _ = w.Write(gzipped)
+	}))
+	defer server.Close()
+
+	rec := httptraffic.NewRecorder()
+	body, err := NewHTTPClient(WithTrafficRecorder(rec)).DoGetRequest(context.Background(), server.URL+path, url.Values{"ids": {"bitcoin"}})
+	require.NoError(t, err)
+	require.Equal(t, payload, string(body))
+
+	var stats *httptraffic.EndpointStats
+	for _, e := range rec.Snapshot().Endpoints {
+		if e.Path == path {
+			stats = &e
+		}
+	}
+	require.NotNil(t, stats)
+	require.Equal(t, uint64(1), stats.Requests)
+	require.Equal(t, uint64(len(payload)), stats.DecodedBodyBytes)
+	require.Less(t, stats.ResponseBytes, uint64(len(payload)), "the compressed size has to be counted")
+	require.Greater(t, stats.ResponseBytes, uint64(len(gzipped)))
 }

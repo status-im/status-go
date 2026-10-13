@@ -9,6 +9,7 @@ import (
 
 	"github.com/status-im/status-go/internal/images"
 	"github.com/status-im/status-go/internal/logutils"
+	"github.com/status-im/status-go/internal/traffic"
 )
 
 func DownloadAvatarAsset(url string) ([]byte, error) {
@@ -21,7 +22,7 @@ func DownloadAvatarAsset(url string) ([]byte, error) {
 }
 
 func DownloadAsset(url string) ([]byte, string, error) {
-	client := http.Client{Timeout: time.Minute}
+	client := http.Client{Timeout: time.Minute, Transport: traffic.Transport}
 	res, err := client.Get(url)
 	if err != nil {
 		return nil, "", err

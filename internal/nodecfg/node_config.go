@@ -39,6 +39,14 @@ func insertNodeConfig(tx *sql.Tx, c *params.NodeConfig) error {
 	return err
 }
 
+func updateNodeConfigEFPBaseURL(tx *sql.Tx, c *params.NodeConfig) error {
+	_, err := tx.Exec(`
+	UPDATE node_config SET efp_base_url = ? WHERE synthetic_id = 'id'`,
+		c.WalletConfig.EFPBaseURL,
+	)
+	return err
+}
+
 func insertLogConfig(tx *sql.Tx, c *params.NodeConfig) error {
 	_, err := tx.Exec(`
 	INSERT OR REPLACE INTO log_config (
@@ -174,6 +182,7 @@ func nodeConfigNormalInserts() []insertFn {
 
 	return []insertFn{
 		insertNodeConfig,
+		updateNodeConfigEFPBaseURL,
 		insertLogConfig,
 		insertClusterConfig,
 		insertShhExtConfig,
@@ -249,12 +258,12 @@ func loadNodeConfig(tx *sql.Tx) (*params.NodeConfig, error) {
 	err := tx.QueryRow(`
 	SELECT
 		network_id, node_key, api_modules,
-		wallet_enabled, browser_enabled, permissions_enabled,
+		wallet_enabled, efp_base_url, browser_enabled, permissions_enabled,
 		connector_enabled FROM node_config
 		WHERE synthetic_id = 'id'
 	`).Scan(
 		&nodecfg.NetworkID, &nodecfg.NodeKey, &nodecfg.APIModules,
-		&nodecfg.WalletConfig.Enabled, &nodecfg.BrowsersConfig.Enabled, &nodecfg.PermissionsConfig.Enabled,
+		&nodecfg.WalletConfig.Enabled, &nodecfg.WalletConfig.EFPBaseURL, &nodecfg.BrowsersConfig.Enabled, &nodecfg.PermissionsConfig.Enabled,
 		&nodecfg.ConnectorConfig.Enabled,
 	)
 	if err != nil && err != sql.ErrNoRows {

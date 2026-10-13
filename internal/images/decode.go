@@ -19,6 +19,7 @@ import (
 	"golang.org/x/image/webp"
 
 	"github.com/status-im/status-go/internal/logutils"
+	"github.com/status-im/status-go/internal/traffic"
 )
 
 var (
@@ -58,7 +59,8 @@ func Decode(fileName string) (image.Image, error) {
 
 func DecodeFromURL(path string) (image.Image, error) {
 	client := http.Client{
-		Timeout: 5 * time.Second,
+		Timeout:   5 * time.Second,
+		Transport: traffic.Transport,
 	}
 	res, err := client.Get(path)
 	if err != nil {

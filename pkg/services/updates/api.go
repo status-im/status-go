@@ -14,13 +14,14 @@ import (
 	"github.com/status-im/status-go/internal/logutils"
 	"github.com/status-im/status-go/internal/panics"
 	"github.com/status-im/status-go/internal/signal"
+	"github.com/status-im/status-go/internal/traffic"
 	"github.com/status-im/status-go/pkg/services/ens"
 )
 
 func NewAPI(ensService *ens.Service) *API {
 	return &API{
 		ensService: ensService,
-		httpClient: &http.Client{Timeout: time.Minute},
+		httpClient: &http.Client{Timeout: time.Minute, Transport: traffic.Transport},
 	}
 }
 

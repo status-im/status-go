@@ -19,6 +19,7 @@ import (
 	"github.com/status-im/status-go/internal/logutils"
 	"github.com/status-im/status-go/internal/panics"
 	"github.com/status-im/status-go/internal/pausable"
+	"github.com/status-im/status-go/internal/traffic"
 )
 
 const maxRequestsPerSecond = 3
@@ -73,7 +74,8 @@ func NewDownloader(rootDir string) *Downloader {
 		inputTaskChan:   make(chan taskRequest, 1000),
 		wg:              sync.WaitGroup{},
 		client: &http.Client{
-			Timeout: time.Second * 5,
+			Timeout:   time.Second * 5,
+			Transport: traffic.Transport,
 		},
 
 		quit: make(chan struct{}),

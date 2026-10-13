@@ -521,8 +521,8 @@ generate-contracts:
 
 download-tokens:
 	echo "Downloading token lists..."; \
-	GOROOT=$$(go env GOROOT) GOFLAGS="-mod=mod" go run ./pkg/services/wallet/token/local-token-lists/default-lists/downloader/main.go; \
-	echo "token list downloaded successfully"; \
+	GOROOT=$$(go env GOROOT) GOWORK=off go run -mod=mod ./pkg/services/wallet/token/local-token-lists/default-lists/downloader/main.go && \
+	echo "token list downloaded successfully"
 
 analyze-token-stores:
 	go run -mod=mod ./pkg/services/wallet/token/local-token-lists/analyzer/main.go
@@ -598,11 +598,14 @@ empty :=
 space := $(empty) $(empty)
 comma := ,
 
+lint-argon2-fork: ##@lint Check internal/crypto/argon2 is upstream x/crypto (go.mod version) + argon2.patch
+	./scripts/check_argon2_fork.sh
+
 lint-panics: generate
 	GOFLAGS=-tags='$(subst $(space),$(comma),$(strip $(BUILD_TAGS) lint))' \
 	go tool goroutine-defer-guard -test=false -target github.com/status-im/status-go/internal/panics.LogOnPanic ./...
 
-lint: generate lint-panics
+lint: generate lint-panics lint-argon2-fork
 lint:
 	golangci-lint --build-tags '$(BUILD_TAGS) lint' run ./...
 

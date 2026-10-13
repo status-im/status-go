@@ -6,12 +6,12 @@ import (
 	"crypto/ecdsa"
 	"database/sql"
 	"encoding/gob"
-	"strings"
 	"time"
 
 	"github.com/golang/protobuf/proto"
 
 	"github.com/status-im/status-go/internal/crypto"
+	"github.com/status-im/status-go/internal/db/sqlutil"
 	"github.com/status-im/status-go/internal/protocol/protobuf"
 )
 
@@ -178,9 +178,7 @@ func (p *Persistence) GetPushNotificationInfo(publicKey *ecdsa.PublicKey, instal
 		queryArgs = append(queryArgs, installationID)
 	}
 
-	inVector := strings.Repeat("?, ", len(installationIDs)-1) + "?"
-
-	rows, err := p.db.Query(`SELECT server_public_key, installation_id, version, access_token, retrieved_at FROM push_notification_client_info WHERE public_key = ? AND installation_id IN (`+inVector+`)`, queryArgs...) //nolint: gosec
+	rows, err := p.db.Query(sqlutil.In(`SELECT server_public_key, installation_id, version, access_token, retrieved_at FROM push_notification_client_info WHERE public_key = ? AND installation_id IN (%s)`, len(installationIDs)), queryArgs...)
 
 	if err != nil {
 		return nil, err
@@ -370,8 +368,7 @@ func (p *Persistence) GetServersByPublicKey(keys []*ecdsa.PublicKey) ([]*PushNot
 		keyArgs = append(keyArgs, crypto.CompressPubkey(key))
 	}
 
-	inVector := strings.Repeat("?, ", len(keys)-1) + "?"
-	rows, err := p.db.Query(`SELECT public_key, registered, registered_at,access_token FROM push_notification_client_servers WHERE public_key IN (`+inVector+")", keyArgs...) //nolint: gosec
+	rows, err := p.db.Query(sqlutil.In(`SELECT public_key, registered, registered_at,access_token FROM push_notification_client_servers WHERE public_key IN (%s)`, len(keys)), keyArgs...)
 	if err != nil {
 		return nil, err
 	}

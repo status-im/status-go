@@ -84,13 +84,13 @@ func (s *ClientSuite) TestBuildPushNotificationRegisterMessage() {
 
 	// Set random generator for uuid
 	var seed int64 = 1
-	uuid.SetRand(rand.New(rand.NewSource(seed))) // nolint: gosec
+	uuid.SetRand(rand.New(rand.NewSource(seed))) //nolint:gosec // test data, weak randomness is fine
 
 	// Get token
 	expectedUUID := uuid.New().String()
 
 	// Reset random generator
-	uuid.SetRand(rand.New(rand.NewSource(seed))) // nolint: gosec
+	uuid.SetRand(rand.New(rand.NewSource(seed))) //nolint:gosec // test data, weak randomness is fine
 
 	s.client.deviceToken = testDeviceToken
 	// Set reader
@@ -147,7 +147,7 @@ func (s *ClientSuite) TestBuildPushNotificationRegisterMessageAllowFromContactsO
 
 	// Set random generator for uuid
 	var seed int64 = 1
-	uuid.SetRand(rand.New(rand.NewSource(seed))) // nolint: gosec
+	uuid.SetRand(rand.New(rand.NewSource(seed))) //nolint:gosec // test data, weak randomness is fine
 
 	// Get token
 	expectedUUID := uuid.New().String()
@@ -162,7 +162,7 @@ func (s *ClientSuite) TestBuildPushNotificationRegisterMessageAllowFromContactsO
 	s.Require().NoError(err)
 
 	// Reset random generator
-	uuid.SetRand(rand.New(rand.NewSource(seed))) // nolint: gosec
+	uuid.SetRand(rand.New(rand.NewSource(seed))) //nolint:gosec // test data, weak randomness is fine
 
 	s.client.config.AllowFromContactsOnly = true
 	s.client.deviceToken = testDeviceToken
