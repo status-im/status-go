@@ -156,7 +156,7 @@ func (c *CommunityChanges) MarshalJSON() ([]byte, error) {
 	var profiles MemberProfileProvider
 	if c.Community != nil {
 		item.CommunityID = c.Community.ID()
-		item.Clock = c.Community.Clock()
+		item.Clock = c.Community.latestClock()
 		profiles = c.Community.memberProfiles
 	}
 	item.RosterAdded = rosterEntries(c.MembersAdded, profiles)
