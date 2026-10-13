@@ -119,6 +119,7 @@ type Manager struct {
 	mediaServer              media.MediaServerInterface
 	communityImageVersions   map[string]uint32
 	cache                    *ttlcache.Cache[string, ReadonlyCommunity]
+	memberProfiles           MemberProfileProvider
 }
 
 type CommunityLock struct {
@@ -427,6 +428,21 @@ type CommunityResponse struct {
 	Changes         *CommunityChanges                      `json:"changes"`
 	RequestsToJoin  []*RequestToJoin                       `json:"requestsToJoin"`
 	FailedToDecrypt []*CommunityPrivateDataFailedToDecrypt `json:"-"`
+}
+
+// SetMemberProfileProvider sets the source of member display data used by
+// roster snapshots and member deltas.
+func (m *Manager) SetMemberProfileProvider(provider MemberProfileProvider) {
+	m.memberProfiles = provider
+}
+
+func (m *Manager) newCommunity(config Config, encryptor DescriptionEncryptor) (*Community, error) {
+	community, err := New(config, m.timesource, encryptor, m.mediaServer)
+	if err != nil {
+		return nil, err
+	}
+	community.memberProfiles = m.memberProfiles
+	return community, nil
 }
 
 func (m *Manager) SetMediaServer(mediaServer media.MediaServerInterface) {
@@ -815,7 +831,7 @@ func (m *Manager) CreateCommunity(request *requests.CreateCommunity, publish boo
 	if m.messaging != nil {
 		descriptionEncryptor = m
 	}
-	community, err := New(config, m.timesource, descriptionEncryptor, m.mediaServer)
+	community, err := m.newCommunity(config, descriptionEncryptor)
 	if err != nil {
 		return nil, err
 	}
@@ -1490,6 +1506,7 @@ func (m *Manager) DeleteCommunity(id cryptotypes.HexBytes) error {
 	m.communityLock.Lock(id)
 	defer m.communityLock.Unlock(id)
 
+	m.cache.Delete(cryptotypes.EncodeHex(id))
 	err := m.persistence.DeleteCommunity(id)
 	if err != nil {
 		return err
@@ -1657,7 +1674,7 @@ func (m *Manager) ImportCommunity(key *ecdsa.PrivateKey, clock uint64) (*Communi
 		if m.messaging != nil {
 			descriptionEncryptor = m
 		}
-		community, err = New(config, m.timesource, descriptionEncryptor, m.mediaServer)
+		community, err = m.newCommunity(config, descriptionEncryptor)
 		if err != nil {
 			return nil, err
 		}
@@ -2088,7 +2105,7 @@ func (m *Manager) HandleCommunityDescriptionMessage(signer *ecdsa.PublicKey, des
 		if m.messaging != nil {
 			descriptionEncryptor = m
 		}
-		community, err = New(config, m.timesource, descriptionEncryptor, m.mediaServer)
+		community, err = m.newCommunity(config, descriptionEncryptor)
 		if err != nil {
 			return nil, err
 		}
@@ -3810,6 +3827,7 @@ func (m *Manager) dbRecordBundleToCommunity(r *CommunityRecordBundle) (*Communit
 	}
 
 	initializer := func(community *Community) error {
+		community.memberProfiles = m.memberProfiles
 		_, description, err := m.preprocessDescription(community.ID(), community.config.CommunityDescription)
 		if err != nil {
 			return err
@@ -3878,6 +3896,15 @@ func (m *Manager) GetByIDStringReadonly(idString string) (ReadonlyCommunity, err
 	m.cache.Set(idString, ReadonlyCommunity(community), ttlcache.DefaultTTL)
 
 	return ReadonlyCommunity(community), err
+}
+
+// GetCommunityMembers returns an atomic roster snapshot of the community.
+func (m *Manager) GetCommunityMembers(communityID cryptotypes.HexBytes) (*CommunityMembers, error) {
+	community, err := m.GetByIDReadonly(communityID)
+	if err != nil {
+		return nil, err
+	}
+	return community.MembersSnapshot(m.memberProfiles), nil
 }
 
 func (m *Manager) SaveRequestToJoinRevealedAddresses(requestID cryptotypes.HexBytes, revealedAccounts []*protobuf.RevealedAccount) error {
