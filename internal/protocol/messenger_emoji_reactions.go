@@ -143,6 +143,27 @@ func (m *Messenger) EmojiReactionsByChatID(chatID string, threadID string, curso
 	return m.persistence.EmojiReactionsByChatID(chatID, threadID, cursor, limit, m.featureFlags.Threads)
 }
 
+func (m *Messenger) EmojiReactionsByChatIDMessageIDs(chatID string, messageIDs []string) ([]*EmojiReaction, error) {
+	chat, err := m.persistence.Chat(chatID)
+	if err != nil {
+		return nil, err
+	}
+	if chat == nil {
+		return nil, ErrChatNotFound
+	}
+	chatIDs := []string{chatID}
+	if chat.Timeline() {
+		chatIDs = []string{"@" + contacts.ContactIDFromPublicKey(&m.identity.PublicKey)}
+		m.allContacts.Range(func(contactID string, contact *contacts.Contact) (shouldContinue bool) {
+			if contact.Added() {
+				chatIDs = append(chatIDs, "@"+contact.ID)
+			}
+			return true
+		})
+	}
+	return m.persistence.emojiReactionsByChatIDsMessageIDs(chatIDs, messageIDs)
+}
+
 func (m *Messenger) EmojiReactionsByChatIDMessageID(chatID string, messageID string) ([]*EmojiReaction, error) {
 	_, err := m.persistence.Chat(chatID)
 	if err != nil {

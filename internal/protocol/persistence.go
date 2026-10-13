@@ -31,11 +31,16 @@ var (
 // sqlitePersistence wrapper around sql db with operations common for a client.
 type sqlitePersistence struct {
 	*common.RawMessagesPersistence
-	db *sql.DB
+	db                 *sql.DB
+	threadSummaryCache *threadSummaryCache
 }
 
 func newSQLitePersistence(db *sql.DB) *sqlitePersistence {
-	return &sqlitePersistence{common.NewRawMessagesPersistence(db), db}
+	return &sqlitePersistence{
+		RawMessagesPersistence: common.NewRawMessagesPersistence(db),
+		db:                     db,
+		threadSummaryCache:     &threadSummaryCache{},
+	}
 }
 
 func (db sqlitePersistence) SaveChat(chat Chat) error {
