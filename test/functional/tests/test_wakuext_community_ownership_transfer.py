@@ -88,8 +88,9 @@ class TestCommunityOwnershipTransfer:
             None,
         )
         assert owner_community is not None
-        assert member_a_backend.public_key in owner_community.get("members", {}), "Member A did not join"
-        assert member_b_backend.public_key in owner_community.get("members", {}), "Member B did not join"
+        members = messenger.community_members(owner_backend, community_id)
+        assert member_a_backend.public_key in members, "Member A did not join"
+        assert member_b_backend.public_key in members, "Member B did not join"
 
         # When the Owner mints the owner token
         community_tokens.fund_native_balance(owner_backend, anvil_client)
