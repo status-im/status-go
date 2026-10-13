@@ -841,6 +841,11 @@ class WakuextService(Service):
         response = self.rpc_request("communities", params)
         return response
 
+    def get_community_members(self, community_id: str):
+        params = [community_id]
+        response = self.rpc_request("getCommunityMembers", params)
+        return response
+
     def joined_communities(self):
         params = []
         response = self.rpc_request("joinedCommunities", params)

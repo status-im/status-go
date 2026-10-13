@@ -46,7 +46,7 @@ class TestCommunityTokenGatedManagement:
         communities = owner_backend.wakuext_service.communities()
         owner_community = next((c for c in messenger.communities_list(communities) if c.get("id") == community_id), None)
         assert owner_community is not None
-        assert member_backend.public_key in owner_community.get("members", {})
+        assert member_backend.public_key in messenger.community_members(owner_backend, community_id)
 
         community_tokens.edit_community_and_wait_until_observer_sees_update(owner_backend, member_backend, community_id)
 
@@ -122,8 +122,9 @@ class TestCommunityTokenGatedManagement:
             None,
         )
         assert owner_community is not None
-        assert member_a.public_key in owner_community.get("members", {})
-        assert member_b.public_key in owner_community.get("members", {})
+        members = messenger.community_members(owner_backend, community_id)
+        assert member_a.public_key in members
+        assert member_b.public_key in members
 
         community_tokens.fund_native_balance(owner_backend, anvil_client)
         owner_backend.wallet_service.restart_wallet_reload_timer()
@@ -157,7 +158,8 @@ class TestCommunityTokenGatedManagement:
             None,
         )
         assert owner_community, "Community not found on owner"
-        assert CommunityRoles.ROLE_ADMIN.value not in owner_community.get("members", {}).get(member_b.public_key, {}).get("roles", [])
+        member_b_roles = messenger.community_members(owner_backend, community_id).get(member_b.public_key, {}).get("roles", [])
+        assert CommunityRoles.ROLE_ADMIN.value not in member_b_roles
 
         new_name, new_description = community_tokens.edit_community_and_wait_until_observer_sees_update(
             member_a, owner_backend, community_id, attempts=45
