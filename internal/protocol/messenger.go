@@ -480,6 +480,7 @@ func NewMessenger(
 		messenger.contractMaker = contracts.NewContractMaker(c.rpcClient)
 	}
 
+	communitiesManager.SetMemberProfileProvider(messenger.allContacts)
 	messenger.mentionsManager = NewMentionManager(messenger)
 	messenger.storeNodeRequestsManager = NewStoreNodeRequestManager(messenger)
 

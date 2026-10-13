@@ -101,6 +101,8 @@ type Community struct {
 	timesource  common.TimeSource
 	encryptor   DescriptionEncryptor
 	mediaServer media.MediaServerInterface
+	// memberProfiles resolves display data for member deltas; may be nil
+	memberProfiles MemberProfileProvider
 }
 
 type ReadonlyCommunity interface {
@@ -109,6 +111,7 @@ type ReadonlyCommunity interface {
 	CanView(pk *ecdsa.PublicKey, chatID string) bool
 	CanPost(pk *ecdsa.PublicKey, chatID string, messageType protobuf.ApplicationMetadataMessage_Type) (bool, error)
 	IsBanned(pk *ecdsa.PublicKey) bool
+	MembersSnapshot(profiles MemberProfileProvider) *CommunityMembers
 }
 
 func New(config Config, timesource common.TimeSource, encryptor DescriptionEncryptor, mediaServer media.MediaServerInterface) (*Community, error) {
@@ -2445,8 +2448,9 @@ func (o *Community) CreateDeepCopy() *Community {
 			EventsData:                          o.config.EventsData,
 			LastOpenedAt:                        o.config.LastOpenedAt,
 		},
-		timesource:  o.timesource,
-		mediaServer: o.mediaServer,
+		timesource:     o.timesource,
+		mediaServer:    o.mediaServer,
+		memberProfiles: o.memberProfiles,
 	}
 }
 
