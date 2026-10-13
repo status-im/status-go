@@ -1,6 +1,8 @@
 package communities
 
 import (
+	"encoding/json"
+
 	"github.com/status-im/status-go/internal/crypto"
 	"github.com/status-im/status-go/internal/protocol/protobuf"
 	"github.com/status-im/status-go/internal/protocol/requests"
@@ -36,6 +38,68 @@ func (s *ManagerSuite) TestGetCommunityMembers() {
 	s.Require().NoError(err)
 	s.Require().Len(updated.Members, 2)
 	s.Require().Greater(updated.Clock, snapshot.Clock)
+}
+
+func (s *ManagerSuite) TestMemberDeltaClockFollowsSnapshot() {
+	community, err := s.manager.CreateCommunity(&requests.CreateCommunity{
+		Name:        "status",
+		Description: "status community description",
+		Membership:  protobuf.CommunityPermissions_AUTO_ACCEPT,
+	}, false)
+	s.Require().NoError(err)
+
+	snapshot, err := s.manager.GetCommunityMembers(community.ID())
+	s.Require().NoError(err)
+
+	member, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+	community, err = s.manager.GetByID(community.ID())
+	s.Require().NoError(err)
+	changes, err := community.AddMember(&member.PublicKey, nil, 0)
+	s.Require().NoError(err)
+	s.Require().NoError(s.manager.SaveCommunity(community))
+
+	updated, err := s.manager.GetCommunityMembers(community.ID())
+	s.Require().NoError(err)
+
+	var delta struct {
+		Clock uint64 `json:"clock"`
+	}
+	bytes, err := json.Marshal(changes)
+	s.Require().NoError(err)
+	s.Require().NoError(json.Unmarshal(bytes, &delta))
+	s.Require().Greater(delta.Clock, snapshot.Clock)
+	s.Require().Equal(updated.Clock, delta.Clock)
+}
+
+func (s *ManagerSuite) TestCommunityChangesUseMemberProfiles() {
+	memberKey, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+	memberHex := crypto.PubkeyToHex(&memberKey.PublicKey)
+	s.manager.SetMemberProfileProvider(memberProfilesStub{memberHex: {DisplayName: "member"}})
+
+	community, err := s.manager.CreateCommunity(&requests.CreateCommunity{
+		Name:        "status",
+		Description: "status community description",
+		Membership:  protobuf.CommunityPermissions_AUTO_ACCEPT,
+	}, false)
+	s.Require().NoError(err)
+
+	stored, err := s.manager.GetByID(community.ID())
+	s.Require().NoError(err)
+
+	for _, c := range []*Community{community, stored, stored.CreateDeepCopy()} {
+		changes, err := c.AddMember(&memberKey.PublicKey, nil, 0)
+		s.Require().NoError(err)
+
+		var delta struct {
+			MembersAdded map[string]RosterEntry `json:"membersAdded"`
+		}
+		bytes, err := json.Marshal(changes)
+		s.Require().NoError(err)
+		s.Require().NoError(json.Unmarshal(bytes, &delta))
+		s.Require().Equal("member", delta.MembersAdded[memberHex].DisplayName)
+	}
 }
 
 func (s *ManagerSuite) TestGetCommunityMembersAfterDelete() {
