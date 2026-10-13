@@ -267,6 +267,43 @@ func (s *CommunitySuite) TestCommunityChangesJSONKeepsExistingKeys() {
 	}
 }
 
+// Admin events patch the description without bumping its clock, so the
+// roster clock must account for them to keep deltas ordered after snapshots.
+func (s *CommunitySuite) TestRosterClockFollowsAppliedEvents() {
+	community := s.rosterCommunity()
+	before := community.MembersSnapshot(nil)
+	origin := community.CreateDeepCopy()
+
+	eventClock := community.Clock() + 5
+	community.config.EventsData = &EventsData{Events: []CommunityEvent{{CommunityEventClock: eventClock}}}
+	community.config.CommunityDescription.Chats[testChatID1].Members[s.member2Key] = &protobuf.CommunityMember{}
+	changes := EvaluateCommunityChanges(origin, community)
+	changes.Community = community
+
+	bytes, err := json.Marshal(changes)
+	s.Require().NoError(err)
+	var delta struct {
+		Clock uint64 `json:"clock"`
+	}
+	s.Require().NoError(json.Unmarshal(bytes, &delta))
+
+	s.Require().Greater(delta.Clock, before.Clock)
+	s.Require().Equal(eventClock, delta.Clock)
+	s.Require().Equal(eventClock, community.MembersSnapshot(nil).Clock)
+}
+
+// The control node must publish a description newer than every event it
+// applied, otherwise members that saw those events would see the clock regress.
+func (s *CommunitySuite) TestIncreaseClockPassesAppliedEvents() {
+	community := s.rosterCommunity()
+	eventClock := community.timesource.GetCurrentTime() + 1000
+	community.config.EventsData = &EventsData{Events: []CommunityEvent{{CommunityEventClock: eventClock}}}
+
+	community.increaseClock()
+
+	s.Require().Greater(community.Clock(), eventClock)
+}
+
 func (s *CommunitySuite) TestMergeKeepsMembersModified() {
 	changes := EmptyCommunityChanges()
 	other := EmptyCommunityChanges()

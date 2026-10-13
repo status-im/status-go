@@ -2299,9 +2299,23 @@ func (o *Community) RequestedToJoinAt() uint64 {
 	return o.config.RequestedToJoinAt
 }
 
+// latestClock is the newest of the description clock and the clocks of the
+// community events applied on top of it.
+func (o *Community) latestClock() uint64 {
+	clock := o.config.CommunityDescription.Clock
+	if o.config.EventsData != nil {
+		for _, event := range o.config.EventsData.Events {
+			if event.CommunityEventClock > clock {
+				clock = event.CommunityEventClock
+			}
+		}
+	}
+	return clock
+}
+
 func (o *Community) nextClock() uint64 {
 	// lamport timestamp
-	clock := o.config.CommunityDescription.Clock
+	clock := o.latestClock()
 	timestamp := o.timesource.GetCurrentTime()
 	if clock == 0 || clock < timestamp {
 		clock = timestamp

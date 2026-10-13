@@ -2354,8 +2354,8 @@ func (m *Manager) HandleCommunityEventsMessage(signer *ecdsa.PublicKey, message 
 				appliedEvents[event.EventTypeID()] = event.CommunityEventClock
 			}
 		}
-		community.config.EventsData = nil // clear events, they are already applied
 		community.increaseClock()
+		community.config.EventsData = nil // clear events, they are already applied
 
 		if m.keyDistributor != nil {
 			encryptionKeyActions := EvaluateCommunityEncryptionKeyActions(originCommunity, community)

@@ -35,7 +35,8 @@ type RosterEntry struct {
 	ThumbnailImageClock uint64 `json:"thumbnailImageClock,omitempty"`
 }
 
-// CommunityMembers is an atomic snapshot of a community roster at Clock.
+// CommunityMembers is an atomic snapshot of a community roster at Clock, the
+// newest of the description clock and the clocks of applied community events.
 type CommunityMembers struct {
 	Clock   uint64        `json:"clock"`
 	Members []RosterEntry `json:"members"`
@@ -86,7 +87,7 @@ func (o *Community) MembersSnapshot(profiles MemberProfileProvider) *CommunityMe
 
 	description := o.config.CommunityDescription
 	snapshot := &CommunityMembers{
-		Clock:    description.GetClock(),
+		Clock:    o.latestClock(),
 		Members:  make([]RosterEntry, 0, len(description.GetMembers())),
 		Channels: make(map[string]map[string]protobuf.CommunityMember_ChannelRole),
 	}
