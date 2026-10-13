@@ -104,6 +104,8 @@ type Message struct {
 	*protobuf.ChatMessage
 
 	ThreadMetadataCreationAuthorized bool `json:"-"`
+	// HasThread is a local read hint; nil means thread presence was not queried.
+	HasThread *bool `json:"-"`
 
 	// ID calculated as keccak256(compressedAuthorPubKey, data) where data is unencrypted payload.
 	ID string `json:"id"`
@@ -255,6 +257,7 @@ func (m *Message) MarshalJSON() ([]byte, error) {
 		PaymentRequests          []*protobuf.PaymentRequest       `json:"paymentRequests,omitempty"`
 		PinnedBy                 string                           `json:"pinnedBy,omitempty"`
 		ThreadID                 string                           `json:"threadId,omitempty"`
+		HasThread                *bool                            `json:"hasThread,omitempty"`
 	}
 	item := MessageStructType{
 		ID:                       m.ID,
@@ -298,6 +301,7 @@ func (m *Message) MarshalJSON() ([]byte, error) {
 		PaymentRequests:          m.PaymentRequests,
 		PinnedBy:                 m.PinnedBy,
 		ThreadID:                 m.GetThreadId(),
+		HasThread:                m.HasThread,
 	}
 
 	if sticker := m.GetSticker(); sticker != nil {
