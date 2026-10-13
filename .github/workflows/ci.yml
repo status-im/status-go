@@ -1,4 +1,4 @@
-name: ci / stack build
+name: ci
 
 permissions:
   contents: read
@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: stack-build-${{ github.ref }}
+  group: ci-${{ github.ref }}
   cancel-in-progress: true
 
 env:
@@ -80,7 +80,7 @@ jobs:
           path: |
             nimbledeps
             ~/.nimble/nimbinaries
-          key: stack-nimbledeps-${{ matrix.os }}-${{ env.NIMBLE_VERSION }}-${{ hashFiles('status_go.nimble') }}
+          key: nimbledeps-${{ matrix.os }}-${{ env.NIMBLE_VERSION }}-${{ hashFiles('status_go.nimble') }}
 
       - name: Generate
         run: make generate
@@ -138,7 +138,7 @@ jobs:
           path: |
             nimbledeps
             ~/.nimble/nimbinaries
-          key: stack-nimbledeps-${{ matrix.target }}-${{ env.NIMBLE_VERSION }}-${{ hashFiles('status_go.nimble') }}
+          key: nimbledeps-${{ matrix.target }}-${{ env.NIMBLE_VERSION }}-${{ hashFiles('status_go.nimble') }}
 
       - name: Build the Android library
         if: startsWith(matrix.target, 'android')
