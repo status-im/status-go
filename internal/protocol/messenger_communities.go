@@ -924,35 +924,28 @@ func (m *Messenger) schedulePublishGrantsForControlledCommunities() {
 
 func (m *Messenger) CheckCommunitiesToUnmute() (*MessengerResponse, error) {
 	response := &MessengerResponse{}
-	communities, err := m.communitiesManager.JoinedOrSpectated()
-	currTime := time.Now()
+	ids, err := m.communitiesManager.ExpiredMutedCommunityIDs(time.Now())
 	if err != nil {
-		return nil, fmt.Errorf("couldn't get all communities: %v", err)
+		return nil, fmt.Errorf("couldn't get muted communities: %v", err)
 	}
-	for _, community := range communities {
-		communityMuteTill := community.MuteTill()
-
-		if currTime.After(communityMuteTill) && !communityMuteTill.Equal(time.Time{}) && community.Muted() {
-			err := m.communitiesManager.SetMuted(community.ID(), false)
-			if err != nil {
-				m.logger.Info("CheckCommunitiesToUnmute err", zap.Any("Couldn't unmute community", err))
-				break
-			}
-
-			err = m.MuteCommunityTill(community.ID(), time.Time{})
-			if err != nil {
-				m.logger.Info("MuteCommunityTill err", zap.Any("Could not set mute community till", err))
-				break
-			}
-
-			unmutedCommunity, err := m.communitiesManager.GetByID(community.ID())
-			if err != nil {
-				return nil, err
-			}
-			response.AddCommunity(unmutedCommunity)
-
+	for _, id := range ids {
+		err := m.communitiesManager.SetMuted(id, false)
+		if err != nil {
+			m.logger.Info("CheckCommunitiesToUnmute err", zap.Any("Couldn't unmute community", err))
+			break
 		}
 
+		err = m.MuteCommunityTill(id, time.Time{})
+		if err != nil {
+			m.logger.Info("MuteCommunityTill err", zap.Any("Could not set mute community till", err))
+			break
+		}
+
+		unmutedCommunity, err := m.communitiesManager.GetByID(id)
+		if err != nil {
+			return nil, err
+		}
+		response.AddCommunity(unmutedCommunity)
 	}
 
 	return response, nil

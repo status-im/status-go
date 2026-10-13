@@ -832,6 +832,29 @@ func (p *Persistence) MuteCommunityTill(communityID []byte, mutedTill time.Time)
 	return err
 }
 
+// ExpiredMutedCommunityIDs returns the joined or spectated communities whose timed mute
+// ended before now. It reads two columns instead of decoding every community.
+func (p *Persistence) ExpiredMutedCommunityIDs(now time.Time) ([]cryptotypes.HexBytes, error) {
+	rows, err := p.db.Query(`SELECT id, muted_till FROM communities_communities WHERE (joined OR spectated) AND muted AND muted_till IS NOT NULL`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var ids []cryptotypes.HexBytes
+	for rows.Next() {
+		var id []byte
+		var mutedTill sql.NullTime
+		if err := rows.Scan(&id, &mutedTill); err != nil {
+			return nil, err
+		}
+		if mutedTill.Valid && !mutedTill.Time.IsZero() && now.After(mutedTill.Time) {
+			ids = append(ids, id)
+		}
+	}
+	return ids, rows.Err()
+}
+
 func (p *Persistence) GetRequestToJoin(id []byte) (*RequestToJoin, error) {
 	request := &RequestToJoin{}
 	err := p.db.QueryRow(`SELECT id,public_key,clock,ens_name,customization_color,chat_id,community_id,state, share_future_addresses FROM communities_requests_to_join WHERE id = ?`, id).Scan(&request.ID, &request.PublicKey, &request.Clock, &request.ENSName, &request.CustomizationColor, &request.ChatID, &request.CommunityID, &request.State, &request.ShareFutureAddresses)
