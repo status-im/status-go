@@ -1,0 +1,104 @@
+name: ci / nimble
+
+permissions:
+  contents: read
+
+on:
+  pull_request:
+  push:
+    branches: [develop]
+  workflow_dispatch:
+
+env:
+  NIMBLE_VERSION: '0.26.0'
+
+jobs:
+  libraries:
+    name: 'libsds and liblogosdelivery / ${{ matrix.os }}'
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      # No compiler here: Nimble resolves the one `requires` names. Installing
+      # one also puts its bundled Nimble on PATH (nim-lang/nimble#1840).
+      - uses: nim-lang/setup-nimble-action@b2eed48dc4ff7b6c1c5704fe9237ab6736c561cb # master: arch detection (#16)
+        with:
+          nimble-version: ${{ env.NIMBLE_VERSION }}
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      # boringssl test paths overrun the 260-char limit from the default temp.
+      - name: Shorten TEMP path for nimble
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path C:\T | Out-Null
+          "TEMP=C:\T" >> $env:GITHUB_ENV
+          "TMP=C:\T"  >> $env:GITHUB_ENV
+
+      # logos-delivery's contract submodules nest past MAX_PATH under ~/.nimble.
+      - name: Allow long paths in git
+        if: runner.os == 'Windows'
+        run: git config --global core.longpaths true
+
+      - name: Cache Nim dependencies
+        uses: actions/cache@v4
+        with:
+          # nimbinaries is global; without it the bootstrap grabs the newest Nim.
+          path: |
+            nimbledeps
+            ~/.nimble/nimbinaries
+          key: nimbledeps-${{ matrix.os }}-${{ env.NIMBLE_VERSION }}-${{ hashFiles('status_go.nimble') }}
+
+      - name: Build libsds through the bindings
+        shell: bash
+        run: make build-libsds
+
+      - name: Build liblogosdelivery through the bindings
+        shell: bash
+        run: make build-liblogosdelivery
+
+      - name: Check the built library
+        shell: bash
+        run: ls -l build/
+
+  liblogosdelivery-mobile:
+    name: 'liblogosdelivery / ${{ matrix.target }}'
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: android-arm64
+            os: ubuntu-22.04
+          - target: ios-arm64
+            os: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: nim-lang/setup-nimble-action@b2eed48dc4ff7b6c1c5704fe9237ab6736c561cb # master: arch detection (#16)
+        with:
+          nimble-version: ${{ env.NIMBLE_VERSION }}
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Android NDK
+        if: startsWith(matrix.target, 'android')
+        id: ndk
+        uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: r27c
+
+      - name: Build liblogosdelivery for Android
+        if: startsWith(matrix.target, 'android')
+        run: make build-liblogosdelivery-android ARCH=arm64 ANDROID_API=28 ANDROID_NDK_ROOT="${{ steps.ndk.outputs.ndk-path }}"
+
+      - name: Build liblogosdelivery for iOS
+        if: startsWith(matrix.target, 'ios')
+        run: make build-liblogosdelivery-ios ARCH=arm64 IPHONE_SDK=iphoneos IOS_TARGET=13.0
+
+      - name: Check the built library
+        run: ls -l build/
