@@ -327,6 +327,7 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 		Images                      map[string]Image                     `json:"images"`
 		Permissions                 *protobuf.CommunityPermissions       `json:"permissions"`
 		Members                     map[string]*enrichedCommunityMember  `json:"members"`
+		MembersCount                int                                  `json:"membersCount"`
 		CanRequestAccess            bool                                 `json:"canRequestAccess"`
 		CanManageUsers              bool                                 `json:"canManageUsers"`              //TODO: we can remove this
 		CanDeleteMessageForEveryone bool                                 `json:"canDeleteMessageForEveryone"` //TODO: we can remove this
@@ -418,6 +419,7 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 		communityItem.TokenPermissions = o.tokenPermissions()
 		communityItem.PendingAndBannedMembers = o.PendingAndBannedMembers()
 		communityItem.Members = enrichMembersMap(o.config.CommunityDescription.Members)
+		communityItem.MembersCount = len(o.config.CommunityDescription.Members)
 		communityItem.Permissions = o.config.CommunityDescription.Permissions
 		communityItem.IntroMessage = o.config.CommunityDescription.IntroMessage
 		communityItem.OutroMessage = o.config.CommunityDescription.OutroMessage
