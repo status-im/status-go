@@ -104,6 +104,9 @@ type Waku interface {
 
 	Peers() PeerStats
 
+	TrafficReport() TrafficReport
+	ResetTrafficStats()
+
 	SubscribeToConnStatusChanges() (*ConnStatusSubscription, error)
 
 	// ConnectionState returns the node's current three-state connection status

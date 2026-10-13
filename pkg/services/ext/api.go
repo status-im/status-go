@@ -1170,6 +1170,15 @@ func (api *PublicAPI) Peers() messagingtypes.PeerStats {
 	return api.service.messenger.Peers()
 }
 
+// GetTrafficReport tells what Waku moved over libp2p, by protocol and by peer.
+func (api *PublicAPI) GetTrafficReport() messagingtypes.TrafficReport {
+	return api.service.messaging.TrafficReport()
+}
+
+func (api *PublicAPI) ResetTrafficStats() {
+	api.service.messaging.ResetTrafficStats()
+}
+
 func (api *PublicAPI) PeerID() string {
 	return api.service.messaging.PeerID().String()
 }

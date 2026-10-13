@@ -789,6 +789,14 @@ func (t *Transport) Peers() wakutypes.PeerStats {
 	return t.waku.Peers()
 }
 
+func (t *Transport) TrafficReport() wakutypes.TrafficReport {
+	return t.waku.TrafficReport()
+}
+
+func (t *Transport) ResetTrafficStats() {
+	t.waku.ResetTrafficStats()
+}
+
 // ConfirmMessagesProcessed marks the messages as processed in the cache so
 // they won't be passed to the next layer anymore
 func (t *Transport) ConfirmMessagesProcessed(ids []string, timestamp uint64) error {
