@@ -55,7 +55,6 @@ import (
 
 	"github.com/libp2p/go-libp2p"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
-	"github.com/libp2p/go-libp2p/core/metrics"
 
 	commonapi "github.com/waku-org/go-waku/waku/v2/api/common"
 	filterapi "github.com/waku-org/go-waku/waku/v2/api/filter"
@@ -146,7 +145,7 @@ type Waku struct {
 	envelopeCache *ttlcache.Cache[gethcommon.Hash, struct{}] // short-lived set of seen envelope hashes; feeds hit/miss metrics and self-send suppression only. De-duplication is owned by the transport's persistent processed-message cache (status-im/status-go#7464).
 	poolMu        sync.RWMutex                               // Mutex to sync the message and expiration pools
 
-	bandwidthCounter *metrics.BandwidthCounter
+	traffic *trafficCounter
 
 	sendQueue *publish.MessageQueue
 
@@ -271,7 +270,7 @@ func New(nodeKey *ecdsa.PrivateKey, cfg *Config, logger *zap.Logger, ts timesour
 		sendQueue:                   publish.NewMessageQueue(1000, cfg.UseThrottledPublish),
 	}
 
-	waku.bandwidthCounter = metrics.NewBandwidthCounter()
+	waku.traffic = newTrafficCounter()
 
 	if nodeKey == nil {
 		// No nodekey is provided, create an ephemeral key
@@ -287,7 +286,7 @@ func New(nodeKey *ecdsa.PrivateKey, cfg *Config, logger *zap.Logger, ts timesour
 	}
 
 	libp2pOpts := node.DefaultLibP2POptions
-	libp2pOpts = append(libp2pOpts, libp2p.BandwidthReporter(waku.bandwidthCounter))
+	libp2pOpts = append(libp2pOpts, libp2p.BandwidthReporter(waku.traffic))
 	libp2pOpts = append(libp2pOpts, libp2p.NATPortMap())
 
 	opts := []node.WakuNodeOption{
