@@ -5,6 +5,8 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/status-im/status-go/internal/images"
+	"github.com/status-im/status-go/internal/protocol/communities"
 	"github.com/status-im/status-go/internal/protocol/contacts"
 	"github.com/status-im/status-go/internal/protocol/protobuf"
 	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
@@ -94,6 +96,24 @@ func (cm *contactMap) Delete(contactID string) {
 		return
 	}
 	cm.sm.Delete(contactID)
+}
+
+// MemberProfile implements communities.MemberProfileProvider.
+func (cm *contactMap) MemberProfile(pubKey string) (communities.MemberProfile, bool) {
+	contact := cm.me
+	if pubKey != cm.me.ID {
+		value, ok := cm.sm.Load(pubKey)
+		if !ok || value == nil {
+			return communities.MemberProfile{}, false
+		}
+		contact = value.(*contacts.Contact)
+	}
+	return communities.MemberProfile{
+		DisplayName:         contact.DisplayName,
+		EnsName:             contact.EnsName,
+		EnsVerified:         contact.ENSVerified,
+		ThumbnailImageClock: contact.Images[images.SmallDimName].Clock,
+	}, true
 }
 
 func (cm *contactMap) Len() int {

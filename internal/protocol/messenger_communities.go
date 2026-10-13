@@ -4616,6 +4616,11 @@ func (m *Messenger) rekeyCommunities(logger *zap.Logger) {
 	}
 }
 
+// GetCommunityMembers returns an atomic roster snapshot of the community.
+func (m *Messenger) GetCommunityMembers(communityID cryptotypes.HexBytes) (*communities.CommunityMembers, error) {
+	return m.communitiesManager.GetCommunityMembers(communityID)
+}
+
 func (m *Messenger) GetCommunityMembersForWalletAddresses(communityID cryptotypes.HexBytes, chainID uint64) (map[string]*contacts.Contact, error) {
 	community, err := m.communitiesManager.GetByID(communityID)
 	if err != nil {
