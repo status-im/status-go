@@ -93,12 +93,12 @@ func (s *ManagerSuite) TestCommunityChangesUseMemberProfiles() {
 		s.Require().NoError(err)
 
 		var delta struct {
-			MembersAdded map[string]RosterEntry `json:"membersAdded"`
+			RosterAdded map[string]RosterEntry `json:"rosterAdded"`
 		}
 		bytes, err := json.Marshal(changes)
 		s.Require().NoError(err)
 		s.Require().NoError(json.Unmarshal(bytes, &delta))
-		s.Require().Equal("member", delta.MembersAdded[memberHex].DisplayName)
+		s.Require().Equal("member", delta.RosterAdded[memberHex].DisplayName)
 	}
 }
 
