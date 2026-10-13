@@ -3,8 +3,10 @@ package communities
 import (
 	"bytes"
 	"crypto/ecdsa"
+	"encoding/json"
 	"slices"
 
+	"github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/protocol/protobuf"
 )
 
@@ -12,18 +14,20 @@ type CommunityChatChanges struct {
 	ChatModified                  *protobuf.CommunityChat
 	MembersAdded                  map[string]*protobuf.CommunityMember
 	MembersRemoved                map[string]*protobuf.CommunityMember
+	MembersModified               map[string]*protobuf.CommunityMember // channel role changed
 	CategoryModified              string
 	PositionModified              int
 	FirstMessageTimestampModified uint32
 }
 
 type CommunityChanges struct {
-	Community *Community `json:"community"`
+	Community *Community `json:"-"`
 
 	ControlNodeChanged *ecdsa.PublicKey `json:"controlNodeChanged"`
 
 	MembersAdded    map[string]*protobuf.CommunityMember `json:"membersAdded"`
 	MembersRemoved  map[string]*protobuf.CommunityMember `json:"membersRemoved"`
+	MembersModified map[string]*protobuf.CommunityMember `json:"membersModified"` // roles changed
 	MembersBanned   map[string]bool                      `json:"membersBanned"`
 	MembersUnbanned map[string]bool                      `json:"membersUnbanned"`
 
@@ -62,6 +66,7 @@ func EmptyCommunityChanges() *CommunityChanges {
 	return &CommunityChanges{
 		MembersAdded:    make(map[string]*protobuf.CommunityMember),
 		MembersRemoved:  make(map[string]*protobuf.CommunityMember),
+		MembersModified: make(map[string]*protobuf.CommunityMember),
 		MembersBanned:   make(map[string]bool),
 		MembersUnbanned: make(map[string]bool),
 
@@ -88,6 +93,9 @@ func (c *CommunityChanges) Merge(other *CommunityChanges) {
 	}
 	for memberID := range other.MembersRemoved {
 		c.MembersRemoved[memberID] = other.MembersRemoved[memberID]
+	}
+	for memberID, member := range other.MembersModified {
+		c.MembersModified[memberID] = member
 	}
 	for memberID, banned := range other.MembersBanned {
 		c.MembersBanned[memberID] = banned
@@ -128,6 +136,46 @@ func (c *CommunityChanges) Merge(other *CommunityChanges) {
 	for walletID, wallets := range other.MemberWalletsAdded {
 		c.MemberWalletsAdded[walletID] = wallets
 	}
+}
+
+// MarshalJSON sends member deltas as roster entries and identifies the
+// community by ID and clock instead of embedding it.
+func (c *CommunityChanges) MarshalJSON() ([]byte, error) {
+	type changesAlias CommunityChanges
+	item := struct {
+		*changesAlias
+		CommunityID     types.HexBytes         `json:"communityId,omitempty"`
+		Clock           uint64                 `json:"clock"`
+		MembersAdded    map[string]RosterEntry `json:"membersAdded"`
+		MembersRemoved  map[string]RosterEntry `json:"membersRemoved"`
+		MembersModified map[string]RosterEntry `json:"membersModified"`
+	}{
+		changesAlias: (*changesAlias)(c),
+	}
+
+	var profiles MemberProfileProvider
+	if c.Community != nil {
+		item.CommunityID = c.Community.ID()
+		item.Clock = c.Community.Clock()
+		profiles = c.Community.memberProfiles
+	}
+	item.MembersAdded = rosterEntries(c.MembersAdded, profiles)
+	item.MembersRemoved = rosterEntries(c.MembersRemoved, profiles)
+	item.MembersModified = rosterEntries(c.MembersModified, profiles)
+
+	return json.Marshal(item)
+}
+
+// chatChanges returns the changes of chatID, creating them if needed.
+func (c *CommunityChanges) chatChanges(chatID string) *CommunityChatChanges {
+	if c.ChatsModified[chatID] == nil {
+		c.ChatsModified[chatID] = &CommunityChatChanges{
+			MembersAdded:    make(map[string]*protobuf.CommunityMember),
+			MembersRemoved:  make(map[string]*protobuf.CommunityMember),
+			MembersModified: make(map[string]*protobuf.CommunityMember),
+		}
+	}
+	return c.ChatsModified[chatID]
 }
 
 func (c *CommunityChanges) HasNewMember(identity string) bool {
@@ -211,10 +259,13 @@ func EvaluateCommunityChanges(origin, modified *Community) *CommunityChanges {
 func evaluateCommunityChangesByDescription(origin, modified *protobuf.CommunityDescription) *CommunityChanges {
 	changes := EmptyCommunityChanges()
 
-	// Check for new members at the org level
+	// Check for new members and role changes at the org level
 	for pk, member := range modified.Members {
-		if _, ok := origin.Members[pk]; !ok {
+		originMember, ok := origin.Members[pk]
+		if !ok {
 			changes.MembersAdded[pk] = member
+		} else if !sameRoles(originMember.GetRoles(), member.GetRoles()) {
+			changes.MembersModified[pk] = member
 		}
 	}
 
@@ -254,42 +305,27 @@ func evaluateCommunityChangesByDescription(origin, modified *protobuf.CommunityD
 			changes.ChatsAdded[chatID] = chat
 		} else {
 
-			// Check for members added
+			// Check for members added and channel role changes
 			for pk, member := range modified.Chats[chatID].Members {
-				if _, ok := origin.Chats[chatID].Members[pk]; !ok {
-					if changes.ChatsModified[chatID] == nil {
-						changes.ChatsModified[chatID] = &CommunityChatChanges{
-							MembersAdded:   make(map[string]*protobuf.CommunityMember),
-							MembersRemoved: make(map[string]*protobuf.CommunityMember),
-						}
-					}
-					changes.ChatsModified[chatID].MembersAdded[pk] = member
+				originMember, ok := origin.Chats[chatID].Members[pk]
+				if !ok {
+					changes.chatChanges(chatID).MembersAdded[pk] = member
+				} else if originMember.GetChannelRole() != member.GetChannelRole() {
+					changes.chatChanges(chatID).MembersModified[pk] = member
 				}
 			}
 
 			// check for members removed
 			for pk, member := range origin.Chats[chatID].Members {
 				if _, ok := modified.Chats[chatID].Members[pk]; !ok {
-					if changes.ChatsModified[chatID] == nil {
-						changes.ChatsModified[chatID] = &CommunityChatChanges{
-							MembersAdded:   make(map[string]*protobuf.CommunityMember),
-							MembersRemoved: make(map[string]*protobuf.CommunityMember),
-						}
-					}
-					changes.ChatsModified[chatID].MembersRemoved[pk] = member
+					changes.chatChanges(chatID).MembersRemoved[pk] = member
 				}
 			}
 
 			// check if first message timestamp was modified
 			if origin.Chats[chatID].Identity.FirstMessageTimestamp !=
 				modified.Chats[chatID].Identity.FirstMessageTimestamp {
-				if changes.ChatsModified[chatID] == nil {
-					changes.ChatsModified[chatID] = &CommunityChatChanges{
-						MembersAdded:   make(map[string]*protobuf.CommunityMember),
-						MembersRemoved: make(map[string]*protobuf.CommunityMember),
-					}
-				}
-				changes.ChatsModified[chatID].FirstMessageTimestampModified = modified.Chats[chatID].Identity.FirstMessageTimestamp
+				changes.chatChanges(chatID).FirstMessageTimestampModified = modified.Chats[chatID].Identity.FirstMessageTimestamp
 			}
 		}
 	}
@@ -338,18 +374,23 @@ func evaluateCommunityChangesByDescription(origin, modified *protobuf.CommunityD
 		}
 
 		if origin.Chats[chatID].CategoryId != chat.CategoryId {
-			if changes.ChatsModified[chatID] == nil {
-				changes.ChatsModified[chatID] = &CommunityChatChanges{
-					MembersAdded:   make(map[string]*protobuf.CommunityMember),
-					MembersRemoved: make(map[string]*protobuf.CommunityMember),
-				}
-			}
-
-			changes.ChatsModified[chatID].CategoryModified = chat.CategoryId
+			changes.chatChanges(chatID).CategoryModified = chat.CategoryId
 		}
 	}
 
 	return changes
+}
+
+func sameRoles(a, b []protobuf.CommunityMember_Roles) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for _, role := range a {
+		if !slices.Contains(b, role) {
+			return false
+		}
+	}
+	return true
 }
 
 func findDiffInBanList(searchFrom []string, searchIn []string, storeTo map[string]bool) {

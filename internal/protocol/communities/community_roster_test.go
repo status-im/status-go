@@ -3,6 +3,8 @@ package communities
 import (
 	"encoding/json"
 
+	"github.com/golang/protobuf/proto"
+
 	"github.com/status-im/status-go/internal/protocol/identity"
 	"github.com/status-im/status-go/internal/protocol/identity/alias"
 	"github.com/status-im/status-go/internal/protocol/protobuf"
@@ -101,4 +103,79 @@ func (s *CommunitySuite) TestMembersSnapshotJSON() {
 		s.Require().NotContains(entry, "compressedKey")
 	}
 	s.Require().Equal(int(protobuf.CommunityMember_CHANNEL_ROLE_VIEWER), parsed.Channels[testChatID1][s.member1Key])
+}
+
+func (s *CommunitySuite) TestEvaluateChangesDetectsRoleChanges() {
+	community := s.rosterCommunity()
+	origin := community.config.CommunityDescription
+	modified := proto.Clone(origin).(*protobuf.CommunityDescription)
+	modified.Members[s.member1Key].Roles = []protobuf.CommunityMember_Roles{protobuf.CommunityMember_ROLE_TOKEN_MASTER}
+	modified.Chats[testChatID1].Members[s.member1Key].ChannelRole = protobuf.CommunityMember_CHANNEL_ROLE_POSTER
+
+	changes := evaluateCommunityChangesByDescription(origin, modified)
+
+	s.Require().Empty(changes.MembersAdded)
+	s.Require().Empty(changes.MembersRemoved)
+	s.Require().Len(changes.MembersModified, 1)
+	s.Require().Contains(changes.MembersModified, s.member1Key)
+	s.Require().NotNil(changes.ChatsModified[testChatID1])
+	s.Require().Empty(changes.ChatsModified[testChatID1].MembersAdded)
+	s.Require().Equal(protobuf.CommunityMember_CHANNEL_ROLE_POSTER,
+		changes.ChatsModified[testChatID1].MembersModified[s.member1Key].ChannelRole)
+}
+
+func (s *CommunitySuite) TestEvaluateChangesIgnoresRoleOrder() {
+	community := s.rosterCommunity()
+	origin := community.config.CommunityDescription
+	origin.Members[s.member2Key].Roles = []protobuf.CommunityMember_Roles{
+		protobuf.CommunityMember_ROLE_ADMIN, protobuf.CommunityMember_ROLE_TOKEN_MASTER}
+	modified := proto.Clone(origin).(*protobuf.CommunityDescription)
+	modified.Members[s.member2Key].Roles = []protobuf.CommunityMember_Roles{
+		protobuf.CommunityMember_ROLE_TOKEN_MASTER, protobuf.CommunityMember_ROLE_ADMIN}
+
+	changes := evaluateCommunityChangesByDescription(origin, modified)
+
+	s.Require().Empty(changes.MembersModified)
+}
+
+func (s *CommunitySuite) TestCommunityChangesJSON() {
+	community := s.rosterCommunity()
+	community.memberProfiles = memberProfilesStub{s.member3Key: {DisplayName: "carol"}}
+	snapshot := community.MembersSnapshot(nil)
+
+	changes, err := community.AddMember(&s.member3.PublicKey, nil, 0)
+	s.Require().NoError(err)
+
+	bytes, err := json.Marshal(changes)
+	s.Require().NoError(err)
+
+	var parsed map[string]json.RawMessage
+	s.Require().NoError(json.Unmarshal(bytes, &parsed))
+	s.Require().NotContains(parsed, "community")
+	s.Require().Contains(parsed, "membersModified")
+
+	var delta struct {
+		CommunityID  string                 `json:"communityId"`
+		Clock        uint64                 `json:"clock"`
+		MembersAdded map[string]RosterEntry `json:"membersAdded"`
+	}
+	s.Require().NoError(json.Unmarshal(bytes, &delta))
+	s.Require().Equal(community.IDString(), delta.CommunityID)
+	s.Require().Greater(delta.Clock, snapshot.Clock)
+	s.Require().Equal(RosterEntry{
+		PubKey:      s.member3Key,
+		Roles:       []protobuf.CommunityMember_Roles{},
+		DisplayName: "carol",
+		ColorID:     delta.MembersAdded[s.member3Key].ColorID,
+	}, delta.MembersAdded[s.member3Key])
+}
+
+func (s *CommunitySuite) TestMergeKeepsMembersModified() {
+	changes := EmptyCommunityChanges()
+	other := EmptyCommunityChanges()
+	other.MembersModified[s.member1Key] = &protobuf.CommunityMember{}
+
+	changes.Merge(other)
+
+	s.Require().Contains(changes.MembersModified, s.member1Key)
 }
