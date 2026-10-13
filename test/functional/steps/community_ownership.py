@@ -366,7 +366,7 @@ def wait_until_owner_and_members_present(
             (c for c in messenger.communities_list(backend.wakuext_service.communities()) if c.get("id") == community_id),
             None,
         )
-        members = (community or {}).get("members", {})
+        members = messenger.community_members(backend, community_id) if community else {}
         owner_roles = members.get(owner_public_key, {}).get("roles", [])
         missing = [k for k in expected_member_public_keys if k not in members]
         if isinstance(community, dict) and CommunityRoles.ROLE_OWNER.value in owner_roles and not missing:
@@ -400,7 +400,7 @@ def wait_until_kicked_from_community(
         if community is not None and not community.get("joined", False):
             if new_owner_public_key is None:
                 return community
-            owner_roles = community.get("members", {}).get(new_owner_public_key, {}).get("roles", [])
+            owner_roles = messenger.community_members(backend, community_id).get(new_owner_public_key, {}).get("roles", [])
             if CommunityRoles.ROLE_OWNER.value in owner_roles:
                 return community
         time.sleep(delay)
