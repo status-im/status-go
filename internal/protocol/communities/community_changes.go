@@ -21,7 +21,7 @@ type CommunityChatChanges struct {
 }
 
 type CommunityChanges struct {
-	Community *Community `json:"-"`
+	Community *Community `json:"community"`
 
 	ControlNodeChanged *ecdsa.PublicKey `json:"controlNodeChanged"`
 
@@ -138,17 +138,17 @@ func (c *CommunityChanges) Merge(other *CommunityChanges) {
 	}
 }
 
-// MarshalJSON sends member deltas as roster entries and identifies the
-// community by ID and clock instead of embedding it.
+// MarshalJSON adds the community ID and clock and the member deltas as
+// roster entries next to the existing keys.
 func (c *CommunityChanges) MarshalJSON() ([]byte, error) {
 	type changesAlias CommunityChanges
 	item := struct {
 		*changesAlias
-		CommunityID     types.HexBytes         `json:"communityId,omitempty"`
-		Clock           uint64                 `json:"clock"`
-		MembersAdded    map[string]RosterEntry `json:"membersAdded"`
-		MembersRemoved  map[string]RosterEntry `json:"membersRemoved"`
-		MembersModified map[string]RosterEntry `json:"membersModified"`
+		CommunityID    types.HexBytes         `json:"communityId,omitempty"`
+		Clock          uint64                 `json:"clock"`
+		RosterAdded    map[string]RosterEntry `json:"rosterAdded"`
+		RosterRemoved  map[string]RosterEntry `json:"rosterRemoved"`
+		RosterModified map[string]RosterEntry `json:"rosterModified"`
 	}{
 		changesAlias: (*changesAlias)(c),
 	}
@@ -159,9 +159,9 @@ func (c *CommunityChanges) MarshalJSON() ([]byte, error) {
 		item.Clock = c.Community.Clock()
 		profiles = c.Community.memberProfiles
 	}
-	item.MembersAdded = rosterEntries(c.MembersAdded, profiles)
-	item.MembersRemoved = rosterEntries(c.MembersRemoved, profiles)
-	item.MembersModified = rosterEntries(c.MembersModified, profiles)
+	item.RosterAdded = rosterEntries(c.MembersAdded, profiles)
+	item.RosterRemoved = rosterEntries(c.MembersRemoved, profiles)
+	item.RosterModified = rosterEntries(c.MembersModified, profiles)
 
 	return json.Marshal(item)
 }
