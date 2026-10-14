@@ -213,7 +213,7 @@ func (s *CommunitySuite) TestCommunityChangesJSONKeepsExistingKeys() {
 	var parsed map[string]json.RawMessage
 	s.Require().NoError(json.Unmarshal(bytes, &parsed))
 	for _, key := range []string{
-		"community", "controlNodeChanged",
+		"controlNodeChanged",
 		"membersAdded", "membersRemoved", "membersBanned", "membersUnbanned",
 		"tokenPermissionsAdded", "tokenPermissionsModified", "tokenPermissionsRemoved",
 		"chatsRemoved", "chatsAdded", "chatsModified",
@@ -227,9 +227,9 @@ func (s *CommunitySuite) TestCommunityChangesJSONKeepsExistingKeys() {
 		s.Require().True(ok, key)
 	}
 
-	var communityJSON map[string]json.RawMessage
-	s.Require().NoError(json.Unmarshal(parsed["community"], &communityJSON))
-	s.Require().Equal(`"`+community.IDString()+`"`, string(communityJSON["id"]))
+	// the community itself is sent once, in the response's communities
+	s.Require().NotContains(parsed, "community")
+	s.Require().Equal(`"`+community.IDString()+`"`, string(parsed["communityId"]))
 
 	for key, pubKey := range map[string]string{
 		"membersAdded":    s.member1Key,
@@ -314,19 +314,27 @@ func (s *CommunitySuite) TestMergeKeepsMembersModified() {
 	s.Require().Contains(changes.MembersModified, s.member1Key)
 }
 
-func (s *CommunitySuite) TestMarshalJSONMembersCount() {
+// Members are read through GetCommunityMembers and roster deltas; the
+// community JSON only carries their count.
+func (s *CommunitySuite) TestMarshalJSONCarriesNoMembers() {
 	community := s.rosterCommunity()
+	s.Require().True(community.ChannelEncrypted(testChatID1))
 
 	bytes, err := json.Marshal(community)
 	s.Require().NoError(err)
 
 	var parsed struct {
-		MembersCount int                        `json:"membersCount"`
-		Members      map[string]json.RawMessage `json:"members"`
+		MembersCount int                                   `json:"membersCount"`
+		Members      json.RawMessage                       `json:"members"`
+		Chats        map[string]map[string]json.RawMessage `json:"chats"`
 	}
 	s.Require().NoError(json.Unmarshal(bytes, &parsed))
 	s.Require().Equal(2, parsed.MembersCount)
-	s.Require().Len(parsed.Members, 2)
+	s.Require().Nil(parsed.Members)
+	s.Require().NotEmpty(parsed.Chats)
+	for chatID, chat := range parsed.Chats {
+		s.Require().NotContains(chat, "members", chatID)
+	}
 }
 
 func (s *CommunitySuite) TestMergeNetsAddThenRemove() {
