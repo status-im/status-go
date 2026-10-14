@@ -4705,6 +4705,7 @@ func (m *Messenger) processCommunityChanges(messageState *ReceivedMessageState) 
 			kept = append(kept, changes)
 		}
 	}
+	kept = communities.CoalesceCommunityChanges(kept)
 	messageState.Response.CommunityChanges = kept
 	messageState.processedCommunityChanges = len(kept)
 }
