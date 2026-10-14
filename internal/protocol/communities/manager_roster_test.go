@@ -118,3 +118,71 @@ func (s *ManagerSuite) TestGetCommunityMembersAfterDelete() {
 	_, err = s.manager.GetCommunityMembers(community.ID())
 	s.Require().ErrorIs(err, ErrOrgNotFound)
 }
+
+func (s *ManagerSuite) createRosterCommunity() *Community {
+	community, err := s.manager.CreateCommunity(&requests.CreateCommunity{
+		Name:        "status",
+		Description: "status community description",
+		Membership:  protobuf.CommunityPermissions_AUTO_ACCEPT,
+	}, false)
+	s.Require().NoError(err)
+	return community
+}
+
+func (s *ManagerSuite) addRosterMember(communityID []byte) *Community {
+	member, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+	community, err := s.manager.GetByID(communityID)
+	s.Require().NoError(err)
+	_, err = community.AddMember(&member.PublicKey, nil, 0)
+	s.Require().NoError(err)
+	return community
+}
+
+// A read between the cache invalidation and the write must not cache the
+// row being replaced.
+func (s *ManagerSuite) TestSaveCommunityReadDuringWrite() {
+	community := s.addRosterMember(s.createRosterCommunity().ID())
+
+	s.manager.testHooks.beforeCommunityWrite = func() {
+		_, err := s.manager.GetCommunityMembers(community.ID())
+		s.Require().NoError(err)
+	}
+	s.Require().NoError(s.manager.SaveCommunity(community))
+	s.manager.testHooks.beforeCommunityWrite = nil
+
+	snapshot, err := s.manager.GetCommunityMembers(community.ID())
+	s.Require().NoError(err)
+	s.Require().Len(snapshot.Members, 2)
+}
+
+// A read that loaded the row before a write must not cache it after the
+// write invalidated the cache.
+func (s *ManagerSuite) TestSaveCommunityDuringRead() {
+	community := s.addRosterMember(s.createRosterCommunity().ID())
+
+	s.manager.testHooks.afterReadonlyLoad = func() {
+		s.manager.testHooks.afterReadonlyLoad = nil
+		s.Require().NoError(s.manager.SaveCommunity(community))
+	}
+	_, err := s.manager.GetCommunityMembers(community.ID())
+	s.Require().NoError(err)
+
+	snapshot, err := s.manager.GetCommunityMembers(community.ID())
+	s.Require().NoError(err)
+	s.Require().Len(snapshot.Members, 2)
+}
+
+func (s *ManagerSuite) TestDeleteCommunityReadDuringWrite() {
+	community := s.createRosterCommunity()
+
+	s.manager.testHooks.beforeCommunityWrite = func() {
+		_, err := s.manager.GetCommunityMembers(community.ID())
+		s.Require().NoError(err)
+	}
+	s.Require().NoError(s.manager.DeleteCommunity(community.ID()))
+	s.manager.testHooks.beforeCommunityWrite = nil
+
+	_, err := s.manager.GetCommunityMembers(community.ID())
+	s.Require().ErrorIs(err, ErrOrgNotFound)
+}
