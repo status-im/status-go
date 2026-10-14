@@ -336,7 +336,7 @@ ifeq ($(NIM_SDS_BUILD_FROM_SOURCE),true)
 	fi
 	cd "$(NIM_SDS_SOURCE_DIR)" && \
 		git switch --no-recurse-submodules --force --detach "$(NIM_SDS_VERSION)" && \
-		git clean -fdx && \
+		git clean -ffdx && \
 		git submodule update --init --recursive --force
 endif
 
