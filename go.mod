@@ -341,7 +341,7 @@ require (
 	github.com/libp2p/go-netroute v0.2.2 // indirect
 	github.com/libp2p/go-reuseport v0.4.0 // indirect
 	github.com/libp2p/go-yamux/v4 v4.0.2 // indirect
-	github.com/logos-messaging/logos-delivery-go-bindings v0.0.0-20261013121354-1fd1f72a9f3c
+	github.com/logos-messaging/logos-delivery-go-bindings v0.0.0-20261014121639-bad56b2a6139
 	github.com/macabu/inamedparam v0.2.0 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/maratori/testableexamples v1.0.1 // indirect
