@@ -1,7 +1,9 @@
 package communities
 
 import (
+	"crypto/ecdsa"
 	"encoding/json"
+	"fmt"
 
 	"github.com/golang/protobuf/proto"
 
@@ -270,4 +272,89 @@ func (s *ManagerSuite) TestSaveCommunityEventsInvalidatesSnapshot() {
 	snapshot, err = s.manager.GetCommunityMembers(community.ID())
 	s.Require().NoError(err)
 	s.Require().Equal(community.Clock(), snapshot.Clock)
+}
+
+// setUpEventsReceiver turns the community into one this node does not
+// control, with two admins, a plain member and one channel per admin.
+func (s *ManagerSuite) setUpEventsReceiver() (*Community, []*ecdsa.PrivateKey, string, []string) {
+	community := s.createRosterCommunity()
+	var admins []*ecdsa.PrivateKey
+	var channels []string
+	for i := 0; i < 2; i++ {
+		admin, err := crypto.GenerateKey()
+		s.Require().NoError(err)
+		_, err = community.AddMember(&admin.PublicKey, []protobuf.CommunityMember_Roles{protobuf.CommunityMember_ROLE_ADMIN}, 0)
+		s.Require().NoError(err)
+		admins = append(admins, admin)
+
+		channelID := fmt.Sprintf("channel-%d", i)
+		_, err = community.CreateChat(channelID, &protobuf.CommunityChat{
+			Identity:    &protobuf.ChatIdentity{DisplayName: channelID},
+			Permissions: &protobuf.CommunityPermissions{Access: protobuf.CommunityPermissions_AUTO_ACCEPT},
+			Members:     map[string]*protobuf.CommunityMember{},
+		})
+		s.Require().NoError(err)
+		channels = append(channels, channelID)
+	}
+	member, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+	_, err = community.AddMember(&member.PublicKey, nil, 0)
+	s.Require().NoError(err)
+
+	raw, err := community.ToProtocolMessageBytes()
+	s.Require().NoError(err)
+	community.config.CommunityDescriptionProtocolMessage = raw
+	community.config.PrivateKey = nil
+	s.Require().NoError(s.manager.SaveCommunity(community))
+
+	community, err = s.manager.GetByID(community.ID())
+	s.Require().NoError(err)
+	s.Require().False(community.IsControlNode())
+	return community, admins, crypto.PubkeyToHex(&member.PublicKey), channels
+}
+
+// channelMemberEventsMessage is an admin's channel edit adding member to the
+// channel.
+func (s *ManagerSuite) channelMemberEventsMessage(community *Community, admin *ecdsa.PrivateKey, channelID string, member string, clock uint64) *protobuf.CommunityEventsMessage {
+	channel := proto.Clone(community.Description().Chats[channelID]).(*protobuf.CommunityChat)
+	channel.Members = map[string]*protobuf.CommunityMember{member: {}}
+	event := CommunityEvent{
+		CommunityEventClock: clock,
+		Type:                protobuf.CommunityEvent_COMMUNITY_CHANNEL_EDIT,
+		ChannelData:         &protobuf.ChannelData{ChannelId: channelID, Channel: channel},
+	}
+	payload, err := proto.Marshal(event.ToProtobuf())
+	s.Require().NoError(err)
+	event.Payload = payload
+	s.Require().NoError(event.Sign(admin))
+
+	message := &CommunityEventsMessage{
+		CommunityID:                    community.ID(),
+		EventsBaseCommunityDescription: community.config.CommunityDescriptionProtocolMessage,
+		Events:                         []CommunityEvent{event},
+	}
+	return message.ToProtobuf()
+}
+
+// An admin event with a lower clock than one already applied, as from an
+// admin with clock skew, still orders its roster delta after the previous one.
+func (s *ManagerSuite) TestRosterClockStaysMonotonicForSkewedEvents() {
+	community, admins, member, channels := s.setUpEventsReceiver()
+	firstClock := community.Clock() + 100
+
+	response, err := s.manager.HandleCommunityEventsMessage(&admins[0].PublicKey, s.channelMemberEventsMessage(community, admins[0], channels[0], member, firstClock))
+	s.Require().NoError(err)
+	s.Require().True(response.Changes.HasRosterChanges())
+	firstDelta := s.rosterDeltaClock(response.Changes)
+	s.Require().Equal(firstClock, firstDelta)
+
+	response, err = s.manager.HandleCommunityEventsMessage(&admins[1].PublicKey, s.channelMemberEventsMessage(community, admins[1], channels[1], member, firstClock-5))
+	s.Require().NoError(err)
+	s.Require().True(response.Changes.HasRosterChanges())
+	secondDelta := s.rosterDeltaClock(response.Changes)
+	s.Require().Greater(secondDelta, firstDelta)
+
+	snapshot, err := s.manager.GetCommunityMembers(community.ID())
+	s.Require().NoError(err)
+	s.Require().Equal(secondDelta, snapshot.Clock)
 }
