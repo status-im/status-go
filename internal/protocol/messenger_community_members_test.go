@@ -2,6 +2,7 @@ package protocol
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 
@@ -13,6 +14,7 @@ import (
 	"github.com/status-im/status-go/internal/protocol/common"
 	"github.com/status-im/status-go/internal/protocol/communities"
 	"github.com/status-im/status-go/internal/protocol/contacts"
+	"github.com/status-im/status-go/internal/protocol/protobuf"
 	"github.com/status-im/status-go/internal/protocol/requests"
 )
 
@@ -148,25 +150,42 @@ func (s *MessengerCommunitiesSuite) TestResolveMentionedNamesPriority() {
 }
 
 func rosterAddedHas(r *MessengerResponse, communityID types.HexBytes, pubKey string) bool {
+	return rosterDeltaHas(r, communityID, "rosterAdded", pubKey)
+}
+
+func rosterRemovedHas(r *MessengerResponse, communityID types.HexBytes, pubKey string) bool {
+	return rosterDeltaHas(r, communityID, "rosterRemoved", pubKey)
+}
+
+func rosterModifiedHas(r *MessengerResponse, communityID types.HexBytes, pubKey string) bool {
+	return rosterDeltaHas(r, communityID, "rosterModified", pubKey)
+}
+
+// rosterDeltaHas reports whether the serialized changes of the community in
+// the response carry pubKey in the given roster delta key.
+func rosterDeltaHas(r *MessengerResponse, communityID types.HexBytes, key string, pubKey string) bool {
+	if r == nil {
+		return false
+	}
 	for _, changes := range r.CommunityChanges {
 		if changes.Community == nil || !bytes.Equal(changes.Community.ID(), communityID) {
-			continue
-		}
-		if _, ok := changes.MembersAdded[pubKey]; !ok {
 			continue
 		}
 		payload, err := json.Marshal(changes)
 		if err != nil {
 			return false
 		}
-		var wire struct {
-			RosterAdded map[string]communities.RosterEntry `json:"rosterAdded"`
-		}
+		var wire map[string]json.RawMessage
 		if json.Unmarshal(payload, &wire) != nil {
 			return false
 		}
-		_, ok := wire.RosterAdded[pubKey]
-		return ok
+		var entries map[string]communities.RosterEntry
+		if json.Unmarshal(wire[key], &entries) != nil {
+			return false
+		}
+		if _, ok := entries[pubKey]; ok {
+			return true
+		}
 	}
 	return false
 }
@@ -213,5 +232,68 @@ func (s *MessengerCommunitiesSuite) TestMemberGetsRosterDeltaForAnotherJoin() {
 	_, err = WaitOnMessengerResponse(s.alice, func(r *MessengerResponse) bool {
 		return rosterAddedHas(r, community.ID(), bobID)
 	}, "member did not get bob as a roster delta")
+	s.Require().NoError(err)
+}
+
+func (s *MessengerCommunitiesSuite) TestKickReturnsRosterDelta() {
+	community, _ := s.createCommunity()
+	s.advertiseCommunityTo(community, s.owner, s.alice)
+	s.joinCommunity(community, s.owner, s.alice)
+
+	response, err := s.owner.RemoveUserFromCommunity(community.ID(), s.alice.IdentityPublicKeyString())
+	s.Require().NoError(err)
+	s.Require().True(rosterRemovedHas(response, community.ID(), s.alice.IdentityPublicKeyString()))
+}
+
+func (s *MessengerCommunitiesSuite) TestBanReturnsRosterDelta() {
+	community, _ := s.createCommunity()
+	s.advertiseCommunityTo(community, s.owner, s.alice)
+	s.joinCommunity(community, s.owner, s.alice)
+
+	aliceID := s.alice.IdentityPublicKeyString()
+	response, err := s.owner.BanUserFromCommunity(context.Background(), &requests.BanUserFromCommunity{
+		CommunityID: community.ID(),
+		User:        crypto.PubkeyToHexBytes(&s.alice.identity.PublicKey),
+	})
+	s.Require().NoError(err)
+	s.Require().True(rosterRemovedHas(response, community.ID(), aliceID))
+	s.Require().Len(response.CommunityChanges, 1)
+	s.Require().Contains(response.CommunityChanges[0].MembersBanned, aliceID)
+
+	// Unbanning does not re-add the member.
+	response, err = s.owner.UnbanUserFromCommunity(&requests.UnbanUserFromCommunity{
+		CommunityID: community.ID(),
+		User:        crypto.PubkeyToHexBytes(&s.alice.identity.PublicKey),
+	})
+	s.Require().NoError(err)
+	s.Require().False(rosterAddedHas(response, community.ID(), aliceID))
+}
+
+func (s *MessengerCommunitiesSuite) TestRoleChangeReturnsRosterDelta() {
+	community, _ := s.createCommunity()
+	s.advertiseCommunityTo(community, s.owner, s.alice)
+	s.joinCommunity(community, s.owner, s.alice)
+
+	response, err := s.owner.AddRoleToMember(&requests.AddRoleToMember{
+		CommunityID: community.ID(),
+		User:        crypto.PubkeyToHexBytes(&s.alice.identity.PublicKey),
+		Role:        protobuf.CommunityMember_ROLE_ADMIN,
+	})
+	s.Require().NoError(err)
+	s.Require().True(rosterModifiedHas(response, community.ID(), s.alice.IdentityPublicKeyString()))
+}
+
+func (s *MessengerCommunitiesSuite) TestControlNodeGetsRosterDeltaOnLeave() {
+	community, _ := s.createCommunity()
+	s.advertiseCommunityTo(community, s.owner, s.alice)
+	s.joinCommunity(community, s.owner, s.alice)
+
+	_, err := s.alice.LeaveCommunity(community.ID())
+	s.Require().NoError(err)
+
+	aliceID := s.alice.IdentityPublicKeyString()
+	_, err = WaitOnMessengerResponse(s.owner, func(r *MessengerResponse) bool {
+		return rosterRemovedHas(r, community.ID(), aliceID)
+	}, "control node did not get alice's leave as a roster delta")
 	s.Require().NoError(err)
 }
