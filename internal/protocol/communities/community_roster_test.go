@@ -401,3 +401,21 @@ func (s *CommunitySuite) TestCoalesceCommunityChanges() {
 	s.Require().Same(other, coalesced[1])
 	s.Require().Contains(added.MembersAdded, s.member3Key, "inputs are not mutated")
 }
+
+func (s *CommunitySuite) TestAddMemberToChatChangesSerializeEmptyMaps() {
+	community := s.rosterCommunity()
+
+	changes, err := community.AddMemberToChat(testChatID1, &s.member3.PublicKey, nil, protobuf.CommunityMember_CHANNEL_ROLE_POSTER)
+	s.Require().NoError(err)
+
+	bytes, err := json.Marshal(changes.ChatsModified[testChatID1])
+	s.Require().NoError(err)
+	var parsed map[string]json.RawMessage
+	s.Require().NoError(json.Unmarshal(bytes, &parsed))
+	s.Require().JSONEq(`{}`, string(parsed["MembersRemoved"]))
+	s.Require().JSONEq(`{}`, string(parsed["MembersModified"]))
+
+	removal := EmptyCommunityChanges()
+	removal.chatChanges(testChatID1).MembersRemoved[s.member3Key] = &protobuf.CommunityMember{}
+	s.Require().NotPanics(func() { changes.Merge(removal) })
+}
