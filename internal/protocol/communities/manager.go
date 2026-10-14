@@ -694,6 +694,10 @@ func (m *Manager) publish(subscription *Subscription) {
 		select {
 		case s <- subscription:
 		default:
+			if subscription.MembersReevaluated != nil {
+				m.logger.Warn("subscription channel full, dropping reevaluated member changes")
+				continue
+			}
 			m.logger.Warn("subscription channel full, dropping message")
 		}
 	}
@@ -1547,6 +1551,7 @@ func (m *Manager) DeleteCommunity(id cryptotypes.HexBytes) error {
 	if err != nil {
 		return err
 	}
+	m.rosterClockFloors.Delete(cryptotypes.EncodeHex(id))
 	return m.persistence.DeleteCommunitySettings(id)
 }
 
@@ -3696,6 +3701,7 @@ func (m *Manager) LeaveCommunity(id cryptotypes.HexBytes) (*Community, error) {
 	if err = m.SaveCommunity(community); err != nil {
 		return nil, err
 	}
+	m.rosterClockFloors.Delete(community.IDString())
 
 	return community, nil
 }

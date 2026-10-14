@@ -358,3 +358,16 @@ func (s *ManagerSuite) TestRosterClockStaysMonotonicForSkewedEvents() {
 	s.Require().NoError(err)
 	s.Require().Equal(secondDelta, snapshot.Clock)
 }
+
+func (s *ManagerSuite) TestRosterClockFloorDroppedOnDeleteAndLeave() {
+	deleted := s.createRosterCommunity()
+	s.manager.rosterClockFloors.Store(deleted.IDString(), deleted.Clock()+100)
+	s.Require().NoError(s.manager.DeleteCommunity(deleted.ID()))
+	s.Require().Zero(s.manager.rosterClockFloor(deleted.IDString()))
+
+	left := s.createRosterCommunity()
+	s.manager.rosterClockFloors.Store(left.IDString(), left.Clock()+100)
+	_, err := s.manager.LeaveCommunity(left.ID())
+	s.Require().NoError(err)
+	s.Require().Zero(s.manager.rosterClockFloor(left.IDString()))
+}
