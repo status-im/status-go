@@ -69,3 +69,17 @@ func BenchmarkMembersSnapshotJSON(b *testing.B) {
 		b.SetBytes(int64(len(bytes)))
 	}
 }
+
+// Community JSON as sent in messages.new / community.found.
+func BenchmarkCommunityMarshalJSON(b *testing.B) {
+	community, _ := benchRosterCommunity(b)
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		bytes, err := json.Marshal(community)
+		if err != nil {
+			b.Fatal(err)
+		}
+		b.SetBytes(int64(len(bytes)))
+	}
+}
