@@ -2973,6 +2973,9 @@ type ReceivedMessageState struct {
 	AllBookmarks            map[string]*browsers.Bookmark
 	AllVerificationRequests []*verification.Request
 	AllTrustStatus          map[string]verification.TrustStatus
+	// processedCommunityChanges counts the Response.CommunityChanges already
+	// handled by processCommunityChanges
+	processedCommunityChanges int
 }
 
 // addNewMessageNotification takes a common.Message and generates a new NotificationBody and appends it to the
@@ -3800,11 +3803,9 @@ func (m *Messenger) MessageByID(id string) (*common.Message, error) {
 	if err != nil {
 		return nil, err
 	}
-	if m.httpServer != nil {
-		err = m.prepareMessage(msg, m.httpServer)
-		if err != nil {
-			return nil, err
-		}
+	err = m.prepareMessage(msg, m.httpServer)
+	if err != nil {
+		return nil, err
 	}
 	return msg, nil
 }
@@ -3858,20 +3859,15 @@ func (m *Messenger) MessageByChatID(chatID, threadID, cursor string, limit int) 
 
 	}
 
-	if m.httpServer != nil {
-		err = m.prepareMessagesList(msgs)
-		if err != nil {
-			return nil, "", err
-		}
+	err = m.prepareMessagesList(msgs)
+	if err != nil {
+		return nil, "", err
 	}
 
 	return msgs, nextCursor, nil
 }
 
 func (m *Messenger) prepareMessages(messages map[string]*common.Message) error {
-	if m.httpServer == nil {
-		return nil
-	}
 	for idx := range messages {
 		err := m.prepareMessage(messages[idx], m.httpServer)
 		if err != nil {
@@ -3882,9 +3878,6 @@ func (m *Messenger) prepareMessages(messages map[string]*common.Message) error {
 }
 
 func (m *Messenger) prepareMessagesList(messages []*common.Message) error {
-	if m.httpServer == nil {
-		return nil
-	}
 	for idx := range messages {
 		err := m.prepareMessage(messages[idx], m.httpServer)
 		if err != nil {
@@ -3914,7 +3907,31 @@ func (m *Messenger) prepareTokenData(tokenData *ActivityTokenData, s *media.Serv
 	return nil
 }
 
+// resolveMentionedNames fills MentionedNames from the in-memory contacts map
+// with the client's name priority. Alias-only entries are left to the client.
+func (m *Messenger) resolveMentionedNames(msg *common.Message) {
+	msg.MentionedNames = nil
+	for _, pubKey := range msg.Mentions {
+		contact, ok := m.allContacts.loadIncludingSelf(pubKey)
+		if !ok || contact == nil {
+			continue
+		}
+		names := contact.Names()
+		if len(names) < 2 {
+			continue
+		}
+		if msg.MentionedNames == nil {
+			msg.MentionedNames = make(map[string]string, len(msg.Mentions))
+		}
+		msg.MentionedNames[pubKey] = names[0]
+	}
+}
+
 func (m *Messenger) prepareMessage(msg *common.Message, s *media.Server) error {
+	m.resolveMentionedNames(msg)
+	if s == nil {
+		return nil
+	}
 	if msg.QuotedMessage != nil && msg.QuotedMessage.ContentType == int64(protobuf.ChatMessage_IMAGE) {
 		msg.QuotedMessage.ImageLocalURL = s.MakeImageURL(msg.QuotedMessage.ID)
 
@@ -4030,7 +4047,14 @@ func (m *Messenger) AllMessagesFromChatsAndCommunitiesWhichMatchTerm(communityId
 		return nil, err
 	}
 
-	return m.filterOutHiddenChatMessages(messages)
+	messages, err = m.filterOutHiddenChatMessages(messages)
+	if err != nil {
+		return nil, err
+	}
+	for _, message := range messages {
+		m.resolveMentionedNames(message)
+	}
+	return messages, nil
 }
 
 func (m *Messenger) filterOutHiddenChatMessages(messages []*common.Message) ([]*common.Message, error) {

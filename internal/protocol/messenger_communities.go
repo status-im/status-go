@@ -424,6 +424,13 @@ func (m *Messenger) handleCommunitiesSubscription(c chan *communities.Subscripti
 					m.config.messengerSignalsHandler.MessengerResponse(response)
 				}
 
+				if sub.MembersReevaluated != nil && m.config.messengerSignalsHandler != nil {
+					response := &MessengerResponse{}
+					response.AddCommunity(sub.MembersReevaluated.Community)
+					response.AddRosterChanges(sub.MembersReevaluated)
+					m.config.messengerSignalsHandler.MessengerResponse(response)
+				}
+
 				if sub.CommunityEventsMessage != nil {
 					err := m.publishCommunityEvents(sub.Community, sub.CommunityEventsMessage)
 					if err != nil {
@@ -2020,7 +2027,7 @@ func (m *Messenger) acceptRequestToJoinCommunity(requestToJoin *communities.Requ
 	ctx, span := m.tracer.Start(context.Background(), "Messenger.acceptRequestToJoinCommunity")
 	defer span.End()
 
-	community, err := m.communitiesManager.AcceptRequestToJoin(requestToJoin)
+	community, changes, err := m.communitiesManager.AcceptRequestToJoin(requestToJoin)
 	if err != nil {
 		return nil, err
 	}
@@ -2117,6 +2124,9 @@ func (m *Messenger) acceptRequestToJoinCommunity(requestToJoin *communities.Requ
 	response := &MessengerResponse{}
 	response.AddCommunity(community)
 	response.AddRequestToJoinCommunity(requestToJoin)
+	if changes != nil {
+		response.CommunityChanges = append(response.CommunityChanges, changes)
+	}
 
 	// Update existing notification
 	notification, err := m.persistence.GetActivityCenterNotificationByID(requestToJoin.ID)
@@ -2997,29 +3007,31 @@ func (m *Messenger) RemoveUserFromCommunity(id cryptotypes.HexBytes, pkString st
 		return nil, err
 	}
 
-	community, err := m.communitiesManager.RemoveUserFromCommunity(id, publicKey)
+	community, changes, err := m.communitiesManager.RemoveUserFromCommunity(id, publicKey)
 	if err != nil {
 		return nil, err
 	}
 
 	response := &MessengerResponse{}
 	response.AddCommunity(community)
+	response.AddRosterChanges(changes)
 	return response, nil
 }
 
 func (m *Messenger) UnbanUserFromCommunity(request *requests.UnbanUserFromCommunity) (*MessengerResponse, error) {
-	community, err := m.communitiesManager.UnbanUserFromCommunity(request)
+	community, changes, err := m.communitiesManager.UnbanUserFromCommunity(request)
 	if err != nil {
 		return nil, err
 	}
 
 	response := &MessengerResponse{}
 	response.AddCommunity(community)
+	response.AddRosterChanges(changes)
 	return response, nil
 }
 
 func (m *Messenger) BanUserFromCommunity(ctx context.Context, request *requests.BanUserFromCommunity) (*MessengerResponse, error) {
-	community, err := m.communitiesManager.BanUserFromCommunity(request)
+	community, changes, err := m.communitiesManager.BanUserFromCommunity(request)
 	if err != nil {
 		return nil, err
 	}
@@ -3031,6 +3043,7 @@ func (m *Messenger) BanUserFromCommunity(ctx context.Context, request *requests.
 	}
 
 	response.AddCommunity(community)
+	response.AddRosterChanges(changes)
 
 	if request.DeleteAllMessages && community.IsControlNode() {
 		deleteMessagesResponse, err := m.deleteCommunityMemberMessages(request.User.String(), request.CommunityID.String(), []*protobuf.DeleteCommunityMemberMessage{})
@@ -3056,13 +3069,14 @@ func (m *Messenger) AddRoleToMember(request *requests.AddRoleToMember) (*Messeng
 	if err := request.Validate(); err != nil {
 		return nil, err
 	}
-	community, err := m.communitiesManager.AddRoleToMember(request)
+	community, changes, err := m.communitiesManager.AddRoleToMember(request)
 	if err != nil {
 		return nil, err
 	}
 
 	response := &MessengerResponse{}
 	response.AddCommunity(community)
+	response.AddRosterChanges(changes)
 	return response, nil
 }
 
@@ -3070,13 +3084,14 @@ func (m *Messenger) RemoveRoleFromMember(request *requests.RemoveRoleFromMember)
 	if err := request.Validate(); err != nil {
 		return nil, err
 	}
-	community, err := m.communitiesManager.RemoveRoleFromMember(request)
+	community, changes, err := m.communitiesManager.RemoveRoleFromMember(request)
 	if err != nil {
 		return nil, err
 	}
 
 	response := &MessengerResponse{}
 	response.AddCommunity(community)
+	response.AddRosterChanges(changes)
 	return response, nil
 }
 
@@ -4662,7 +4677,9 @@ func (m *Messenger) GetCommunityMembersForWalletAddresses(communityID cryptotype
 func (m *Messenger) processCommunityChanges(messageState *ReceivedMessageState) {
 	// Process any community changes
 	pkString := crypto.PubkeyToHex(&m.identity.PublicKey)
-	for _, changes := range messageState.Response.CommunityChanges {
+	processed := min(messageState.processedCommunityChanges, len(messageState.Response.CommunityChanges))
+	pending := messageState.Response.CommunityChanges[processed:]
+	for _, changes := range pending {
 		if changes.ShouldMemberJoin {
 			response, err := m.joinCommunity(context.TODO(), changes.Community.ID(), false)
 			if err != nil {
@@ -4688,8 +4705,16 @@ func (m *Messenger) processCommunityChanges(messageState *ReceivedMessageState) 
 			m.AddActivityCenterNotificationToResponse(changes.Community.IDString(), ActivityCenterNotificationTypeCommunityUnbanned, messageState.Response)
 		}
 	}
-	// Clean up as not used by clients currently
-	messageState.Response.CommunityChanges = nil
+	// Clients only read the roster deltas
+	kept := messageState.Response.CommunityChanges[:processed]
+	for _, changes := range messageState.Response.CommunityChanges[processed:] {
+		if changes.Community != nil && changes.HasRosterChanges() {
+			kept = append(kept, changes)
+		}
+	}
+	kept = communities.CoalesceCommunityChanges(kept)
+	messageState.Response.CommunityChanges = kept
+	messageState.processedCommunityChanges = len(kept)
 }
 
 func (m *Messenger) PromoteSelfToControlNode(communityID cryptotypes.HexBytes) (*MessengerResponse, error) {

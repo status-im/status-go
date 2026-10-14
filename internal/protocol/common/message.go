@@ -163,6 +163,10 @@ type Message struct {
 	// Mentions is an array of mentions for a given message
 	Mentions []string
 
+	// MentionedNames maps mentioned public keys to their known display names;
+	// keys without a known name are absent.
+	MentionedNames map[string]string `json:"-"`
+
 	// Mentioned is whether the user is mentioned in the message
 	Mentioned bool `json:"mentioned"`
 
@@ -241,6 +245,7 @@ func (m *Message) MarshalJSON() ([]byte, error) {
 		ContentType              protobuf.ChatMessage_ContentType `json:"contentType"`
 		MessageType              protobuf.MessageType             `json:"messageType"`
 		Mentions                 []string                         `json:"mentions,omitempty"`
+		MentionedNames           map[string]string                `json:"mentionedNames,omitempty"`
 		Mentioned                bool                             `json:"mentioned,omitempty"`
 		Replied                  bool                             `json:"replied,omitempty"`
 		Links                    []string                         `json:"links,omitempty"`
@@ -285,6 +290,7 @@ func (m *Message) MarshalJSON() ([]byte, error) {
 		Timestamp:                m.Timestamp,
 		ContentType:              m.ContentType,
 		Mentions:                 m.Mentions,
+		MentionedNames:           m.MentionedNames,
 		Mentioned:                m.Mentioned,
 		Replied:                  m.Replied,
 		Links:                    m.Links,
