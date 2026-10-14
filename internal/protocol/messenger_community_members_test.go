@@ -323,3 +323,45 @@ func (s *MessengerCommunitiesSuite) TestProcessCommunityChangesCoalescesPerCommu
 	s.Require().False(rosterAddedHas(state.Response, community.ID(), aliceID))
 	s.Require().True(rosterRemovedHas(state.Response, community.ID(), aliceID))
 }
+
+// A received roster change marshals the community once, in communities, and
+// changes reference it only by communityId.
+func (s *MessengerCommunitiesSuite) TestRosterChangeResponseJSONCarriesCommunityOnce() {
+	community, _ := s.createCommunity()
+	s.advertiseCommunityTo(community, s.owner, s.alice)
+	s.joinCommunity(community, s.owner, s.alice)
+	s.advertiseCommunityTo(community, s.owner, s.bob)
+
+	_, err := s.bob.RequestToJoinCommunity(s.createRequestToJoinCommunity(community.ID(), s.bob))
+	s.Require().NoError(err)
+
+	bobID := s.bob.IdentityPublicKeyString()
+	_, err = WaitOnMessengerResponse(s.owner, func(r *MessengerResponse) bool {
+		return rosterAddedHas(r, community.ID(), bobID)
+	}, "control node did not get bob as a roster delta")
+	s.Require().NoError(err)
+
+	response, err := WaitOnMessengerResponse(s.alice, func(r *MessengerResponse) bool {
+		return rosterAddedHas(r, community.ID(), bobID)
+	}, "member did not get bob as a roster delta")
+	s.Require().NoError(err)
+
+	payload, err := json.Marshal(response)
+	s.Require().NoError(err)
+	var parsed struct {
+		Communities []struct {
+			ID string `json:"id"`
+		} `json:"communities"`
+		CommunityChanges []map[string]json.RawMessage `json:"communityChanges"`
+	}
+	s.Require().NoError(json.Unmarshal(payload, &parsed))
+
+	s.Require().Len(parsed.Communities, 1)
+	s.Require().Equal(community.IDString(), parsed.Communities[0].ID)
+	s.Require().NotEmpty(parsed.CommunityChanges)
+	for _, changes := range parsed.CommunityChanges {
+		s.Require().NotContains(changes, "community")
+		s.Require().Contains(changes, "communityId")
+		s.Require().Contains(changes, "rosterAdded")
+	}
+}
