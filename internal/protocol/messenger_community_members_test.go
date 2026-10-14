@@ -92,6 +92,14 @@ func (s *MessengerCommunitiesSuite) TestMentionedNames() {
 	s.Require().True(ok)
 	s.Require().False(contact.Added())
 
+	// alice drops bob's message as "can't post" until she has the
+	// description that adds bob.
+	_, err = WaitOnMessengerResponse(s.alice, func(*MessengerResponse) bool {
+		aliceCommunity, err := s.alice.GetCommunityByID(community.ID())
+		return err == nil && aliceCommunity.HasMember(&s.bob.identity.PublicKey)
+	}, "alice did not see bob join")
+	s.Require().NoError(err)
+
 	text := fmt.Sprintf("@%s @%s @%s @%s", ownerID, bobID, unknownID, common.EveryoneMentionTag)
 	sent := sendChatMessage(&s.Suite, s.bob, chat.ID, text)
 
