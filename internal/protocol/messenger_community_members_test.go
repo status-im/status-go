@@ -1,15 +1,19 @@
 package protocol
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/internal/crypto"
+	"github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/images"
 	"github.com/status-im/status-go/internal/protocol/common"
 	"github.com/status-im/status-go/internal/protocol/communities"
 	"github.com/status-im/status-go/internal/protocol/contacts"
+	"github.com/status-im/status-go/internal/protocol/requests"
 )
 
 func (s *MessengerCommunitiesSuite) TestGetCommunityMembers() {
@@ -133,4 +137,73 @@ func (s *MessengerCommunitiesSuite) TestResolveMentionedNamesPriority() {
 		"0xunverified":                    "plain",
 		s.owner.IdentityPublicKeyString(): "Charlie",
 	}, msg.MentionedNames)
+}
+
+func rosterAddedHas(r *MessengerResponse, communityID types.HexBytes, pubKey string) bool {
+	for _, changes := range r.CommunityChanges {
+		if changes.Community == nil || !bytes.Equal(changes.Community.ID(), communityID) {
+			continue
+		}
+		if _, ok := changes.MembersAdded[pubKey]; !ok {
+			continue
+		}
+		payload, err := json.Marshal(changes)
+		if err != nil {
+			return false
+		}
+		var wire struct {
+			RosterAdded map[string]communities.RosterEntry `json:"rosterAdded"`
+		}
+		if json.Unmarshal(payload, &wire) != nil {
+			return false
+		}
+		_, ok := wire.RosterAdded[pubKey]
+		return ok
+	}
+	return false
+}
+
+func (s *MessengerCommunitiesSuite) TestControlNodeGetsRosterDeltaOnAutoAcceptedJoin() {
+	community, _ := s.createCommunity()
+	s.advertiseCommunityTo(community, s.owner, s.alice)
+
+	_, err := s.alice.RequestToJoinCommunity(s.createRequestToJoinCommunity(community.ID(), s.alice))
+	s.Require().NoError(err)
+
+	aliceID := s.alice.IdentityPublicKeyString()
+	_, err = WaitOnMessengerResponse(s.owner, func(r *MessengerResponse) bool {
+		return rosterAddedHas(r, community.ID(), aliceID)
+	}, "control node did not get alice as a roster delta")
+	s.Require().NoError(err)
+}
+
+func (s *MessengerCommunitiesSuite) TestManualAcceptReturnsRosterDelta() {
+	community, _ := createOnRequestCommunity(&s.Suite, s.owner)
+	s.advertiseCommunityTo(community, s.owner, s.alice)
+
+	requestID := requestToJoinCommunity(&s.Suite, s.owner, s.alice, s.createRequestToJoinCommunity(community.ID(), s.alice))
+	response, err := s.owner.AcceptRequestToJoinCommunity(&requests.AcceptRequestToJoinCommunity{ID: requestID})
+	s.Require().NoError(err)
+	s.Require().True(rosterAddedHas(response, community.ID(), s.alice.IdentityPublicKeyString()))
+}
+
+func (s *MessengerCommunitiesSuite) TestMemberGetsRosterDeltaForAnotherJoin() {
+	community, _ := s.createCommunity()
+	s.advertiseCommunityTo(community, s.owner, s.alice)
+	s.joinCommunity(community, s.owner, s.alice)
+	s.advertiseCommunityTo(community, s.owner, s.bob)
+
+	_, err := s.bob.RequestToJoinCommunity(s.createRequestToJoinCommunity(community.ID(), s.bob))
+	s.Require().NoError(err)
+
+	bobID := s.bob.IdentityPublicKeyString()
+	_, err = WaitOnMessengerResponse(s.owner, func(r *MessengerResponse) bool {
+		return rosterAddedHas(r, community.ID(), bobID)
+	}, "control node did not get bob as a roster delta")
+	s.Require().NoError(err)
+
+	_, err = WaitOnMessengerResponse(s.alice, func(r *MessengerResponse) bool {
+		return rosterAddedHas(r, community.ID(), bobID)
+	}, "member did not get bob as a roster delta")
+	s.Require().NoError(err)
 }

@@ -2744,24 +2744,28 @@ func (m *Manager) accountsSatisfyPermissionsToJoinChannels(
 	return viewChats, viewAndPostChats, nil
 }
 
-func (m *Manager) AcceptRequestToJoin(dbRequest *RequestToJoin) (*Community, error) {
+// AcceptRequestToJoin accepts the request and returns the member changes it
+// applied; the changes are nil when the acceptance is pending the control node.
+func (m *Manager) AcceptRequestToJoin(dbRequest *RequestToJoin) (*Community, *CommunityChanges, error) {
 	m.communityLock.Lock(dbRequest.CommunityID)
 	defer m.communityLock.Unlock(dbRequest.CommunityID)
 
 	pk, err := crypto.HexToPubkey(dbRequest.PublicKey)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	community, err := m.GetByID(dbRequest.CommunityID)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
+
+	var changes *CommunityChanges
 
 	if community.IsControlNode() {
 		revealedAccounts, err := m.persistence.GetRequestToJoinRevealedAddresses(dbRequest.ID)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
 		accountsAndChainIDs := revealedAccountsToAccountsAndChainIDsCombination(revealedAccounts)
@@ -2770,11 +2774,11 @@ func (m *Manager) AcceptRequestToJoin(dbRequest *RequestToJoin) (*Community, err
 
 		permissionsSatisfied, role, err := m.accountsSatisfyPermissionsToJoin(communityPermissionsPreParsedData, accountsAndChainIDs)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
 		if !permissionsSatisfied {
-			return community, ErrNoPermissionToJoin
+			return community, nil, ErrNoPermissionToJoin
 		}
 
 		memberRoles := []protobuf.CommunityMember_Roles{}
@@ -2782,38 +2786,40 @@ func (m *Manager) AcceptRequestToJoin(dbRequest *RequestToJoin) (*Community, err
 			memberRoles = []protobuf.CommunityMember_Roles{role}
 		}
 
-		_, err = community.AddMember(pk, memberRoles, dbRequest.Clock)
+		changes, err = community.AddMember(pk, memberRoles, dbRequest.Clock)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
 		viewChannels, postChannels, err := m.accountsSatisfyPermissionsToJoinChannels(community, channelPermissionsPreParsedData, accountsAndChainIDs)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
 		for channelID := range viewChannels {
-			_, err = community.AddMemberToChat(channelID, pk, memberRoles, protobuf.CommunityMember_CHANNEL_ROLE_VIEWER)
+			chatChanges, err := community.AddMemberToChat(channelID, pk, memberRoles, protobuf.CommunityMember_CHANNEL_ROLE_VIEWER)
 			if err != nil {
-				return nil, err
+				return nil, nil, err
 			}
+			changes.Merge(chatChanges)
 		}
 
 		for channelID := range postChannels {
-			_, err = community.AddMemberToChat(channelID, pk, memberRoles, protobuf.CommunityMember_CHANNEL_ROLE_POSTER)
+			chatChanges, err := community.AddMemberToChat(channelID, pk, memberRoles, protobuf.CommunityMember_CHANNEL_ROLE_POSTER)
 			if err != nil {
-				return nil, err
+				return nil, nil, err
 			}
+			changes.Merge(chatChanges)
 		}
 
 		dbRequest.State = RequestToJoinStateAccepted
 		if err := m.markRequestToJoinAsAccepted(pk, community); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
 		dbRequest.RevealedAccounts = revealedAccounts
 		if err = m.shareAcceptedRequestToJoinWithPrivilegedMembers(community, dbRequest); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
 		// if accepted member has a privilege role, share with him requests to join
@@ -2824,29 +2830,29 @@ func (m *Manager) AcceptRequestToJoin(dbRequest *RequestToJoin) (*Community, err
 			newPrivilegedMember := make(map[protobuf.CommunityMember_Roles][]*ecdsa.PublicKey)
 			newPrivilegedMember[memberRole] = []*ecdsa.PublicKey{pk}
 			if err = m.ShareRequestsToJoinWithPrivilegedMembers(community, newPrivilegedMember); err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 		}
 	} else if community.hasPermissionToSendCommunityEvent(protobuf.CommunityEvent_COMMUNITY_REQUEST_TO_JOIN_ACCEPT) {
 		err := community.addNewCommunityEvent(community.ToCommunityRequestToJoinAcceptCommunityEvent(dbRequest.PublicKey, dbRequest.ToCommunityRequestToJoinProtobuf()))
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
 		dbRequest.State = RequestToJoinStateAcceptedPending
 		if err := m.markRequestToJoinAsAcceptedPending(pk, community); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 	} else {
-		return nil, ErrNotAuthorized
+		return nil, nil, ErrNotAuthorized
 	}
 
 	err = m.saveAndPublish(community)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return community, nil
+	return community, changes, nil
 }
 
 func (m *Manager) GetRequestToJoin(ID cryptotypes.HexBytes) (*RequestToJoin, error) {
