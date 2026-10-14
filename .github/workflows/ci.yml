@@ -39,7 +39,10 @@ jobs:
       - name: Locate the Go module cache
         id: go-env
         shell: bash
-        run: echo "modcache=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
+        run: |
+          echo "modcache=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
+          # The Makefile defaults GOPATH to $HOME/go, and MSYS2 has its own HOME.
+          echo "GOPATH=$(go env GOPATH)" >> "$GITHUB_ENV"
 
       - name: Cache Go modules
         uses: actions/cache@v4
@@ -129,7 +132,10 @@ jobs:
       - name: Locate the Go module cache
         id: go-env
         shell: bash
-        run: echo "modcache=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
+        run: |
+          echo "modcache=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
+          # The Makefile defaults GOPATH to $HOME/go, and MSYS2 has its own HOME.
+          echo "GOPATH=$(go env GOPATH)" >> "$GITHUB_ENV"
 
       - name: Cache Go modules
         uses: actions/cache@v4
