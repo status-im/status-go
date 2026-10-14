@@ -23,7 +23,8 @@ type CommunityChatChanges struct {
 }
 
 type CommunityChanges struct {
-	Community *Community `json:"community"`
+	// Sent once, in the response's communities, not again with its changes.
+	Community *Community `json:"-"`
 
 	ControlNodeChanged *ecdsa.PublicKey `json:"controlNodeChanged"`
 
