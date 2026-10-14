@@ -928,10 +928,9 @@ func (o *Community) RemoveMembersFromOrg(membersToRemove []string) *CommunityCha
 			}
 		}
 
-		changes.ChatsModified[chatID] = &CommunityChatChanges{
-			ChatModified:   chat,
-			MembersRemoved: chatMembersToRemove,
-		}
+		chatChanges := changes.chatChanges(chatID)
+		chatChanges.ChatModified = chat
+		chatChanges.MembersRemoved = chatMembersToRemove
 	}
 
 	return changes
@@ -959,10 +958,9 @@ func (o *Community) RemoveAllUsersFromOrg() *CommunityChanges {
 		chat.Members = make(map[string]*protobuf.CommunityMember)
 		chat.Members[myPublicKey] = member
 
-		changes.ChatsModified[chatID] = &CommunityChatChanges{
-			ChatModified:   chat,
-			MembersRemoved: chatMembersToRemove,
-		}
+		chatChanges := changes.chatChanges(chatID)
+		chatChanges.ChatModified = chat
+		chatChanges.MembersRemoved = chatMembersToRemove
 	}
 
 	return changes
@@ -2404,12 +2402,9 @@ func (o *Community) AddMemberToChat(chatID string, publicKey *ecdsa.PublicKey,
 		Roles:       roles,
 		ChannelRole: channelRole,
 	}
-	changes.ChatsModified[chatID] = &CommunityChatChanges{
-		ChatModified: chat,
-		MembersAdded: map[string]*protobuf.CommunityMember{
-			memberKey: chat.Members[memberKey],
-		},
-	}
+	chatChanges := changes.chatChanges(chatID)
+	chatChanges.ChatModified = chat
+	chatChanges.MembersAdded[memberKey] = chat.Members[memberKey]
 
 	if o.IsControlNode() {
 		o.increaseClock()
