@@ -328,3 +328,76 @@ func (s *CommunitySuite) TestMarshalJSONMembersCount() {
 	s.Require().Equal(2, parsed.MembersCount)
 	s.Require().Len(parsed.Members, 2)
 }
+
+func (s *CommunitySuite) TestMergeNetsAddThenRemove() {
+	member := &protobuf.CommunityMember{}
+	changes := EmptyCommunityChanges()
+	changes.MembersAdded[s.member1Key] = member
+	changes.chatChanges(testChatID1).MembersAdded[s.member1Key] = member
+
+	removal := EmptyCommunityChanges()
+	removal.MembersRemoved[s.member1Key] = member
+	removal.chatChanges(testChatID1).MembersRemoved[s.member1Key] = member
+	changes.Merge(removal)
+
+	s.Require().NotContains(changes.MembersAdded, s.member1Key)
+	s.Require().Contains(changes.MembersRemoved, s.member1Key)
+	s.Require().NotContains(changes.ChatsModified[testChatID1].MembersAdded, s.member1Key)
+	s.Require().Contains(changes.ChatsModified[testChatID1].MembersRemoved, s.member1Key)
+
+	readd := EmptyCommunityChanges()
+	readd.MembersAdded[s.member1Key] = member
+	changes.Merge(readd)
+
+	s.Require().Contains(changes.MembersAdded, s.member1Key)
+	s.Require().NotContains(changes.MembersRemoved, s.member1Key)
+}
+
+func (s *CommunitySuite) TestMergeKeepsChatChangesOfBothSides() {
+	changes := EmptyCommunityChanges()
+	changes.chatChanges(testChatID1).MembersAdded[s.member1Key] = &protobuf.CommunityMember{}
+	other := EmptyCommunityChanges()
+	other.chatChanges(testChatID1).MembersAdded[s.member2Key] = &protobuf.CommunityMember{}
+
+	changes.Merge(other)
+
+	s.Require().Contains(changes.ChatsModified[testChatID1].MembersAdded, s.member1Key)
+	s.Require().Contains(changes.ChatsModified[testChatID1].MembersAdded, s.member2Key)
+}
+
+func (s *CommunitySuite) TestCoalesceCommunityChanges() {
+	member := &protobuf.CommunityMember{}
+	atClock := func(community *Community, clock uint64) *Community {
+		c := community.CreateDeepCopy()
+		c.config.CommunityDescription.Clock = clock
+		return c
+	}
+	first := s.rosterCommunity()
+	second := s.buildCommunity(&s.identity.PublicKey)
+	second.config.ID = &s.member3.PublicKey
+
+	added := first.emptyCommunityChanges()
+	added.Community = atClock(first, 10)
+	added.MembersAdded[s.member3Key] = member
+	removed := first.emptyCommunityChanges()
+	removed.Community = atClock(first, 11)
+	removed.MembersRemoved[s.member3Key] = member
+	other := second.emptyCommunityChanges()
+	other.MembersAdded[s.member1Key] = member
+	modified := first.emptyCommunityChanges()
+	modified.Community = atClock(first, 12)
+	modified.MembersModified[s.member1Key] = member
+
+	// Out of clock order: the removal of the batch must win over the add.
+	coalesced := CoalesceCommunityChanges([]*CommunityChanges{removed, other, added, modified})
+
+	s.Require().Len(coalesced, 2)
+	merged := coalesced[0]
+	s.Require().Equal(first.IDString(), merged.Community.IDString())
+	s.Require().Equal(uint64(12), merged.Community.latestClock())
+	s.Require().NotContains(merged.MembersAdded, s.member3Key)
+	s.Require().Contains(merged.MembersRemoved, s.member3Key)
+	s.Require().Contains(merged.MembersModified, s.member1Key)
+	s.Require().Same(other, coalesced[1])
+	s.Require().Contains(added.MembersAdded, s.member3Key, "inputs are not mutated")
+}

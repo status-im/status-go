@@ -2,8 +2,10 @@ package communities
 
 import (
 	"bytes"
+	"cmp"
 	"crypto/ecdsa"
 	"encoding/json"
+	"maps"
 	"slices"
 
 	"github.com/status-im/status-go/internal/crypto/types"
@@ -87,16 +89,10 @@ func EmptyCommunityChanges() *CommunityChanges {
 	}
 }
 
+// Merge applies other on top of c, which must be the earlier of the two.
 func (c *CommunityChanges) Merge(other *CommunityChanges) {
-	for memberID, member := range other.MembersAdded {
-		c.MembersAdded[memberID] = member
-	}
-	for memberID := range other.MembersRemoved {
-		c.MembersRemoved[memberID] = other.MembersRemoved[memberID]
-	}
-	for memberID, member := range other.MembersModified {
-		c.MembersModified[memberID] = member
-	}
+	mergeMemberDeltas(&c.MembersAdded, &c.MembersRemoved, &c.MembersModified,
+		other.MembersAdded, other.MembersRemoved, other.MembersModified)
 	for memberID, banned := range other.MembersBanned {
 		c.MembersBanned[memberID] = banned
 	}
@@ -119,7 +115,17 @@ func (c *CommunityChanges) Merge(other *CommunityChanges) {
 		c.ChatsAdded[chatID] = chat
 	}
 	for chatID, changes := range other.ChatsModified {
-		c.ChatsModified[chatID] = changes
+		existing, ok := c.ChatsModified[chatID]
+		if !ok {
+			c.ChatsModified[chatID] = changes
+			continue
+		}
+		merged := *existing
+		merged.MembersAdded = maps.Clone(existing.MembersAdded)
+		merged.MembersRemoved = maps.Clone(existing.MembersRemoved)
+		merged.MembersModified = maps.Clone(existing.MembersModified)
+		merged.merge(changes)
+		c.ChatsModified[chatID] = &merged
 	}
 
 	c.CategoriesRemoved = append(c.CategoriesRemoved, other.CategoriesRemoved...)
@@ -435,4 +441,92 @@ func findDiffInBannedMembers(searchFrom map[string]*protobuf.CommunityBanInfo, s
 			}
 		}
 	}
+}
+
+func (c *CommunityChatChanges) merge(other *CommunityChatChanges) {
+	mergeMemberDeltas(&c.MembersAdded, &c.MembersRemoved, &c.MembersModified,
+		other.MembersAdded, other.MembersRemoved, other.MembersModified)
+	if other.ChatModified != nil {
+		c.ChatModified = other.ChatModified
+	}
+	if other.CategoryModified != "" {
+		c.CategoryModified = other.CategoryModified
+	}
+	if other.PositionModified != 0 {
+		c.PositionModified = other.PositionModified
+	}
+	if other.FirstMessageTimestampModified != 0 {
+		c.FirstMessageTimestampModified = other.FirstMessageTimestampModified
+	}
+}
+
+// mergeMemberDeltas applies later member deltas on top of earlier ones, so a
+// member ends up in at most one of the earlier maps.
+func mergeMemberDeltas(added, removed, modified *map[string]*protobuf.CommunityMember,
+	laterAdded, laterRemoved, laterModified map[string]*protobuf.CommunityMember) {
+	for _, m := range []*map[string]*protobuf.CommunityMember{added, removed, modified} {
+		if *m == nil {
+			*m = make(map[string]*protobuf.CommunityMember)
+		}
+	}
+
+	for pk, member := range laterRemoved {
+		delete(*added, pk)
+		delete(*modified, pk)
+		(*removed)[pk] = member
+	}
+	for pk, member := range laterAdded {
+		delete(*removed, pk)
+		delete(*modified, pk)
+		(*added)[pk] = member
+	}
+	for pk, member := range laterModified {
+		if _, ok := (*added)[pk]; ok {
+			(*added)[pk] = member
+			continue
+		}
+		(*modified)[pk] = member
+	}
+}
+
+// CoalesceCommunityChanges merges the changes of each community into one
+// entry, in clock order, keeping the first position of each community.
+// Changes without a community are kept as they are.
+func CoalesceCommunityChanges(changes []*CommunityChanges) []*CommunityChanges {
+	groups := make(map[string][]*CommunityChanges, len(changes))
+	order := make([]*CommunityChanges, 0, len(changes))
+	for _, change := range changes {
+		if change.Community == nil {
+			order = append(order, change)
+			continue
+		}
+		id := change.Community.IDString()
+		if _, ok := groups[id]; !ok {
+			order = append(order, change)
+		}
+		groups[id] = append(groups[id], change)
+	}
+
+	result := make([]*CommunityChanges, 0, len(order))
+	for _, change := range order {
+		if change.Community == nil {
+			result = append(result, change)
+			continue
+		}
+		group := groups[change.Community.IDString()]
+		if len(group) == 1 {
+			result = append(result, change)
+			continue
+		}
+		slices.SortStableFunc(group, func(a, b *CommunityChanges) int {
+			return cmp.Compare(a.Community.latestClock(), b.Community.latestClock())
+		})
+		merged := EmptyCommunityChanges()
+		for _, entry := range group {
+			merged.Merge(entry)
+		}
+		merged.Community = group[len(group)-1].Community
+		result = append(result, merged)
+	}
+	return result
 }

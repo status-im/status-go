@@ -297,3 +297,29 @@ func (s *MessengerCommunitiesSuite) TestControlNodeGetsRosterDeltaOnLeave() {
 	}, "control node did not get alice's leave as a roster delta")
 	s.Require().NoError(err)
 }
+
+func (s *MessengerCommunitiesSuite) TestProcessCommunityChangesCoalescesPerCommunity() {
+	community, _ := s.createCommunity()
+	aliceID := s.alice.IdentityPublicKeyString()
+	bobID := s.bob.IdentityPublicKeyString()
+
+	batch := make([]*communities.CommunityChanges, 0, 3)
+	for _, pubKey := range []string{aliceID, bobID} {
+		changes := communities.EmptyCommunityChanges()
+		changes.Community = community
+		changes.MembersAdded[pubKey] = &protobuf.CommunityMember{}
+		batch = append(batch, changes)
+	}
+	removal := communities.EmptyCommunityChanges()
+	removal.Community = community
+	removal.MembersRemoved[aliceID] = &protobuf.CommunityMember{}
+	batch = append(batch, removal)
+
+	state := &ReceivedMessageState{Response: &MessengerResponse{CommunityChanges: batch}}
+	s.owner.processCommunityChanges(state)
+
+	s.Require().Len(state.Response.CommunityChanges, 1)
+	s.Require().True(rosterAddedHas(state.Response, community.ID(), bobID))
+	s.Require().False(rosterAddedHas(state.Response, community.ID(), aliceID))
+	s.Require().True(rosterRemovedHas(state.Response, community.ID(), aliceID))
+}
