@@ -23,7 +23,7 @@ requires "https://github.com/logos-messaging/sds-go-bindings#25831865"
 requires "chronos#0de7b335d0ad5557ad5ba71a4b7662f7b201750e"
 
 # Pins the logos-delivery revision whose C ABI the bindings match.
-requires "https://github.com/logos-messaging/logos-delivery-go-bindings#bad56b2a"
+requires "https://github.com/logos-messaging/logos-delivery-go-bindings#9d0652fe"
 
 
 ### Helpers
@@ -62,4 +62,4 @@ task libsdsIOS, "Build libsds for iOS":
 task liblogosdelivery, "Build the liblogosdelivery status-go links against":
   ## LIBLOGOSDELIVERY_OUT and NIM_PARAMS come from the caller.
   withDir nimblePkgDir("logos_delivery_go_bindings"):
-    exec "nimble liblogosdelivery"
+    exec nimbleExe() & " liblogosdelivery"
