@@ -814,3 +814,23 @@ func TestPrepareContentDiscordMessageMissingPayload(t *testing.T) {
 	}, "PrepareContent must not panic on a DISCORD_MESSAGE without a payload")
 	require.Error(t, err)
 }
+
+func TestMessageJSONMentionedNames(t *testing.T) {
+	msg := NewMessage()
+	msg.Mentions = []string{"0xa", "0xb"}
+	msg.MentionedNames = map[string]string{"0xa": "alice"}
+
+	rawJSON, err := json.Marshal(msg)
+	require.NoError(t, err)
+	var decoded map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(rawJSON, &decoded))
+	require.JSONEq(t, `{"0xa":"alice"}`, string(decoded["mentionedNames"]))
+	require.NotContains(t, decoded, "MentionedNames")
+
+	msg.MentionedNames = nil
+	rawJSON, err = json.Marshal(msg)
+	require.NoError(t, err)
+	decoded = nil
+	require.NoError(t, json.Unmarshal(rawJSON, &decoded))
+	require.NotContains(t, decoded, "mentionedNames")
+}
