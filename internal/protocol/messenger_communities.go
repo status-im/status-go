@@ -424,6 +424,13 @@ func (m *Messenger) handleCommunitiesSubscription(c chan *communities.Subscripti
 					m.config.messengerSignalsHandler.MessengerResponse(response)
 				}
 
+				if sub.MembersReevaluated != nil && m.config.messengerSignalsHandler != nil {
+					response := &MessengerResponse{}
+					response.AddCommunity(sub.MembersReevaluated.Community)
+					response.AddRosterChanges(sub.MembersReevaluated)
+					m.config.messengerSignalsHandler.MessengerResponse(response)
+				}
+
 				if sub.CommunityEventsMessage != nil {
 					err := m.publishCommunityEvents(sub.Community, sub.CommunityEventsMessage)
 					if err != nil {
@@ -3000,29 +3007,31 @@ func (m *Messenger) RemoveUserFromCommunity(id cryptotypes.HexBytes, pkString st
 		return nil, err
 	}
 
-	community, err := m.communitiesManager.RemoveUserFromCommunity(id, publicKey)
+	community, changes, err := m.communitiesManager.RemoveUserFromCommunity(id, publicKey)
 	if err != nil {
 		return nil, err
 	}
 
 	response := &MessengerResponse{}
 	response.AddCommunity(community)
+	response.AddRosterChanges(changes)
 	return response, nil
 }
 
 func (m *Messenger) UnbanUserFromCommunity(request *requests.UnbanUserFromCommunity) (*MessengerResponse, error) {
-	community, err := m.communitiesManager.UnbanUserFromCommunity(request)
+	community, changes, err := m.communitiesManager.UnbanUserFromCommunity(request)
 	if err != nil {
 		return nil, err
 	}
 
 	response := &MessengerResponse{}
 	response.AddCommunity(community)
+	response.AddRosterChanges(changes)
 	return response, nil
 }
 
 func (m *Messenger) BanUserFromCommunity(ctx context.Context, request *requests.BanUserFromCommunity) (*MessengerResponse, error) {
-	community, err := m.communitiesManager.BanUserFromCommunity(request)
+	community, changes, err := m.communitiesManager.BanUserFromCommunity(request)
 	if err != nil {
 		return nil, err
 	}
@@ -3034,6 +3043,7 @@ func (m *Messenger) BanUserFromCommunity(ctx context.Context, request *requests.
 	}
 
 	response.AddCommunity(community)
+	response.AddRosterChanges(changes)
 
 	if request.DeleteAllMessages && community.IsControlNode() {
 		deleteMessagesResponse, err := m.deleteCommunityMemberMessages(request.User.String(), request.CommunityID.String(), []*protobuf.DeleteCommunityMemberMessage{})
@@ -3059,13 +3069,14 @@ func (m *Messenger) AddRoleToMember(request *requests.AddRoleToMember) (*Messeng
 	if err := request.Validate(); err != nil {
 		return nil, err
 	}
-	community, err := m.communitiesManager.AddRoleToMember(request)
+	community, changes, err := m.communitiesManager.AddRoleToMember(request)
 	if err != nil {
 		return nil, err
 	}
 
 	response := &MessengerResponse{}
 	response.AddCommunity(community)
+	response.AddRosterChanges(changes)
 	return response, nil
 }
 
@@ -3073,13 +3084,14 @@ func (m *Messenger) RemoveRoleFromMember(request *requests.RemoveRoleFromMember)
 	if err := request.Validate(); err != nil {
 		return nil, err
 	}
-	community, err := m.communitiesManager.RemoveRoleFromMember(request)
+	community, changes, err := m.communitiesManager.RemoveRoleFromMember(request)
 	if err != nil {
 		return nil, err
 	}
 
 	response := &MessengerResponse{}
 	response.AddCommunity(community)
+	response.AddRosterChanges(changes)
 	return response, nil
 }
 
