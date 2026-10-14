@@ -3939,29 +3939,23 @@ func (m *Messenger) prepareTokenData(tokenData *ActivityTokenData, s *media.Serv
 	return nil
 }
 
-// resolveMentionedNames fills MentionedNames from the in-memory contacts map,
-// the same source as community roster entries. Aliases are left to the client.
+// resolveMentionedNames fills MentionedNames from the in-memory contacts map
+// with the client's name priority. Alias-only entries are left to the client.
 func (m *Messenger) resolveMentionedNames(msg *common.Message) {
 	msg.MentionedNames = nil
 	for _, pubKey := range msg.Mentions {
-		if pubKey == common.EveryoneMentionTag {
+		contact, ok := m.allContacts.loadIncludingSelf(pubKey)
+		if !ok || contact == nil {
 			continue
 		}
-		profile, ok := m.allContacts.MemberProfile(pubKey)
-		if !ok {
-			continue
-		}
-		name := profile.DisplayName
-		if profile.EnsVerified && profile.EnsName != "" {
-			name = profile.EnsName
-		}
-		if name == "" {
+		names := contact.Names()
+		if len(names) < 2 {
 			continue
 		}
 		if msg.MentionedNames == nil {
 			msg.MentionedNames = make(map[string]string, len(msg.Mentions))
 		}
-		msg.MentionedNames[pubKey] = name
+		msg.MentionedNames[pubKey] = names[0]
 	}
 }
 

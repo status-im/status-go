@@ -98,15 +98,23 @@ func (cm *contactMap) Delete(contactID string) {
 	cm.sm.Delete(contactID)
 }
 
+// loadIncludingSelf is Load without the own-identity warning.
+func (cm *contactMap) loadIncludingSelf(pubKey string) (*contacts.Contact, bool) {
+	if pubKey == cm.me.ID {
+		return cm.me, true
+	}
+	value, ok := cm.sm.Load(pubKey)
+	if !ok || value == nil {
+		return nil, false
+	}
+	return value.(*contacts.Contact), true
+}
+
 // MemberProfile implements communities.MemberProfileProvider.
 func (cm *contactMap) MemberProfile(pubKey string) (communities.MemberProfile, bool) {
-	contact := cm.me
-	if pubKey != cm.me.ID {
-		value, ok := cm.sm.Load(pubKey)
-		if !ok || value == nil {
-			return communities.MemberProfile{}, false
-		}
-		contact = value.(*contacts.Contact)
+	contact, ok := cm.loadIncludingSelf(pubKey)
+	if !ok {
+		return communities.MemberProfile{}, false
 	}
 	return communities.MemberProfile{
 		DisplayName:         contact.DisplayName,
