@@ -119,7 +119,18 @@ type Manager struct {
 	mediaServer              media.MediaServerInterface
 	communityImageVersions   map[string]uint32
 	cache                    *ttlcache.Cache[string, ReadonlyCommunity]
-	memberProfiles           MemberProfileProvider
+	// cacheMutex guards cacheGeneration, bumped on every invalidation so a
+	// read that loaded a row before a write does not cache it afterwards
+	cacheMutex      sync.Mutex
+	cacheGeneration uint64
+	memberProfiles  MemberProfileProvider
+	testHooks       managerTestHooks
+}
+
+// managerTestHooks order concurrent operations deterministically in tests.
+type managerTestHooks struct {
+	beforeCommunityWrite func()
+	afterReadonlyLoad    func()
 }
 
 type CommunityLock struct {
@@ -1523,7 +1534,11 @@ func (m *Manager) DeleteCommunity(id cryptotypes.HexBytes) error {
 	m.communityLock.Lock(id)
 	defer m.communityLock.Unlock(id)
 
-	m.cache.Delete(cryptotypes.EncodeHex(id))
+	m.invalidateCache(cryptotypes.EncodeHex(id))
+	defer m.invalidateCache(cryptotypes.EncodeHex(id))
+	if m.testHooks.beforeCommunityWrite != nil {
+		m.testHooks.beforeCommunityWrite()
+	}
 	err := m.persistence.DeleteCommunity(id)
 	if err != nil {
 		return err
@@ -3927,11 +3942,23 @@ func (m *Manager) GetByIDStringReadonly(idString string) (ReadonlyCommunity, err
 		return cached.Value(), nil
 	}
 
+	m.cacheMutex.Lock()
+	generation := m.cacheGeneration
+	m.cacheMutex.Unlock()
+
 	community, err := m.GetByIDString(idString)
 	if err != nil {
 		return nil, err
 	}
-	m.cache.Set(idString, ReadonlyCommunity(community), ttlcache.DefaultTTL)
+	if m.testHooks.afterReadonlyLoad != nil {
+		m.testHooks.afterReadonlyLoad()
+	}
+
+	m.cacheMutex.Lock()
+	if m.cacheGeneration == generation {
+		m.cache.Set(idString, ReadonlyCommunity(community), ttlcache.DefaultTTL)
+	}
+	m.cacheMutex.Unlock()
 
 	return ReadonlyCommunity(community), err
 }
@@ -5012,8 +5039,19 @@ func (m *Manager) GetCommunityRequestsToJoinWithRevealedAddresses(communityID cr
 }
 
 func (m *Manager) SaveCommunity(community *Community) error {
-	m.cache.Delete(community.IDString())
+	m.invalidateCache(community.IDString())
+	defer m.invalidateCache(community.IDString())
+	if m.testHooks.beforeCommunityWrite != nil {
+		m.testHooks.beforeCommunityWrite()
+	}
 	return m.persistence.SaveCommunity(community)
+}
+
+func (m *Manager) invalidateCache(idString string) {
+	m.cacheMutex.Lock()
+	defer m.cacheMutex.Unlock()
+	m.cacheGeneration++
+	m.cache.Delete(idString)
 }
 
 func (m *Manager) CreateCommunityTokenDeploymentSignature(ctx context.Context, chainID uint64, addressFrom string, communityID string) ([]byte, error) {
