@@ -118,13 +118,19 @@ func (s *MessengerCommunitiesSuite) TestMentionedNames() {
 	s.Require().Equal(expected, byID.MentionedNames)
 }
 
-func (s *MessengerCommunitiesSuite) TestResolveMentionedNamesPrefersVerifiedEns() {
-	s.owner.allContacts.Store("0xens", &contacts.Contact{ID: "0xens", DisplayName: "name", EnsName: "name.eth", ENSVerified: true})
-	s.owner.allContacts.Store("0xunverified", &contacts.Contact{ID: "0xunverified", DisplayName: "plain", EnsName: "fake.eth"})
-	s.owner.allContacts.Store("0xnoname", &contacts.Contact{ID: "0xnoname"})
+func (s *MessengerCommunitiesSuite) TestResolveMentionedNamesPriority() {
+	s.owner.allContacts.Store("0xnick", &contacts.Contact{ID: "0xnick", Alias: "a", LocalNickname: "nick", DisplayName: "name", EnsName: "nick.eth", ENSVerified: true})
+	s.owner.allContacts.Store("0xens", &contacts.Contact{ID: "0xens", Alias: "a", DisplayName: "name", EnsName: "name.eth", ENSVerified: true})
+	s.owner.allContacts.Store("0xunverified", &contacts.Contact{ID: "0xunverified", Alias: "a", DisplayName: "plain", EnsName: "fake.eth"})
+	s.owner.allContacts.Store("0xaliasonly", &contacts.Contact{ID: "0xaliasonly", Alias: "a"})
 
 	msg := common.NewMessage()
-	msg.Mentions = []string{"0xens", "0xunverified", "0xnoname"}
+	msg.Mentions = []string{"0xnick", "0xens", "0xunverified", "0xaliasonly", s.owner.IdentityPublicKeyString()}
 	s.owner.resolveMentionedNames(msg)
-	s.Require().Equal(map[string]string{"0xens": "name.eth", "0xunverified": "plain"}, msg.MentionedNames)
+	s.Require().Equal(map[string]string{
+		"0xnick":                          "nick",
+		"0xens":                           "name.eth",
+		"0xunverified":                    "plain",
+		s.owner.IdentityPublicKeyString(): "Charlie",
+	}, msg.MentionedNames)
 }
