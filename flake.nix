@@ -2,8 +2,14 @@
   description = "Status Go Flake";
 
   nixConfig = {
-    extra-substituters = [ "https://nix-cache.status.im/" ];
-    extra-trusted-public-keys = [ "nix-cache.status.im-1:x/93lOfLU+duPplwMSBR+OlY4+mo+dCN7n0mr4oPwgY=" ];
+    extra-substituters = [
+      "https://nix-cache.status.im/"
+      "https://cache.nix.logos.co/public"
+    ];
+    extra-trusted-public-keys = [
+      "nix-cache.status.im-1:x/93lOfLU+duPplwMSBR+OlY4+mo+dCN7n0mr4oPwgY="
+      "public:l4HrXgL4nw246+LBh2SOJyhz64BoGegOYLheT/iIAPU="
+    ];
     # Some downloads are multiple GB, default is 5 minutes
     stalled-download-timeout = 3600;
     connect-timeout = 10;
@@ -22,7 +28,7 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
     # We cannot do follows since the nim-unwrapped-2_0 doesn't exist in this nixpkgs version above
-    nim-sds.url = "git+https://github.com/logos-messaging/nim-sds?submodules=1&ref=refs/tags/v0.3.4&rev=d317821fe2737de44cf993cef608e110c2b94660";
+    nim-sds.url = "git+https://github.com/logos-messaging/nim-sds?submodules=1&rev=4b08d508dbfa69c0e2e3883db67adf1fe5a0c994";
   };
 
   outputs = { self, nixpkgs, logos-storage-nim, nim-sds }:
