@@ -2255,3 +2255,42 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestDeleteChannelWithTokenPe
 	s.Require().Len(community.Chats(), 0)
 	s.Require().Len(community.TokenPermissions(), 0)
 }
+
+func (s *MessengerCommunitiesTokenPermissionsSuite) TestReevaluationRemovalSignalsRosterDelta() {
+	community, _ := s.createCommunity()
+	s.advertiseCommunityTo(community, s.bob)
+	s.joinCommunity(community, s.bob)
+
+	responses := make(chan *MessengerResponse, 64)
+	s.owner.config.messengerSignalsHandler = &MessengerSignalsHandlerMock{responseChan: responses}
+	defer func() { s.owner.config.messengerSignalsHandler = nil }()
+
+	_, err := s.owner.CreateCommunityTokenPermission(&requests.CreateCommunityTokenPermission{
+		CommunityID: community.ID(),
+		Type:        protobuf.CommunityTokenPermission_BECOME_MEMBER,
+		TokenCriteria: []*protobuf.TokenCriteria{
+			{
+				Type:              protobuf.CommunityTokenType_ERC20,
+				ContractAddresses: map[uint64]string{testChainID1: "0x123"},
+				Symbol:            "TEST",
+				AmountInWei:       "100000000000000000000",
+				Decimals:          uint64(18),
+			},
+		},
+	})
+	s.Require().NoError(err)
+
+	bobID := s.bob.IdentityPublicKeyString()
+	timeout := time.After(10 * time.Second)
+	for {
+		select {
+		case r := <-responses:
+			if rosterRemovedHas(r, community.ID(), bobID) {
+				return
+			}
+		case <-timeout:
+			s.Require().Fail("control node did not signal bob's removal as a roster delta")
+			return
+		}
+	}
+}

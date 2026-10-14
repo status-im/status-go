@@ -1785,6 +1785,7 @@ func (m *Messenger) HandleCommunityRequestToLeave(ctx context.Context, state *Re
 	if len(response.Communities()) > 0 {
 		state.Response.AddCommunity(response.Communities()[0])
 	}
+	state.Response.CommunityChanges = append(state.Response.CommunityChanges, response.CommunityChanges...)
 
 	return nil
 }
