@@ -3,6 +3,12 @@ package delivery
 import (
 	"context"
 	"crypto/ecdsa"
+
+	"github.com/libp2p/go-libp2p/core/peer"
+
+	storepb "github.com/waku-org/go-waku/waku/v2/protocol/store/pb"
+
+	"github.com/status-im/status-go/pkg/messaging/waku/types"
 )
 
 // Client is the part of a logos-delivery Messaging API client the Adapter
@@ -18,6 +24,15 @@ type Client interface {
 	// Send queues payload on contentTopic and returns the request ID that
 	// correlates it with the SentEvent, PropagatedEvent or ErrorEvent it produces.
 	Send(ctx context.Context, contentTopic string, payload []byte, ephemeral bool) (string, error)
+
+	// StoreQuery runs one store request against peerInfo and returns the page
+	// of messages and the cursor of the next page, nil on the last one.
+	StoreQuery(ctx context.Context, peerInfo peer.AddrInfo, request *storepb.StoreQueryRequest) ([]*storepb.WakuMessageKeyValue, []byte, error)
+	// ConnectedPeers returns the protocols and addresses of every connected peer.
+	ConnectedPeers() (types.PeerStats, error)
+	PeerID() (peer.ID, error)
+	// Metrics returns the node's metrics in the Prometheus text format.
+	Metrics() (string, error)
 }
 
 // Event is one Messaging API event: ReceivedEvent, SentEvent, PropagatedEvent,

@@ -6,10 +6,17 @@ import (
 	"testing"
 	"time"
 
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
+	"google.golang.org/protobuf/proto"
+
+	wakupb "github.com/waku-org/go-waku/waku/v2/protocol/pb"
+	storepb "github.com/waku-org/go-waku/waku/v2/protocol/store/pb"
 
 	"github.com/status-im/status-go/pkg/messaging/layers/transport"
+	"github.com/status-im/status-go/pkg/messaging/waku"
+	"github.com/status-im/status-go/pkg/messaging/waku/fleets"
 	"github.com/status-im/status-go/pkg/messaging/waku/types"
 )
 
@@ -23,6 +30,10 @@ type fakeClient struct {
 	subscribed   map[string]int
 	sendID       string
 	beforeReturn func()
+
+	storePages    [][]*storepb.WakuMessageKeyValue
+	storeRequests []*storepb.StoreQueryRequest
+	peers         types.PeerStats
 }
 
 func newFakeClient() *fakeClient {
@@ -55,6 +66,26 @@ func (f *fakeClient) Send(ctx context.Context, contentTopic string, payload []by
 	return f.sendID, nil
 }
 
+// StoreQuery serves storePages in order, each with a cursor to the next.
+func (f *fakeClient) StoreQuery(_ context.Context, _ peer.AddrInfo, request *storepb.StoreQueryRequest) ([]*storepb.WakuMessageKeyValue, []byte, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.storeRequests = append(f.storeRequests, proto.Clone(request).(*storepb.StoreQueryRequest))
+	page := len(f.storeRequests) - 1
+	if page >= len(f.storePages) {
+		return nil, nil, nil
+	}
+	var cursor []byte
+	if page+1 < len(f.storePages) {
+		cursor = []byte{byte(page + 1)}
+	}
+	return f.storePages[page], cursor, nil
+}
+
+func (f *fakeClient) ConnectedPeers() (types.PeerStats, error) { return f.peers, nil }
+func (f *fakeClient) PeerID() (peer.ID, error)                 { return "16Uiu2HAmTest", nil }
+func (f *fakeClient) Metrics() (string, error)                 { return "metric 1", nil }
+
 func (f *fakeClient) subscriptions(contentTopic string) int {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -63,7 +94,7 @@ func (f *fakeClient) subscriptions(contentTopic string) int {
 
 func startAdapter(t *testing.T) (*Adapter, *fakeClient) {
 	client := newFakeClient()
-	a := NewAdapter(client, zap.NewNop())
+	a := NewAdapter(client, "", zap.NewNop())
 	require.NoError(t, a.Start())
 	t.Cleanup(func() { _ = a.Stop() })
 	return a, client
@@ -218,4 +249,53 @@ func TestConnectionStatusIsTracked(t *testing.T) {
 		t.Fatal("no connection status")
 	}
 	require.Equal(t, types.ConnectionStatePartiallyConnected, a.ConnectionState())
+}
+
+func storedMessage(hash byte, payload string) *storepb.WakuMessageKeyValue {
+	return &storepb.WakuMessageKeyValue{
+		MessageHash: []byte{hash},
+		PubsubTopic: proto.String("/waku/2/rs/16/32"),
+		Message:     &wakupb.WakuMessage{ContentTopic: "/waku/1/0x01020304/rfc26", Payload: []byte(payload), Timestamp: proto.Int64(7)},
+	}
+}
+
+func TestFetchMessagesByHashesFollowsCursorsAndReportsMessages(t *testing.T) {
+	client := newFakeClient()
+	a := NewAdapter(client, fleets.StatusProd, zap.NewNop())
+	require.NoError(t, a.Start())
+	t.Cleanup(func() { _ = a.Stop() })
+	client.storePages = [][]*storepb.WakuMessageKeyValue{{storedMessage(1, "a")}, {storedMessage(2, "b")}}
+
+	events := make(chan types.EnvelopeEvent, 4)
+	sub := a.SubscribeEnvelopeEvents(events)
+	defer sub.Unsubscribe()
+
+	require.NoError(t, a.FetchMessagesByHashes(context.Background(), []string{"0x01", "0x02", "not-hex"}))
+
+	for _, want := range []string{"a", "b"} {
+		ev := nextEvent(t, events)
+		require.Equal(t, types.EventEnvelopeAvailable, ev.Event)
+		msg := ev.Data.(*types.ReceivedMessage)
+		require.Equal(t, []byte(want), msg.Payload)
+		require.Equal(t, "/waku/2/rs/16/32", msg.PubsubTopic)
+	}
+	require.Len(t, client.storeRequests, 2)
+	require.Equal(t, [][]byte{{1}, {2}}, client.storeRequests[0].MessageHashes)
+	require.Nil(t, client.storeRequests[0].PaginationCursor)
+	require.Equal(t, []byte{1}, client.storeRequests[1].PaginationCursor)
+}
+
+func TestStoreQueryWithoutStorenodesFails(t *testing.T) {
+	a, _ := startAdapter(t)
+	err := a.StoreQuery(context.Background(), types.MailserverBatch{}, 10, nil, false)
+	require.ErrorIs(t, err, waku.ErrNoStorenodesReachable)
+}
+
+func TestPeersPeerIDAndMetricsComeFromTheNode(t *testing.T) {
+	a, client := startAdapter(t)
+	client.peers = types.PeerStats{"16Uiu2HAmPeer": types.WakuV2Peer{}}
+
+	require.Equal(t, client.peers, a.Peers())
+	require.Equal(t, peer.ID("16Uiu2HAmTest"), a.PeerID())
+	require.Equal(t, "metric 1", a.Metrics())
 }
