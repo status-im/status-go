@@ -2321,7 +2321,7 @@ func (m *Manager) handleCommunityDescriptionMessageCommon(community *Community, 
 	}
 
 	if description.Clock > prevClock {
-		err = m.persistence.DeleteCommunityEvents(community.ID())
+		err = m.deleteCommunityEvents(community.ID())
 		if err != nil {
 			return nil, err
 		}
@@ -2441,7 +2441,7 @@ func (m *Manager) HandleCommunityEventsMessage(signer *ecdsa.PublicKey, message 
 		if err != nil {
 			return nil, err
 		}
-		err := m.persistence.SaveCommunityEvents(community)
+		err := m.saveCommunityEvents(community)
 		if err != nil {
 			return nil, err
 		}
@@ -4540,7 +4540,7 @@ func (m *Manager) saveAndPublish(community *Community) error {
 		if err != nil {
 			return err
 		}
-		err = m.persistence.SaveCommunityEvents(community)
+		err = m.saveCommunityEvents(community)
 		if err != nil {
 			return err
 		}
@@ -5074,6 +5074,20 @@ func (m *Manager) SaveCommunity(community *Community) error {
 		m.testHooks.beforeCommunityWrite()
 	}
 	return m.persistence.SaveCommunity(community)
+}
+
+// saveCommunityEvents and deleteCommunityEvents invalidate the cache like
+// SaveCommunity, as the cached row includes the community events.
+func (m *Manager) saveCommunityEvents(community *Community) error {
+	m.invalidateCache(community.IDString())
+	defer m.invalidateCache(community.IDString())
+	return m.persistence.SaveCommunityEvents(community)
+}
+
+func (m *Manager) deleteCommunityEvents(id cryptotypes.HexBytes) error {
+	m.invalidateCache(cryptotypes.EncodeHex(id))
+	defer m.invalidateCache(cryptotypes.EncodeHex(id))
+	return m.persistence.DeleteCommunityEvents(id)
 }
 
 func (m *Manager) invalidateCache(idString string) {
