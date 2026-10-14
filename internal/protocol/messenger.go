@@ -4379,7 +4379,7 @@ func (m *Messenger) MarkThreadRead(ctx context.Context, chatID string, threadID 
 		}
 	}
 
-	thread, err := m.persistence.ThreadByID(chatID, threadID)
+	thread, err := m.persistence.ThreadWithSummaryByID(chatID, threadID)
 	if err != nil {
 		return nil, err
 	}
@@ -4405,6 +4405,15 @@ func (m *Messenger) MarkAllReadInCommunity(ctx context.Context, communityID stri
 	err = m.persistence.MarkAllReadMultiple(chatIDs)
 	if err != nil {
 		return nil, err
+	}
+
+	threads, err := m.persistence.ThreadsByChatIDs(chatIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, thread := range threads {
+		response.AddThread(thread)
 	}
 
 	for _, chatID := range chatIDs {
