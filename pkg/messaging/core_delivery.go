@@ -10,27 +10,14 @@ import (
 	"github.com/status-im/status-go/pkg/messaging/waku/fleets"
 )
 
-// deliveryNetwork is a fleet's logos-delivery network preset and the node
-// configuration Status sets on top of it.
-type deliveryNetwork struct {
-	preset    string
-	overrides map[string]any
-}
-
-// deliveryNetworks maps the fleets logos-delivery has a network preset for.
-var deliveryNetworks = map[string]deliveryNetwork{
-	fleets.StatusProd: {
-		preset: "status.prod",
-		overrides: map[string]any{
-			"autosharding-shards": []uint16{32},
-			// Remove after Status 2.41 (status-im/status-go#7498).
-			"extra-listen-shard": []uint16{64},
-		},
-	},
+// deliveryPresets maps the fleets logos-delivery has a network preset for.
+var deliveryPresets = map[string]string{
+	fleets.StatusProd:    "status.prod",
+	fleets.StatusStaging: "status.staging",
 }
 
 func deliveryConfig(params CoreParams) (delivery.Config, error) {
-	network, ok := deliveryNetworks[params.Fleet]
+	preset, ok := deliveryPresets[params.Fleet]
 	if !ok {
 		return delivery.Config{}, fmt.Errorf("fleet %q has no logos-delivery preset", params.Fleet)
 	}
@@ -39,13 +26,12 @@ func deliveryConfig(params CoreParams) (delivery.Config, error) {
 		mode = delivery.ModeEdge
 	}
 	return delivery.Config{
-		Preset:    network.preset,
-		Mode:      mode,
-		NodeKey:   params.NodeKey,
-		DataDir:   params.DataDir,
-		TCPPort:   params.WakuConfig.Port,
-		UDPPort:   params.WakuConfig.UDPPort,
-		Overrides: network.overrides,
+		Preset:  preset,
+		Mode:    mode,
+		NodeKey: params.NodeKey,
+		DataDir: params.DataDir,
+		TCPPort: params.WakuConfig.Port,
+		UDPPort: params.WakuConfig.UDPPort,
 	}, nil
 }
 

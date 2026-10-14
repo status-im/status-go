@@ -10,15 +10,19 @@ import (
 	"github.com/status-im/status-go/pkg/messaging/waku/fleets"
 )
 
-func TestDeliveryConfigPublishesOn32AndListensOn64(t *testing.T) {
-	cfg, err := deliveryConfig(CoreParams{Fleet: fleets.StatusProd, Mode: waku.ModeEdge, DataDir: "/data"})
-	require.NoError(t, err)
+func TestDeliveryConfigUsesTheFleetPreset(t *testing.T) {
+	for fleet, preset := range map[string]string{
+		fleets.StatusProd:    "status.prod",
+		fleets.StatusStaging: "status.staging",
+	} {
+		cfg, err := deliveryConfig(CoreParams{Fleet: fleet, Mode: waku.ModeEdge, DataDir: "/data"})
+		require.NoError(t, err)
 
-	require.Equal(t, "status.prod", cfg.Preset)
-	require.Equal(t, delivery.ModeEdge, cfg.Mode)
-	require.Equal(t, "/data", cfg.DataDir)
-	require.Equal(t, []uint16{32}, cfg.Overrides["autosharding-shards"])
-	require.Equal(t, []uint16{64}, cfg.Overrides["extra-listen-shard"])
+		require.Equal(t, preset, cfg.Preset)
+		require.Equal(t, delivery.ModeEdge, cfg.Mode)
+		require.Equal(t, "/data", cfg.DataDir)
+		require.Empty(t, cfg.Overrides)
+	}
 }
 
 func TestDeliveryConfigRejectsFleetWithoutPreset(t *testing.T) {
