@@ -124,7 +124,10 @@ type Manager struct {
 	cacheMutex      sync.Mutex
 	cacheGeneration uint64
 	memberProfiles  MemberProfileProvider
-	testHooks       managerTestHooks
+	// rosterClockFloors keeps, per community ID, the clock floor that keeps
+	// roster clocks monotonic after a description cleared newer events
+	rosterClockFloors sync.Map
+	testHooks         managerTestHooks
 }
 
 // managerTestHooks order concurrent operations deterministically in tests.
@@ -455,6 +458,7 @@ func (m *Manager) newCommunity(config Config, encryptor DescriptionEncryptor) (*
 		return nil, err
 	}
 	community.memberProfiles = m.memberProfiles
+	community.clockFloor = m.rosterClockFloor(community.IDString())
 	return community, nil
 }
 
@@ -2209,8 +2213,35 @@ func (m *Manager) preprocessDescription(id cryptotypes.HexBytes, description *pr
 	return response, description, m.persistence.SaveDecryptedCommunityDescription(id, response, description)
 }
 
+func (m *Manager) rosterClockFloor(idString string) uint64 {
+	floor, ok := m.rosterClockFloors.Load(idString)
+	if !ok {
+		return 0
+	}
+	return floor.(uint64)
+}
+
+// keepRosterClockMonotonic raises the community clock floor when applying a
+// description moved its latest clock below prevLatestClock, as when the
+// description is older than the community events it cleared. Roster changes
+// get a clock past prevLatestClock so clients order them after the state
+// they last saw.
+func (m *Manager) keepRosterClockMonotonic(community *Community, prevLatestClock uint64, changes *CommunityChanges) {
+	latestClock := community.latestClock()
+	floor := prevLatestClock
+	if changes.HasRosterChanges() {
+		floor++
+	}
+	if latestClock >= floor {
+		return
+	}
+	community.clockFloor = floor
+	m.rosterClockFloors.Store(community.IDString(), floor)
+}
+
 func (m *Manager) handleCommunityDescriptionMessageCommon(community *Community, description *protobuf.CommunityDescription, payload []byte, newControlNode *ecdsa.PublicKey) (*CommunityResponse, error) {
 	prevClock := community.config.CommunityDescription.Clock
+	prevLatestClock := community.latestClock()
 	prevResendAccountsClock := community.config.CommunityDescription.ResendAccountsClock
 
 	changes, err := community.UpdateCommunityDescription(description, payload, newControlNode)
@@ -2296,6 +2327,7 @@ func (m *Manager) handleCommunityDescriptionMessageCommon(community *Community, 
 		}
 		community.config.EventsData = nil
 	}
+	m.keepRosterClockMonotonic(community, prevLatestClock, changes)
 
 	// Set Joined if we are part of the member list
 	if !community.Joined() && community.hasMember(&m.identity.PublicKey) {
@@ -3877,6 +3909,7 @@ func (m *Manager) dbRecordBundleToCommunity(r *CommunityRecordBundle) (*Communit
 
 	initializer := func(community *Community) error {
 		community.memberProfiles = m.memberProfiles
+		community.clockFloor = m.rosterClockFloor(community.IDString())
 		_, description, err := m.preprocessDescription(community.ID(), community.config.CommunityDescription)
 		if err != nil {
 			return err
