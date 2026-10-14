@@ -165,14 +165,17 @@ func (s *CommunitySuite) TestCommunityChangesJSON() {
 	}, delta.RosterAdded[s.member3Key])
 }
 
-// The client in production reads the develop-era keys, so they must keep
-// their names and shapes; roster entries only appear under new keys.
-func (s *CommunitySuite) TestCommunityChangesJSONKeepsExistingKeys() {
+// Member deltas are sent only as roster entries and chats only without their
+// members; channel member deltas and every other key keep their shape.
+func (s *CommunitySuite) TestCommunityChangesJSONKeys() {
 	community := s.rosterCommunity()
 	member := func() *protobuf.CommunityMember {
 		return &protobuf.CommunityMember{Roles: []protobuf.CommunityMember_Roles{protobuf.CommunityMember_ROLE_ADMIN}}
 	}
-	chat := &protobuf.CommunityChat{Identity: &protobuf.ChatIdentity{DisplayName: "chat"}}
+	chat := &protobuf.CommunityChat{
+		Identity: &protobuf.ChatIdentity{DisplayName: "chat"},
+		Members:  map[string]*protobuf.CommunityMember{s.member1Key: member()},
+	}
 	category := &protobuf.CommunityCategory{CategoryId: testCategoryID1, Name: testCategoryName1}
 	permission := NewCommunityTokenPermission(&protobuf.CommunityTokenPermission{Id: "permission"})
 
@@ -210,38 +213,39 @@ func (s *CommunitySuite) TestCommunityChangesJSONKeepsExistingKeys() {
 	bytes, err := json.Marshal(changes)
 	s.Require().NoError(err)
 
+	// marshalling leaves the members of the changes in place
+	s.Require().Contains(chat.Members, s.member1Key)
+	s.Require().Contains(changes.MembersAdded, s.member1Key)
+
 	var parsed map[string]json.RawMessage
 	s.Require().NoError(json.Unmarshal(bytes, &parsed))
 	for _, key := range []string{
 		"controlNodeChanged",
-		"membersAdded", "membersRemoved", "membersBanned", "membersUnbanned",
+		"membersBanned", "membersUnbanned",
 		"tokenPermissionsAdded", "tokenPermissionsModified", "tokenPermissionsRemoved",
 		"chatsRemoved", "chatsAdded", "chatsModified",
 		"categoriesRemoved", "categoriesAdded", "categoriesModified",
 		"memberWalletsRemoved", "memberWalletsAdded",
 		"memberAdded", "memberRemoved", "memberSoftRemoved", "communityImageModified",
-		"membersModified", "communityId", "clock",
+		"communityId", "clock",
 		"rosterAdded", "rosterRemoved", "rosterModified",
 	} {
 		_, ok := parsed[key]
 		s.Require().True(ok, key)
+	}
+	for _, key := range []string{"membersAdded", "membersRemoved", "membersModified"} {
+		s.Require().NotContains(parsed, key)
 	}
 
 	// the community itself is sent once, in the response's communities
 	s.Require().NotContains(parsed, "community")
 	s.Require().Equal(`"`+community.IDString()+`"`, string(parsed["communityId"]))
 
-	for key, pubKey := range map[string]string{
-		"membersAdded":    s.member1Key,
-		"membersRemoved":  s.member2Key,
-		"membersModified": s.member3Key,
-	} {
-		var members map[string]map[string]json.RawMessage
-		s.Require().NoError(json.Unmarshal(parsed[key], &members), key)
-		var roles []protobuf.CommunityMember_Roles
-		s.Require().NoError(json.Unmarshal(members[pubKey]["roles"], &roles), key)
-		s.Require().Equal([]protobuf.CommunityMember_Roles{protobuf.CommunityMember_ROLE_ADMIN}, roles, key)
-		s.Require().NotContains(members[pubKey], "pubKey", key)
+	for _, key := range []string{"chatsAdded", "chatsRemoved"} {
+		var chats map[string]map[string]json.RawMessage
+		s.Require().NoError(json.Unmarshal(parsed[key], &chats), key)
+		s.Require().Contains(chats[testChatID2], "identity", key)
+		s.Require().NotContains(chats[testChatID2], "members", key)
 	}
 
 	var chatsModified map[string]map[string]json.RawMessage
@@ -254,6 +258,13 @@ func (s *CommunitySuite) TestCommunityChangesJSONKeepsExistingKeys() {
 	}
 	s.Require().JSONEq(`"`+testCategoryID1+`"`, string(chatsModified[testChatID1]["CategoryModified"]))
 	s.Require().JSONEq(`2`, string(chatsModified[testChatID1]["PositionModified"]))
+	var chatModified map[string]json.RawMessage
+	s.Require().NoError(json.Unmarshal(chatsModified[testChatID1]["ChatModified"], &chatModified))
+	s.Require().Contains(chatModified, "identity")
+	s.Require().NotContains(chatModified, "members")
+	var channelAdded map[string]json.RawMessage
+	s.Require().NoError(json.Unmarshal(chatsModified[testChatID1]["MembersAdded"], &channelAdded))
+	s.Require().Contains(channelAdded, s.member1Key)
 
 	for key, pubKey := range map[string]string{
 		"rosterAdded":    s.member1Key,

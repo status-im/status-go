@@ -28,9 +28,10 @@ type CommunityChanges struct {
 
 	ControlNodeChanged *ecdsa.PublicKey `json:"controlNodeChanged"`
 
-	MembersAdded    map[string]*protobuf.CommunityMember `json:"membersAdded"`
-	MembersRemoved  map[string]*protobuf.CommunityMember `json:"membersRemoved"`
-	MembersModified map[string]*protobuf.CommunityMember `json:"membersModified"` // roles changed
+	// Sent as roster entries under rosterAdded, rosterRemoved and rosterModified.
+	MembersAdded    map[string]*protobuf.CommunityMember `json:"-"`
+	MembersRemoved  map[string]*protobuf.CommunityMember `json:"-"`
+	MembersModified map[string]*protobuf.CommunityMember `json:"-"` // roles changed
 	MembersBanned   map[string]bool                      `json:"membersBanned"`
 	MembersUnbanned map[string]bool                      `json:"membersUnbanned"`
 
@@ -145,19 +146,25 @@ func (c *CommunityChanges) Merge(other *CommunityChanges) {
 	}
 }
 
-// MarshalJSON adds the community ID and clock and the member deltas as
-// roster entries next to the existing keys.
+// MarshalJSON identifies the community by ID and clock, sends member deltas
+// as roster entries and leaves the members out of changed chats.
 func (c *CommunityChanges) MarshalJSON() ([]byte, error) {
 	type changesAlias CommunityChanges
 	item := struct {
 		*changesAlias
-		CommunityID    types.HexBytes         `json:"communityId,omitempty"`
-		Clock          uint64                 `json:"clock"`
-		RosterAdded    map[string]RosterEntry `json:"rosterAdded"`
-		RosterRemoved  map[string]RosterEntry `json:"rosterRemoved"`
-		RosterModified map[string]RosterEntry `json:"rosterModified"`
+		CommunityID    types.HexBytes                     `json:"communityId,omitempty"`
+		Clock          uint64                             `json:"clock"`
+		RosterAdded    map[string]RosterEntry             `json:"rosterAdded"`
+		RosterRemoved  map[string]RosterEntry             `json:"rosterRemoved"`
+		RosterModified map[string]RosterEntry             `json:"rosterModified"`
+		ChatsRemoved   map[string]*protobuf.CommunityChat `json:"chatsRemoved"`
+		ChatsAdded     map[string]*protobuf.CommunityChat `json:"chatsAdded"`
+		ChatsModified  map[string]*CommunityChatChanges   `json:"chatsModified"`
 	}{
-		changesAlias: (*changesAlias)(c),
+		changesAlias:  (*changesAlias)(c),
+		ChatsRemoved:  chatsWithoutMembers(c.ChatsRemoved),
+		ChatsAdded:    chatsWithoutMembers(c.ChatsAdded),
+		ChatsModified: chatChangesWithoutMembers(c.ChatsModified),
 	}
 
 	var profiles MemberProfileProvider
@@ -171,6 +178,51 @@ func (c *CommunityChanges) MarshalJSON() ([]byte, error) {
 	item.RosterModified = rosterEntries(c.MembersModified, profiles)
 
 	return json.Marshal(item)
+}
+
+// chatWithoutMembers copies chat without its members, which clients get from
+// GetCommunityMembers and the chatsModified member deltas.
+func chatWithoutMembers(chat *protobuf.CommunityChat) *protobuf.CommunityChat {
+	if chat == nil {
+		return nil
+	}
+	return &protobuf.CommunityChat{
+		Permissions:             chat.GetPermissions(),
+		Identity:                chat.GetIdentity(),
+		CategoryId:              chat.GetCategoryId(),
+		Position:                chat.GetPosition(),
+		ViewersCanPostReactions: chat.GetViewersCanPostReactions(),
+		HideIfPermissionsNotMet: chat.GetHideIfPermissionsNotMet(),
+		MembersList:             chat.GetMembersList(),
+	}
+}
+
+func chatsWithoutMembers(chats map[string]*protobuf.CommunityChat) map[string]*protobuf.CommunityChat {
+	if chats == nil {
+		return nil
+	}
+	out := make(map[string]*protobuf.CommunityChat, len(chats))
+	for chatID, chat := range chats {
+		out[chatID] = chatWithoutMembers(chat)
+	}
+	return out
+}
+
+func chatChangesWithoutMembers(chats map[string]*CommunityChatChanges) map[string]*CommunityChatChanges {
+	if chats == nil {
+		return nil
+	}
+	out := make(map[string]*CommunityChatChanges, len(chats))
+	for chatID, changes := range chats {
+		if changes == nil {
+			out[chatID] = nil
+			continue
+		}
+		copied := *changes
+		copied.ChatModified = chatWithoutMembers(changes.ChatModified)
+		out[chatID] = &copied
+	}
+	return out
 }
 
 // chatChanges returns the changes of chatID, creating them if needed.
