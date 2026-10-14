@@ -103,6 +103,9 @@ type Community struct {
 	mediaServer media.MediaServerInterface
 	// memberProfiles resolves display data for member deltas; may be nil
 	memberProfiles MemberProfileProvider
+	// clockFloor is the newest clock this node emitted for the community
+	// beyond its description and events; see Manager.rosterClockFloors
+	clockFloor uint64
 }
 
 type ReadonlyCommunity interface {
@@ -2299,10 +2302,13 @@ func (o *Community) RequestedToJoinAt() uint64 {
 	return o.config.RequestedToJoinAt
 }
 
-// latestClock is the newest of the description clock and the clocks of the
-// community events applied on top of it.
+// latestClock is the newest of the description clock, the clocks of the
+// community events applied on top of it and the clock floor.
 func (o *Community) latestClock() uint64 {
 	clock := o.config.CommunityDescription.Clock
+	if o.clockFloor > clock {
+		clock = o.clockFloor
+	}
 	if o.config.EventsData != nil {
 		for _, event := range o.config.EventsData.Events {
 			if event.CommunityEventClock > clock {
@@ -2462,6 +2468,7 @@ func (o *Community) CreateDeepCopy() *Community {
 		timesource:     o.timesource,
 		mediaServer:    o.mediaServer,
 		memberProfiles: o.memberProfiles,
+		clockFloor:     o.clockFloor,
 	}
 }
 

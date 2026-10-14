@@ -3,6 +3,8 @@ package communities
 import (
 	"encoding/json"
 
+	"github.com/golang/protobuf/proto"
+
 	"github.com/status-im/status-go/internal/crypto"
 	"github.com/status-im/status-go/internal/protocol/protobuf"
 	"github.com/status-im/status-go/internal/protocol/requests"
@@ -185,4 +187,60 @@ func (s *ManagerSuite) TestDeleteCommunityReadDuringWrite() {
 
 	_, err := s.manager.GetCommunityMembers(community.ID())
 	s.Require().ErrorIs(err, ErrOrgNotFound)
+}
+
+func (s *ManagerSuite) rosterDeltaClock(changes *CommunityChanges) uint64 {
+	var delta struct {
+		Clock uint64 `json:"clock"`
+	}
+	bytes, err := json.Marshal(changes)
+	s.Require().NoError(err)
+	s.Require().NoError(json.Unmarshal(bytes, &delta))
+	return delta.Clock
+}
+
+// A description older than the community events applied locally clears
+// them; its member deltas must still be ordered after those events.
+func (s *ManagerSuite) TestRosterClockStaysMonotonicWhenEventsAreCleared() {
+	community := s.addRosterMember(s.createRosterCommunity().ID())
+	s.Require().NoError(s.manager.SaveCommunity(community))
+	prevClock := community.Clock()
+	eventClock := prevClock + 100
+	community.config.EventsData = &EventsData{Events: []CommunityEvent{{CommunityEventClock: eventClock}}}
+
+	snapshot := community.MembersSnapshot(nil)
+	s.Require().Equal(eventClock, snapshot.Clock)
+
+	removal := proto.Clone(community.Description()).(*protobuf.CommunityDescription)
+	var removedKey string
+	for pk := range removal.Members {
+		if pk != crypto.PubkeyToHex(&s.manager.identity.PublicKey) {
+			removedKey = pk
+		}
+	}
+	delete(removal.Members, removedKey)
+	removal.Clock = prevClock + 50
+
+	response, err := s.manager.handleCommunityDescriptionMessageCommon(community, removal, nil, nil)
+	s.Require().NoError(err)
+	s.Require().Contains(response.Changes.MembersRemoved, removedKey)
+	removalClock := s.rosterDeltaClock(response.Changes)
+	s.Require().Greater(removalClock, snapshot.Clock)
+
+	after, err := s.manager.GetCommunityMembers(community.ID())
+	s.Require().NoError(err)
+	s.Require().Equal(removalClock, after.Clock)
+
+	// A later description still below the cleared events orders after the
+	// removal.
+	community, err = s.manager.GetByID(community.ID())
+	s.Require().NoError(err)
+	readd := proto.Clone(removal).(*protobuf.CommunityDescription)
+	readd.Members[removedKey] = &protobuf.CommunityMember{}
+	readd.Clock = prevClock + 60
+
+	response, err = s.manager.handleCommunityDescriptionMessageCommon(community, readd, nil, nil)
+	s.Require().NoError(err)
+	s.Require().Contains(response.Changes.MembersAdded, removedKey)
+	s.Require().Greater(s.rosterDeltaClock(response.Changes), removalClock)
 }
