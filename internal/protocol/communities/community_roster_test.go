@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 
 	"github.com/golang/protobuf/proto"
+	protoV2 "google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/reflect/protoreflect"
 
 	"github.com/status-im/status-go/internal/protocol/identity"
 	"github.com/status-im/status-go/internal/protocol/identity/alias"
@@ -464,4 +466,72 @@ func (s *CommunitySuite) TestAddMemberToChatChangesSerializeEmptyMaps() {
 	removal := EmptyCommunityChanges()
 	removal.chatChanges(testChatID1).MembersRemoved[s.member3Key] = &protobuf.CommunityMember{}
 	s.Require().NotPanics(func() { changes.Merge(removal) })
+}
+
+func populatedScalar(fd protoreflect.FieldDescriptor) protoreflect.Value {
+	switch fd.Kind() {
+	case protoreflect.BoolKind:
+		return protoreflect.ValueOfBool(true)
+	case protoreflect.EnumKind:
+		return protoreflect.ValueOfEnum(1)
+	case protoreflect.StringKind:
+		return protoreflect.ValueOfString("x")
+	case protoreflect.BytesKind:
+		return protoreflect.ValueOfBytes([]byte("x"))
+	case protoreflect.Int32Kind, protoreflect.Sint32Kind, protoreflect.Sfixed32Kind:
+		return protoreflect.ValueOfInt32(1)
+	case protoreflect.Int64Kind, protoreflect.Sint64Kind, protoreflect.Sfixed64Kind:
+		return protoreflect.ValueOfInt64(1)
+	case protoreflect.Uint32Kind, protoreflect.Fixed32Kind:
+		return protoreflect.ValueOfUint32(1)
+	case protoreflect.Uint64Kind, protoreflect.Fixed64Kind:
+		return protoreflect.ValueOfUint64(1)
+	case protoreflect.FloatKind:
+		return protoreflect.ValueOfFloat32(1)
+	case protoreflect.DoubleKind:
+		return protoreflect.ValueOfFloat64(1)
+	}
+	panic("unhandled kind " + fd.Kind().String())
+}
+
+// populateAllFields sets every top-level field of m to a non-default value.
+func populateAllFields(m protoreflect.Message) {
+	fields := m.Descriptor().Fields()
+	for i := 0; i < fields.Len(); i++ {
+		fd := fields.Get(i)
+		switch {
+		case fd.IsMap():
+			entries := m.Mutable(fd).Map()
+			value := entries.NewValue()
+			if fd.MapValue().Message() == nil {
+				value = populatedScalar(fd.MapValue())
+			}
+			entries.Set(populatedScalar(fd.MapKey()).MapKey(), value)
+		case fd.IsList():
+			list := m.Mutable(fd).List()
+			element := list.NewElement()
+			if fd.Message() == nil {
+				element = populatedScalar(fd)
+			}
+			list.Append(element)
+		case fd.Message() != nil:
+			m.Mutable(fd)
+		default:
+			m.Set(fd, populatedScalar(fd))
+		}
+	}
+}
+
+// chatWithoutMembers must copy every channel field but the members, so a
+// field added to the proto fails here until it is copied too.
+func (s *CommunitySuite) TestChatWithoutMembersCopiesEveryOtherField() {
+	chat := &protobuf.CommunityChat{}
+	populateAllFields(chat.ProtoReflect())
+
+	expected := protoV2.Clone(chat).(*protobuf.CommunityChat)
+	expected.Members = nil
+
+	stripped := chatWithoutMembers(chat)
+	s.Require().Empty(stripped.Members)
+	s.Require().True(protoV2.Equal(expected, stripped), "chatWithoutMembers dropped a field: %v", stripped)
 }
