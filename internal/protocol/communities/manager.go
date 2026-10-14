@@ -2222,8 +2222,9 @@ func (m *Manager) rosterClockFloor(idString string) uint64 {
 }
 
 // keepRosterClockMonotonic raises the community clock floor when applying a
-// description moved its latest clock below prevLatestClock, as when the
-// description is older than the community events it cleared. Roster changes
+// description or community events left its latest clock below
+// prevLatestClock, as when the description is older than the community
+// events it cleared or an admin's event clock is skewed. Roster changes
 // get a clock past prevLatestClock so clients order them after the state
 // they last saw.
 func (m *Manager) keepRosterClockMonotonic(community *Community, prevLatestClock uint64, changes *CommunityChanges) {
@@ -2392,6 +2393,7 @@ func (m *Manager) HandleCommunityEventsMessage(signer *ecdsa.PublicKey, message 
 	}
 
 	originCommunity := community.CreateDeepCopy()
+	prevLatestClock := community.latestClock()
 
 	var lastlyAppliedEvents map[string]uint64
 	if community.IsControlNode() {
@@ -2407,8 +2409,8 @@ func (m *Manager) HandleCommunityEventsMessage(signer *ecdsa.PublicKey, message 
 	}
 
 	// Control node applies events and publish updated CommunityDescription
+	appliedEvents := map[string]uint64{}
 	if community.IsControlNode() {
-		appliedEvents := map[string]uint64{}
 		if community.config.EventsData != nil {
 			for _, event := range community.config.EventsData.Events {
 				appliedEvents[event.EventTypeID()] = event.CommunityEventClock
@@ -2424,12 +2426,17 @@ func (m *Manager) HandleCommunityEventsMessage(signer *ecdsa.PublicKey, message 
 				return nil, err
 			}
 		}
+	}
 
-		err = m.SaveCommunity(community)
-		if err != nil {
-			return nil, err
-		}
+	changes := EvaluateCommunityChanges(originCommunity, community)
+	m.keepRosterClockMonotonic(community, prevLatestClock, changes)
 
+	err = m.SaveCommunity(community)
+	if err != nil {
+		return nil, err
+	}
+
+	if community.IsControlNode() {
 		err = m.persistence.UpsertAppliedCommunityEvents(community.ID(), appliedEvents)
 		if err != nil {
 			return nil, err
@@ -2437,11 +2444,7 @@ func (m *Manager) HandleCommunityEventsMessage(signer *ecdsa.PublicKey, message 
 
 		m.publish(&Subscription{Community: community})
 	} else {
-		err = m.SaveCommunity(community)
-		if err != nil {
-			return nil, err
-		}
-		err := m.saveCommunityEvents(community)
+		err = m.saveCommunityEvents(community)
 		if err != nil {
 			return nil, err
 		}
@@ -2449,7 +2452,7 @@ func (m *Manager) HandleCommunityEventsMessage(signer *ecdsa.PublicKey, message 
 
 	return &CommunityResponse{
 		Community:      community,
-		Changes:        EvaluateCommunityChanges(originCommunity, community),
+		Changes:        changes,
 		RequestsToJoin: additionalCommunityResponse.RequestsToJoin,
 	}, nil
 }
