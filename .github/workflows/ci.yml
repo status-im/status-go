@@ -34,6 +34,19 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
+          cache: false
+
+      - name: Locate the Go module cache
+        id: go-env
+        shell: bash
+        run: echo "modcache=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Go modules
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.go-env.outputs.modcache }}
+          key: gomod-${{ matrix.os }}-${{ hashFiles('go.sum') }}
+          restore-keys: gomod-${{ matrix.os }}-
 
       - uses: nim-lang/setup-nimble-action@b2eed48dc4ff7b6c1c5704fe9237ab6736c561cb # master: arch detection (#16)
         with:
@@ -73,13 +86,16 @@ jobs:
           mkdir -p "$HOME/protoc" && unzip -q -o protoc.zip -d "$HOME/protoc"
           echo "$HOME/protoc/bin" >> "$GITHUB_PATH"
 
-      - name: Cache Nim dependencies
+      - name: Cache Nim dependencies and build cache
         uses: actions/cache@v4
         with:
           path: |
             nimbledeps
             ~/.nimble/nimbinaries
-          key: nimbledeps-${{ matrix.os }}-${{ env.NIMBLE_VERSION }}-${{ hashFiles('status_go.nimble') }}
+            ~/.cache/nim
+            ~/nimcache
+          key: nimble-${{ matrix.os }}-${{ env.NIMBLE_VERSION }}-${{ hashFiles('status_go.nimble') }}
+          restore-keys: nimble-${{ matrix.os }}-${{ env.NIMBLE_VERSION }}-
 
       - name: Generate
         run: make generate
@@ -108,6 +124,19 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
+          cache: false
+
+      - name: Locate the Go module cache
+        id: go-env
+        shell: bash
+        run: echo "modcache=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Go modules
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.go-env.outputs.modcache }}
+          key: gomod-${{ matrix.target }}-${{ hashFiles('go.sum') }}
+          restore-keys: gomod-${{ matrix.target }}-
 
       - uses: nim-lang/setup-nimble-action@b2eed48dc4ff7b6c1c5704fe9237ab6736c561cb # master: arch detection (#16)
         with:
@@ -131,13 +160,16 @@ jobs:
         with:
           ndk-version: r27c
 
-      - name: Cache Nim dependencies
+      - name: Cache Nim dependencies and build cache
         uses: actions/cache@v4
         with:
           path: |
             nimbledeps
             ~/.nimble/nimbinaries
-          key: nimbledeps-${{ matrix.target }}-${{ env.NIMBLE_VERSION }}-${{ hashFiles('status_go.nimble') }}
+            ~/.cache/nim
+            ~/nimcache
+          key: nimble-${{ matrix.target }}-${{ env.NIMBLE_VERSION }}-${{ hashFiles('status_go.nimble') }}
+          restore-keys: nimble-${{ matrix.target }}-${{ env.NIMBLE_VERSION }}-
 
       - name: Build the Android library
         if: startsWith(matrix.target, 'android')
