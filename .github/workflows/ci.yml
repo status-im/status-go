@@ -1,0 +1,201 @@
+name: ci
+
+permissions:
+  contents: read
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GO_VERSION: '1.26.5'
+  NIMBLE_VERSION: '0.26.0'
+  PROTOC_VERSION: '36.0'
+
+jobs:
+  desktop:
+    name: 'status-go / ${{ matrix.os }}'
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    defaults:
+      run:
+        shell: ${{ matrix.os == 'windows-latest' && 'msys2 {0}' || 'bash' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: false
+
+      - name: Locate the Go module cache
+        id: go-env
+        shell: bash
+        run: |
+          echo "modcache=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
+          # The Makefile defaults GOPATH to $HOME/go, and MSYS2 has its own HOME.
+          echo "GOPATH=$(go env GOPATH)" >> "$GITHUB_ENV"
+
+      - name: Cache Go modules
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.go-env.outputs.modcache }}
+          key: gomod-${{ matrix.os }}-${{ hashFiles('go.sum') }}
+          restore-keys: gomod-${{ matrix.os }}-
+
+      - uses: nim-lang/setup-nimble-action@b2eed48dc4ff7b6c1c5704fe9237ab6736c561cb # master: arch detection (#16)
+        with:
+          nimble-version: ${{ env.NIMBLE_VERSION }}
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Shorten TEMP path for nimble
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path C:\T | Out-Null
+          "TEMP=C:\T" >> $env:GITHUB_ENV
+          "TMP=C:\T"  >> $env:GITHUB_ENV
+
+      - name: Allow long paths in git
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: git config --global core.longpaths true
+
+      - uses: msys2/setup-msys2@v2
+        if: runner.os == 'Windows'
+        with:
+          msystem: MINGW64
+          path-type: inherit
+          install: >-
+            make
+            unzip
+
+      - name: Install protoc
+        run: |
+          case "${{ runner.os }}-${{ runner.arch }}" in
+            Linux-X64)   asset=linux-x86_64 ;;
+            macOS-ARM64) asset=osx-aarch_64 ;;
+            Windows-X64) asset=win64 ;;
+          esac
+          curl -sSfL -o protoc.zip "https://github.com/protocolbuffers/protobuf/releases/download/v${PROTOC_VERSION}/protoc-${PROTOC_VERSION}-${asset}.zip"
+          mkdir -p "$HOME/protoc" && unzip -q -o protoc.zip -d "$HOME/protoc"
+          echo "$HOME/protoc/bin" >> "$GITHUB_PATH"
+
+      - name: Cache Nim dependencies and build cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            nimbledeps
+            ~/.nimble/nimbinaries
+            ~/.cache/nim
+            ~/nimcache
+          key: nimble-${{ matrix.os }}-${{ env.NIMBLE_VERSION }}-${{ hashFiles('status_go.nimble') }}
+          restore-keys: nimble-${{ matrix.os }}-${{ env.NIMBLE_VERSION }}-
+
+      - name: Generate
+        run: make generate
+
+      - name: Build the shared library
+        run: make statusgo-shared-library
+
+      - name: Build status-backend
+        run: make status-backend
+
+  mobile:
+    name: 'status-go / ${{ matrix.target }}'
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: android-arm64
+            os: ubuntu-latest
+          - target: ios-arm64
+            os: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: false
+
+      - name: Locate the Go module cache
+        id: go-env
+        shell: bash
+        run: |
+          echo "modcache=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
+          # The Makefile defaults GOPATH to $HOME/go, and MSYS2 has its own HOME.
+          echo "GOPATH=$(go env GOPATH)" >> "$GITHUB_ENV"
+
+      - name: Cache Go modules
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.go-env.outputs.modcache }}
+          key: gomod-${{ matrix.target }}-${{ hashFiles('go.sum') }}
+          restore-keys: gomod-${{ matrix.target }}-
+
+      - uses: nim-lang/setup-nimble-action@b2eed48dc4ff7b6c1c5704fe9237ab6736c561cb # master: arch detection (#16)
+        with:
+          nimble-version: ${{ env.NIMBLE_VERSION }}
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install protoc
+        run: |
+          case "${{ runner.os }}-${{ runner.arch }}" in
+            Linux-X64)   asset=linux-x86_64 ;;
+            macOS-ARM64) asset=osx-aarch_64 ;;
+          esac
+          curl -sSfL -o protoc.zip "https://github.com/protocolbuffers/protobuf/releases/download/v${PROTOC_VERSION}/protoc-${PROTOC_VERSION}-${asset}.zip"
+          mkdir -p "$HOME/protoc" && unzip -q -o protoc.zip -d "$HOME/protoc"
+          echo "$HOME/protoc/bin" >> "$GITHUB_PATH"
+
+      - name: Set up Android NDK
+        if: startsWith(matrix.target, 'android')
+        id: ndk
+        uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: r27c
+
+      - name: Cache Nim dependencies and build cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            nimbledeps
+            ~/.nimble/nimbinaries
+            ~/.cache/nim
+            ~/nimcache
+          key: nimble-${{ matrix.target }}-${{ env.NIMBLE_VERSION }}-${{ hashFiles('status_go.nimble') }}
+          restore-keys: nimble-${{ matrix.target }}-${{ env.NIMBLE_VERSION }}-
+
+      - name: Build the Android library
+        if: startsWith(matrix.target, 'android')
+        run: make statusgo-android-library ARCH=arm64 ANDROID_NDK_ROOT="${{ steps.ndk.outputs.ndk-path }}"
+
+      - name: Build the iOS library
+        if: startsWith(matrix.target, 'ios')
+        run: make statusgo-ios-library ARCH=arm64
+
+  nix:
+    name: 'status-go / nix package'
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: cachix/install-nix-action@v31
+        with:
+          extra_nix_config: |
+            accept-flake-config = true
+
+      - name: Build the status-go-library package
+        run: nix build -L .#status-go-library
