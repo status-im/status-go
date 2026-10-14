@@ -244,3 +244,30 @@ func (s *ManagerSuite) TestRosterClockStaysMonotonicWhenEventsAreCleared() {
 	s.Require().Contains(response.Changes.MembersAdded, removedKey)
 	s.Require().Greater(s.rosterDeltaClock(response.Changes), removalClock)
 }
+
+// The cached row joins the community events; writing them must not leave a
+// snapshot read before the write in the cache.
+func (s *ManagerSuite) TestSaveCommunityEventsInvalidatesSnapshot() {
+	community := s.addRosterMember(s.createRosterCommunity().ID())
+	s.Require().NoError(s.manager.SaveCommunity(community))
+
+	_, err := s.manager.GetCommunityMembers(community.ID())
+	s.Require().NoError(err)
+
+	eventClock := community.Clock() + 100
+	community.config.EventsData = &EventsData{
+		EventsBaseCommunityDescription: []byte("base"),
+		Events:                         []CommunityEvent{{CommunityEventClock: eventClock}},
+	}
+	s.Require().NoError(s.manager.saveCommunityEvents(community))
+
+	snapshot, err := s.manager.GetCommunityMembers(community.ID())
+	s.Require().NoError(err)
+	s.Require().Equal(eventClock, snapshot.Clock)
+
+	s.Require().NoError(s.manager.deleteCommunityEvents(community.ID()))
+
+	snapshot, err = s.manager.GetCommunityMembers(community.ID())
+	s.Require().NoError(err)
+	s.Require().Equal(community.Clock(), snapshot.Clock)
+}
