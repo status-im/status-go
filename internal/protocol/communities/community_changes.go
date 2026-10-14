@@ -178,6 +178,20 @@ func (c *CommunityChanges) chatChanges(chatID string) *CommunityChatChanges {
 	return c.ChatsModified[chatID]
 }
 
+// HasRosterChanges reports whether the changes add, remove or modify a
+// community or channel member.
+func (c *CommunityChanges) HasRosterChanges() bool {
+	if len(c.MembersAdded) > 0 || len(c.MembersRemoved) > 0 || len(c.MembersModified) > 0 {
+		return true
+	}
+	for _, chat := range c.ChatsModified {
+		if len(chat.MembersAdded) > 0 || len(chat.MembersRemoved) > 0 || len(chat.MembersModified) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
 func (c *CommunityChanges) HasNewMember(identity string) bool {
 	if len(c.MembersAdded) == 0 {
 		return false

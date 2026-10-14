@@ -2986,6 +2986,9 @@ type ReceivedMessageState struct {
 	AllBookmarks            map[string]*browsers.Bookmark
 	AllVerificationRequests []*verification.Request
 	AllTrustStatus          map[string]verification.TrustStatus
+	// processedCommunityChanges counts the Response.CommunityChanges already
+	// handled by processCommunityChanges
+	processedCommunityChanges int
 }
 
 // addNewMessageNotification takes a common.Message and generates a new NotificationBody and appends it to the
