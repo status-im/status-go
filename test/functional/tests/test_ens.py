@@ -81,15 +81,6 @@ def cast_rpc(foundry, method, params=None):
     return result.output.decode().strip()
 
 
-@retry_anvil_read
-def get_block_timestamp(foundry):
-    cmd = f"cast block latest --field timestamp --rpc-url {constants.ANVIL_RPC_URL}"
-    result = foundry.container.exec_run(cmd)
-    if result.exit_code != 0:
-        raise RuntimeError(f"get_block_timestamp failed: {result.output.decode().strip()}")
-    return int(result.output.decode().strip())
-
-
 def sync_registry_to_well_known(foundry, registry_addr, username):
     """Sync deployed registry storage to well-known address so Go code can read it."""
     foundry.ensure_anvil_reachable()
@@ -147,10 +138,8 @@ def register_ens_name(foundry, ens_addresses, username, account_address, public_
 
 def register_and_sync_ens_name(foundry, ens_addresses, username, account_address, public_key):
     with anvil_lock():
-        registered_at = get_block_timestamp(foundry)
         register_ens_name(foundry, ens_addresses, username, account_address, public_key)
         sync_registry_to_well_known(foundry, ens_addresses["registry"], username)
-    return registered_at
 
 
 MAINNET_NETWORK = {
@@ -420,7 +409,7 @@ class TestEnsRegistration:
         full_name = f"{username}.stateofus.eth"
         one_year_seconds = 365 * 24 * 60 * 60
 
-        registered_at = register_and_sync_ens_name(
+        register_and_sync_ens_name(
             self.foundry,
             self.ens_addresses,
             username,
@@ -435,9 +424,11 @@ class TestEnsRegistration:
         expire_time = int(expire_hex, 16)
         logger.info(f"Expiration timestamp: {expire_time}")
 
-        expected_expire = registered_at + one_year_seconds
-        delta = abs(expire_time - expected_expire)
-        assert delta < 60, f"Expiration {expire_time} too far from expected {expected_expire} (delta={delta}s)"
+        label = cast_keccak(self.foundry, username)
+        creation_raw = cast_call(self.foundry, self.ens_addresses["registrar"], "getCreationTime(bytes32)(uint256)", [label])
+        creation_time = int(creation_raw.strip().split()[0])
+        expected_expire = creation_time + one_year_seconds
+        assert expire_time == expected_expire, f"Expiration {expire_time} != creation {creation_time} + 1 year ({expected_expire})"
 
         with anvil_snapshot(self.foundry):
             half_year_seconds = 180 * 24 * 60 * 60

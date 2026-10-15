@@ -8,6 +8,7 @@ import resources.constants as constants
 from clients.api import ApiResponseError
 from resources.constants import BURN_ADDRESS
 from utils import wallet_utils
+from utils.anvil_lock import anvil_lock
 
 
 @pytest.mark.rpc
@@ -42,18 +43,19 @@ class TestRouter:
             "gasFeeMode": gas_fee_mode,
         }
 
-        routes = wallet_utils.get_suggested_routes(self.rpc_client, **params)
-        assert len(routes["Route"]) > 0
-        wallet_router_sign_transactions = wallet_utils.build_transactions_from_route(self.rpc_client, uuid)
-        if wallet_router_sign_transactions is None:
-            raise ValueError("wallet_router_sign_transactions is None")
+        with anvil_lock():
+            routes = wallet_utils.get_suggested_routes(self.rpc_client, **params)
+            assert len(routes["Route"]) > 0
+            wallet_router_sign_transactions = wallet_utils.build_transactions_from_route(self.rpc_client, uuid)
+            if wallet_router_sign_transactions is None:
+                raise ValueError("wallet_router_sign_transactions is None")
 
-        if "signingDetails" not in wallet_router_sign_transactions:
-            raise ValueError("signingDetails not found in wallet_router_sign_transactions")
+            if "signingDetails" not in wallet_router_sign_transactions:
+                raise ValueError("signingDetails not found in wallet_router_sign_transactions")
 
-        transaction_hashes = wallet_router_sign_transactions["signingDetails"]["hashes"]
-        tx_signatures = wallet_utils.sign_messages(self.rpc_client, transaction_hashes, self.wallet_address)
-        tx_status = wallet_utils.send_router_transactions_with_signatures(self.rpc_client, uuid, tx_signatures)
+            transaction_hashes = wallet_router_sign_transactions["signingDetails"]["hashes"]
+            tx_signatures = wallet_utils.sign_messages(self.rpc_client, transaction_hashes, self.wallet_address)
+            tx_status = wallet_utils.send_router_transactions_with_signatures(self.rpc_client, uuid, tx_signatures)
 
         # Check tx details
         tx_data = self.anvil_client.get_transaction(tx_status["hash"])

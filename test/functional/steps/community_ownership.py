@@ -20,6 +20,8 @@ from clients.signals import SignalType
 from clients.status_backend import StatusBackend
 from steps import community_token_deploy, community_tokens, messenger
 from steps.community_tokens import NATIVE_TOKEN_ADDRESS
+from utils import wallet_utils
+import resources.constants as constants
 
 logger = logging.getLogger(__name__)
 
@@ -76,30 +78,44 @@ def resolve_owner_token_id(anvil_client, owner_token_address: str, holder_addres
 
 
 def transfer_owner_token_to_new_owner(
+    owner_backend: StatusBackend,
     anvil_client,
     owner_token_address: str,
     from_wallet: str,
     to_wallet: str,
     token_id: Optional[int] = None,
 ) -> int:
-    # Test-only: Anvil impersonation, no private key. App equivalent is an ERC721_TRANSFER route.
+    """Transfer the community Owner NFT via wallet router ERC721_TRANSFER."""
     from_wallet = Web3.to_checksum_address(from_wallet)
     to_wallet = Web3.to_checksum_address(to_wallet)
     if token_id is None:
         token_id = resolve_owner_token_id(anvil_client, owner_token_address, from_wallet)
 
-    contract = anvil_client.eth.contract(address=Web3.to_checksum_address(owner_token_address), abi=ERC721_OWNERSHIP_ABI)
-    _anvil_rpc(anvil_client, "anvil_impersonateAccount", [from_wallet])
-    try:
-        tx_hash = contract.functions.safeTransferFrom(from_wallet, to_wallet, token_id).transact({"from": from_wallet})
-        receipt = anvil_client.eth.wait_for_transaction_receipt(tx_hash, timeout=60)
-        assert receipt.get("status") == 1, f"Owner token transfer failed: {receipt}"
-    finally:
-        _anvil_rpc(anvil_client, "anvil_stopImpersonatingAccount", [from_wallet])
+    chain_id = owner_backend.network_id
+    token_key = wallet_utils.collectible_token_key(chain_id, owner_token_address, token_id)
+    owner_backend.wallet_service.restart_wallet_reload_timer()
+    owner_backend.wallet_service.get_balances_at_by_chain([from_wallet], [f"{chain_id}-{NATIVE_TOKEN_ADDRESS}"])
 
+    wallet_utils.send_router_transaction(
+        owner_backend,
+        uuid=str(uuid.uuid4()),
+        sendType=int(WalletSendType.ERC721_TRANSFER),
+        addrFrom=from_wallet,
+        addrTo=to_wallet,
+        amountIn="0x1",
+        amountOut="0x0",
+        tokenKey=token_key,
+        tokenIDIsOwnerToken=True,
+        toTokenKey=token_key,
+        fromChainID=chain_id,
+        toChainID=chain_id,
+        gasFeeMode=constants.gas_fee_mode_medium,
+    )
+
+    contract = anvil_client.eth.contract(address=Web3.to_checksum_address(owner_token_address), abi=ERC721_OWNERSHIP_ABI)
     new_owner = contract.functions.ownerOf(token_id).call()
     assert new_owner.lower() == to_wallet.lower(), f"Owner token still held by {new_owner}, expected {to_wallet}"
-    logger.info(f"Transferred owner token {owner_token_address}#{token_id} from {from_wallet} to {to_wallet}")
+    logger.info(f"Transferred owner token {owner_token_address}#{token_id} from {from_wallet} to {to_wallet} via ERC721_TRANSFER")
     return token_id
 
 
@@ -459,7 +475,7 @@ def transfer_community_ownership(
     # Persist the type-6 permission while the old owner is still the verified signer, then flip it.
     assert_new_owner_receives_owner_permission(owner_backend, new_owner_backend, community_id)
 
-    transfer_owner_token_to_new_owner(anvil_client, owner_token_address, owner_wallet, new_owner_wallet)
+    transfer_owner_token_to_new_owner(owner_backend, anvil_client, owner_token_address, owner_wallet, new_owner_wallet)
     register_owner_token_on_backend(new_owner_backend, community_id, owner_token_address)
     set_signer_pubkey(new_owner_backend, community_id, owner_token_address)
 

@@ -18,6 +18,8 @@ from typing import (
 )
 from hexbytes import HexBytes
 
+from utils.anvil_lock import anvil_lock
+
 
 class Anvil(Web3):
 
@@ -70,7 +72,9 @@ class Anvil(Web3):
         return self.eth.get_transaction_receipt(HexStr(tx_hash))
 
     def send_raw_transaction(self, transaction: Union[HexStr, bytes]) -> HexBytes:
-        return self.eth.send_raw_transaction(transaction)
+        with anvil_lock():
+            return self.eth.send_raw_transaction(transaction)
 
     def set_balance(self, address: str, raw_amount: int):
-        return self.provider.make_request(RPCEndpoint("anvil_setBalance"), [address, hex(raw_amount)])
+        with anvil_lock():
+            return self.provider.make_request(RPCEndpoint("anvil_setBalance"), [address, hex(raw_amount)])
