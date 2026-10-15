@@ -117,14 +117,18 @@ pipeline {
       } }
     }
 
+    stage('Token Library Coexistence') {
+      when { expression { !params.UNIT_TEST_DRY_RUN } }
+      steps { script {
+        nix.develop('make test-libtkl-coexistence', pure: false)
+      } }
+    }
+
     stage('Unit Tests') {
       environment {
         TEST_POSTGRES_PORT = "${env.DB_PORT}"
       }
       steps { script {
-        if (!params.UNIT_TEST_DRY_RUN) {
-          nix.develop('make test-libtkl-coexistence', pure: false)
-        }
         db = docker.image('postgres:9.6-alpine').withRun([
           "--name=${DB_CONT}",
           "--env=POSTGRES_HOST_AUTH_METHOD=trust",
