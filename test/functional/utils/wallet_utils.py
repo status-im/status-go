@@ -4,7 +4,9 @@ import uuid as uuid_lib
 
 import resources.constants as constants
 from clients.signals import SignalType, WalletEventType
+from clients.wallet_pending_tx_status import WalletPendingTxStatus
 
+from utils.anvil_lock import anvil_lock
 from utils.config import Config
 
 
@@ -136,18 +138,35 @@ def check_fees_for_path(path_name, gas_fee_mode, check_approval, route):
         )
 
 
+def _pending_tx_status(signal: dict) -> dict | None:
+    event = signal.get("event") or {}
+    if event.get("type") != WalletEventType.TRANSACTIONS_PENDING_TRANSACTION_STATUS_CHANGED.value:
+        return None
+    try:
+        tx_status = json.loads(event.get("message", "{}").replace("'", '"'))
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(tx_status, dict):
+        return None
+    return tx_status
+
+
+def _is_final_tx_status(signal: dict) -> bool:
+    tx_status = _pending_tx_status(signal)
+    return tx_status is not None and tx_status.get("status") in (WalletPendingTxStatus.SUCCESS, WalletPendingTxStatus.FAILED)
+
+
 def send_router_transactions_with_signatures(rpc_client, uuid, tx_signatures):
-    with rpc_client.expect_signal(
+    with anvil_lock(), rpc_client.expect_signal(
         SignalType.WALLET,
         timeout=60,
-        accept_fn=lambda signal: signal["event"]["type"] == WalletEventType.TRANSACTIONS_PENDING_TRANSACTION_STATUS_CHANGED.value,
+        accept_fn=_is_final_tx_status,
     ) as exp:
         _ = rpc_client.wallet_service.send_router_transactions_with_signatures(uuid, tx_signatures)
+
     event_response = exp.result["event"]
     tx_status = json.loads(event_response["message"].replace("'", '"'))
-
-    assert tx_status["status"] == "Success"
-
+    assert tx_status["status"] == WalletPendingTxStatus.SUCCESS, tx_status
     return tx_status
 
 
