@@ -11,6 +11,7 @@ from clients.signals import SignalType
 import resources.constants as constants
 from steps import async_messenger
 from utils import wallet_utils
+from utils.anvil_lock import anvil_lock
 from utils.config import Config
 
 logger = logging.getLogger(__name__)
@@ -26,7 +27,7 @@ def cast_send(foundry, to, sig, args, private_key=constants.DEPLOYER_ACCOUNT.pri
     foundry.ensure_anvil_reachable()
     args_str = " ".join(str(a) for a in args)
     cmd = f"cast send {to} '{sig}' {args_str} --rpc-url {constants.ANVIL_RPC_URL} --private-key {private_key}"
-    result = foundry.container.exec_run(cmd)
+    result = foundry.exec_anvil(cmd)
     if result.exit_code != 0:
         raise RuntimeError(f"cast send failed: {result.output.decode().strip()}")
     return result.output.decode().strip()
@@ -104,12 +105,13 @@ def sync_registry_to_well_known(foundry, registry_addr, username):
 def anvil_snapshot(foundry):
     """Snapshot Anvil state and revert on exit. Use around evm_increaseTime
     to prevent permanent timestamp drift from affecting other tests."""
-    raw = cast_rpc(foundry, "evm_snapshot")
-    snapshot_id = json.loads(raw)
-    try:
-        yield snapshot_id
-    finally:
-        cast_rpc(foundry, "evm_revert", [snapshot_id])
+    with anvil_lock():
+        raw = cast_rpc(foundry, "evm_snapshot")
+        snapshot_id = json.loads(raw)
+        try:
+            yield snapshot_id
+        finally:
+            cast_rpc(foundry, "evm_revert", [snapshot_id])
 
 
 def register_ens_name(foundry, ens_addresses, username, account_address, public_key):
@@ -144,8 +146,11 @@ def register_ens_name(foundry, ens_addresses, username, account_address, public_
 
 
 def register_and_sync_ens_name(foundry, ens_addresses, username, account_address, public_key):
-    register_ens_name(foundry, ens_addresses, username, account_address, public_key)
-    sync_registry_to_well_known(foundry, ens_addresses["registry"], username)
+    with anvil_lock():
+        registered_at = get_block_timestamp(foundry)
+        register_ens_name(foundry, ens_addresses, username, account_address, public_key)
+        sync_registry_to_well_known(foundry, ens_addresses["registry"], username)
+    return registered_at
 
 
 MAINNET_NETWORK = {
@@ -415,7 +420,7 @@ class TestEnsRegistration:
         full_name = f"{username}.stateofus.eth"
         one_year_seconds = 365 * 24 * 60 * 60
 
-        register_and_sync_ens_name(
+        registered_at = register_and_sync_ens_name(
             self.foundry,
             self.ens_addresses,
             username,
@@ -430,8 +435,7 @@ class TestEnsRegistration:
         expire_time = int(expire_hex, 16)
         logger.info(f"Expiration timestamp: {expire_time}")
 
-        current_time = get_block_timestamp(self.foundry)
-        expected_expire = current_time + one_year_seconds
+        expected_expire = registered_at + one_year_seconds
         delta = abs(expire_time - expected_expire)
         assert delta < 60, f"Expiration {expire_time} too far from expected {expected_expire} (delta={delta}s)"
 
