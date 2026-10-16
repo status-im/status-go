@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 
 	"github.com/golang/protobuf/proto"
+	protoV2 "google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/reflect/protoreflect"
 
 	"github.com/status-im/status-go/internal/protocol/identity"
 	"github.com/status-im/status-go/internal/protocol/identity/alias"
@@ -165,14 +167,17 @@ func (s *CommunitySuite) TestCommunityChangesJSON() {
 	}, delta.RosterAdded[s.member3Key])
 }
 
-// The client in production reads the develop-era keys, so they must keep
-// their names and shapes; roster entries only appear under new keys.
-func (s *CommunitySuite) TestCommunityChangesJSONKeepsExistingKeys() {
+// Member deltas are sent only as roster entries and chats only without their
+// members; channel member deltas and every other key keep their shape.
+func (s *CommunitySuite) TestCommunityChangesJSONKeys() {
 	community := s.rosterCommunity()
 	member := func() *protobuf.CommunityMember {
 		return &protobuf.CommunityMember{Roles: []protobuf.CommunityMember_Roles{protobuf.CommunityMember_ROLE_ADMIN}}
 	}
-	chat := &protobuf.CommunityChat{Identity: &protobuf.ChatIdentity{DisplayName: "chat"}}
+	chat := &protobuf.CommunityChat{
+		Identity: &protobuf.ChatIdentity{DisplayName: "chat"},
+		Members:  map[string]*protobuf.CommunityMember{s.member1Key: member()},
+	}
 	category := &protobuf.CommunityCategory{CategoryId: testCategoryID1, Name: testCategoryName1}
 	permission := NewCommunityTokenPermission(&protobuf.CommunityTokenPermission{Id: "permission"})
 
@@ -210,38 +215,39 @@ func (s *CommunitySuite) TestCommunityChangesJSONKeepsExistingKeys() {
 	bytes, err := json.Marshal(changes)
 	s.Require().NoError(err)
 
+	// marshalling leaves the members of the changes in place
+	s.Require().Contains(chat.Members, s.member1Key)
+	s.Require().Contains(changes.MembersAdded, s.member1Key)
+
 	var parsed map[string]json.RawMessage
 	s.Require().NoError(json.Unmarshal(bytes, &parsed))
 	for _, key := range []string{
-		"community", "controlNodeChanged",
-		"membersAdded", "membersRemoved", "membersBanned", "membersUnbanned",
+		"controlNodeChanged",
+		"membersBanned", "membersUnbanned",
 		"tokenPermissionsAdded", "tokenPermissionsModified", "tokenPermissionsRemoved",
 		"chatsRemoved", "chatsAdded", "chatsModified",
 		"categoriesRemoved", "categoriesAdded", "categoriesModified",
 		"memberWalletsRemoved", "memberWalletsAdded",
 		"memberAdded", "memberRemoved", "memberSoftRemoved", "communityImageModified",
-		"membersModified", "communityId", "clock",
+		"communityId", "clock",
 		"rosterAdded", "rosterRemoved", "rosterModified",
 	} {
 		_, ok := parsed[key]
 		s.Require().True(ok, key)
 	}
+	for _, key := range []string{"membersAdded", "membersRemoved", "membersModified"} {
+		s.Require().NotContains(parsed, key)
+	}
 
-	var communityJSON map[string]json.RawMessage
-	s.Require().NoError(json.Unmarshal(parsed["community"], &communityJSON))
-	s.Require().Equal(`"`+community.IDString()+`"`, string(communityJSON["id"]))
+	// the community itself is sent once, in the response's communities
+	s.Require().NotContains(parsed, "community")
+	s.Require().Equal(`"`+community.IDString()+`"`, string(parsed["communityId"]))
 
-	for key, pubKey := range map[string]string{
-		"membersAdded":    s.member1Key,
-		"membersRemoved":  s.member2Key,
-		"membersModified": s.member3Key,
-	} {
-		var members map[string]map[string]json.RawMessage
-		s.Require().NoError(json.Unmarshal(parsed[key], &members), key)
-		var roles []protobuf.CommunityMember_Roles
-		s.Require().NoError(json.Unmarshal(members[pubKey]["roles"], &roles), key)
-		s.Require().Equal([]protobuf.CommunityMember_Roles{protobuf.CommunityMember_ROLE_ADMIN}, roles, key)
-		s.Require().NotContains(members[pubKey], "pubKey", key)
+	for _, key := range []string{"chatsAdded", "chatsRemoved"} {
+		var chats map[string]map[string]json.RawMessage
+		s.Require().NoError(json.Unmarshal(parsed[key], &chats), key)
+		s.Require().Contains(chats[testChatID2], "identity", key)
+		s.Require().NotContains(chats[testChatID2], "members", key)
 	}
 
 	var chatsModified map[string]map[string]json.RawMessage
@@ -254,6 +260,13 @@ func (s *CommunitySuite) TestCommunityChangesJSONKeepsExistingKeys() {
 	}
 	s.Require().JSONEq(`"`+testCategoryID1+`"`, string(chatsModified[testChatID1]["CategoryModified"]))
 	s.Require().JSONEq(`2`, string(chatsModified[testChatID1]["PositionModified"]))
+	var chatModified map[string]json.RawMessage
+	s.Require().NoError(json.Unmarshal(chatsModified[testChatID1]["ChatModified"], &chatModified))
+	s.Require().Contains(chatModified, "identity")
+	s.Require().NotContains(chatModified, "members")
+	var channelAdded map[string]json.RawMessage
+	s.Require().NoError(json.Unmarshal(chatsModified[testChatID1]["MembersAdded"], &channelAdded))
+	s.Require().Contains(channelAdded, s.member1Key)
 
 	for key, pubKey := range map[string]string{
 		"rosterAdded":    s.member1Key,
@@ -314,19 +327,95 @@ func (s *CommunitySuite) TestMergeKeepsMembersModified() {
 	s.Require().Contains(changes.MembersModified, s.member1Key)
 }
 
-func (s *CommunitySuite) TestMarshalJSONMembersCount() {
+// Members are read through GetCommunityMembers and roster deltas; the
+// community JSON only carries their count.
+func (s *CommunitySuite) TestMarshalJSONCarriesNoMembers() {
 	community := s.rosterCommunity()
+	s.Require().True(community.ChannelEncrypted(testChatID1))
 
 	bytes, err := json.Marshal(community)
 	s.Require().NoError(err)
 
 	var parsed struct {
-		MembersCount int                        `json:"membersCount"`
-		Members      map[string]json.RawMessage `json:"members"`
+		MembersCount int                                   `json:"membersCount"`
+		Members      json.RawMessage                       `json:"members"`
+		Chats        map[string]map[string]json.RawMessage `json:"chats"`
 	}
 	s.Require().NoError(json.Unmarshal(bytes, &parsed))
 	s.Require().Equal(2, parsed.MembersCount)
-	s.Require().Len(parsed.Members, 2)
+	s.Require().Nil(parsed.Members)
+	s.Require().NotEmpty(parsed.Chats)
+	for chatID, chat := range parsed.Chats {
+		s.Require().NotContains(chat, "members", chatID)
+	}
+}
+
+func populatedScalar(fd protoreflect.FieldDescriptor) protoreflect.Value {
+	switch fd.Kind() {
+	case protoreflect.BoolKind:
+		return protoreflect.ValueOfBool(true)
+	case protoreflect.EnumKind:
+		return protoreflect.ValueOfEnum(1)
+	case protoreflect.StringKind:
+		return protoreflect.ValueOfString("x")
+	case protoreflect.BytesKind:
+		return protoreflect.ValueOfBytes([]byte("x"))
+	case protoreflect.Int32Kind, protoreflect.Sint32Kind, protoreflect.Sfixed32Kind:
+		return protoreflect.ValueOfInt32(1)
+	case protoreflect.Int64Kind, protoreflect.Sint64Kind, protoreflect.Sfixed64Kind:
+		return protoreflect.ValueOfInt64(1)
+	case protoreflect.Uint32Kind, protoreflect.Fixed32Kind:
+		return protoreflect.ValueOfUint32(1)
+	case protoreflect.Uint64Kind, protoreflect.Fixed64Kind:
+		return protoreflect.ValueOfUint64(1)
+	case protoreflect.FloatKind:
+		return protoreflect.ValueOfFloat32(1)
+	case protoreflect.DoubleKind:
+		return protoreflect.ValueOfFloat64(1)
+	}
+	panic("unhandled kind " + fd.Kind().String())
+}
+
+// populateAllFields sets every top-level field of m to a non-default value.
+func populateAllFields(m protoreflect.Message) {
+	fields := m.Descriptor().Fields()
+	for i := 0; i < fields.Len(); i++ {
+		fd := fields.Get(i)
+		switch {
+		case fd.IsMap():
+			entries := m.Mutable(fd).Map()
+			value := entries.NewValue()
+			if fd.MapValue().Message() == nil {
+				value = populatedScalar(fd.MapValue())
+			}
+			entries.Set(populatedScalar(fd.MapKey()).MapKey(), value)
+		case fd.IsList():
+			list := m.Mutable(fd).List()
+			element := list.NewElement()
+			if fd.Message() == nil {
+				element = populatedScalar(fd)
+			}
+			list.Append(element)
+		case fd.Message() != nil:
+			m.Mutable(fd)
+		default:
+			m.Set(fd, populatedScalar(fd))
+		}
+	}
+}
+
+// chatWithoutMembers must copy every channel field but the members, so a
+// field added to the proto fails here until it is copied too.
+func (s *CommunitySuite) TestChatWithoutMembersCopiesEveryOtherField() {
+	chat := &protobuf.CommunityChat{}
+	populateAllFields(chat.ProtoReflect())
+
+	expected := protoV2.Clone(chat).(*protobuf.CommunityChat)
+	expected.Members = nil
+
+	stripped := chatWithoutMembers(chat)
+	s.Require().Empty(stripped.Members)
+	s.Require().True(protoV2.Equal(expected, stripped), "chatWithoutMembers dropped a field: %v", stripped)
 }
 
 func (s *CommunitySuite) TestMergeNetsAddThenRemove() {
