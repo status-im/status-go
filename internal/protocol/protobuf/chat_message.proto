@@ -50,6 +50,16 @@ message EditMessage {
   UnfurledStatusLinks unfurled_status_links = 9;
 }
 
+message ThreadMetadata {
+  uint64 clock = 1;
+  string chat_id = 2;
+  string thread_id = 3;
+  string name = 4;
+  // Set only while establishing creator provenance. It must match the signer.
+  string creator_id = 5;
+  MessageType message_type = 6;
+}
+
 message DeleteMessage {
   uint64 clock = 1;
 
