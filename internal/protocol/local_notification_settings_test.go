@@ -9,6 +9,8 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/status-im/status-go/internal/crypto"
+	"github.com/status-im/status-go/internal/crypto/types"
+	"github.com/status-im/status-go/internal/protocol/requests"
 	"github.com/status-im/status-go/internal/testutils"
 )
 
@@ -164,6 +166,70 @@ func (s *LocalNotificationSettingsSuite) TestGroupChatsTurnOff() {
 
 	s.Require().NotEmpty(bobResponse.Messages())
 	s.Require().Empty(bobResponse.Notifications(), "GroupChats=TurnOff should produce no local notifications")
+}
+
+// TestContactRequestsTurnOff_OneToOneContactRequest verifies that one-to-one
+// pending contact requests obey the dedicated ContactRequests setting instead
+// of falling through to the generic one-to-one chat notification setting.
+func (s *LocalNotificationSettingsSuite) TestContactRequestsTurnOff_OneToOneContactRequest() {
+	bob := s.m
+	alice := s.newMessenger()
+
+	s.Require().NoError(bob.settings.SetContactRequests(notifValueTurnOff))
+	s.Require().NoError(bob.settings.SetOneToOneChats(notifValueSendAlerts))
+
+	request := &requests.SendContactRequest{
+		ID:      types.EncodeHex(crypto.FromECDSAPub(&bob.identity.PublicKey)),
+		Message: "hello!",
+	}
+	_, err := alice.SendContactRequest(context.Background(), request)
+	s.Require().NoError(err)
+
+	response, err := WaitOnMessengerResponse(
+		bob,
+		func(r *MessengerResponse) bool {
+			return len(r.Messages()) >= 2 && len(r.ActivityCenterNotifications()) == 1
+		},
+		"contact request not received",
+	)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+
+	s.Require().NotEmpty(response.Messages())
+	s.Require().NotEmpty(response.ActivityCenterNotifications())
+	s.Require().Empty(response.Notifications(), "ContactRequests=TurnOff should suppress 1:1 contact request local notifications")
+}
+
+// TestContactRequestsSendAlerts_OneToOneContactRequest verifies that enabling
+// ContactRequests keeps the existing one-to-one contact request alert behavior,
+// even when ordinary one-to-one chat messages are muted separately.
+func (s *LocalNotificationSettingsSuite) TestContactRequestsSendAlerts_OneToOneContactRequest() {
+	bob := s.m
+	alice := s.newMessenger()
+
+	s.Require().NoError(bob.settings.SetContactRequests(notifValueSendAlerts))
+	s.Require().NoError(bob.settings.SetOneToOneChats(notifValueTurnOff))
+
+	request := &requests.SendContactRequest{
+		ID:      types.EncodeHex(crypto.FromECDSAPub(&bob.identity.PublicKey)),
+		Message: "hello!",
+	}
+	_, err := alice.SendContactRequest(context.Background(), request)
+	s.Require().NoError(err)
+
+	response, err := WaitOnMessengerResponse(
+		bob,
+		func(r *MessengerResponse) bool {
+			return len(r.Messages()) >= 2 && len(r.ActivityCenterNotifications()) == 1
+		},
+		"contact request not received",
+	)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+
+	s.Require().NotEmpty(response.Messages())
+	s.Require().NotEmpty(response.ActivityCenterNotifications())
+	s.Require().NotEmpty(response.Notifications(), "ContactRequests=SendAlerts should allow 1:1 contact request local notifications")
 }
 
 // TestContactRequestsTurnOff_GroupInvite verifies that when ContactRequests is TurnOff,
