@@ -731,6 +731,10 @@ func (m *Manager) JoinedOrSpectated() ([]*Community, error) {
 	return m.persistence.JoinedOrSpectatedCommunities(&m.identity.PublicKey)
 }
 
+func (m *Manager) JoinedOrSpectatedMuteStatuses() ([]CommunityMuteStatus, error) {
+	return m.persistence.JoinedOrSpectatedCommunitiesMuteStatus()
+}
+
 func (m *Manager) CommunityUpdateLastOpenedAt(communityID cryptotypes.HexBytes, timestamp int64) (*Community, error) {
 	m.communityLock.Lock(communityID)
 	defer m.communityLock.Unlock(communityID)
