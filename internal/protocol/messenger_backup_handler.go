@@ -3,6 +3,7 @@ package protocol
 import (
 	"context"
 	"database/sql"
+	"slices"
 
 	"go.uber.org/zap"
 
@@ -37,13 +38,20 @@ func (m *Messenger) handleLocalBackup(ctx context.Context, state *ReceivedMessag
 		errors = append(errors, err)
 	}
 
-	if len(backup.Messages) > 0 {
+	if len(backup.Messages) > 0 || len(backup.Threads) > 0 {
 		err := m.persistence.SaveBackedUpMessages(backup.Messages)
 		if err != nil {
 			errors = append(errors, err)
 		}
 
-		signal.LocalMessageBackupDone()
+		threadErr := m.persistence.SaveBackedUpThreads(backup.Threads)
+		if threadErr != nil {
+			errors = append(errors, threadErr)
+		}
+
+		if err == nil && threadErr == nil {
+			signal.LocalMessageBackupDone()
+		}
 	}
 
 	for _, contact := range backup.Contacts {
@@ -64,6 +72,35 @@ func (m *Messenger) handleLocalBackup(ctx context.Context, state *ReceivedMessag
 	}
 
 	return errors
+}
+
+func (m *Messenger) addBackedUpThreadsToResponse(response *MessengerResponse, backedUpThreads []*protobuf.BackedUpThread) error {
+	if !m.featureFlags.Threads {
+		return nil
+	}
+
+	identities := make([]threadIdentity, 0, len(backedUpThreads))
+	seen := make(map[threadIdentity]struct{})
+	for _, backedUpThread := range backedUpThreads {
+		if backedUpThread == nil {
+			continue
+		}
+		identity := threadIdentity{chatID: backedUpThread.ChatId, threadID: backedUpThread.ThreadId}
+		if _, ok := seen[identity]; ok {
+			continue
+		}
+		seen[identity] = struct{}{}
+		identities = append(identities, identity)
+	}
+
+	for batch := range slices.Chunk(identities, 100) {
+		threads, err := m.persistence.threadsWithSummariesByIDs(batch)
+		if err != nil {
+			return err
+		}
+		response.AddThreads(threads)
+	}
+	return nil
 }
 
 func (m *Messenger) handleBackedUpProfile(message *protobuf.BackedUpProfile, backupTime uint64) error {

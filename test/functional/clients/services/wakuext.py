@@ -444,6 +444,7 @@ class WakuextService(Service):
         content_type=MessageContentType.TEXT_PLAIN.value,
         responseTo: str = "",
         image_path: str = "",
+        thread_id: str = "",
     ):
         payload = {
             "chatId": chat_id,
@@ -453,6 +454,8 @@ class WakuextService(Service):
         }
         if image_path:
             payload["imagePath"] = image_path
+        if thread_id:
+            payload["threadId"] = thread_id
         params = [payload]
         response = self.rpc_request("sendChatMessage", params)
         return response
@@ -502,6 +505,18 @@ class WakuextService(Service):
         params = [chat_id, cursor, limit]
         response = self.rpc_request("chatMessages", params)
         return response
+
+    def create_thread(self, chat_id: str, parent_message_id: str):
+        return self.rpc_request("createThread", [chat_id, parent_message_id])
+
+    def chat_threads(self, chat_id: str):
+        return self.rpc_request("chatThreads", [chat_id])
+
+    def chat_thread_messages(self, chat_id: str, thread_id: str, cursor: str = "", limit: int = 10):
+        return self.rpc_request("chatMessagesV2", [chat_id, thread_id, cursor, limit])
+
+    def mark_thread_read(self, chat_id: str, thread_id: str):
+        return self.rpc_request("markThreadRead", [chat_id, thread_id])
 
     def message_by_message_id(self, message_id: str):
         params = [message_id]
