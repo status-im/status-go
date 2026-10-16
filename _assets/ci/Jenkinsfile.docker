@@ -52,16 +52,23 @@ pipeline {
   }
 
   stages {
-    stage('Prep') { steps { dir(env.REPO) { script {
-      println("Output: ${env.DOCKER_IMAGE_NAME}:${env.RELEASE_IMAGE_TAG}")
-    } } } }
+    stage('Prep') {
+      options { timeout(time: 5, unit: 'MINUTES') }
+      steps { dir(env.REPO) { script {
+        println("Output: ${env.DOCKER_IMAGE_NAME}:${env.RELEASE_IMAGE_TAG}")
+      } } }
+    }
 
-    stage('Build') { steps { dir(env.REPO) { script {
-      sh 'make docker-image'
-      image = docker.image("${env.DOCKER_IMAGE_NAME}:${env.DOCKER_IMAGE_CUSTOM_TAG}")
-    } } } }
+    stage('Build') {
+      options { timeout(time: 10, unit: 'MINUTES') }
+      steps { dir(env.REPO) { script {
+        sh 'make docker-image'
+        image = docker.image("${env.DOCKER_IMAGE_NAME}:${env.DOCKER_IMAGE_CUSTOM_TAG}")
+      } } }
+    }
 
     stage('Deploy') {
+      options { timeout(time: 10, unit: 'MINUTES') }
       when { expression { params.RELEASE == true } }
       steps { dir(env.REPO) { script {
         withDockerRegistry([credentialsId: 'harbor-status-go-robot', url: 'https://harbor.status.im']) {

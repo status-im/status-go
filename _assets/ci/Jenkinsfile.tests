@@ -104,6 +104,7 @@ pipeline {
 
   stages {
     stage('Prep') {
+      options { timeout(time: 5, unit: 'MINUTES') }
       steps {
         /* Go needs to find status-go in GOPATH. */
         sh "mkdir -p \$(dirname ${REPO_SRC})"
@@ -112,12 +113,14 @@ pipeline {
     }
 
     stage('Generate') {
+      options { timeout(time: 20, unit: 'MINUTES') }
       steps { script {
         nix.develop('make generate', pure: false)
       } }
     }
 
     stage('Unit Tests') {
+      options { timeout(time: getUnitTestTimeout(), unit: 'MINUTES') }
       environment {
         TEST_POSTGRES_PORT = "${env.DB_PORT}"
       }
@@ -198,6 +201,9 @@ def isPRJob() { !isNightlyJob() && !isDevelopJob() }
 def getDefaultUnitTestCount() { isNightlyJob() ? '20' : '1' }
 
 def getDefaultTimeout() { isNightlyJob() ? 5*60 : 50 }
+
+/* Stage timeout must stay below the overall pipeline timeout. */
+def getUnitTestTimeout() { isNightlyJob() ? 4*60 : 40 }
 
 def getAmountToKeep() { isNightlyJob() ? '14' : isDevelopJob() ? '30' : '5' }
 
