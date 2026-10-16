@@ -4,7 +4,7 @@ import re
 import time
 import uuid
 from dataclasses import dataclass
-from typing import Optional, Tuple
+from typing import Callable, Optional, Tuple
 
 from web3 import Web3
 
@@ -25,6 +25,7 @@ from clients.status_backend import StatusBackend
 from clients.services.wallet_send_type import WalletSendType
 from steps import community_tokens, messenger
 from steps.community_tokens import NATIVE_TOKEN_ADDRESS
+from utils.anvil_lock import anvil_lock
 from utils.keys import change_community_key_compression
 
 logger = logging.getLogger(__name__)
@@ -88,36 +89,15 @@ def _store_deployed_owner_token(
     )
 
 
-def _wait_wallet_deploy_tx_success(owner_backend: StatusBackend, sent_hashes: list[str], timeout: float = 60) -> dict:
-    def _accept_wallet_signal(signal: dict) -> bool:
-        event = signal.get("event", {})
-        if event.get("type") != "pending-transaction-status-changed":
-            return False
-        try:
-            tx_status = json.loads(event.get("message", "{}").replace("'", '"'))
-        except json.JSONDecodeError:
-            return False
-        if tx_status.get("status") != WalletPendingTxStatus.SUCCESS:
-            return False
-        if sent_hashes:
-            return any(h in sent_hashes for h in _extract_tx_hashes({"event": tx_status}))
-        return True
-
-    with owner_backend.expect_signal(SignalType.WALLET, accept_fn=_accept_wallet_signal, timeout=timeout) as wallet_exp:
-        pass
-
-    wallet_signal = wallet_exp.result
-    assert isinstance(wallet_signal, dict), f"Unexpected wallet signal payload: {wallet_signal}"
-    return json.loads(wallet_signal["event"]["message"].replace("'", '"'))
-
-
-def _resolve_deploy_tx_hash(sent_hashes: list[str], wallet_tx_status: dict) -> Optional[str]:
-    if sent_hashes and _is_valid_tx_hash(sent_hashes[0]):
-        return sent_hashes[0]
-    for candidate in _extract_tx_hashes({"event": wallet_tx_status}):
-        if _is_valid_tx_hash(candidate):
-            return candidate
-    return None
+def _wallet_tx_status(signal: dict) -> Optional[dict]:
+    event = signal.get("event", {})
+    if event.get("type") != "pending-transaction-status-changed":
+        return None
+    try:
+        tx_status = json.loads(event.get("message", "{}").replace("'", '"'))
+    except json.JSONDecodeError:
+        return None
+    return tx_status if isinstance(tx_status, dict) else None
 
 
 def _wait_deploy_owner_token_success_signal(owner_backend: StatusBackend, tx_hash: str, timeout: float = 60) -> dict:
@@ -157,18 +137,12 @@ def deploy_owner_token(
     wallet_account = next(a for a in accounts if not a.get("chat"))
     assert wallet_account, "No wallet account found"
     address_from = wallet_account["address"]
-
-    # CommunityTokenDeployer contract address
-    contract_address = community_token_deployer
-
-    # Generate deployment signature
     chain_id = owner_backend.network_id
     signature = owner_backend.wakuext_service.create_community_token_deployment_signature(chain_id, address_from, community_id)
     logger.info(f"Community token deployment signature: {signature}")
 
     token_uri = change_community_key_compression(community_id) + "/"
 
-    # Owner and master token parameters for deployment
     owner_token_parameters = {
         "name": "TestOwnerToken",
         "symbol": "TOT",
@@ -202,13 +176,8 @@ def deploy_owner_token(
         "base64image": DEFAULT_TOKEN_BASE64_IMAGE,
     }
 
-    # Generate UUID for the transaction
     transaction_uuid = str(uuid.uuid4())
-
-    # Fetch balances
     owner_backend.wallet_service.get_balances_at_by_chain([address_from], [f"{chain_id}-{NATIVE_TOKEN_ADDRESS}"])
-
-    # Get suggested routes for deploying tokens
     signer_pub_key = owner_backend.public_key
 
     routes_result = owner_backend.wallet_service.suggested_community_routes(
@@ -216,7 +185,7 @@ def deploy_owner_token(
         send_type=WalletSendType.COMMUNITY_DEPLOY_OWNER_TOKEN,
         chain_id=chain_id,
         address_from=address_from,
-        addr_to=contract_address,
+        addr_to=community_token_deployer,
         community_id=community_id,
         signer_pub_key=signer_pub_key,
         token_ids=[],
@@ -229,50 +198,32 @@ def deploy_owner_token(
 
     assert routes_result.get("Uuid") == transaction_uuid, f"Expected UUID {transaction_uuid}, got {routes_result.get('uuid')}"
 
-    sent_signal, sent_hashes = _sign_and_send_community_route(owner_backend, transaction_uuid, address_from)
-    logger.debug(f"Sent router transactions for UUID {transaction_uuid}: {sent_signal}")
-
-    tx_hash: Optional[str] = sent_hashes[0] if sent_hashes else None
-    stored = False
-    if _is_valid_tx_hash(tx_hash):
-        try:
-            _store_deployed_owner_token(
-                owner_backend,
-                address_from=address_from,
-                chain_id=chain_id,
-                tx_hash=_require_tx_hash(tx_hash, context="early storeDeployedOwnerToken"),
-                owner_token_parameters=owner_token_parameters,
-                master_token_parameters=master_token_parameters,
-                state=state,
-            )
-            stored = True
-        except ApiResponseError as exc:
-            logger.info(f"Early storeDeployedOwnerToken failed, will retry after tx confirmation: {exc}")
-
-    wallet_tx_status = {}
-    if not _is_valid_tx_hash(tx_hash):
-        wallet_tx_status = _wait_wallet_deploy_tx_success(owner_backend, sent_hashes)
-        tx_hash = _resolve_deploy_tx_hash(sent_hashes, wallet_tx_status)
-
-    tx_hash = _require_tx_hash(
-        tx_hash,
-        context=f"owner token deploy (sent_hashes={sent_hashes}, wallet_status={wallet_tx_status})",
-    )
-
-    if wallet_tx_status:
-        logger.info(f"Owner token deployment wallet status {wallet_tx_status}")
-    logger.info(f"Owner token deployment tx hash {tx_hash}")
-
-    if not stored:
+    def _store_owner_deployment(sent_hashes: list[str]) -> None:
         _store_deployed_owner_token(
             owner_backend,
             address_from=address_from,
             chain_id=chain_id,
-            tx_hash=tx_hash,
+            tx_hash=_require_tx_hash(sent_hashes[0] if sent_hashes else None, context="storeDeployedOwnerToken"),
             owner_token_parameters=owner_token_parameters,
             master_token_parameters=master_token_parameters,
             state=state,
         )
+
+    sent_signal, sent_hashes = _sign_and_send_community_route(
+        owner_backend,
+        transaction_uuid,
+        address_from,
+        on_sent=_store_owner_deployment,
+    )
+    logger.debug(f"Sent router transactions for UUID {transaction_uuid}: {sent_signal}")
+
+    tx_hash: Optional[str] = sent_hashes[0] if sent_hashes else None
+    tx_hash = _require_tx_hash(
+        tx_hash,
+        context=f"owner token deploy (sent_hashes={sent_hashes})",
+    )
+
+    logger.info(f"Owner token deployment tx hash {tx_hash}")
 
     if wait_for_deploy_status_signal:
         deploy_signal = _wait_deploy_owner_token_success_signal(owner_backend, tx_hash)
@@ -366,33 +317,47 @@ def _deploy_community_token_via_router(
     )
     assert routes_result.get("Uuid") == transaction_uuid, f"Expected UUID {transaction_uuid}, got {routes_result.get('uuid')}"
 
-    _, sent_hashes = _sign_and_send_community_route(owner_backend, transaction_uuid, address_from)
-    tx_hash = sent_hashes[0] if sent_hashes else None
-    assert tx_hash, f"No tx hash from deploy route ({send_type.name}): sent_hashes={sent_hashes}"
+    sent_hashes: list[str] = []
 
-    owner_backend.rpc_valid_request(
-        store_rpc_method,
-        [address_from, predicted_address, chain_id, tx_hash, deployment_parameters],
-    )
+    def _deploy_status_ok(signal: dict) -> bool:
+        tx_hash = sent_hashes[0] if sent_hashes else None
+        return is_community_token_tx_success(signal, send_type, tx_hash)
 
-    if anvil_client:
-        receipt = anvil_client.eth.wait_for_transaction_receipt(tx_hash, timeout=60)
-        assert receipt_status_is_success(receipt.get("status")), (
-            f"Deploy tx failed ({send_type.name}): {tx_hash} " f"(status={receipt.get('status')}, expected {TransactionReceiptStatus.SUCCESS.name})"
+    def _store_deployment(sent_hashes_from_route: list[str]) -> None:
+        tx_hash = sent_hashes_from_route[0] if sent_hashes_from_route else None
+        assert tx_hash, f"No tx hash from deploy route ({send_type.name}): sent_hashes={sent_hashes_from_route}"
+        owner_backend.rpc_valid_request(
+            store_rpc_method,
+            [address_from, predicted_address, chain_id, tx_hash, deployment_parameters],
         )
-        deployed_address = Web3.to_checksum_address(receipt["contractAddress"])
-        assert (
-            deployed_address.lower() == predicted_address.lower()
-        ), f"Predicted contract address mismatch: predicted={predicted_address}, receipt={deployed_address}"
-    else:
-        deployed_address = predicted_address
 
     with owner_backend.expect_signal(
         SignalType.COMMUNITY_TOKEN_TRANSACTION_STATUS_CHANGED,
-        predicate=lambda s: is_community_token_tx_success(s, send_type, tx_hash),
+        predicate=_deploy_status_ok,
         timeout=60,
     ):
-        pass
+        _, sent_hashes_from_route = _sign_and_send_community_route(
+            owner_backend,
+            transaction_uuid,
+            address_from,
+            on_sent=_store_deployment,
+        )
+        sent_hashes.extend(sent_hashes_from_route)
+        tx_hash = sent_hashes[0] if sent_hashes else None
+        assert tx_hash, f"No tx hash from deploy route ({send_type.name}): sent_hashes={sent_hashes}"
+
+        if anvil_client:
+            receipt = anvil_client.eth.wait_for_transaction_receipt(tx_hash, timeout=60)
+            assert receipt_status_is_success(receipt.get("status")), (
+                f"Deploy tx failed ({send_type.name}): {tx_hash} "
+                f"(status={receipt.get('status')}, expected {TransactionReceiptStatus.SUCCESS.name})"
+            )
+            deployed_address = Web3.to_checksum_address(receipt["contractAddress"])
+            assert (
+                deployed_address.lower() == predicted_address.lower()
+            ), f"Predicted contract address mismatch: predicted={predicted_address}, receipt={deployed_address}"
+        else:
+            deployed_address = predicted_address
 
     return deployed_address
 
@@ -405,13 +370,19 @@ def deploy_community_erc20_asset(
     community_token_deployer: str,
     foundry_client,
     anvil_client=None,
+    *,
+    name: str = "AdminToken",
+    symbol: str = "ADM",
+    supply: str = str(10**24),
+    description: str = "Admin permission token",
+    decimals: int = 18,
 ) -> str:
     """Deploy a community ERC20 asset token via wallet router (CommunityDeployAssets)."""
     token_uri = change_community_key_compression(community_id) + "/"
     deployment_parameters = {
-        "name": "AdminToken",
-        "symbol": "ADM",
-        "supply": str(10**24),
+        "name": name,
+        "symbol": symbol,
+        "supply": supply,
         "infiniteSupply": False,
         "transferable": True,
         "remoteSelfDestruct": False,
@@ -419,9 +390,9 @@ def deploy_community_erc20_asset(
         "ownerTokenAddress": Web3.to_checksum_address(owner_token_address),
         "masterTokenAddress": Web3.to_checksum_address(master_token_address),
         "communityId": community_id,
-        "description": "Admin permission token",
+        "description": description,
         "base64image": DEFAULT_TOKEN_BASE64_IMAGE,
-        "decimals": 18,
+        "decimals": decimals,
     }
     return _deploy_community_token_via_router(
         owner_backend,
@@ -445,21 +416,28 @@ def deploy_community_erc721_collectible(
     community_token_deployer: str,
     foundry_client,
     anvil_client=None,
+    *,
+    name: str = "AdminCollectible",
+    symbol: str = "ADC",
+    supply: str = "1000",
+    remote_self_destruct: bool = False,
+    transferable: bool = True,
+    description: str = "Admin permission collectible",
 ) -> str:
     """Deploy a community ERC721 collectible via wallet router (CommunityDeployCollectibles)."""
     token_uri = change_community_key_compression(community_id) + "/"
     deployment_parameters = {
-        "name": "AdminCollectible",
-        "symbol": "ADC",
-        "supply": "1000",
+        "name": name,
+        "symbol": symbol,
+        "supply": supply,
         "infiniteSupply": False,
-        "transferable": True,
-        "remoteSelfDestruct": False,
+        "transferable": transferable,
+        "remoteSelfDestruct": remote_self_destruct,
         "tokenUri": token_uri,
         "ownerTokenAddress": Web3.to_checksum_address(owner_token_address),
         "masterTokenAddress": Web3.to_checksum_address(master_token_address),
         "communityId": community_id,
-        "description": "Admin permission collectible",
+        "description": description,
         "base64image": DEFAULT_TOKEN_BASE64_IMAGE,
         "decimals": 0,
     }
@@ -506,6 +484,137 @@ def deploy_community_admin_permission_token(
         foundry_client,
         anvil_client=anvil_client,
     )
+
+
+SUPPLY_ABI = [
+    {
+        "inputs": [],
+        "name": "maxSupply",
+        "outputs": [{"name": "", "type": "uint256"}],
+        "stateMutability": "view",
+        "type": "function",
+    },
+    {
+        "inputs": [],
+        "name": "mintedCount",
+        "outputs": [{"name": "", "type": "uint256"}],
+        "stateMutability": "view",
+        "type": "function",
+    },
+    {
+        "inputs": [],
+        "name": "totalSupply",
+        "outputs": [{"name": "", "type": "uint256"}],
+        "stateMutability": "view",
+        "type": "function",
+    },
+]
+
+
+def remaining_collectibles_supply(anvil_client, contract_address: str) -> int:
+    contract = anvil_client.eth.contract(address=Web3.to_checksum_address(contract_address), abi=SUPPLY_ABI)
+    return int(contract.functions.maxSupply().call() - contract.functions.mintedCount().call())
+
+
+def remaining_assets_supply(anvil_client, contract_address: str) -> int:
+    contract = anvil_client.eth.contract(address=Web3.to_checksum_address(contract_address), abi=SUPPLY_ABI)
+    return int(contract.functions.maxSupply().call() - contract.functions.totalSupply().call())
+
+
+def remote_burn_community_token(
+    sender_backend: StatusBackend,
+    community_id: str,
+    token_contract_address: str,
+    token_ids: list[int],
+    wallet_addresses: list[str],
+    anvil_client=None,
+):
+    assert token_ids, "token_ids must not be empty"
+    address_from = messenger.wallet_address(sender_backend)
+    chain_id = sender_backend.network_id
+    sender_backend.wallet_service.get_balances_at_by_chain([address_from], [f"{chain_id}-{NATIVE_TOKEN_ADDRESS}"])
+
+    transaction_uuid = str(uuid.uuid4())
+    transfer_details = [
+        {
+            "tokenType": CommunityTokenType.ERC721.value,
+            "privilegeLevel": CommunityTokenPrivilegesLevel.COMMUNITY_LEVEL.value,
+            "tokenContractAddress": token_contract_address,
+            "amount": hex(len(token_ids)),
+        }
+    ]
+    with sender_backend.expect_signal(
+        SignalType.COMMUNITY_TOKEN_TRANSACTION_STATUS_CHANGED,
+        predicate=lambda s: is_community_token_tx_success(s, WalletSendType.COMMUNITY_REMOTE_BURN),
+        timeout=60,
+    ):
+        routes_result = sender_backend.wallet_service.suggested_community_routes(
+            uuid=transaction_uuid,
+            send_type=WalletSendType.COMMUNITY_REMOTE_BURN,
+            chain_id=chain_id,
+            address_from=address_from,
+            addr_to=token_contract_address,
+            community_id=community_id,
+            signer_pub_key="",
+            token_ids=[hex(token_id) for token_id in token_ids],
+            wallet_addresses=wallet_addresses,
+            transfer_details=transfer_details,
+        )
+        assert routes_result.get("Uuid") == transaction_uuid, f"Expected UUID {transaction_uuid}, got {routes_result.get('Uuid')}"
+        sent_signal, sent_hashes = _sign_and_send_community_route(sender_backend, transaction_uuid, address_from)
+
+    if anvil_client and sent_hashes:
+        receipt = anvil_client.eth.wait_for_transaction_receipt(sent_hashes[0], timeout=60)
+        assert receipt_status_is_success(receipt.get("status")), f"Remote burn tx failed: {sent_hashes[0]} (status={receipt.get('status')})"
+    return sent_signal
+
+
+def burn_community_token(
+    sender_backend: StatusBackend,
+    community_id: str,
+    token_contract_address: str,
+    token_type: CommunityTokenType,
+    amount: int,
+    anvil_client=None,
+):
+    assert amount > 0, "burn amount must be positive"
+    address_from = messenger.wallet_address(sender_backend)
+    chain_id = sender_backend.network_id
+    sender_backend.wallet_service.get_balances_at_by_chain([address_from], [f"{chain_id}-{NATIVE_TOKEN_ADDRESS}"])
+
+    transaction_uuid = str(uuid.uuid4())
+    transfer_details = [
+        {
+            "tokenType": token_type.value,
+            "privilegeLevel": CommunityTokenPrivilegesLevel.COMMUNITY_LEVEL.value,
+            "tokenContractAddress": token_contract_address,
+            "amount": hex(amount),
+        }
+    ]
+    with sender_backend.expect_signal(
+        SignalType.COMMUNITY_TOKEN_TRANSACTION_STATUS_CHANGED,
+        predicate=lambda s: is_community_token_tx_success(s, WalletSendType.COMMUNITY_BURN),
+        timeout=60,
+    ):
+        routes_result = sender_backend.wallet_service.suggested_community_routes(
+            uuid=transaction_uuid,
+            send_type=WalletSendType.COMMUNITY_BURN,
+            chain_id=chain_id,
+            address_from=address_from,
+            addr_to=token_contract_address,
+            community_id=community_id,
+            signer_pub_key="",
+            token_ids=[],
+            wallet_addresses=[],
+            transfer_details=transfer_details,
+        )
+        assert routes_result.get("Uuid") == transaction_uuid, f"Expected UUID {transaction_uuid}, got {routes_result.get('Uuid')}"
+        sent_signal, sent_hashes = _sign_and_send_community_route(sender_backend, transaction_uuid, address_from)
+
+    if anvil_client and sent_hashes:
+        receipt = anvil_client.eth.wait_for_transaction_receipt(sent_hashes[0], timeout=60)
+        assert receipt_status_is_success(receipt.get("status")), f"Burn remaining supply tx failed: {sent_hashes[0]} (status={receipt.get('status')})"
+    return sent_signal
 
 
 def airdrop_community_admin_token(
@@ -932,6 +1041,7 @@ def deploy_owner_and_master_tokens(
     state: CommunityTokenDeployState,
     anvil_client=None,
     wait_for_deploy_status_signal: bool = False,
+    wait_for_backend_transition: bool = True,
 ) -> OwnerMasterTokens:
     """Deploy owner/master tokens and wait until backend resolves final addresses."""
     deploy_tx_hash = deploy_owner_token(
@@ -944,6 +1054,17 @@ def deploy_owner_and_master_tokens(
     )
     assert deploy_tx_hash and re.fullmatch(r"0x[a-fA-F0-9]{64}", deploy_tx_hash), f"Invalid deploy tx hash: {deploy_tx_hash}"
     state.deploy_tx_hash = deploy_tx_hash
+
+    if not wait_for_backend_transition:
+        owner_token_address, master_token_address = resolve_owner_and_master_token_addresses_from_receipt(
+            anvil_client, community_token_deployer, deploy_tx_hash
+        )
+        assert owner_token_address and master_token_address, f"Owner/master addresses missing in deploy receipt {deploy_tx_hash}"
+        return OwnerMasterTokens(
+            deploy_tx_hash=deploy_tx_hash,
+            owner_token_address=owner_token_address,
+            master_token_address=master_token_address,
+        )
 
     (
         _temp_owner,
@@ -1261,36 +1382,74 @@ def _extract_tx_hashes(payload: dict) -> list[str]:
     return hashes
 
 
-def _sign_and_send_community_route(backend: StatusBackend, transaction_uuid: str, address_from: str) -> tuple[dict, list[str]]:
-    with backend.expect_signal(
-        SignalType.WALLET_ROUTER_SIGN_TRANSACTIONS,
-        predicate=lambda s: s.get("event", {}).get("sendDetails", {}).get("uuid") == transaction_uuid,
-        timeout=60,
-    ) as sign_exp:
-        backend.wallet_service.build_transactions_from_route(transaction_uuid)
+def _sign_and_send_community_route(
+    backend: StatusBackend,
+    transaction_uuid: str,
+    address_from: str,
+    on_sent: Optional[Callable[[list[str]], None]] = None,
+) -> tuple[dict, list[str]]:
+    sent_hashes: list[str] = []
+    statuses: dict[str, dict] = {}
 
-    sign_signal = sign_exp.result
-    assert isinstance(sign_signal, dict), f"Unexpected sign signal payload: {sign_signal}"
-    signing_details = sign_signal["event"]["signingDetails"]
-    signatures = {}
-    for tx_hash in signing_details["hashes"]:
-        sig_hex = backend.wallet_service.sign_message(tx_hash, address_from, backend.password)
-        assert sig_hex and sig_hex.startswith("0x"), f"Invalid transaction signature for hash {tx_hash}: {sig_hex}"
-        tx_signature = sig_hex[2:]
-        signatures[tx_hash] = {
-            "r": tx_signature[:64],
-            "s": tx_signature[64:128],
-            "v": tx_signature[128:],
-        }
+    def _route_finished(signal: dict) -> bool:
+        tx_status = _wallet_tx_status(signal)
+        if tx_status is None:
+            return False
+        tx_hash = str(tx_status.get("hash", "")).lower()
+        expected = {sent_hash.lower() for sent_hash in sent_hashes}
+        if tx_hash not in expected or tx_status.get("status") not in (WalletPendingTxStatus.SUCCESS, WalletPendingTxStatus.FAILED):
+            return False
+        statuses[tx_hash] = tx_status
+        return expected <= set(statuses)
 
-    with backend.expect_signal(
-        SignalType.WALLET_ROUTER_TRANSACTIONS_SENT,
-        predicate=lambda s: s.get("event", {}).get("uuid") == transaction_uuid
-        or s.get("event", {}).get("sendDetails", {}).get("uuid") == transaction_uuid,
-        timeout=60,
-    ) as sent_exp:
-        backend.wallet_service.send_router_transactions_with_signatures(transaction_uuid, signatures)
+    def _route_sent(signal: dict) -> bool:
+        event = signal.get("event", {})
+        if event.get("uuid") != transaction_uuid and (event.get("sendDetails") or {}).get("uuid") != transaction_uuid:
+            return False
+        sent_hashes.extend(_extract_tx_hashes(signal))
+        return True
 
-    sent_signal = sent_exp.result
-    assert isinstance(sent_signal, dict), f"Unexpected sent signal payload: {sent_signal}"
-    return sent_signal, _extract_tx_hashes(sent_signal)
+    with anvil_lock():
+        with backend.expect_signal(
+            SignalType.WALLET_ROUTER_SIGN_TRANSACTIONS,
+            predicate=lambda s: s.get("event", {}).get("sendDetails", {}).get("uuid") == transaction_uuid,
+            timeout=60,
+        ) as sign_exp:
+            backend.wallet_service.build_transactions_from_route(transaction_uuid)
+
+        sign_signal = sign_exp.result
+        assert isinstance(sign_signal, dict), f"Unexpected sign signal payload: {sign_signal}"
+        signing_details = sign_signal["event"]["signingDetails"]
+        signatures = {}
+        for tx_hash in signing_details["hashes"]:
+            sig_hex = backend.wallet_service.sign_message(tx_hash, address_from, backend.password)
+            assert sig_hex and sig_hex.startswith("0x"), f"Invalid transaction signature for hash {tx_hash}: {sig_hex}"
+            tx_signature = sig_hex[2:]
+            signatures[tx_hash] = {
+                "r": tx_signature[:64],
+                "s": tx_signature[64:128],
+                "v": tx_signature[128:],
+            }
+
+        with backend.expect_signal(SignalType.WALLET, predicate=_route_finished, timeout=60):
+            with backend.expect_signal(
+                SignalType.WALLET_ROUTER_TRANSACTIONS_SENT,
+                predicate=_route_sent,
+                timeout=60,
+            ) as sent_exp:
+                backend.wallet_service.send_router_transactions_with_signatures(transaction_uuid, signatures)
+
+            sent_signal = sent_exp.result
+            assert isinstance(sent_signal, dict), f"Unexpected sent signal payload: {sent_signal}"
+            event = sent_signal.get("event") or {}
+            error_response = (event.get("sendDetails") or {}).get("errorResponse") or event.get("errorResponse")
+            assert not error_response, f"Router failed to send community transactions: {error_response}"
+            assert sent_hashes, f"Router reported success without transaction hashes: {event}"
+            if on_sent:
+                on_sent(sent_hashes)
+
+    expected = {sent_hash.lower() for sent_hash in sent_hashes}
+    assert expected and expected <= set(statuses), f"Missing terminal statuses for {sent_hashes}: {statuses}"
+    failed = [statuses[tx_hash] for tx_hash in expected if statuses[tx_hash].get("status") != WalletPendingTxStatus.SUCCESS]
+    assert not failed, failed
+    return sent_signal, sent_hashes

@@ -8,6 +8,7 @@ import docker
 import docker.errors
 import os
 
+from utils.anvil_lock import anvil_lock
 from utils.config import Config
 from resources.constants import user_1, ANVIL_NETWORK_ID, ANVIL_RPC_URL
 from tenacity import retry, retry_if_exception, stop_after_attempt, wait_fixed
@@ -80,6 +81,12 @@ class Foundry:
             return False
         return True
 
+    def exec_anvil(self, command, **kwargs):
+        if not self.container:
+            raise Exception("Container not found")
+        with anvil_lock():
+            return self.container.exec_run(command, **kwargs)
+
     def clone_and_run(self, **kwargs):
         if not self.container:
             raise Exception("Container not found")
@@ -100,10 +107,7 @@ class Foundry:
         cmd = f"/app/clone_and_run.sh {github_org} {github_repo} {smart_contract_dir} {smart_contract_filename} {private_key} {sender_address}"
         logging.info(f"Running command: {cmd}")
 
-        exec_result = self.container.exec_run(
-            f"{cmd}",
-            workdir="/app",
-        )
+        exec_result = self.exec_anvil(cmd, workdir="/app")
         logging.info(f"Exit code: {exec_result.exit_code}")
         logging.info(f"Result: {exec_result.output.decode().strip()}")
         if exec_result.exit_code != 0:
@@ -137,10 +141,7 @@ class Foundry:
             cmd += f" --constructor-args {args_str}"
 
         logging.info(f"Running command: {cmd}")
-        exec_result = self.container.exec_run(
-            f"{cmd}",
-            workdir="/app",
-        )
+        exec_result = self.exec_anvil(cmd, workdir="/app")
         exit_code = exec_result.exit_code
         output = exec_result.output.decode()
 
@@ -224,7 +225,7 @@ class Foundry:
             f"{to_address} {token_amount} --rpc-url {ANVIL_RPC_URL} "
             f"--private-key {private_key}"
         )
-        result = self.container.exec_run(generate_cmd)
+        result = self.exec_anvil(generate_cmd)
         if result.exit_code != 0:
             raise RuntimeError(f"cast send failed with exit_code={result.exit_code}, output={result.output.decode().strip()}")
         return result
