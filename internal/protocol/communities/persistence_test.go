@@ -106,6 +106,46 @@ func (s *PersistenceSuite) TestSaveCommunity() {
 	s.Require().Len(communities, 1)
 }
 
+func (s *PersistenceSuite) TestExpiredMutedCommunityIDs() {
+	now := time.Now()
+	save := func(joined, spectated, muted bool, till time.Time) types.HexBytes {
+		key, err := crypto.GenerateKey()
+		s.Require().NoError(err)
+		community := Community{
+			config: &Config{
+				PrivateKey:           key,
+				ControlNode:          &key.PublicKey,
+				ControlDevice:        true,
+				ID:                   &key.PublicKey,
+				Joined:               joined,
+				Spectated:            spectated,
+				Muted:                muted,
+				MuteTill:             till,
+				CommunityDescription: &protobuf.CommunityDescription{},
+			},
+		}
+		s.Require().NoError(s.db.SaveCommunity(&community))
+		return types.HexBytes(crypto.CompressPubkey(&key.PublicKey))
+	}
+
+	expiredJoined := save(true, false, true, now.Add(-time.Hour))
+	expiredSpectated := save(false, true, true, now.Add(-time.Minute))
+	save(true, false, true, now.Add(time.Hour))   // mute still running
+	save(true, false, true, time.Time{})          // muted without expiry
+	save(true, false, false, now.Add(-time.Hour)) // not muted
+	save(false, false, true, now.Add(-time.Hour)) // neither joined nor spectated
+
+	ids, err := s.db.ExpiredMutedCommunityIDs(now)
+	s.Require().NoError(err)
+	s.Require().ElementsMatch([]types.HexBytes{expiredJoined, expiredSpectated}, ids)
+
+	// MuteCommunityTill stores RFC3339 text; it must be read back the same way.
+	s.Require().NoError(s.db.MuteCommunityTill(expiredJoined, now.Add(time.Hour)))
+	ids, err = s.db.ExpiredMutedCommunityIDs(now)
+	s.Require().NoError(err)
+	s.Require().ElementsMatch([]types.HexBytes{expiredSpectated}, ids)
+}
+
 func (s *PersistenceSuite) TestUpdateEncryptionKeyRequestsWithEarlierTimestamp() {
 	communityID := types.HexBytes("community-id")
 	channelIDs := []string{"channel-id"}
