@@ -101,6 +101,11 @@ type Community struct {
 	timesource  common.TimeSource
 	encryptor   DescriptionEncryptor
 	mediaServer media.MediaServerInterface
+	// memberProfiles resolves display data for member deltas; may be nil
+	memberProfiles MemberProfileProvider
+	// clockFloor is the newest clock this node emitted for the community
+	// beyond its description and events; see Manager.rosterClockFloors
+	clockFloor uint64
 }
 
 type ReadonlyCommunity interface {
@@ -109,6 +114,7 @@ type ReadonlyCommunity interface {
 	CanView(pk *ecdsa.PublicKey, chatID string) bool
 	CanPost(pk *ecdsa.PublicKey, chatID string, messageType protobuf.ApplicationMetadataMessage_Type) (bool, error)
 	IsBanned(pk *ecdsa.PublicKey) bool
+	MembersSnapshot(profiles MemberProfileProvider) *CommunityMembers
 }
 
 func New(config Config, timesource common.TimeSource, encryptor DescriptionEncryptor, mediaServer media.MediaServerInterface) (*Community, error) {
@@ -324,6 +330,7 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 		Images                      map[string]Image                     `json:"images"`
 		Permissions                 *protobuf.CommunityPermissions       `json:"permissions"`
 		Members                     map[string]*enrichedCommunityMember  `json:"members"`
+		MembersCount                int                                  `json:"membersCount"`
 		CanRequestAccess            bool                                 `json:"canRequestAccess"`
 		CanManageUsers              bool                                 `json:"canManageUsers"`              //TODO: we can remove this
 		CanDeleteMessageForEveryone bool                                 `json:"canDeleteMessageForEveryone"` //TODO: we can remove this
@@ -415,6 +422,7 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 		communityItem.TokenPermissions = o.tokenPermissions()
 		communityItem.PendingAndBannedMembers = o.PendingAndBannedMembers()
 		communityItem.Members = enrichMembersMap(o.config.CommunityDescription.Members)
+		communityItem.MembersCount = len(o.config.CommunityDescription.Members)
 		communityItem.Permissions = o.config.CommunityDescription.Permissions
 		communityItem.IntroMessage = o.config.CommunityDescription.IntroMessage
 		communityItem.OutroMessage = o.config.CommunityDescription.OutroMessage
@@ -920,10 +928,9 @@ func (o *Community) RemoveMembersFromOrg(membersToRemove []string) *CommunityCha
 			}
 		}
 
-		changes.ChatsModified[chatID] = &CommunityChatChanges{
-			ChatModified:   chat,
-			MembersRemoved: chatMembersToRemove,
-		}
+		chatChanges := changes.chatChanges(chatID)
+		chatChanges.ChatModified = chat
+		chatChanges.MembersRemoved = chatMembersToRemove
 	}
 
 	return changes
@@ -951,10 +958,9 @@ func (o *Community) RemoveAllUsersFromOrg() *CommunityChanges {
 		chat.Members = make(map[string]*protobuf.CommunityMember)
 		chat.Members[myPublicKey] = member
 
-		changes.ChatsModified[chatID] = &CommunityChatChanges{
-			ChatModified:   chat,
-			MembersRemoved: chatMembersToRemove,
-		}
+		chatChanges := changes.chatChanges(chatID)
+		chatChanges.ChatModified = chat
+		chatChanges.MembersRemoved = chatMembersToRemove
 	}
 
 	return changes
@@ -2294,9 +2300,26 @@ func (o *Community) RequestedToJoinAt() uint64 {
 	return o.config.RequestedToJoinAt
 }
 
+// latestClock is the newest of the description clock, the clocks of the
+// community events applied on top of it and the clock floor.
+func (o *Community) latestClock() uint64 {
+	clock := o.config.CommunityDescription.Clock
+	if o.clockFloor > clock {
+		clock = o.clockFloor
+	}
+	if o.config.EventsData != nil {
+		for _, event := range o.config.EventsData.Events {
+			if event.CommunityEventClock > clock {
+				clock = event.CommunityEventClock
+			}
+		}
+	}
+	return clock
+}
+
 func (o *Community) nextClock() uint64 {
 	// lamport timestamp
-	clock := o.config.CommunityDescription.Clock
+	clock := o.latestClock()
 	timestamp := o.timesource.GetCurrentTime()
 	if clock == 0 || clock < timestamp {
 		clock = timestamp
@@ -2379,12 +2402,9 @@ func (o *Community) AddMemberToChat(chatID string, publicKey *ecdsa.PublicKey,
 		Roles:       roles,
 		ChannelRole: channelRole,
 	}
-	changes.ChatsModified[chatID] = &CommunityChatChanges{
-		ChatModified: chat,
-		MembersAdded: map[string]*protobuf.CommunityMember{
-			memberKey: chat.Members[memberKey],
-		},
-	}
+	chatChanges := changes.chatChanges(chatID)
+	chatChanges.ChatModified = chat
+	chatChanges.MembersAdded[memberKey] = chat.Members[memberKey]
 
 	if o.IsControlNode() {
 		o.increaseClock()
@@ -2440,8 +2460,10 @@ func (o *Community) CreateDeepCopy() *Community {
 			EventsData:                          o.config.EventsData,
 			LastOpenedAt:                        o.config.LastOpenedAt,
 		},
-		timesource:  o.timesource,
-		mediaServer: o.mediaServer,
+		timesource:     o.timesource,
+		mediaServer:    o.mediaServer,
+		memberProfiles: o.memberProfiles,
+		clockFloor:     o.clockFloor,
 	}
 }
 

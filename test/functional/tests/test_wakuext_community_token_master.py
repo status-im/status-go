@@ -60,8 +60,9 @@ class TestCommunityTokenMaster:
             None,
         )
         assert owner_community is not None
-        assert member_backend.public_key in owner_community.get("members", {})
-        assert member_b_backend.public_key in owner_community.get("members", {})
+        members = messenger.community_members(owner_backend, community_id)
+        assert member_backend.public_key in members
+        assert member_b_backend.public_key in members
 
         community_tokens.fund_native_balance(owner_backend, anvil_client)
         community_tokens.fund_native_balance(member_backend, anvil_client)

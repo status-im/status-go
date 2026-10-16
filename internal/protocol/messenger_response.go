@@ -397,6 +397,13 @@ func (r *MessengerResponse) AddCommunity(c *communities.Community) {
 	r.communities[c.IDString()] = c
 }
 
+// AddRosterChanges adds the changes when they carry member deltas.
+func (r *MessengerResponse) AddRosterChanges(changes *communities.CommunityChanges) {
+	if changes != nil && changes.Community != nil && changes.HasRosterChanges() {
+		r.CommunityChanges = append(r.CommunityChanges, changes)
+	}
+}
+
 func (r *MessengerResponse) AddCommunitySettings(c *communities.CommunitySettings) {
 	if r.communitiesSettings == nil {
 		r.communitiesSettings = make(map[string]*communities.CommunitySettings)

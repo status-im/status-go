@@ -690,8 +690,9 @@ func (s *CommunitySuite) TestHandleCommunityDescription() {
 				changes := org.emptyCommunityChanges()
 				changes.MembersRemoved[s.member1Key] = &protobuf.CommunityMember{}
 				changes.ChatsModified[testChatID1] = &CommunityChatChanges{
-					MembersAdded:   make(map[string]*protobuf.CommunityMember),
-					MembersRemoved: make(map[string]*protobuf.CommunityMember),
+					MembersAdded:    make(map[string]*protobuf.CommunityMember),
+					MembersRemoved:  make(map[string]*protobuf.CommunityMember),
+					MembersModified: make(map[string]*protobuf.CommunityMember),
 				}
 				changes.ChatsModified[testChatID1].MembersRemoved[s.member1Key] = &protobuf.CommunityMember{}
 
@@ -707,8 +708,9 @@ func (s *CommunitySuite) TestHandleCommunityDescription() {
 				changes := org.emptyCommunityChanges()
 				changes.MembersAdded[s.member3Key] = &protobuf.CommunityMember{}
 				changes.ChatsModified[testChatID1] = &CommunityChatChanges{
-					MembersAdded:   make(map[string]*protobuf.CommunityMember),
-					MembersRemoved: make(map[string]*protobuf.CommunityMember),
+					MembersAdded:    make(map[string]*protobuf.CommunityMember),
+					MembersRemoved:  make(map[string]*protobuf.CommunityMember),
+					MembersModified: make(map[string]*protobuf.CommunityMember),
 				}
 				changes.ChatsModified[testChatID1].MembersAdded[s.member3Key] = &protobuf.CommunityMember{}
 

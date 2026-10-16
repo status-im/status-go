@@ -224,3 +224,21 @@ func (s *TokenMasterCommunityEventsSuite) TestTokenMasterBanMemberWithDeletingAl
 	community := setUpCommunityAndRoles(s, protobuf.CommunityMember_ROLE_TOKEN_MASTER)
 	testBanMemberWithDeletingAllMessages(s, community)
 }
+
+func (s *TokenMasterCommunityEventsSuite) TestTokenMasterKickMemberGetsRosterDelta() {
+	community := setUpCommunityAndRoles(s, protobuf.CommunityMember_ROLE_TOKEN_MASTER)
+	aliceID := crypto.PubkeyToHex(&s.alice.identity.PublicKey)
+
+	_, err := s.GetEventSender().RemoveUserFromCommunity(community.ID(), aliceID)
+	s.Require().NoError(err)
+
+	_, err = WaitOnMessengerResponse(s.GetControlNode(), func(r *MessengerResponse) bool {
+		return rosterRemovedHas(r, community.ID(), aliceID)
+	}, "control node did not apply the kick event")
+	s.Require().NoError(err)
+
+	_, err = WaitOnMessengerResponse(s.GetEventSender(), func(r *MessengerResponse) bool {
+		return rosterRemovedHas(r, community.ID(), aliceID)
+	}, "event sender did not get alice's kick as a roster delta")
+	s.Require().NoError(err)
+}
