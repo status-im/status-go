@@ -15,8 +15,8 @@ This package provides a unified interface for:
 
 ### Controller
 The main orchestrator that manages balance fetching operations:
-- Monitors account and network changes
-- Debounces fetch requests (10s debounce, 2min fetch period)
+- Monitors account and network changes, token list updates and pending transactions
+- Leaves when and what to fetch to `refresh.Policy` from go-wallet-sdk (`pkg/balance/refresh`): every balance every 2 min on screen and every 15 min hidden, other reads after a 10s debounce, a confirmed transaction at once
 - Coordinates between storage, fetcher, and providers
 
 ### Fetcher
@@ -36,6 +36,7 @@ fetcher := multistandardbalance.NewFetcher(ethClientGetter, 5000)
 ### Storage
 Abstract interface for persisting balance data:
 - Tracks balance values and metadata (block number, hash, fetch time)
+- Keeps the block each token was read at: a read takes a token only when it is newer, and keeps the tokens it did not cover
 - Supports all token standards
 - Handles cleanup of missing accounts/chains
 
