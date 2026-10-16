@@ -17,6 +17,7 @@ import (
 
 	"github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/panics"
+	"github.com/status-im/status-go/internal/traffic"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/pubsub"
 	"github.com/status-im/status-go/pkg/services/accounts/accountsevent"
@@ -248,7 +249,7 @@ func (c *Controller) runNow(stopCh <-chan struct{}) {
 		return
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(traffic.WithSource(context.Background(), traffic.TransferDetection))
 	defer cancel()
 
 	wg := sync.WaitGroup{}

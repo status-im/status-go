@@ -26,6 +26,7 @@ const (
 	MarketLeaderboard = "Market: leaderboard"
 	Collectibles      = "Collectibles"
 	Activity          = "Activity"
+	TransferDetection = "Transfer detection"
 )
 
 // attribution names the sources of status-go's untagged requests.
@@ -55,7 +56,7 @@ var attribution = httptraffic.Attribution{
 		{Function: "/multistandardbalance.", Source: Balances},
 		{Function: "/multistandardfetcher.", Source: Balances},
 		{Function: "/multicall.", Source: Balances},
-		{Function: "/transferdetector.", Source: "Transfer detection"},
+		{Function: "/transferdetector.", Source: TransferDetection},
 		{Function: "/activityfetcher", Source: Activity},
 		{Function: "/activity/", Source: Activity},
 		{Function: "/activity.", Source: Activity},
