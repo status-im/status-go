@@ -82,7 +82,8 @@ func (s *ENSRegisterProcessor) PackTxInputData(params ProcessorInputParams) ([]b
 	}
 
 	x, y := walletCommon.ExtractCoordinates(params.PublicKey)
-	extraData, err := registrarABI.Pack("register", walletCommon.UsernameToLabel(params.Username), params.FromAddr, x, y)
+	name := pathProcessorCommon.GetNameFromEnsUsername(params.Username)
+	extraData, err := registrarABI.Pack("register", walletCommon.UsernameToLabel(name), params.FromAddr, x, y)
 	if err != nil {
 		return []byte{}, createENSRegisterProcessorErrorResponse(err)
 	}
