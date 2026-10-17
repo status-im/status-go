@@ -375,7 +375,7 @@ build-libsds-android: clone-nim-sds
 
 build-libsds-ios: clone-nim-sds
 	@echo "Building nim-sds for iOS" $(LIBSDS)
-	cd "$(NIM_SDS_SOURCE_DIR)" && $(NIMBLE) setup -l -y && $(NIMBLE) libsdsIOS
+	cd "$(NIM_SDS_SOURCE_DIR)" && env -u SDKROOT -u CPATH -u LIBRARY_PATH $(NIMBLE) setup -l -y && $(NIMBLE) libsdsIOS
 
 clean-libsds:
 	@echo "Removing libsds"
