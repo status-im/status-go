@@ -11,7 +11,7 @@ import (
 
 type StorageMemory struct {
 	nativeBalances  map[BalancesKey]balanceEntry[*big.Int]
-	erc20Balances   map[BalancesKey]balanceEntry[map[ContractAddress]*big.Int]
+	erc20Balances   map[BalancesKey]balanceEntry[ERC20Balances]
 	erc721Balances  map[BalancesKey]balanceEntry[map[ContractAddress]*big.Int]
 	erc1155Balances map[BalancesKey]balanceEntry[map[HashableCollectibleID]*big.Int]
 	mu              sync.RWMutex
@@ -20,7 +20,7 @@ type StorageMemory struct {
 func NewStorageMemory() *StorageMemory {
 	return &StorageMemory{
 		nativeBalances:  make(map[BalancesKey]balanceEntry[*big.Int]),
-		erc20Balances:   make(map[BalancesKey]balanceEntry[map[ContractAddress]*big.Int]),
+		erc20Balances:   make(map[BalancesKey]balanceEntry[ERC20Balances]),
 		erc721Balances:  make(map[BalancesKey]balanceEntry[map[ContractAddress]*big.Int]),
 		erc1155Balances: make(map[BalancesKey]balanceEntry[map[HashableCollectibleID]*big.Int]),
 	}
@@ -84,14 +84,14 @@ func (s *StorageMemory) GetNativeBalance(ctx context.Context, key BalancesKey) (
 	return
 }
 
-func (s *StorageMemory) UpdateERC20Balances(ctx context.Context, key BalancesKey, balances map[ContractAddress]*big.Int, state State) (balanceChanged bool, oldState State, err error) {
+func (s *StorageMemory) UpdateERC20Balances(ctx context.Context, key BalancesKey, balances ERC20Balances, state State) (balanceChanged bool, oldState State, err error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	return updateIfNeeded(s.erc20Balances, key, balanceEntry[map[ContractAddress]*big.Int]{balance: balances, state: state}, isBigIntMapEqual)
+	return updateIfNeeded(s.erc20Balances, key, balanceEntry[ERC20Balances]{balance: balances, state: state}, isERC20BalancesEqual)
 }
 
-func (s *StorageMemory) GetERC20Balances(ctx context.Context, key BalancesKey) (balances map[ContractAddress]*big.Int, state State, err error) {
+func (s *StorageMemory) GetERC20Balances(ctx context.Context, key BalancesKey) (balances ERC20Balances, state State, err error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 

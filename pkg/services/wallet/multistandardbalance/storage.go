@@ -12,8 +12,8 @@ import (
 type Storage interface {
 	UpdateNativeBalance(ctx context.Context, key BalancesKey, balance *big.Int, state State) (balanceChanged bool, oldState State, err error)
 	GetNativeBalance(ctx context.Context, key BalancesKey) (balance *big.Int, state State, err error)
-	UpdateERC20Balances(ctx context.Context, key BalancesKey, balances map[ContractAddress]*big.Int, state State) (balanceChanged bool, oldState State, err error)
-	GetERC20Balances(ctx context.Context, key BalancesKey) (balances map[ContractAddress]*big.Int, state State, err error)
+	UpdateERC20Balances(ctx context.Context, key BalancesKey, balances ERC20Balances, state State) (balanceChanged bool, oldState State, err error)
+	GetERC20Balances(ctx context.Context, key BalancesKey) (balances ERC20Balances, state State, err error)
 	UpdateERC721Balances(ctx context.Context, key BalancesKey, balances map[ContractAddress]*big.Int, state State) (balanceChanged bool, oldState State, err error)
 	GetERC721Balances(ctx context.Context, key BalancesKey) (balances map[ContractAddress]*big.Int, state State, err error)
 	UpdateERC1155Balances(ctx context.Context, key BalancesKey, balances map[HashableCollectibleID]*big.Int, state State) (balanceChanged bool, oldState State, err error)

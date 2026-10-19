@@ -11,7 +11,7 @@ import (
 	"github.com/status-im/status-go/internal/logutils"
 )
 
-func (c *Controller) handleERC20Result(ctx context.Context, chainID uint64, result multistandardfetcher.ERC20Result) {
+func (c *Controller) handleERC20Result(ctx context.Context, chainID uint64, asked []ContractAddress, result multistandardfetcher.ERC20Result) {
 	key := BalancesKey{Account: result.Account, ChainID: chainID}
 	resultType := multistandardfetcher.ResultTypeERC20
 
@@ -29,15 +29,13 @@ func (c *Controller) handleERC20Result(ctx context.Context, chainID uint64, resu
 		FetchedAt:     time.Now().Unix(),
 	}
 
-	balances := result.Results
-	// The batch drops the sub-calls that failed; keep the last known balance of
-	// those tokens rather than letting them read as zero until the next fetch.
-	if previous, _, prevErr := c.storage.GetERC20Balances(ctx, key); prevErr == nil {
-		var kept int
-		balances, kept = keepLastKnownBalances(previous, balances)
-		if kept > 0 {
-			c.logger.Warn("ERC20 balances missing from the fetch result, keeping the last known ones", zap.String("address", logutils.TruncateWithDot(key.Account.String())), zap.Uint64("chainID", key.ChainID), zap.Int("kept", kept), zap.Int("answered", len(result.Results)-kept))
-		}
+	previous, _, prevErr := c.storage.GetERC20Balances(ctx, key)
+	if prevErr != nil {
+		previous = ERC20Balances{}
+	}
+	balances := mergeERC20Balances(previous, asked, result.Results, result.Failed)
+	if len(result.Failed) > 0 {
+		c.logger.Warn("ERC20 balance calls failed, keeping the last known balances", zap.String("address", logutils.TruncateWithDot(key.Account.String())), zap.Uint64("chainID", key.ChainID), zap.Int("failed", len(result.Failed)))
 	}
 	balanceChanged, oldState, err := c.storage.UpdateERC20Balances(ctx, key, balances, state)
 	if err != nil {
