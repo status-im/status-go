@@ -14,7 +14,7 @@
 
   inputs = {
     nim-token-lists = {
-      url = "git+https://github.com/status-im/nim-token-lists?submodules=1&rev=55dd8963fdb266c06a782684211dc0cad05b297f";
+      url = "git+https://github.com/status-im/nim-token-lists?submodules=1&rev=ffa28248c1253d2d2c6709946d42acc6a6ae7ca8";
       flake = false;
     };
     # We are pinning the commit because ultimately we want to use same commit across different projects.
