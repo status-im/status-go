@@ -342,3 +342,7 @@ func DummyProfileShowcasePreferences(withCollectibles bool) *identity.ProfileSho
 
 	return preferences
 }
+
+func NewMessengerWithCommunitiesManagerForTests(manager *communities.Manager) *Messenger {
+	return &Messenger{communitiesManager: manager}
+}

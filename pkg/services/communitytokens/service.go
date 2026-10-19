@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/big"
+	"time"
 
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
@@ -262,7 +263,23 @@ func (s *Service) updateStateAndAddTokenToCommunityDescription(status string, ch
 	return s.Messenger.GetCommunityTokenByChainAndAddress(chainID, address)
 }
 
+const communityTokenDeployAttempts = 5
+
+var communityTokenDeployRetryDelay = 100 * time.Millisecond
+
 func (s *Service) handleDeployCommunityToken(status string, toAddress common.Address, chainID walletCommon.ChainID) (*token.CommunityToken, error) {
+	for attempt := 0; attempt < communityTokenDeployAttempts; attempt++ {
+		communityToken, err := s.Messenger.GetCommunityTokenByChainAndAddress(int(chainID), toAddress.String())
+		if err != nil {
+			return nil, err
+		}
+		if communityToken != nil {
+			return s.updateStateAndAddTokenToCommunityDescription(status, int(chainID), toAddress.String())
+		}
+		if attempt < communityTokenDeployAttempts-1 {
+			time.Sleep(communityTokenDeployRetryDelay)
+		}
+	}
 	return s.updateStateAndAddTokenToCommunityDescription(status, int(chainID), toAddress.String())
 }
 

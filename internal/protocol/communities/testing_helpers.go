@@ -1,6 +1,16 @@
 package communities
 
-import "github.com/status-im/status-go/internal/protocol/protobuf"
+import (
+	"database/sql"
+
+	"github.com/status-im/status-go/internal/protocol/protobuf"
+)
+
+func NewManagerWithDBForTests(db *sql.DB) *Manager {
+	return &Manager{
+		persistence: &Persistence{db: db},
+	}
+}
 
 // NoopDescriptionEncryptor implements DescriptionEncryptor with no-op behavior.
 // Intended for tests that operate on unencrypted communities. Kept in a non-test
