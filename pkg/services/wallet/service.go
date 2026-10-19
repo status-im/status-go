@@ -254,6 +254,7 @@ func NewService(
 		rpcClient.GetNetworkManager(),
 		NewMultistandardBalanceTokenListProvider(tokenManager),
 		NewMultistandardBalanceCollectiblesListProvider(ownership.NewOwnershipDB(db), collectibles.NewContractTypeDB(db)),
+		NewMultistandardBalanceHeldTokensProvider(tokenManager, pendingTxManager),
 		blockChainState,
 		feed,
 		logutils.ZapLogger().Named("MultistandardBalanceController"),

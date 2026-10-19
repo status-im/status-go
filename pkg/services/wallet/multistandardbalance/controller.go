@@ -30,6 +30,7 @@ import (
 
 	"github.com/status-im/go-wallet-sdk/pkg/balance/multistandardfetcher"
 	"github.com/status-im/go-wallet-sdk/pkg/balance/refresh"
+	tokentypes "github.com/status-im/go-wallet-sdk/pkg/tokens/types"
 
 	"go.uber.org/zap"
 )
@@ -51,6 +52,12 @@ type CollectiblesListProvider interface {
 	GetCollectiblesList(chainID uint64, account common.Address) (erc721 []CollectibleID, erc1155 []CollectibleID, err error)
 }
 
+// HeldTokensProvider gives the tokens read with the held set whatever their
+// balance: custom tokens and the tokens of pending transactions.
+type HeldTokensProvider interface {
+	GetHeldTokens(chainID uint64, account common.Address) ([]common.Address, error)
+}
+
 type BalanceFetcher interface {
 	FetchBalances(ctx context.Context, chainID uint64, config multistandardfetcher.FetchConfig) (<-chan multistandardfetcher.FetchResult, error)
 }
@@ -62,10 +69,9 @@ type LastBlockManager interface {
 type ControllerConfig struct {
 	FetchDebounceTime time.Duration
 	FetchPeriod       time.Duration
-	// IdleFetchPeriod is the full fetch period while the client says nobody
-	// is looking at balances (SetActive(false)). A full fetch reads every
-	// token of every list on every chain for every account, so it is most of
-	// the RPC traffic. Zero keeps FetchPeriod.
+	// FetchPeriod is how often the held set is read while balances are on
+	// screen, IdleFetchPeriod while they are not (SetActive(false)). Zero
+	// IdleFetchPeriod keeps FetchPeriod.
 	IdleFetchPeriod time.Duration
 }
 
@@ -83,14 +89,12 @@ func policyConfig(config ControllerConfig) refresh.Config {
 		hiddenPeriod = config.FetchPeriod
 	}
 	policy := refresh.DefaultConfig()
-	policy.Schedule = refresh.FullEveryTick
+	policy.Schedule = refresh.HeldEveryTick
 	policy.OnScreenPeriod = config.FetchPeriod
 	policy.HiddenPeriod = hiddenPeriod
 	policy.Debounce = config.FetchDebounceTime
 	return policy
 }
-
-type FetchConfig map[BalancesKey][]multistandardfetcher.ResultType
 
 type Controller struct {
 	config  ControllerConfig
@@ -102,6 +106,7 @@ type Controller struct {
 	networksProvider        NetworksProvider
 	tokenListProvider       TokenListProvider
 	collectibleListProvider CollectiblesListProvider
+	heldTokensProvider      HeldTokensProvider
 	lastBlockManager        LastBlockManager
 	walletFeed              *event.Feed
 	walletEventsWatcher     *walletevent.Watcher
@@ -134,6 +139,7 @@ func NewController(
 	networksProvider NetworksProvider,
 	tokenListProvider TokenListProvider,
 	collectibleListProvider CollectiblesListProvider,
+	heldTokensProvider HeldTokensProvider,
 	lastBlockManager LastBlockManager,
 	walletFeed *event.Feed,
 	logger *zap.Logger,
@@ -147,6 +153,7 @@ func NewController(
 		networksProvider:        networksProvider,
 		tokenListProvider:       tokenListProvider,
 		collectibleListProvider: collectibleListProvider,
+		heldTokensProvider:      heldTokensProvider,
 		lastBlockManager:        lastBlockManager,
 		publisher:               pubsub.NewPublisher(),
 		policy:                  refresh.NewPolicy(policyConfig(config)),
@@ -307,15 +314,17 @@ func (c *Controller) startWalletEventsWatcher() {
 			if err := json.Unmarshal([]byte(event.Message), &p); err != nil || !p.Deleted {
 				return
 			}
-			if pairs := sentTransactionsPairs(p.SentTransactions); len(pairs) > 0 {
-				c.handle(refresh.TransactionEnded{Pairs: pairs})
+			for _, ev := range transactionsEnded(sentTransactionsTransfers(p.SentTransactions), false) {
+				c.handle(ev)
 			}
 		case pendingtxtracker.EventPendingTransactionStatusChanged:
 			var p pendingtxtracker.StatusChangedPayload
 			if err := json.Unmarshal([]byte(event.Message), &p); err != nil || p.Status != ac.Success {
 				return
 			}
-			c.handle(confirmedTransaction(&p))
+			for _, ev := range confirmedTransaction(&p) {
+				c.handle(ev)
+			}
 		case walletevent.EventTokenListsUpdated:
 			c.handle(refresh.TokenListsUpdated{})
 		}
@@ -333,55 +342,70 @@ func (c *Controller) stopWalletEventsWatcher() {
 	}
 }
 
-// sentTransactionsPairs are the senders and recipients of the transactions on
-// their source and destination chains.
-func sentTransactionsPairs(transactions []*responses.RouterSentTransaction) []refresh.Pair {
-	var accounts []common.Address
-	var chains []uint64
+// transfer is one side of a transaction: the account, the chain and the token
+// it moved there.
+type transfer struct {
+	account  common.Address
+	chain    uint64
+	tokenKey string
+}
+
+func sentTransactionsTransfers(transactions []*responses.RouterSentTransaction) []transfer {
+	transfers := make([]transfer, 0, 2*len(transactions))
 	for _, tx := range transactions {
-		for _, account := range []common.Address{common.Address(tx.FromAddress), common.Address(tx.ToAddress)} {
-			if account != walletcommon.ZeroAddress() && !slices.Contains(accounts, account) {
-				accounts = append(accounts, account)
-			}
-		}
-		for _, chain := range []uint64{tx.FromChain, tx.ToChain} {
-			if chain != 0 && !slices.Contains(chains, chain) {
-				chains = append(chains, chain)
-			}
-		}
+		transfers = append(transfers,
+			transfer{common.Address(tx.FromAddress), tx.FromChain, tx.FromTokenKey},
+			transfer{common.Address(tx.ToAddress), tx.ToChain, tx.ToTokenKey},
+		)
 	}
-	pairs := make([]refresh.Pair, 0, len(accounts)*len(chains))
-	for _, account := range accounts {
-		for _, chain := range chains {
-			pairs = append(pairs, refresh.Pair{Account: account, Chain: chain})
-		}
-	}
-	return pairs
+	return transfers
 }
 
 // confirmedTransaction reads the sender on the source chain and the recipient
-// on the destination chain, or every balance when the details are unknown.
-func confirmedTransaction(p *pendingtxtracker.StatusChangedPayload) refresh.TransactionEnded {
+// on the destination chain, or every native coin when the details are unknown.
+func confirmedTransaction(p *pendingtxtracker.StatusChangedPayload) []refresh.TransactionEnded {
 	if p.SendDetails == nil {
-		return refresh.TransactionEnded{Pairs: []refresh.Pair{{}}, Confirmed: true}
+		return []refresh.TransactionEnded{{Pairs: []refresh.Pair{{}}, Confirmed: true}}
 	}
-	kinds := refresh.Native | refresh.ERC20
+	fromToken, toToken := p.SendDetails.FromTokenKey, p.SendDetails.ToTokenKey
 	if sendtype.SendType(p.SendDetails.SendType).IsCollectiblesTransfer() {
-		kinds |= refresh.ERC721 | refresh.ERC1155
+		fromToken, toToken = "", ""
 	}
-	return refresh.TransactionEnded{
-		Pairs: []refresh.Pair{
-			{Account: common.Address(p.SendDetails.FromAddress), Chain: p.SendDetails.FromChain},
-			{Account: common.Address(p.SendDetails.ToAddress), Chain: p.SendDetails.ToChain},
-		},
-		Kinds:     kinds,
-		Confirmed: true,
-	}
+	return transactionsEnded([]transfer{
+		{common.Address(p.SendDetails.FromAddress), p.SendDetails.FromChain, fromToken},
+		{common.Address(p.SendDetails.ToAddress), p.SendDetails.ToChain, toToken},
+	}, true)
 }
 
-// SetActive tells whether someone looks at balances: while not, full fetches
-// run at IdleFetchPeriod instead of FetchPeriod. Becoming active fetches at
-// once when the last periodic fetch is older than FetchPeriod.
+// transactionsEnded makes one event per chain, so that each chain is read by
+// one fetch.
+func transactionsEnded(transfers []transfer, confirmed bool) []refresh.TransactionEnded {
+	var events []refresh.TransactionEnded
+	for _, t := range transfers {
+		if t.account == walletcommon.ZeroAddress() || t.chain == 0 {
+			continue
+		}
+		i := slices.IndexFunc(events, func(ev refresh.TransactionEnded) bool { return ev.Pairs[0].Chain == t.chain })
+		if i < 0 {
+			events = append(events, refresh.TransactionEnded{Confirmed: confirmed})
+			i = len(events) - 1
+		}
+		ev := &events[i]
+		pair := refresh.Pair{Account: t.account, Chain: t.chain}
+		if !slices.Contains(ev.Pairs, pair) {
+			ev.Pairs = append(ev.Pairs, pair)
+		}
+		if chain, contract, ok := tokentypes.ChainAndAddressFromTokenKey(t.tokenKey); ok && chain == t.chain &&
+			contract != walletcommon.ZeroAddress() && !slices.Contains(ev.Contracts, contract) {
+			ev.Contracts = append(ev.Contracts, contract)
+		}
+	}
+	return events
+}
+
+// SetActive tells whether someone looks at balances: while not, the held set
+// is read every IdleFetchPeriod and the hourly full refresh waits. Becoming
+// active reads at once what is due.
 func (c *Controller) SetActive(active bool) {
 	if c.hidden.Swap(!active) != !active {
 		c.logger.Info("balances refresh period changed", zap.Bool("active", active))
@@ -389,7 +413,8 @@ func (c *Controller) SetActive(active bool) {
 	c.handle(refresh.OnScreenChanged{OnScreen: active})
 }
 
-// TriggerFullFetch reads every balance after the debounce.
+// TriggerFullFetch reads the held set after the debounce, and every balance
+// when the last full refresh is older than ten minutes.
 func (c *Controller) TriggerFullFetch() {
 	c.handle(refresh.RefreshRequested{})
 }
@@ -440,87 +465,16 @@ func (c *Controller) read(reads []refresh.Read) {
 	c.storage.ClearMissingAccounts(context.Background(), accounts)
 	c.storage.ClearMissingChains(context.Background(), networks)
 
-	balancesToFetch := make(FetchConfig)
+	plan := newReadPlan()
 	for _, r := range reads {
-		c.addRead(balancesToFetch, r, accounts, networks)
+		c.addRead(plan, r, accounts, networks)
 	}
-
-	fetchConfigs := c.buildMultiStandardFetcherFetchConfigs(balancesToFetch)
-	if len(fetchConfigs) == 0 {
-		return
-	}
-	c.executeFetchConfigs(fetchConfigs)
+	c.executeChainFetches(c.buildChainFetches(plan))
 }
 
-func (c *Controller) addRead(balancesToFetch FetchConfig, r refresh.Read, accounts []common.Address, chains []uint64) {
-	if r.Tokens != refresh.Full || r.Scope.Unread {
-		c.logger.Warn("unsupported balance read", zap.Any("read", r))
-		return
-	}
-	if r.Scope.Pair.Account != (common.Address{}) {
-		accounts = []common.Address{r.Scope.Pair.Account}
-	}
-	if r.Scope.Pair.Chain != 0 {
-		chains = []uint64{r.Scope.Pair.Chain}
-	}
-	for _, account := range accounts {
-		for _, chain := range chains {
-			key := BalancesKey{Account: account, ChainID: chain}
-			for _, resultType := range resultTypes(r.Kinds) {
-				if r.Scope.OlderThan > 0 && !c.readBefore(key, resultType, r.Scope.OlderThan) {
-					continue
-				}
-				if !slices.Contains(balancesToFetch[key], resultType) {
-					balancesToFetch[key] = append(balancesToFetch[key], resultType)
-				}
-			}
-		}
-	}
-}
-
-func resultTypes(kinds refresh.Kinds) []multistandardfetcher.ResultType {
-	all := []struct {
-		kind       refresh.Kinds
-		resultType multistandardfetcher.ResultType
-	}{
-		{refresh.Native, multistandardfetcher.ResultTypeNative},
-		{refresh.ERC20, multistandardfetcher.ResultTypeERC20},
-		{refresh.ERC721, multistandardfetcher.ResultTypeERC721},
-		{refresh.ERC1155, multistandardfetcher.ResultTypeERC1155},
-	}
-	selected := make([]multistandardfetcher.ResultType, 0, len(all))
-	for _, k := range all {
-		if kinds == 0 || kinds&k.kind != 0 {
-			selected = append(selected, k.resultType)
-		}
-	}
-	return selected
-}
-
-// readBefore reports whether the balances of key of resultType were never
-// read or last read longer than d ago.
-func (c *Controller) readBefore(key BalancesKey, resultType multistandardfetcher.ResultType, d time.Duration) bool {
-	ctx := context.Background()
-	var state State
-	var err error
-	switch resultType {
-	case multistandardfetcher.ResultTypeNative:
-		_, state, err = c.storage.GetNativeBalance(ctx, key)
-	case multistandardfetcher.ResultTypeERC20:
-		_, state, err = c.storage.GetERC20Balances(ctx, key)
-	case multistandardfetcher.ResultTypeERC721:
-		_, state, err = c.storage.GetERC721Balances(ctx, key)
-	case multistandardfetcher.ResultTypeERC1155:
-		_, state, err = c.storage.GetERC1155Balances(ctx, key)
-	}
-	if err != nil {
-		return false
-	}
-	return state.FetchedAt == NeverFetched || state.FetchedAt+int64(d.Seconds()) < time.Now().Unix()
-}
-
-func (c *Controller) executeFetchConfigs(fetchConfigs map[uint64]multistandardfetcher.FetchConfig) {
-	for chainID, chainFetchConfig := range fetchConfigs {
+func (c *Controller) executeChainFetches(fetches map[uint64]*chainFetch) {
+	for chainID, fetch := range fetches {
+		chainFetchConfig := fetch.config
 		for _, address := range chainFetchConfig.Native {
 			c.logger.Debug(
 				"fetching Native balance",
@@ -560,6 +514,7 @@ func (c *Controller) executeFetchConfigs(fetchConfigs map[uint64]multistandardfe
 			cancel()
 			c.logger.Error("failed to fetch balances", zap.Uint64("chainID", chainID), zap.Error(err))
 			c.sendEventBalanceFetchFailedToStart(chainID, chainFetchConfig, err)
+			c.fullRefreshFailed(chainID, fetch)
 			continue
 		}
 
@@ -569,17 +524,31 @@ func (c *Controller) executeFetchConfigs(fetchConfigs map[uint64]multistandardfe
 		go func(fetchChainID uint64, ctx context.Context, cancel context.CancelFunc) {
 			defer panics.LogOnPanic()
 			defer cancel()
+			failed := false
 			for {
 				select {
 				case <-ctx.Done():
+					c.fullRefreshFailed(fetchChainID, fetch)
 					return
 				case result, ok := <-resultsCh:
 					if !ok {
+						if failed {
+							c.fullRefreshFailed(fetchChainID, fetch)
+						}
 						return
 					}
-					c.handleFetchResult(ctx, fetchChainID, result)
+					if !c.handleFetchResult(ctx, fetchChainID, result, fetch) {
+						failed = true
+					}
 				}
 			}
 		}(chainID, ctx, cancel)
+	}
+}
+
+// fullRefreshFailed tells the policy when fetch was a full refresh of chainID.
+func (c *Controller) fullRefreshFailed(chainID uint64, fetch *chainFetch) {
+	if len(fetch.listed) > 0 {
+		c.handle(refresh.FullRefreshFailed{Chain: chainID})
 	}
 }

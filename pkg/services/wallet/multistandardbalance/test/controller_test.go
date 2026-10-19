@@ -47,6 +47,8 @@ func TestController_DebounceTiming(t *testing.T) {
 		tokenListProvider := mock_multistandardbalance.NewMockTokenListProvider(ctrl)
 		collectibleListProvider := mock_multistandardbalance.NewMockCollectiblesListProvider(ctrl)
 		lastBlockManager := mock_multistandardbalance.NewMockLastBlockManager(ctrl)
+		heldTokensProvider := mock_multistandardbalance.NewMockHeldTokensProvider(ctrl)
+		heldTokensProvider.EXPECT().GetHeldTokens(gomock.Any(), gomock.Any()).AnyTimes()
 		logger := zap.NewNop()
 
 		// Mock accounts and networks
@@ -123,6 +125,7 @@ func TestController_DebounceTiming(t *testing.T) {
 			networksProvider,
 			tokenListProvider,
 			collectibleListProvider,
+			heldTokensProvider,
 			lastBlockManager,
 			nil, // walletFeed
 			logger,
@@ -171,6 +174,8 @@ func TestController_FetchPeriod(t *testing.T) {
 		tokenListProvider := mock_multistandardbalance.NewMockTokenListProvider(ctrl)
 		collectibleListProvider := mock_multistandardbalance.NewMockCollectiblesListProvider(ctrl)
 		lastBlockManager := mock_multistandardbalance.NewMockLastBlockManager(ctrl)
+		heldTokensProvider := mock_multistandardbalance.NewMockHeldTokensProvider(ctrl)
+		heldTokensProvider.EXPECT().GetHeldTokens(gomock.Any(), gomock.Any()).AnyTimes()
 		logger := zap.NewNop()
 
 		// Mock accounts and networks
@@ -248,6 +253,7 @@ func TestController_FetchPeriod(t *testing.T) {
 			networksProvider,
 			tokenListProvider,
 			collectibleListProvider,
+			heldTokensProvider,
 			lastBlockManager,
 			nil, // walletFeed
 			logger,
@@ -302,6 +308,8 @@ func TestController_BasicFlow(t *testing.T) {
 		tokenListProvider := mock_multistandardbalance.NewMockTokenListProvider(ctrl)
 		collectibleListProvider := mock_multistandardbalance.NewMockCollectiblesListProvider(ctrl)
 		lastBlockManager := mock_multistandardbalance.NewMockLastBlockManager(ctrl)
+		heldTokensProvider := mock_multistandardbalance.NewMockHeldTokensProvider(ctrl)
+		heldTokensProvider.EXPECT().GetHeldTokens(gomock.Any(), gomock.Any()).AnyTimes()
 		logger := zap.NewNop()
 
 		// Mock accounts and networks
@@ -351,16 +359,20 @@ func TestController_BasicFlow(t *testing.T) {
 			FetchedAt:     multistandardbalance.NeverFetched,
 		}
 
+		erc20Contract1 := common.HexToAddress("0x1234567890123456789012345678901234567890")
+		erc20Contract2 := common.HexToAddress("0x2345678901234567890123456789012345678901")
+		bothTokens := map[multistandardbalance.ContractAddress]*big.Int{erc20Contract1: big.NewInt(0), erc20Contract2: big.NewInt(0)}
+
 		// Mock storage calls with different states for different keys
-		// key1_1: recent state (should NOT fetch)
+		// key1_1: recent state, every listed token read
 		storage.EXPECT().GetNativeBalance(gomock.Any(), key1_1).Return(big.NewInt(1000), recentState, nil).AnyTimes()
-		storage.EXPECT().GetERC20Balances(gomock.Any(), key1_1).Return(map[multistandardbalance.ContractAddress]*big.Int{}, recentState, nil).AnyTimes()
+		storage.EXPECT().GetERC20Balances(gomock.Any(), key1_1).Return(bothTokens, recentState, nil).AnyTimes()
 		storage.EXPECT().GetERC721Balances(gomock.Any(), key1_1).Return(map[multistandardbalance.ContractAddress]*big.Int{}, recentState, nil).AnyTimes()
 		storage.EXPECT().GetERC1155Balances(gomock.Any(), key1_1).Return(map[multistandardbalance.HashableCollectibleID]*big.Int{}, recentState, nil).AnyTimes()
 
-		// key1_2: old state (should fetch)
+		// key1_2: old state, erc20Contract2 never read
 		storage.EXPECT().GetNativeBalance(gomock.Any(), key1_2).Return(big.NewInt(2000), oldState, nil).AnyTimes()
-		storage.EXPECT().GetERC20Balances(gomock.Any(), key1_2).Return(map[multistandardbalance.ContractAddress]*big.Int{}, oldState, nil).AnyTimes()
+		storage.EXPECT().GetERC20Balances(gomock.Any(), key1_2).Return(map[multistandardbalance.ContractAddress]*big.Int{erc20Contract1: big.NewInt(0)}, oldState, nil).AnyTimes()
 		storage.EXPECT().GetERC721Balances(gomock.Any(), key1_2).Return(map[multistandardbalance.ContractAddress]*big.Int{}, oldState, nil).AnyTimes()
 		storage.EXPECT().GetERC1155Balances(gomock.Any(), key1_2).Return(map[multistandardbalance.HashableCollectibleID]*big.Int{}, oldState, nil).AnyTimes()
 
@@ -370,9 +382,9 @@ func TestController_BasicFlow(t *testing.T) {
 		storage.EXPECT().GetERC721Balances(gomock.Any(), key2_1).Return((map[multistandardbalance.ContractAddress]*big.Int)(nil), neverFetchedState, nil).AnyTimes()
 		storage.EXPECT().GetERC1155Balances(gomock.Any(), key2_1).Return((map[multistandardbalance.HashableCollectibleID]*big.Int)(nil), neverFetchedState, nil).AnyTimes()
 
-		// key2_2: recent state (should NOT fetch)
+		// key2_2: recent state, every listed token read
 		storage.EXPECT().GetNativeBalance(gomock.Any(), key2_2).Return(big.NewInt(4000), recentState, nil).AnyTimes()
-		storage.EXPECT().GetERC20Balances(gomock.Any(), key2_2).Return(map[multistandardbalance.ContractAddress]*big.Int{}, recentState, nil).AnyTimes()
+		storage.EXPECT().GetERC20Balances(gomock.Any(), key2_2).Return(bothTokens, recentState, nil).AnyTimes()
 		storage.EXPECT().GetERC721Balances(gomock.Any(), key2_2).Return(map[multistandardbalance.ContractAddress]*big.Int{}, recentState, nil).AnyTimes()
 		storage.EXPECT().GetERC1155Balances(gomock.Any(), key2_2).Return(map[multistandardbalance.HashableCollectibleID]*big.Int{}, recentState, nil).AnyTimes()
 
@@ -391,8 +403,6 @@ func TestController_BasicFlow(t *testing.T) {
 		storage.EXPECT().ClearMissingChains(gomock.Any(), []uint64{1, 2}).AnyTimes()
 
 		// Create some test contracts for ERC20, ERC721, and ERC1155
-		erc20Contract1 := common.HexToAddress("0x1234567890123456789012345678901234567890")
-		erc20Contract2 := common.HexToAddress("0x2345678901234567890123456789012345678901")
 		erc721Contract1 := common.HexToAddress("0x3456789012345678901234567890123456789012")
 		erc721Contract2 := common.HexToAddress("0x4567890123456789012345678901234567890123")
 		erc1155Contract1 := common.HexToAddress("0x5678901234567890123456789012345678901234")
@@ -549,6 +559,7 @@ func TestController_BasicFlow(t *testing.T) {
 			networksProvider,
 			tokenListProvider,
 			collectibleListProvider,
+			heldTokensProvider,
 			lastBlockManager,
 			nil, // walletFeed
 			logger,
@@ -739,7 +750,7 @@ func TestController_BasicFlow(t *testing.T) {
 		}, 100*time.Millisecond, 10*time.Millisecond, "Expected 2 chains to be fetched after Start")
 		resetFetchCalls()
 
-		// Added accounts read only the balances that are old or never fetched
+		// Added accounts read only what was never read
 		pubsub.Publish(accountsPublisher, accountsevent.AccountsAddedEvent{})
 
 		// Wait for the fetch to complete
@@ -748,15 +759,12 @@ func TestController_BasicFlow(t *testing.T) {
 			return len(chains) == 2 // Should fetch chains 1 and 2
 		}, 100*time.Millisecond, 10*time.Millisecond, "Expected 2 chains to be fetched after accounts were added")
 
-		// Verify that only chains with old/never fetched states were fetched
+		// Chain 1 reads key2_1, which was never read; chain 2 the token key1_2 never read
 		actualCalls := getFetchCalls()
 		actualChains := getChainIDs()
-		// Should have fetched chains 1 and 2 (for key1_2 and key2_1 which have old/never fetched states)
-		// Chain 1: key2_1 has never fetched state
-		// Chain 2: key1_2 has old state
 		require.Len(t, actualChains, 2, "Expected 2 chains to be fetched")
-		require.Contains(t, actualChains, uint64(1), "Expected chain 1 to be fetched (key2_1 has never fetched state)")
-		require.Contains(t, actualChains, uint64(2), "Expected chain 2 to be fetched (key1_2 has old state)")
+		require.Contains(t, actualChains, uint64(1), "Expected chain 1 to be fetched (key2_1 was never read)")
+		require.Contains(t, actualChains, uint64(2), "Expected chain 2 to be fetched (key1_2 lacks a listed token)")
 
 		// Verify the configs contain only the expected accounts
 		require.Len(t, actualCalls, 2, "Expected 2 fetch calls to be made")
@@ -771,13 +779,14 @@ func TestController_BasicFlow(t *testing.T) {
 			}
 		}
 
-		// Chain 1 should only have address2 (key2_1 has never fetched state)
-		require.Len(t, config1.Native, 1, "Chain 1 should have 1 native account")
-		require.Contains(t, config1.Native, common.BytesToAddress(address2.Bytes()), "Chain 1 should include address2")
+		// Chain 1 reads every balance of address2 only
+		require.Equal(t, []common.Address{common.Address(address2)}, config1.Native)
+		require.Len(t, config1.ERC20, 1)
+		require.ElementsMatch(t, []common.Address{erc20Contract1, erc20Contract2}, config1.ERC20[common.Address(address2)])
 
-		// Chain 2 should only have address1 (key1_2 has old state)
-		require.Len(t, config2.Native, 1, "Chain 2 should have 1 native account")
-		require.Contains(t, config2.Native, common.BytesToAddress(address1.Bytes()), "Chain 2 should include address1")
+		// Chain 2 reads only the token address1 has no balance of
+		require.Empty(t, config2.Native)
+		require.Equal(t, map[common.Address][]common.Address{common.Address(address1): {erc20Contract2}}, config2.ERC20)
 
 		// Reset and test with full fetch - should fetch all chains
 		resetFetchCalls()
@@ -845,6 +854,8 @@ func newTestController(
 	tokenListProvider := mock_multistandardbalance.NewMockTokenListProvider(ctrl)
 	collectibleListProvider := mock_multistandardbalance.NewMockCollectiblesListProvider(ctrl)
 	lastBlockManager := mock_multistandardbalance.NewMockLastBlockManager(ctrl)
+	heldTokensProvider := mock_multistandardbalance.NewMockHeldTokensProvider(ctrl)
+	heldTokensProvider.EXPECT().GetHeldTokens(gomock.Any(), gomock.Any()).AnyTimes()
 
 	fromAddr = types.Address{0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11}
 	toAddr = types.Address{0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x22}
@@ -880,7 +891,7 @@ func newTestController(
 
 	controller = multistandardbalance.NewController(
 		cfg, storage, balanceFetcher, accountsProvider, accountsPublisher,
-		networksProvider, tokenListProvider, collectibleListProvider,
+		networksProvider, tokenListProvider, collectibleListProvider, heldTokensProvider,
 		lastBlockManager, walletFeed, zap.NewNop(),
 	)
 
@@ -1049,6 +1060,8 @@ func TestController_CancelsInFlightFetchWhenStartingNewFetchForSameChain(t *test
 		tokenListProvider := mock_multistandardbalance.NewMockTokenListProvider(ctrl)
 		collectibleListProvider := mock_multistandardbalance.NewMockCollectiblesListProvider(ctrl)
 		lastBlockManager := mock_multistandardbalance.NewMockLastBlockManager(ctrl)
+		heldTokensProvider := mock_multistandardbalance.NewMockHeldTokensProvider(ctrl)
+		heldTokensProvider.EXPECT().GetHeldTokens(gomock.Any(), gomock.Any()).AnyTimes()
 		logger := zap.NewNop()
 
 		chainID := uint64(10)
@@ -1111,6 +1124,7 @@ func TestController_CancelsInFlightFetchWhenStartingNewFetchForSameChain(t *test
 			networksProvider,
 			tokenListProvider,
 			collectibleListProvider,
+			heldTokensProvider,
 			lastBlockManager,
 			nil,
 			logger,
