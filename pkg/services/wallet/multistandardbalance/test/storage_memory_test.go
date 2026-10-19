@@ -625,3 +625,119 @@ func TestStorageMemory_UpdateERC1155Balances_WithNilBlockNumber(t *testing.T) {
 	}
 	assert.Equal(t, initialState.AtBlockNumber, retrievedState.AtBlockNumber)
 }
+
+func atBlock(block int64) multistandardbalance.State {
+	return multistandardbalance.State{AtBlockNumber: big.NewInt(block), FetchedAt: block}
+}
+
+func TestStorageMemory_ERC20KeepsTokensMissingFromALaterRead(t *testing.T) {
+	storage := multistandardbalance.NewStorageMemory()
+	ctx := context.Background()
+	key := multistandardbalance.BalancesKey{Account: common.HexToAddress("0xa11ce"), ChainID: 1}
+	usdc, dai := common.HexToAddress("0x1"), common.HexToAddress("0x2")
+
+	_, _, err := storage.UpdateERC20Balances(ctx, key, map[multistandardbalance.ContractAddress]*big.Int{usdc: big.NewInt(1), dai: big.NewInt(2)}, atBlock(100))
+	require.NoError(t, err)
+	changed, _, err := storage.UpdateERC20Balances(ctx, key, map[multistandardbalance.ContractAddress]*big.Int{usdc: big.NewInt(3)}, atBlock(101))
+	require.NoError(t, err)
+
+	require.True(t, changed)
+	balances, _, err := storage.GetERC20Balances(ctx, key)
+	require.NoError(t, err)
+	require.Equal(t, map[multistandardbalance.ContractAddress]*big.Int{usdc: big.NewInt(3), dai: big.NewInt(2)}, balances)
+}
+
+func TestStorageMemory_ERC20TakesEachTokenFromItsNewestRead(t *testing.T) {
+	storage := multistandardbalance.NewStorageMemory()
+	ctx := context.Background()
+	key := multistandardbalance.BalancesKey{Account: common.HexToAddress("0xa11ce"), ChainID: 1}
+	usdc, dai := common.HexToAddress("0x1"), common.HexToAddress("0x2")
+
+	_, _, err := storage.UpdateERC20Balances(ctx, key, map[multistandardbalance.ContractAddress]*big.Int{usdc: big.NewInt(1), dai: big.NewInt(2)}, atBlock(100))
+	require.NoError(t, err)
+	_, _, err = storage.UpdateERC20Balances(ctx, key, map[multistandardbalance.ContractAddress]*big.Int{dai: big.NewInt(5)}, atBlock(102))
+	require.NoError(t, err)
+
+	changed, oldState, err := storage.UpdateERC20Balances(ctx, key, map[multistandardbalance.ContractAddress]*big.Int{usdc: big.NewInt(7), dai: big.NewInt(9)}, atBlock(101))
+	require.NoError(t, err)
+
+	require.True(t, changed, "usdc was last read at block 100")
+	require.Equal(t, big.NewInt(102), oldState.AtBlockNumber)
+	balances, state, err := storage.GetERC20Balances(ctx, key)
+	require.NoError(t, err)
+	require.Equal(t, map[multistandardbalance.ContractAddress]*big.Int{usdc: big.NewInt(7), dai: big.NewInt(5)}, balances,
+		"dai read at block 102 is newer than the read at block 101")
+	require.Equal(t, big.NewInt(102), state.AtBlockNumber, "the state is that of the newest read")
+}
+
+func TestStorageMemory_ERC20ReadOfOnlyStaleTokensChangesNothing(t *testing.T) {
+	storage := multistandardbalance.NewStorageMemory()
+	ctx := context.Background()
+	key := multistandardbalance.BalancesKey{Account: common.HexToAddress("0xa11ce"), ChainID: 1}
+	usdc := common.HexToAddress("0x1")
+
+	_, _, err := storage.UpdateERC20Balances(ctx, key, map[multistandardbalance.ContractAddress]*big.Int{usdc: big.NewInt(1)}, atBlock(101))
+	require.NoError(t, err)
+	changed, _, err := storage.UpdateERC20Balances(ctx, key, map[multistandardbalance.ContractAddress]*big.Int{usdc: big.NewInt(2)}, atBlock(100))
+	require.NoError(t, err)
+
+	require.False(t, changed)
+	balances, state, err := storage.GetERC20Balances(ctx, key)
+	require.NoError(t, err)
+	require.Equal(t, map[multistandardbalance.ContractAddress]*big.Int{usdc: big.NewInt(1)}, balances)
+	require.Equal(t, atBlock(101), state)
+}
+
+func TestStorageMemory_ERC721TakesEachTokenFromItsNewestRead(t *testing.T) {
+	storage := multistandardbalance.NewStorageMemory()
+	ctx := context.Background()
+	key := multistandardbalance.BalancesKey{Account: common.HexToAddress("0xa11ce"), ChainID: 1}
+	punks, apes := common.HexToAddress("0x1"), common.HexToAddress("0x2")
+
+	_, _, err := storage.UpdateERC721Balances(ctx, key, map[multistandardbalance.ContractAddress]*big.Int{punks: big.NewInt(1), apes: big.NewInt(1)}, atBlock(100))
+	require.NoError(t, err)
+	_, _, err = storage.UpdateERC721Balances(ctx, key, map[multistandardbalance.ContractAddress]*big.Int{apes: big.NewInt(0)}, atBlock(102))
+	require.NoError(t, err)
+	_, _, err = storage.UpdateERC721Balances(ctx, key, map[multistandardbalance.ContractAddress]*big.Int{punks: big.NewInt(2), apes: big.NewInt(1)}, atBlock(101))
+	require.NoError(t, err)
+
+	balances, _, err := storage.GetERC721Balances(ctx, key)
+	require.NoError(t, err)
+	require.Equal(t, map[multistandardbalance.ContractAddress]*big.Int{punks: big.NewInt(2), apes: big.NewInt(0)}, balances)
+}
+
+func TestStorageMemory_ERC1155TakesEachTokenFromItsNewestRead(t *testing.T) {
+	storage := multistandardbalance.NewStorageMemory()
+	ctx := context.Background()
+	key := multistandardbalance.BalancesKey{Account: common.HexToAddress("0xa11ce"), ChainID: 1}
+	sword := multistandardbalance.HashableCollectibleID{ContractAddress: common.HexToAddress("0x1"), TokenID: [32]byte{1}}
+	shield := multistandardbalance.HashableCollectibleID{ContractAddress: common.HexToAddress("0x1"), TokenID: [32]byte{2}}
+
+	_, _, err := storage.UpdateERC1155Balances(ctx, key, map[multistandardbalance.HashableCollectibleID]*big.Int{sword: big.NewInt(1), shield: big.NewInt(1)}, atBlock(100))
+	require.NoError(t, err)
+	_, _, err = storage.UpdateERC1155Balances(ctx, key, map[multistandardbalance.HashableCollectibleID]*big.Int{shield: big.NewInt(3)}, atBlock(102))
+	require.NoError(t, err)
+	_, _, err = storage.UpdateERC1155Balances(ctx, key, map[multistandardbalance.HashableCollectibleID]*big.Int{sword: big.NewInt(2), shield: big.NewInt(2)}, atBlock(101))
+	require.NoError(t, err)
+
+	balances, _, err := storage.GetERC1155Balances(ctx, key)
+	require.NoError(t, err)
+	require.Equal(t, map[multistandardbalance.HashableCollectibleID]*big.Int{sword: big.NewInt(2), shield: big.NewInt(3)}, balances)
+}
+
+func TestStorageMemory_ReturnedBalancesDoNotChangeWithLaterReads(t *testing.T) {
+	storage := multistandardbalance.NewStorageMemory()
+	ctx := context.Background()
+	key := multistandardbalance.BalancesKey{Account: common.HexToAddress("0xa11ce"), ChainID: 1}
+	usdc, dai := common.HexToAddress("0x1"), common.HexToAddress("0x2")
+
+	_, _, err := storage.UpdateERC20Balances(ctx, key, map[multistandardbalance.ContractAddress]*big.Int{usdc: big.NewInt(1), dai: big.NewInt(2)}, atBlock(100))
+	require.NoError(t, err)
+	returned, _, err := storage.GetERC20Balances(ctx, key)
+	require.NoError(t, err)
+
+	_, _, err = storage.UpdateERC20Balances(ctx, key, map[multistandardbalance.ContractAddress]*big.Int{usdc: big.NewInt(3)}, atBlock(101))
+	require.NoError(t, err)
+
+	require.Equal(t, map[multistandardbalance.ContractAddress]*big.Int{usdc: big.NewInt(1), dai: big.NewInt(2)}, returned)
+}

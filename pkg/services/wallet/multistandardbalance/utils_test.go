@@ -9,100 +9,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestIsBigIntMapEqual(t *testing.T) {
-	tests := []struct {
-		name     string
-		m1       map[string]*big.Int
-		m2       map[string]*big.Int
-		expected bool
-	}{
-		{
-			name:     "empty maps",
-			m1:       map[string]*big.Int{},
-			m2:       map[string]*big.Int{},
-			expected: true,
-		},
-		{
-			name: "identical maps",
-			m1: map[string]*big.Int{
-				"key1": big.NewInt(100),
-				"key2": big.NewInt(200),
-			},
-			m2: map[string]*big.Int{
-				"key1": big.NewInt(100),
-				"key2": big.NewInt(200),
-			},
-			expected: true,
-		},
-		{
-			name: "different values",
-			m1: map[string]*big.Int{
-				"key1": big.NewInt(100),
-				"key2": big.NewInt(200),
-			},
-			m2: map[string]*big.Int{
-				"key1": big.NewInt(100),
-				"key2": big.NewInt(300),
-			},
-			expected: false,
-		},
-		{
-			name: "different keys",
-			m1: map[string]*big.Int{
-				"key1": big.NewInt(100),
-				"key2": big.NewInt(200),
-			},
-			m2: map[string]*big.Int{
-				"key1": big.NewInt(100),
-				"key3": big.NewInt(200),
-			},
-			expected: false,
-		},
-		{
-			name: "different lengths",
-			m1: map[string]*big.Int{
-				"key1": big.NewInt(100),
-			},
-			m2: map[string]*big.Int{
-				"key1": big.NewInt(100),
-				"key2": big.NewInt(200),
-			},
-			expected: false,
-		},
-		{
-			name: "nil values",
-			m1: map[string]*big.Int{
-				"key1": nil,
-				"key2": big.NewInt(200),
-			},
-			m2: map[string]*big.Int{
-				"key1": nil,
-				"key2": big.NewInt(200),
-			},
-			expected: true,
-		},
-		{
-			name: "zero values",
-			m1: map[string]*big.Int{
-				"key1": big.NewInt(0),
-				"key2": big.NewInt(200),
-			},
-			m2: map[string]*big.Int{
-				"key1": big.NewInt(0),
-				"key2": big.NewInt(200),
-			},
-			expected: true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := isBigIntMapEqual(tt.m1, tt.m2)
-			assert.Equal(t, tt.expected, result)
-		})
-	}
-}
-
 func TestDeleteAccountsNotInList(t *testing.T) {
 	tests := []struct {
 		name           string
@@ -245,71 +151,11 @@ func TestDeleteChainsNotInList(t *testing.T) {
 	}
 }
 
-func TestIsBigIntMapEqualWithDifferentTypes(t *testing.T) {
-	// Test with ContractAddress type
-	contractMap1 := map[ContractAddress]*big.Int{
-		common.HexToAddress("0x1111111111111111111111111111111111111111"): big.NewInt(100),
-		common.HexToAddress("0x2222222222222222222222222222222222222222"): big.NewInt(200),
-	}
-
-	contractMap2 := map[ContractAddress]*big.Int{
-		common.HexToAddress("0x1111111111111111111111111111111111111111"): big.NewInt(100),
-		common.HexToAddress("0x2222222222222222222222222222222222222222"): big.NewInt(200),
-	}
-
-	assert.True(t, isBigIntMapEqual(contractMap1, contractMap2))
-
-	// Test with HashableCollectibleID type
-	collectibleMap1 := map[HashableCollectibleID]*big.Int{
-		HashableCollectibleID{
-			ContractAddress: common.HexToAddress("0x1111111111111111111111111111111111111111"),
-			TokenID:         [32]byte{1},
-		}: big.NewInt(10),
-	}
-
-	collectibleMap2 := map[HashableCollectibleID]*big.Int{
-		HashableCollectibleID{
-			ContractAddress: common.HexToAddress("0x1111111111111111111111111111111111111111"),
-			TokenID:         [32]byte{1},
-		}: big.NewInt(10),
-	}
-
-	assert.True(t, isBigIntMapEqual(collectibleMap1, collectibleMap2))
-}
-
-func TestKeepLastKnownBalances(t *testing.T) {
+func TestCountMissing(t *testing.T) {
 	a := common.HexToAddress("0x1")
 	b := common.HexToAddress("0x2")
-	c := common.HexToAddress("0x3")
 
-	t.Run("a token the batch did not answer keeps its last known balance", func(t *testing.T) {
-		previous := map[common.Address]*big.Int{a: big.NewInt(10), b: big.NewInt(20)}
-		fetched := map[common.Address]*big.Int{a: big.NewInt(11)}
-		merged, kept := keepLastKnownBalances(previous, fetched)
-		assert.Equal(t, 1, kept)
-		assert.Equal(t, big.NewInt(11), merged[a]) // answered: the fresh value wins
-		assert.Equal(t, big.NewInt(20), merged[b]) // unanswered: carried over
-	})
-
-	t.Run("an answered zero is a real zero, not a miss", func(t *testing.T) {
-		previous := map[common.Address]*big.Int{a: big.NewInt(10)}
-		fetched := map[common.Address]*big.Int{a: big.NewInt(0)}
-		merged, kept := keepLastKnownBalances(previous, fetched)
-		assert.Equal(t, 0, kept)
-		assert.Equal(t, big.NewInt(0), merged[a])
-	})
-
-	t.Run("nothing stored yet leaves the result untouched", func(t *testing.T) {
-		fetched := map[common.Address]*big.Int{c: big.NewInt(5)}
-		merged, kept := keepLastKnownBalances(nil, fetched)
-		assert.Equal(t, 0, kept)
-		assert.Equal(t, fetched, merged)
-	})
-
-	t.Run("a nil result still carries the stored balances", func(t *testing.T) {
-		previous := map[common.Address]*big.Int{a: big.NewInt(10)}
-		merged, kept := keepLastKnownBalances(previous, nil)
-		assert.Equal(t, 1, kept)
-		assert.Equal(t, big.NewInt(10), merged[a])
-	})
+	assert.Equal(t, 1, countMissing(map[common.Address]*big.Int{a: big.NewInt(10), b: big.NewInt(20)}, map[common.Address]*big.Int{a: big.NewInt(0)}))
+	assert.Equal(t, 0, countMissing(nil, map[common.Address]*big.Int{a: big.NewInt(5)}))
+	assert.Equal(t, 1, countMissing(map[common.Address]*big.Int{a: big.NewInt(10)}, nil))
 }

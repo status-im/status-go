@@ -24,12 +24,12 @@ import (
 	ac "github.com/status-im/status-go/pkg/services/wallet/activity/common"
 	walletcommon "github.com/status-im/status-go/pkg/services/wallet/common"
 	"github.com/status-im/status-go/pkg/services/wallet/pendingtxtracker"
+	"github.com/status-im/status-go/pkg/services/wallet/responses"
 	"github.com/status-im/status-go/pkg/services/wallet/router/sendtype"
 	"github.com/status-im/status-go/pkg/services/wallet/walletevent"
 
 	"github.com/status-im/go-wallet-sdk/pkg/balance/multistandardfetcher"
-
-	"github.com/bep/debounce"
+	"github.com/status-im/go-wallet-sdk/pkg/balance/refresh"
 
 	"go.uber.org/zap"
 )
@@ -77,14 +77,25 @@ func DefaultControllerConfig() ControllerConfig {
 	}
 }
 
+func policyConfig(config ControllerConfig) refresh.Config {
+	hiddenPeriod := config.IdleFetchPeriod
+	if hiddenPeriod == 0 {
+		hiddenPeriod = config.FetchPeriod
+	}
+	policy := refresh.DefaultConfig()
+	policy.Schedule = refresh.FullEveryTick
+	policy.OnScreenPeriod = config.FetchPeriod
+	policy.HiddenPeriod = hiddenPeriod
+	policy.Debounce = config.FetchDebounceTime
+	return policy
+}
+
 type FetchConfig map[BalancesKey][]multistandardfetcher.ResultType
 
 type Controller struct {
 	config  ControllerConfig
 	storage Storage
 	fetcher BalanceFetcher
-
-	mu sync.RWMutex
 
 	accountsProvider        AccountsProvider
 	accountsPublisher       *pubsub.Publisher
@@ -97,18 +108,16 @@ type Controller struct {
 
 	publisher *pubsub.Publisher
 
-	stopCh                     chan struct{}
-	fetchDebounceFn            func(f func())
-	firstFetchPending          atomic.Bool
-	tokenListsColdFetchPending atomic.Bool
-	pendingFullFetch           bool
-	pendingFetchConfig         FetchConfig
+	stopCh chan struct{}
 
-	idle            atomic.Bool
-	activityChanged chan struct{}
-	// lastPeriodicFetch keeps the monotonic clock reading time.Now gives, so
-	// that a change of the wall clock does not move the next fetch.
-	lastPeriodicFetch atomic.Pointer[time.Time]
+	// policyMu guards the policy, which is not safe for concurrent use, and
+	// the timer that calls it back.
+	policyMu sync.Mutex
+	policy   *refresh.Policy
+	running  bool
+	timer    *time.Timer
+
+	hidden atomic.Bool
 
 	chainFetchMu      sync.Mutex
 	chainFetchCancels map[uint64]context.CancelFunc
@@ -140,9 +149,7 @@ func NewController(
 		collectibleListProvider: collectibleListProvider,
 		lastBlockManager:        lastBlockManager,
 		publisher:               pubsub.NewPublisher(),
-		fetchDebounceFn:         debounce.New(config.FetchDebounceTime),
-		pendingFetchConfig:      make(FetchConfig),
-		activityChanged:         make(chan struct{}, 1),
+		policy:                  refresh.NewPolicy(policyConfig(config)),
 		chainFetchCancels:       make(map[uint64]context.CancelFunc),
 		walletFeed:              walletFeed,
 		logger:                  logger,
@@ -155,61 +162,64 @@ func (c *Controller) Start() {
 	}
 
 	c.stopCh = make(chan struct{})
-	// Arm the leading edges only for a COLD start (some pair has never been fetched)
-	coldStart := c.hasNeverFetchedBalances()
-	c.firstFetchPending.Store(coldStart)
-	c.tokenListsColdFetchPending.Store(coldStart)
-
 	c.startAccountsWatcher()
 	c.startNetworksWatcher()
 	c.startWalletEventsWatcher()
-	c.startFetcher()
+	c.handle(refresh.Started{})
 }
 
 func (c *Controller) Stop() {
 	if c.stopCh != nil {
 		close(c.stopCh)
 		c.stopCh = nil
+		c.handle(refresh.Stopped{})
 	}
 
 	c.cancelAllChainFetches()
 	c.stopWalletEventsWatcher()
-
-	// After the watcher is stopped (Stop waits for the callback to return), so a
-	// token-lists event racing teardown can't leave a leading edge armed.
-	c.firstFetchPending.Store(false)
-	c.tokenListsColdFetchPending.Store(false)
 }
 
-// hasNeverFetchedBalances reports whether any (account, chain) pair has a
-// never-fetched native or ERC20 balance.
-//
-// Collectible types are deliberately excluded: an account owning no
-// collectibles on a chain never produces an ERC721/ERC1155 fetch job
-// (buildMultiStandardFetcherFetchConfigs only adds a map entry for a non-empty
-// list, and the SDK builds one job per entry), so their state stays
-// NeverFetched forever and would make every start look cold.
-func (c *Controller) hasNeverFetchedBalances() bool {
-	accounts, err := c.getAllAccounts()
-	if err != nil {
-		return true
-	}
-	networks, err := c.getAllNetworks()
-	if err != nil {
-		return true
-	}
-	for _, account := range accounts {
-		for _, network := range networks {
-			key := BalancesKey{Account: account, ChainID: network}
-			if _, state, err := c.storage.GetNativeBalance(context.Background(), key); err != nil || state.FetchedAt == NeverFetched {
-				return true
-			}
-			if _, state, err := c.storage.GetERC20Balances(context.Background(), key); err != nil || state.FetchedAt == NeverFetched {
-				return true
-			}
+// handle passes ev to the policy, makes the reads it asks for and sets the
+// timer to its next tick. While stopped, the policy hears events but nothing
+// is read.
+func (c *Controller) handle(ev refresh.Event) {
+	c.policyMu.Lock()
+	switch ev.(type) {
+	case refresh.Started:
+		c.running = true
+	case refresh.Stopped:
+		c.running = false
+	case refresh.Tick:
+		if !c.running {
+			c.policyMu.Unlock()
+			return
 		}
 	}
-	return false
+	decision := c.policy.Handle(time.Now(), ev)
+	running := c.running
+	c.setTimer(decision.WakeAt)
+	c.policyMu.Unlock()
+
+	if running {
+		c.read(decision.Reads)
+	}
+}
+
+func (c *Controller) setTimer(wakeAt time.Time) {
+	if !c.running || wakeAt.IsZero() {
+		if c.timer != nil {
+			c.timer.Stop()
+		}
+		return
+	}
+	if c.timer == nil {
+		c.timer = time.AfterFunc(time.Until(wakeAt), func() {
+			defer panics.LogOnPanic()
+			c.handle(refresh.Tick{})
+		})
+		return
+	}
+	c.timer.Reset(time.Until(wakeAt))
 }
 
 func (c *Controller) startChainFetch(chainID uint64) (context.Context, context.CancelFunc) {
@@ -254,7 +264,7 @@ func (c *Controller) startAccountsWatcher() {
 				if !ok {
 					return
 				}
-				c.triggerFetch()
+				c.handle(refresh.AccountsOrChainsChanged{})
 			}
 		}
 	}()
@@ -279,7 +289,7 @@ func (c *Controller) startNetworksWatcher() {
 				if !ok {
 					return
 				}
-				c.triggerFetch()
+				c.handle(refresh.AccountsOrChainsChanged{})
 			}
 		}
 	}()
@@ -290,69 +300,24 @@ func (c *Controller) startWalletEventsWatcher() {
 		return
 	}
 
-	// Respond to any sent transaction update
 	walletEventCb := func(event walletevent.Event) {
 		switch event.Type {
 		case pendingtxtracker.EventPendingTransactionUpdate:
 			var p pendingtxtracker.PendingTxUpdatePayload
-			err := json.Unmarshal([]byte(event.Message), &p)
-			if err != nil {
+			if err := json.Unmarshal([]byte(event.Message), &p); err != nil || !p.Deleted {
 				return
 			}
-			if p.Deleted {
-				// Some pending transaction moved to its
-				// final state, trigger a fetch
-				fetchConfig := make(FetchConfig)
-				accounts := make([]common.Address, 0)
-				networks := make([]uint64, 0)
-				for _, sentTransaction := range p.TxDetails.SentTransactions {
-					accounts = append(accounts, common.BytesToAddress(sentTransaction.FromAddress.Bytes()))
-					accounts = append(accounts, common.BytesToAddress(sentTransaction.ToAddress.Bytes()))
-					networks = append(networks, sentTransaction.FromChain)
-					networks = append(networks, sentTransaction.ToChain)
-				}
-				for _, account := range accounts {
-					for _, network := range networks {
-						c.logger.Debug("triggering fetch due to pending transaction update", zap.Uint64("chainID", network), zap.String("account", logutils.TruncateWithDot(account.String())))
-						// TODO: Add only relevant result types to the transaction type
-						// For now we simply fetch all result types. It shouldn't normally cause additional calls
-						// due to use of multicall
-						fetchConfig[BalancesKey{Account: account, ChainID: network}] = []multistandardfetcher.ResultType{
-							multistandardfetcher.ResultTypeNative,
-							multistandardfetcher.ResultTypeERC20,
-							multistandardfetcher.ResultTypeERC721,
-							multistandardfetcher.ResultTypeERC1155,
-						}
-					}
-				}
-				c.TriggerFetchWithConfig(fetchConfig)
+			if pairs := sentTransactionsPairs(p.SentTransactions); len(pairs) > 0 {
+				c.handle(refresh.TransactionEnded{Pairs: pairs})
 			}
 		case pendingtxtracker.EventPendingTransactionStatusChanged:
 			var p pendingtxtracker.StatusChangedPayload
-			err := json.Unmarshal([]byte(event.Message), &p)
-			if err != nil {
+			if err := json.Unmarshal([]byte(event.Message), &p); err != nil || p.Status != ac.Success {
 				return
 			}
-			if p.Status != ac.Success {
-				return
-			}
-
-			fetchConfig, err := c.buildFetchConfigFromTransactionStatus(&p)
-			if err != nil {
-				c.logger.Error("failed to build fetch config from transaction status", zap.Error(err))
-				return
-			}
-			if len(fetchConfig) > 0 {
-				c.fetchImmediatelyWithConfig(fetchConfig)
-			}
+			c.handle(confirmedTransaction(&p))
 		case walletevent.EventTokenListsUpdated:
-			if c.tokenListsColdFetchPending.CompareAndSwap(true, false) {
-				c.firstFetchPending.Store(true)
-			}
-			c.TriggerFullFetch()
-		default:
-			// Unrelated event, do not trigger a fetch
-			return
+			c.handle(refresh.TokenListsUpdated{})
 		}
 	}
 
@@ -368,96 +333,65 @@ func (c *Controller) stopWalletEventsWatcher() {
 	}
 }
 
+// sentTransactionsPairs are the senders and recipients of the transactions on
+// their source and destination chains.
+func sentTransactionsPairs(transactions []*responses.RouterSentTransaction) []refresh.Pair {
+	var accounts []common.Address
+	var chains []uint64
+	for _, tx := range transactions {
+		for _, account := range []common.Address{common.Address(tx.FromAddress), common.Address(tx.ToAddress)} {
+			if account != walletcommon.ZeroAddress() && !slices.Contains(accounts, account) {
+				accounts = append(accounts, account)
+			}
+		}
+		for _, chain := range []uint64{tx.FromChain, tx.ToChain} {
+			if chain != 0 && !slices.Contains(chains, chain) {
+				chains = append(chains, chain)
+			}
+		}
+	}
+	pairs := make([]refresh.Pair, 0, len(accounts)*len(chains))
+	for _, account := range accounts {
+		for _, chain := range chains {
+			pairs = append(pairs, refresh.Pair{Account: account, Chain: chain})
+		}
+	}
+	return pairs
+}
+
+// confirmedTransaction reads the sender on the source chain and the recipient
+// on the destination chain, or every balance when the details are unknown.
+func confirmedTransaction(p *pendingtxtracker.StatusChangedPayload) refresh.TransactionEnded {
+	if p.SendDetails == nil {
+		return refresh.TransactionEnded{Pairs: []refresh.Pair{{}}, Confirmed: true}
+	}
+	kinds := refresh.Native | refresh.ERC20
+	if sendtype.SendType(p.SendDetails.SendType).IsCollectiblesTransfer() {
+		kinds |= refresh.ERC721 | refresh.ERC1155
+	}
+	return refresh.TransactionEnded{
+		Pairs: []refresh.Pair{
+			{Account: common.Address(p.SendDetails.FromAddress), Chain: p.SendDetails.FromChain},
+			{Account: common.Address(p.SendDetails.ToAddress), Chain: p.SendDetails.ToChain},
+		},
+		Kinds:     kinds,
+		Confirmed: true,
+	}
+}
+
 // SetActive tells whether someone looks at balances: while not, full fetches
 // run at IdleFetchPeriod instead of FetchPeriod. Becoming active fetches at
 // once when the last periodic fetch is older than FetchPeriod.
 func (c *Controller) SetActive(active bool) {
-	if c.idle.Swap(!active) == !active {
-		return
+	if c.hidden.Swap(!active) != !active {
+		c.logger.Info("balances refresh period changed", zap.Bool("active", active))
 	}
-	c.logger.Info("balances refresh period changed", zap.Bool("active", active), zap.Duration("period", c.fetchPeriod()))
-	select {
-	case c.activityChanged <- struct{}{}:
-	default:
-	}
+	c.handle(refresh.OnScreenChanged{OnScreen: active})
 }
 
-func (c *Controller) fetchPeriod() time.Duration {
-	if c.idle.Load() && c.config.IdleFetchPeriod > 0 {
-		return c.config.IdleFetchPeriod
-	}
-	return c.config.FetchPeriod
-}
-
-func (c *Controller) startFetcher() {
-	stopCh := c.stopCh
-	periodicFetch := func() {
-		now := time.Now()
-		c.lastPeriodicFetch.Store(&now)
-		c.TriggerFullFetch()
-	}
-	sinceLastFetch := func() time.Duration {
-		last := c.lastPeriodicFetch.Load()
-		if last == nil {
-			return c.fetchPeriod()
-		}
-		return time.Since(*last)
-	}
-
-	timer := time.NewTimer(c.fetchPeriod())
-	go func() {
-		defer panics.LogOnPanic()
-		defer timer.Stop()
-		for {
-			select {
-			case <-stopCh:
-				return
-			case <-timer.C:
-				periodicFetch()
-				timer.Reset(c.fetchPeriod())
-			case <-c.activityChanged:
-				timer.Stop()
-				wait := c.fetchPeriod() - sinceLastFetch()
-				if wait <= 0 {
-					periodicFetch()
-					wait = c.fetchPeriod()
-				}
-				timer.Reset(wait)
-			}
-		}
-	}()
-	// Trigger initial fetch
-	periodicFetch()
-}
-
-// Triggers delayed fetch for some accounts/networks/types, according to fetchConfig
-func (c *Controller) TriggerFetchWithConfig(fetchConfig FetchConfig) {
-	c.upsertFetchConfig(fetchConfig)
-	c.triggerFetch()
-}
-
-// Triggers delayed fetch for all accounts/networks/types
+// TriggerFullFetch reads every balance after the debounce.
 func (c *Controller) TriggerFullFetch() {
-	c.mu.Lock()
-	c.pendingFullFetch = true
-	c.mu.Unlock()
-	c.triggerFetch()
-}
-
-func (c *Controller) triggerFetch() {
-	if c.firstFetchPending.CompareAndSwap(true, false) {
-		go func() {
-			defer panics.LogOnPanic()
-			c.fetchNow()
-		}()
-		return
-	}
-	c.fetchDebounceFn(c.fetchNow)
-}
-
-// Needs to fetch if the balance has never been fetched or if the last fetch was more than fetchPeriod ago
-func (c *Controller) needsToFetch(state State) bool {
-	return state.FetchedAt == NeverFetched || state.FetchedAt+int64(c.fetchPeriod().Seconds()) < time.Now().Unix()
+	c.handle(refresh.RefreshRequested{})
 }
 
 func (c *Controller) getAllAccounts() ([]common.Address, error) {
@@ -484,96 +418,105 @@ func (c *Controller) getAllNetworks() ([]uint64, error) {
 	return chains, nil
 }
 
-// If fullFetch is true, fetch all balance types for all accounts and networks.
-// If fullFetch is false, fetch only the balance types for the accounts and networks that need to be fetched based on the last fetch time and
-// the pendingFetchConfig.
-func (c *Controller) computeBalancesToFetch(fullFetch bool, pendingFetchConfig FetchConfig) FetchConfig {
-	balancesToFetch := make(map[BalancesKey][]multistandardfetcher.ResultType)
+// read makes the reads of one decision with one fetch per chain, so that they
+// do not cancel each other.
+func (c *Controller) read(reads []refresh.Read) {
+	if len(reads) == 0 {
+		return
+	}
 
 	accounts, err := c.getAllAccounts()
 	if err != nil {
-		return nil
+		c.logger.Error("failed to get accounts to read balances of", zap.Error(err))
+		return
 	}
-
 	networks, err := c.getAllNetworks()
 	if err != nil {
-		return nil
+		c.logger.Error("failed to get networks to read balances on", zap.Error(err))
+		return
 	}
 
 	// Clear up dangling data from storage
 	c.storage.ClearMissingAccounts(context.Background(), accounts)
 	c.storage.ClearMissingChains(context.Background(), networks)
 
+	balancesToFetch := make(FetchConfig)
+	for _, r := range reads {
+		c.addRead(balancesToFetch, r, accounts, networks)
+	}
+
+	fetchConfigs := c.buildMultiStandardFetcherFetchConfigs(balancesToFetch)
+	if len(fetchConfigs) == 0 {
+		return
+	}
+	c.executeFetchConfigs(fetchConfigs)
+}
+
+func (c *Controller) addRead(balancesToFetch FetchConfig, r refresh.Read, accounts []common.Address, chains []uint64) {
+	if r.Tokens != refresh.Full || r.Scope.Unread {
+		c.logger.Warn("unsupported balance read", zap.Any("read", r))
+		return
+	}
+	if r.Scope.Pair.Account != (common.Address{}) {
+		accounts = []common.Address{r.Scope.Pair.Account}
+	}
+	if r.Scope.Pair.Chain != 0 {
+		chains = []uint64{r.Scope.Pair.Chain}
+	}
 	for _, account := range accounts {
-		for _, network := range networks {
-			key := BalancesKey{Account: account, ChainID: network}
-
-			resultTypes := make([]multistandardfetcher.ResultType, 0, 4)
-			if fullFetch {
-				resultTypes = []multistandardfetcher.ResultType{
-					multistandardfetcher.ResultTypeNative,
-					multistandardfetcher.ResultTypeERC20,
-					multistandardfetcher.ResultTypeERC721,
-					multistandardfetcher.ResultTypeERC1155,
+		for _, chain := range chains {
+			key := BalancesKey{Account: account, ChainID: chain}
+			for _, resultType := range resultTypes(r.Kinds) {
+				if r.Scope.OlderThan > 0 && !c.readBefore(key, resultType, r.Scope.OlderThan) {
+					continue
 				}
-			} else {
-				// Insert values from pendingFetchConfig
-				resultTypes = append(resultTypes, pendingFetchConfig[key]...)
-
-				// Add remaining values that need to be fetched
-				stateMap := make(map[multistandardfetcher.ResultType]State)
-				if _, state, err := c.storage.GetNativeBalance(context.Background(), key); err == nil {
-					stateMap[multistandardfetcher.ResultTypeNative] = state
-				}
-				if _, state, err := c.storage.GetERC20Balances(context.Background(), key); err == nil {
-					stateMap[multistandardfetcher.ResultTypeERC20] = state
-				}
-				if _, state, err := c.storage.GetERC721Balances(context.Background(), key); err == nil {
-					stateMap[multistandardfetcher.ResultTypeERC721] = state
-				}
-				if _, state, err := c.storage.GetERC1155Balances(context.Background(), key); err == nil {
-					stateMap[multistandardfetcher.ResultTypeERC1155] = state
-				}
-
-				for resultType, state := range stateMap {
-					if slices.Contains(resultTypes, resultType) {
-						continue
-					}
-					if c.needsToFetch(state) {
-						resultTypes = append(resultTypes, resultType)
-					}
+				if !slices.Contains(balancesToFetch[key], resultType) {
+					balancesToFetch[key] = append(balancesToFetch[key], resultType)
 				}
 			}
-
-			balancesToFetch[key] = resultTypes
 		}
-	}
-
-	return balancesToFetch
-}
-
-func (c *Controller) upsertFetchConfig(fetchConfig FetchConfig) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	for key, resultTypes := range fetchConfig {
-		pendingFetchConfig := c.pendingFetchConfig[key]
-		for _, resultType := range resultTypes {
-			if !slices.Contains(pendingFetchConfig, resultType) {
-				pendingFetchConfig = append(pendingFetchConfig, resultType)
-			}
-		}
-		c.pendingFetchConfig[key] = pendingFetchConfig
 	}
 }
 
-func (c *Controller) popPendingFetchValues() (bool, FetchConfig) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	fullFetch := c.pendingFullFetch
-	c.pendingFullFetch = false
-	fetchConfig := c.pendingFetchConfig
-	c.pendingFetchConfig = make(FetchConfig)
-	return fullFetch, fetchConfig
+func resultTypes(kinds refresh.Kinds) []multistandardfetcher.ResultType {
+	all := []struct {
+		kind       refresh.Kinds
+		resultType multistandardfetcher.ResultType
+	}{
+		{refresh.Native, multistandardfetcher.ResultTypeNative},
+		{refresh.ERC20, multistandardfetcher.ResultTypeERC20},
+		{refresh.ERC721, multistandardfetcher.ResultTypeERC721},
+		{refresh.ERC1155, multistandardfetcher.ResultTypeERC1155},
+	}
+	selected := make([]multistandardfetcher.ResultType, 0, len(all))
+	for _, k := range all {
+		if kinds == 0 || kinds&k.kind != 0 {
+			selected = append(selected, k.resultType)
+		}
+	}
+	return selected
+}
+
+// readBefore reports whether the balances of key of resultType were never
+// read or last read longer than d ago.
+func (c *Controller) readBefore(key BalancesKey, resultType multistandardfetcher.ResultType, d time.Duration) bool {
+	ctx := context.Background()
+	var state State
+	var err error
+	switch resultType {
+	case multistandardfetcher.ResultTypeNative:
+		_, state, err = c.storage.GetNativeBalance(ctx, key)
+	case multistandardfetcher.ResultTypeERC20:
+		_, state, err = c.storage.GetERC20Balances(ctx, key)
+	case multistandardfetcher.ResultTypeERC721:
+		_, state, err = c.storage.GetERC721Balances(ctx, key)
+	case multistandardfetcher.ResultTypeERC1155:
+		_, state, err = c.storage.GetERC1155Balances(ctx, key)
+	}
+	if err != nil {
+		return false
+	}
+	return state.FetchedAt == NeverFetched || state.FetchedAt+int64(d.Seconds()) < time.Now().Unix()
 }
 
 func (c *Controller) executeFetchConfigs(fetchConfigs map[uint64]multistandardfetcher.FetchConfig) {
@@ -639,103 +582,4 @@ func (c *Controller) executeFetchConfigs(fetchConfigs map[uint64]multistandardfe
 			}
 		}(chainID, ctx, cancel)
 	}
-}
-
-func (c *Controller) fetchNow() {
-	c.logger.Debug("starting fetch")
-	// Get the fullFetch flag + fetchConfig and reset them
-	fullFetch, fetchConfig := c.popPendingFetchValues()
-
-	balancesToFetch := c.computeBalancesToFetch(fullFetch, fetchConfig)
-	fetchConfigs := c.buildMultiStandardFetcherFetchConfigs(balancesToFetch)
-
-	if len(fetchConfigs) == 0 {
-		return
-	}
-
-	c.executeFetchConfigs(fetchConfigs)
-}
-
-// fetchImmediatelyWithConfig triggers a balance fetch for specific accounts/chains immediately,
-// bypassing the debounce. Used when a transaction has just confirmed and we need fresh balances now.
-func (c *Controller) fetchImmediatelyWithConfig(fetchConfig FetchConfig) {
-	go func() {
-		defer panics.LogOnPanic()
-		fetchConfigs := c.buildMultiStandardFetcherFetchConfigs(fetchConfig)
-		if len(fetchConfigs) == 0 {
-			return
-		}
-		c.executeFetchConfigs(fetchConfigs)
-	}()
-}
-
-// buildFetchConfigFromTransactionStatus builds a FetchConfig for the from/to addresses and chains
-// from a successful transaction's SendDetails.
-func (c *Controller) buildFetchConfigFromTransactionStatus(p *pendingtxtracker.StatusChangedPayload) (FetchConfig, error) {
-	fetchConfig := make(FetchConfig)
-
-	addBalanceKeyToFetchConfig := func(addr common.Address, chainID uint64, includeCollectibles bool) {
-		if chainID == 0 || addr == walletcommon.ZeroAddress() {
-			return
-		}
-		key := BalancesKey{Account: addr, ChainID: chainID}
-		fetchConfig[key] = []multistandardfetcher.ResultType{
-			multistandardfetcher.ResultTypeNative,
-			multistandardfetcher.ResultTypeERC20,
-		}
-		if includeCollectibles {
-			fetchConfig[key] = append(fetchConfig[key], multistandardfetcher.ResultTypeERC721, multistandardfetcher.ResultTypeERC1155)
-		}
-	}
-
-	addBalanceKeyOrKeysToFetchConfigIfParamsAreEmpty := func(addr common.Address, chainID uint64, includeCollectibles bool) error {
-		var (
-			addresses []common.Address
-			chainIDs  []uint64
-			err       error
-		)
-		if addr == walletcommon.ZeroAddress() {
-			addresses, err = c.getAllAccounts()
-			if err != nil {
-				return err
-			}
-		} else {
-			addresses = []common.Address{addr}
-		}
-
-		if chainID == 0 {
-			chainIDs, err = c.getAllNetworks()
-			if err != nil {
-				return err
-			}
-		} else {
-			chainIDs = []uint64{chainID}
-		}
-
-		for _, address := range addresses {
-			for _, chainID := range chainIDs {
-				addBalanceKeyToFetchConfig(address, chainID, includeCollectibles)
-			}
-		}
-		return nil
-	}
-
-	if p.SendDetails != nil {
-		includeCollectibles := sendtype.SendType(p.SendDetails.SendType).IsCollectiblesTransfer()
-		err := addBalanceKeyOrKeysToFetchConfigIfParamsAreEmpty(common.Address(p.SendDetails.FromAddress), p.SendDetails.FromChain, includeCollectibles)
-		if err != nil {
-			return nil, err
-		}
-		err = addBalanceKeyOrKeysToFetchConfigIfParamsAreEmpty(common.Address(p.SendDetails.ToAddress), p.SendDetails.ToChain, includeCollectibles)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		err := addBalanceKeyOrKeysToFetchConfigIfParamsAreEmpty(walletcommon.ZeroAddress(), 0, true)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return fetchConfig, nil
 }
