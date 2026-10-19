@@ -1276,6 +1276,10 @@ func fakeToken() security.SensitiveString {
 }
 
 func TestWalletConfigOnLoginAccount(t *testing.T) {
+	testWalletConfigOnLoginAccount(t)
+}
+
+func testWalletConfigOnLoginAccount(t *testing.T) {
 	testContext := setupTestContext(t, testPassword, false, false, true)
 
 	poktToken := fakeToken()
@@ -1338,6 +1342,7 @@ func TestWalletConfigOnLoginAccount(t *testing.T) {
 	}
 
 	walletConfig := testContext.backend.config.WalletConfig
+	require.NotNil(t, testContext.backend.statusNode.TokenManager().CataloguePausable())
 	require.Equal(t, walletConfig.InfuraAPIKey, infuraToken)
 	require.Equal(t, walletConfig.AlchemyAPIKey, alchemyAPIKey)
 	require.Equal(t, walletConfig.RaribleMainnetAPIKey, raribleMainnetAPIKey)

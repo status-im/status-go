@@ -3,6 +3,7 @@ package messaging
 import (
 	"context"
 	"crypto/ecdsa"
+	"sync"
 	"testing"
 	"time"
 
@@ -60,6 +61,12 @@ func (f *TestMessagingEnvironment) SetProcessMailserverBatchHook(hook func(ctx c
 	f.waku.processMailserverBatchHook = hook
 }
 
+func (f *TestMessagingEnvironment) SetConnectionState(state types.ConnectionState) {
+	f.waku.connectionStateMu.Lock()
+	defer f.waku.connectionStateMu.Unlock()
+	f.waku.connectionStateOverride = &state
+}
+
 func (f *TestMessagingEnvironment) SimulateOffline() func() {
 	f.waku.Waku.SkipPublishToTopic(true)
 	return func() {
@@ -73,12 +80,23 @@ func (f *TestMessagingEnvironment) SimulateOffline() func() {
 // envelope events, i.e. transport.MessagingAPI — are promoted too.
 type testWakuWrapper struct {
 	*waku.Waku
-	postSubscriptions []chan *PostMessageSubscription
+	postSubscriptions       []chan *PostMessageSubscription
+	connectionStateMu       sync.RWMutex
+	connectionStateOverride *types.ConnectionState
 
 	// processMailserverBatchHook, when set, intercepts every store (mailserver)
 	// batch request instead of forwarding it to the underlying waku. Used by
 	// tests to observe store queries without a real store node.
 	processMailserverBatchHook func(ctx context.Context, batch types.MailserverBatch, pageLimit uint64, shouldProcessNextPage func(int) (bool, uint64), processEnvelopes bool) error
+}
+
+func (tw *testWakuWrapper) ConnectionState() types.ConnectionState {
+	tw.connectionStateMu.RLock()
+	defer tw.connectionStateMu.RUnlock()
+	if tw.connectionStateOverride != nil {
+		return *tw.connectionStateOverride
+	}
+	return tw.Waku.ConnectionState()
 }
 
 // Send overrides the embedded Waku's Send to fan out post events to any

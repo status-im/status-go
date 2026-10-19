@@ -12,7 +12,7 @@ import (
 
 	gomock "go.uber.org/mock/gomock"
 
-	sdkTypes "github.com/status-im/go-wallet-sdk/pkg/tokens/types"
+	sdkTypes "github.com/status-im/status-go/pkg/services/wallet/token/tokenlist"
 
 	"github.com/status-im/status-go/internal/crypto/types"
 	mock_ethclient "github.com/status-im/status-go/internal/rpc/chain/ethclient/mock/client/ethclient"

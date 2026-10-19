@@ -14,7 +14,7 @@ import (
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
 	gethParams "github.com/ethereum/go-ethereum/params"
 
-	wsdktypes "github.com/status-im/go-wallet-sdk/pkg/tokens/types"
+	wsdktypes "github.com/status-im/status-go/pkg/services/wallet/token/tokenlist"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 

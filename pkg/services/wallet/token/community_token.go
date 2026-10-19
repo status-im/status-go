@@ -8,7 +8,7 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/status-im/go-wallet-sdk/pkg/tokens/types"
+	types "github.com/status-im/status-go/pkg/services/wallet/token/tokenlist"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -42,16 +42,9 @@ func (tm *Manager) discoverTokenCommunityID(ctx context.Context, token *tokentyp
 		return
 	}
 
-	update, err := tm.walletDB.Prepare("UPDATE tokens SET community_id=? WHERE network_id=? AND address=?")
-	if err != nil {
-		logutils.ZapLogger().Error("Cannot prepare token update query", zap.Error(err))
-		return
-	}
-	defer update.Close()
-
 	if uri == "" {
 		// Update token community ID to prevent further checks
-		_, err := update.Exec("", token.ChainID, token.Address)
+		err := tm.setDiscoveredCommunityID(ctx, token.Token, "")
 		if err != nil {
 			logutils.ZapLogger().Error("Cannot update community id", zap.Error(err))
 		}
@@ -65,14 +58,23 @@ func (tm *Manager) discoverTokenCommunityID(ctx context.Context, token *tokentyp
 	}
 	communityID := cryptotypes.EncodeHex(communityIDHex)
 
-	token.CommunityData = &tokentypes.CommunityData{
-		ID: communityID,
-	}
-
-	_, err = update.Exec(communityID, token.ChainID, token.Address)
+	err = tm.setDiscoveredCommunityID(ctx, token.Token, communityID)
 	if err != nil {
 		logutils.ZapLogger().Error("Cannot update community id", zap.Error(err))
+		return
 	}
+	token.CommunityData = &tokentypes.CommunityData{ID: communityID}
+}
+
+func (tm *Manager) setDiscoveredCommunityID(ctx context.Context, token *types.Token, communityID string) error {
+	persist := func(ctx context.Context) error {
+		_, err := tm.walletDB.ExecContext(ctx, "UPDATE tokens SET community_id=? WHERE network_id=? AND address=?", communityID, token.ChainID, token.Address)
+		return err
+	}
+	if communityID != "" {
+		return tm.tokensManager.DeleteCustom(ctx, token.Key(), persist)
+	}
+	return persist(ctx)
 }
 
 func (tm *Manager) GetCommunityTokenType(chainID uint64, tokenContractAddress string) (protobuf.CommunityTokenType, error) {
@@ -204,18 +206,33 @@ func (tm *Manager) getCustomByChainAddress(onlyCommunityCustoms bool, chainID ui
 }
 
 func (tm *Manager) UpsertCustom(token tokentypes.Token) error {
-	insert, err := tm.walletDB.Prepare("INSERT OR REPLACE INTO TOKENS (network_id, address, name, symbol, decimals) VALUES (?, ?, ?, ?, ?)")
-	if err != nil {
-		return err
+	if token.Token == nil {
+		return fmt.Errorf("custom token is nil")
 	}
-	defer insert.Close()
-	_, err = insert.Exec(token.ChainID, token.Address, token.Name, token.Symbol, token.Decimals)
+	if token.CommunityData != nil && token.CommunityData.ID != "" {
+		return tm.tokensManager.DeleteCustom(context.Background(), token.Key(), func(ctx context.Context) error {
+			return upsertCustomSQL(ctx, tm.walletDB, token)
+		})
+	}
+	return tm.tokensManager.UpsertCustom(context.Background(), token.Token, func(ctx context.Context, row *types.Token) error {
+		return upsertCustomSQL(ctx, tm.walletDB, tokentypes.Token{Token: row, CommunityData: token.CommunityData})
+	})
+}
+
+func upsertCustomSQL(ctx context.Context, db *sql.DB, token tokentypes.Token) error {
+	var communityID any
+	if token.CommunityData != nil && token.CommunityData.ID != "" {
+		communityID = token.CommunityData.ID
+	}
+	_, err := db.ExecContext(ctx, "INSERT OR REPLACE INTO tokens (network_id,address,name,symbol,decimals,community_id) VALUES (?,?,?,?,?,?)", token.ChainID, token.Address, token.Name, token.Symbol, token.Decimals, communityID)
 	return err
 }
 
 func (tm *Manager) DeleteCustom(chainID uint64, address common.Address) error {
-	_, err := tm.walletDB.Exec(`DELETE FROM TOKENS WHERE address = ? and network_id = ?`, address, chainID)
-	return err
+	return tm.tokensManager.DeleteCustom(context.Background(), types.TokenKey(chainID, address), func(ctx context.Context) error {
+		_, err := tm.walletDB.ExecContext(ctx, `DELETE FROM tokens WHERE address=? AND network_id=?`, address, chainID)
+		return err
+	})
 }
 
 func (tm *Manager) fillCommunityData(token *tokentypes.Token) error {

@@ -3,15 +3,18 @@ package protocol
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/suite"
 
+	"github.com/status-im/status-go/internal/db/multiaccounts/settings"
 	"github.com/status-im/status-go/internal/protocol/communities"
 	"github.com/status-im/status-go/internal/protocol/protobuf"
 	"github.com/status-im/status-go/internal/protocol/requests"
 	"github.com/status-im/status-go/pkg/messaging"
 	"github.com/status-im/status-go/pkg/messaging/types"
 	wakutypes "github.com/status-im/status-go/pkg/messaging/waku/types"
+	"github.com/status-im/status-go/pkg/services/mailservers"
 )
 
 func TestMessengerFetchLatestCommunityDescriptionsSuite(t *testing.T) {
@@ -154,4 +157,119 @@ func (s *MessengerFetchLatestCommunityDescriptionsSuite) TestReusedFilterForgott
 
 	s.Require().False(s.m.storeNodeRequestsManager.reusedFilterShouldForget(storeNodeContactRequest, unknownID),
 		"contact requests are unaffected")
+}
+
+func TestMessengerHistoricSyncCursorSuite(t *testing.T) {
+	suite.Run(t, new(MessengerHistoricSyncCursorSuite))
+}
+
+type MessengerHistoricSyncCursorSuite struct {
+	suite.Suite
+
+	messagingEnv *messaging.TestMessagingEnvironment
+	m            *Messenger
+}
+
+func (s *MessengerHistoricSyncCursorSuite) SetupTest() {
+	var err error
+	s.messagingEnv, err = messaging.NewTestMessagingEnvironment()
+	s.Require().NoError(err)
+	s.Require().NoError(s.messagingEnv.Setup(s.T()))
+
+	s.m, err = newTestMessenger(s.T(), s.messagingEnv, testMessengerConfig{})
+	s.Require().NoError(err)
+	s.m.mailserversDatabase = mailservers.NewDB(s.m.database)
+	s.Require().NoError(s.m.settings.SaveSettingField(settings.DefaultSyncPeriod, uint(30*24*60*60)))
+
+	s.Require().NoError(s.m.messaging.Start())
+	s.T().Cleanup(func() {
+		s.Require().NoError(s.m.messaging.Stop())
+	})
+}
+
+func (s *MessengerHistoricSyncCursorSuite) seedTopic(filter *types.ChatFilter, lastRequest int) {
+	s.Require().NoError(s.m.mailserversDatabase.AddTopics([]mailservers.MailserverTopic{{
+		PubsubTopic:  filter.PubsubTopic(),
+		ContentTopic: filter.ContentTopic().String(),
+		LastRequest:  lastRequest,
+	}}))
+}
+
+func (s *MessengerHistoricSyncCursorSuite) topicLastRequest(filter *types.ChatFilter) int {
+	topics, err := s.m.mailserversDatabase.Topics()
+	s.Require().NoError(err)
+	for _, topic := range topics {
+		if topic.PubsubTopic == filter.PubsubTopic() && topic.ContentTopic == filter.ContentTopic().String() {
+			return topic.LastRequest
+		}
+	}
+	s.FailNow("mailserver topic not found")
+	return 0
+}
+
+func (s *MessengerHistoricSyncCursorSuite) TestWorkerPreservesStaleCursorUntilCatchUp() {
+	filter, err := s.m.messaging.JoinPublicChat("history-cursor-worker")
+	s.Require().NoError(err)
+
+	now := time.Now().Truncate(time.Second)
+	staleCursor := int(now.Add(-7 * 24 * time.Hour).Unix())
+	s.seedTopic(filter, staleCursor)
+
+	batches := make(chan wakutypes.MailserverBatch, 1)
+	s.messagingEnv.SetProcessMailserverBatchHook(func(_ context.Context, batch wakutypes.MailserverBatch, _ uint64, _ func(int) (bool, uint64), _ bool) error {
+		for _, topic := range batch.Topics {
+			if topic.String() == filter.ContentTopic().String() {
+				batches <- batch
+				break
+			}
+		}
+		return nil
+	})
+	s.T().Cleanup(func() {
+		s.messagingEnv.SetProcessMailserverBatchHook(nil)
+	})
+
+	s.m.started = true
+	s.Require().NoError(s.m.settings.SetUseMailservers(true))
+	s.m.startHistoricSyncWorker()
+	s.T().Cleanup(func() {
+		close(s.m.quit)
+		s.m.shutdownWaitGroup.Wait()
+	})
+
+	bounded := historicSyncRequest{From: now, To: now.Add(time.Millisecond)}
+	s.m.enqueueHistoricSync(bounded)
+
+	var batch wakutypes.MailserverBatch
+	select {
+	case batch = <-batches:
+	case <-time.After(2 * time.Second):
+		s.FailNow("historic sync worker did not issue a store query")
+	}
+
+	s.Equal(uint32(staleCursor)-tolerance, uint32(batch.From.Unix()))
+	s.Equal(bounded.To, batch.To)
+	s.Eventually(s.m.historicCatchUpDone.Load, time.Second, 10*time.Millisecond)
+	s.Equal(int(bounded.To.Unix()), s.topicLastRequest(filter))
+}
+
+func (s *MessengerHistoricSyncCursorSuite) TestCursorMonitorWaitsForCatchUp() {
+	filter := types.NewChatFilter(&types.ChatFilterConfig{
+		PubsubTopic:  "/waku/2/rs/16/32",
+		ContentTopic: types.StringToContentTopic("0x6d6f6e69"),
+		Listen:       true,
+	})
+	now := time.Now().Truncate(time.Second)
+	staleCursor := int(now.Add(-7 * 24 * time.Hour).Unix())
+	s.seedTopic(filter, staleCursor)
+
+	s.messagingEnv.SetConnectionState(types.ConnectionStateConnected)
+	s.Require().Equal(types.ConnectionStateConnected, s.m.messaging.ConnectionStatus().State)
+
+	s.m.advanceHistoryCursors(now)
+	s.Equal(staleCursor, s.topicLastRequest(filter))
+
+	s.m.historicCatchUpDone.Store(true)
+	s.m.advanceHistoryCursors(now)
+	s.Equal(int(now.Unix()), s.topicLastRequest(filter))
 }
