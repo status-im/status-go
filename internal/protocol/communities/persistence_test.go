@@ -91,6 +91,13 @@ func (s *PersistenceSuite) TestSaveCommunity() {
 	s.Require().NoError(err)
 	s.Require().Len(communities, 1)
 
+	muteStatuses, err := s.db.JoinedOrSpectatedCommunitiesMuteStatus()
+	s.Require().NoError(err)
+	s.Require().Len(muteStatuses, 1)
+	s.Equal(types.HexBytes(crypto.CompressPubkey(&s.identity.PublicKey)), muteStatuses[0].ID)
+	s.True(muteStatuses[0].Muted)
+	s.Zero(muteStatuses[0].MuteTill)
+
 	community.config.Joined = false
 	community.config.Spectated = true
 	s.Require().NoError(s.db.SaveCommunity(&community))
