@@ -2,14 +2,17 @@
 
 # CI-related changes
 Makefile              @status-im/devops
-default.nix           @status-im/devops
-shell.nix             @status-im/devops
 Dockerfile            @status-im/devops
+/default.nix          @status-im/devops
+/shell.nix            @status-im/devops
 /nix/                 @status-im/devops
 /_assets/ci/          @status-im/devops
 /.github/workflows/   @status-im/devops @0xM3R
 /githooks/            @status-im/devops
 /scripts/             @status-im/devops
+
+# Avoid pinging devops for status-go hash bumps.
+/nix/pkgs/status-go/library/vendorHash.sha256
 
 # Custom ownership for specific folders
 # Feel free to add yourself for any new packages you implement.
