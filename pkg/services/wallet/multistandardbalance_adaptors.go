@@ -134,3 +134,34 @@ func pendingERC20Transfers(pending []*pendingtxtracker.PendingTransaction, chain
 	}
 	return tokens
 }
+
+// TransferDetectionKnownTokensProvider gives the tokens whose transfers are
+// kept: the token lists and custom tokens.
+type TransferDetectionKnownTokensProvider struct {
+	tokenManager *token.Manager
+}
+
+func NewTransferDetectionKnownTokensProvider(tokenManager *token.Manager) *TransferDetectionKnownTokensProvider {
+	return &TransferDetectionKnownTokensProvider{tokenManager: tokenManager}
+}
+
+func (p *TransferDetectionKnownTokensProvider) GetTokenContractAddresses(chainID uint64) ([]common.Address, error) {
+	listed, err := p.tokenManager.GetTokensByChain(chainID)
+	if err != nil {
+		return nil, err
+	}
+	customs, err := p.tokenManager.GetCustoms(false)
+	if err != nil {
+		return nil, err
+	}
+	known := make([]common.Address, 0, len(listed)+len(customs))
+	for _, t := range listed {
+		known = append(known, t.Address)
+	}
+	for _, custom := range customs {
+		if custom.ChainID == chainID {
+			known = append(known, custom.Address)
+		}
+	}
+	return known, nil
+}

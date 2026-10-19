@@ -5,6 +5,8 @@ package multistandardbalance
 import (
 	"context"
 	"encoding/json"
+	"maps"
+	"math/big"
 	"slices"
 	"sync"
 	"sync/atomic"
@@ -107,6 +109,7 @@ type Controller struct {
 	tokenListProvider       TokenListProvider
 	collectibleListProvider CollectiblesListProvider
 	heldTokensProvider      HeldTokensProvider
+	changeSource            refresh.ChangeSource
 	lastBlockManager        LastBlockManager
 	walletFeed              *event.Feed
 	walletEventsWatcher     *walletevent.Watcher
@@ -124,6 +127,13 @@ type Controller struct {
 
 	hidden atomic.Bool
 
+	stopWatching func()
+
+	// detected are the tokens transfer detection found, kept in the held set
+	// until read as zero.
+	detectedMu sync.Mutex
+	detected   map[BalancesKey]map[common.Address]struct{}
+
 	chainFetchMu      sync.Mutex
 	chainFetchCancels map[uint64]context.CancelFunc
 
@@ -140,6 +150,7 @@ func NewController(
 	tokenListProvider TokenListProvider,
 	collectibleListProvider CollectiblesListProvider,
 	heldTokensProvider HeldTokensProvider,
+	changeSource refresh.ChangeSource,
 	lastBlockManager LastBlockManager,
 	walletFeed *event.Feed,
 	logger *zap.Logger,
@@ -154,10 +165,12 @@ func NewController(
 		tokenListProvider:       tokenListProvider,
 		collectibleListProvider: collectibleListProvider,
 		heldTokensProvider:      heldTokensProvider,
+		changeSource:            changeSource,
 		lastBlockManager:        lastBlockManager,
 		publisher:               pubsub.NewPublisher(),
 		policy:                  refresh.NewPolicy(policyConfig(config)),
 		chainFetchCancels:       make(map[uint64]context.CancelFunc),
+		detected:                make(map[BalancesKey]map[common.Address]struct{}),
 		walletFeed:              walletFeed,
 		logger:                  logger,
 	}
@@ -172,6 +185,7 @@ func (c *Controller) Start() {
 	c.startAccountsWatcher()
 	c.startNetworksWatcher()
 	c.startWalletEventsWatcher()
+	c.stopWatching = c.changeSource.Watch(c.handleChange)
 	c.handle(refresh.Started{})
 }
 
@@ -179,6 +193,7 @@ func (c *Controller) Stop() {
 	if c.stopCh != nil {
 		close(c.stopCh)
 		c.stopCh = nil
+		c.stopWatching()
 		c.handle(refresh.Stopped{})
 	}
 
@@ -209,6 +224,56 @@ func (c *Controller) handle(ev refresh.Event) {
 
 	if running {
 		c.read(decision.Reads)
+		if scansForChanges(ev, decision.Reads) {
+			c.changeSource.Scan()
+		}
+	}
+}
+
+// scansForChanges reports whether the change source looks for changes after
+// ev: with every periodic refresh, and at once when the user asks for one.
+func scansForChanges(ev refresh.Event, reads []refresh.Read) bool {
+	if _, requested := ev.(refresh.RefreshRequested); requested {
+		return true
+	}
+	return slices.ContainsFunc(reads, func(r refresh.Read) bool {
+		return r.Scope == (refresh.Scope{}) && (r.Tokens == refresh.Held || r.Tokens == refresh.Full)
+	})
+}
+
+// handleChange takes what the change source finds.
+func (c *Controller) handleChange(ev refresh.Event) {
+	if transfer, ok := ev.(refresh.TransferDetected); ok && len(transfer.Contracts) > 0 {
+		key := BalancesKey{Account: transfer.Pair.Account, ChainID: transfer.Pair.Chain}
+		c.detectedMu.Lock()
+		if c.detected[key] == nil {
+			c.detected[key] = make(map[common.Address]struct{})
+		}
+		for _, token := range transfer.Contracts {
+			c.detected[key][token] = struct{}{}
+		}
+		c.detectedMu.Unlock()
+	}
+	c.handle(ev)
+}
+
+func (c *Controller) detectedTokens(key BalancesKey) []common.Address {
+	c.detectedMu.Lock()
+	defer c.detectedMu.Unlock()
+	return slices.Collect(maps.Keys(c.detected[key]))
+}
+
+// forgetDetected drops the detected tokens read as zero.
+func (c *Controller) forgetDetected(key BalancesKey, balances map[ContractAddress]*big.Int) {
+	c.detectedMu.Lock()
+	defer c.detectedMu.Unlock()
+	for token, balance := range balances {
+		if balance != nil && balance.Sign() == 0 {
+			delete(c.detected[key], token)
+		}
+	}
+	if len(c.detected[key]) == 0 {
+		delete(c.detected, key)
 	}
 }
 

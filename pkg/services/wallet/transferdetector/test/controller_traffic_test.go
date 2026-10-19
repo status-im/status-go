@@ -50,10 +50,9 @@ func TestController_TagsItsRequestsAsTransferDetection(t *testing.T) {
 	networksProvider.EXPECT().GetPublisher().Return(pubsub.NewPublisher()).AnyTimes()
 	var block atomic.Uint64
 	block.Store(100)
-	lastBlockProvider.EXPECT().GetEstimatedLatestBlockNumber(gomock.Any(), uint64(1)).DoAndReturn(
-		func(ctx context.Context, _ uint64) (uint64, error) {
-			request(ctx)
-			return block.Add(10), nil
+	lastBlockProvider.EXPECT().GetReadBlocks(uint64(1)).DoAndReturn(
+		func(uint64) (uint64, uint64, bool) {
+			return 100, block.Add(10), true
 		}).AnyTimes()
 	var filtered atomic.Bool
 	fetcher.EXPECT().FilterTransfers(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
@@ -64,7 +63,7 @@ func TestController_TagsItsRequestsAsTransferDetection(t *testing.T) {
 		}).AnyTimes()
 
 	controller := transferdetector.NewController(
-		transferdetector.ControllerConfig{FetchDebounceTime: 10 * time.Millisecond, FetchPeriod: 50 * time.Millisecond},
+		transferdetector.ControllerConfig{FetchDebounceTime: 10 * time.Millisecond},
 		fetcher, accountsProvider, pubsub.NewPublisher(), networksProvider, lastBlockProvider, zap.NewNop())
 	controller.Start()
 	require.Eventually(t, filtered.Load, time.Second, 10*time.Millisecond)

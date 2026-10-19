@@ -19,6 +19,7 @@ The main orchestrator that manages balance fetching operations:
 - Leaves when and what to fetch to `refresh.Policy` from go-wallet-sdk (`pkg/balance/refresh`) with the `HeldEveryTick` schedule: the held set every 2 min on screen and every 15 min hidden, every balance on start and hourly on screen, other reads after a 10s debounce, a confirmed transaction at once
 - The held set of an account on a chain is its native coin, its tokens with a balance, the tokens of `HeldTokensProvider` (custom tokens, pending ERC20 transfers) and its known collectibles
 - A full refresh of a chain that fails is retried at the next period
+- Takes `TransferDetected` and `DetectionGap` from a `refresh.ChangeSource` (transfer detection), and scans it with every periodic refresh and when the user asks for a refresh; tokens it finds stay in the held set until read as zero
 - Coordinates between storage, fetcher, and providers
 
 ### Fetcher
@@ -56,6 +57,7 @@ controller := multistandardbalance.NewController(
     tokenListProvider,
     collectibleListProvider,
     heldTokensProvider,
+    changeSource,
     lastBlockManager,
     walletFeed,
     logger,

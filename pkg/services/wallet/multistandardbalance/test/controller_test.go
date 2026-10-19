@@ -126,6 +126,7 @@ func TestController_DebounceTiming(t *testing.T) {
 			tokenListProvider,
 			collectibleListProvider,
 			heldTokensProvider,
+			&fakeChangeSource{},
 			lastBlockManager,
 			nil, // walletFeed
 			logger,
@@ -254,6 +255,7 @@ func TestController_FetchPeriod(t *testing.T) {
 			tokenListProvider,
 			collectibleListProvider,
 			heldTokensProvider,
+			&fakeChangeSource{},
 			lastBlockManager,
 			nil, // walletFeed
 			logger,
@@ -560,6 +562,7 @@ func TestController_BasicFlow(t *testing.T) {
 			tokenListProvider,
 			collectibleListProvider,
 			heldTokensProvider,
+			&fakeChangeSource{},
 			lastBlockManager,
 			nil, // walletFeed
 			logger,
@@ -891,7 +894,7 @@ func newTestController(
 
 	controller = multistandardbalance.NewController(
 		cfg, storage, balanceFetcher, accountsProvider, accountsPublisher,
-		networksProvider, tokenListProvider, collectibleListProvider, heldTokensProvider,
+		networksProvider, tokenListProvider, collectibleListProvider, heldTokensProvider, &fakeChangeSource{},
 		lastBlockManager, walletFeed, zap.NewNop(),
 	)
 
@@ -1125,6 +1128,7 @@ func TestController_CancelsInFlightFetchWhenStartingNewFetchForSameChain(t *test
 			tokenListProvider,
 			collectibleListProvider,
 			heldTokensProvider,
+			&fakeChangeSource{},
 			lastBlockManager,
 			nil,
 			logger,

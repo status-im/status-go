@@ -145,9 +145,9 @@ func (c *Controller) unreadTokens(plan *readPlan, key BalancesKey) []common.Addr
 }
 
 // heldTokens are the tokens of the held set of key: the ones with a balance,
-// and those of heldTokensProvider.
+// those transfer detection found, and those of heldTokensProvider.
 func (c *Controller) heldTokens(key BalancesKey) []common.Address {
-	var held []common.Address
+	held := c.detectedTokens(key)
 	if stored, _, err := c.storage.GetERC20Balances(context.Background(), key); err == nil {
 		for token, balance := range stored {
 			if balance != nil && balance.Sign() != 0 {
