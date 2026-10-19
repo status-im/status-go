@@ -122,7 +122,7 @@ func TestDurableCustomWriteRecoversOnRead(t *testing.T) {
 			require.Len(t, found, 1)
 		},
 		"batch": func(t *testing.T, m *Manager, row *types.Token) {
-			found := m.GetTokensByChainAddresses([]ChainAddress{{ChainID: 1, Address: row.Address}})
+			found := m.GetTokensByChainAddresses([]types.ChainAddress{{ChainID: 1, Address: row.Address}})
 			require.NotNil(t, found[0])
 		},
 		"all":   func(t *testing.T, m *Manager, _ *types.Token) { require.Len(t, m.UniqueTokens(), 2) },
