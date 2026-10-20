@@ -69,6 +69,14 @@ pipeline {
       steps { script {
         sh "mkdir -p \$(dirname ${REPO_SRC})"
         sh "ln -s ${WORKSPACE} ${REPO_SRC}"
+        /* Computed on the agent. */
+        def cores = sh(script: 'getconf _NPROCESSORS_ONLN', returnStdout: true).trim() as Integer
+        def executors = (env.EXECUTORS ?: '2') as Integer
+        env.NPROC = Math.max(1, cores.intdiv(executors)).toString()
+        env.MAKEFLAGS = "-j${env.NPROC}"
+        /* Caps go build -p and compiler threads. */
+        env.GOMAXPROCS = env.NPROC
+        echo "Agent cores: ${cores}, executors: ${executors}, NPROC: ${env.NPROC}"
       } }
     }
 
