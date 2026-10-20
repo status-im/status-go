@@ -561,6 +561,39 @@ func TestRefreshPersistsFetchedBytes(t *testing.T) {
 	require.Equal(t, "ONE", token.Symbol)
 }
 
+func TestRefreshKeepsRegistryListingItsOwnID(t *testing.T) {
+	const list = `{"name":"Tokens","timestamp":"2026-01-01T00:00:00Z","version":{"major":1,"minor":0,"patch":0},"tokens":[{"chainId":1,"address":"0x0000000000000000000000000000000000000001","name":"One","symbol":"ONE","decimals":18}]}`
+	var registry string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/registry" {
+			fmt.Fprint(w, registry)
+			return
+		}
+		fmt.Fprint(w, list)
+	}))
+	defer server.Close()
+	// The entry using the reserved registry id is reported unsupported next
+	// to the registry's own update.
+	registry = fmt.Sprintf(`{"timestamp":"2026-01-01T00:00:00Z","version":{"major":1,"minor":0,"patch":0},"tokenLists":[{"id":"registry","sourceUrl":%q},{"id":"list","sourceUrl":%q}]}`, server.URL+"/registry", server.URL+"/list")
+	var persisted []Write
+	m, err := New(tkl.Config{Chains: []uint64{1}, RegistryID: "registry", RegistryURL: server.URL + "/registry"}, noStored, RefreshOptions{Persist: func(_ context.Context, writes []Write) error {
+		persisted = writes
+		return nil
+	}})
+	require.NoError(t, err)
+	defer func() { _ = m.Stop() }()
+	require.NoError(t, m.Start(context.Background(), false, nil))
+	require.NoError(t, m.TriggerRefresh(context.Background()))
+	byID := map[string]string{}
+	for _, write := range persisted {
+		byID[write.ID] = string(write.Body)
+	}
+	require.Equal(t, map[string]string{"registry": registry, "list": list}, byID)
+	token, ok := m.GetTokenByChainAddress(1, common.HexToAddress("0x1"))
+	require.True(t, ok)
+	require.Equal(t, "ONE", token.Symbol)
+}
+
 func TestRefreshCapsInFlightBodies(t *testing.T) {
 	listBody := func(address, symbol string) string {
 		return fmt.Sprintf(`{"name":"Tokens","timestamp":"2026-01-01T00:00:00Z","version":{"major":1,"minor":0,"patch":0},"tokens":[{"chainId":1,"address":"0x000000000000000000000000000000000000000%s","name":"%s","symbol":"%s","decimals":18}]}`, address, symbol, symbol)

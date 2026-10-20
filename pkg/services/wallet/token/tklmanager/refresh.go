@@ -340,9 +340,19 @@ func (m *Manager) refresh(ctx context.Context, force bool) error {
 			m.mu.Unlock()
 			return err
 		}
-		// Only updated sources are written; release every other body now.
+		// Only updated sources are written; release every other body now. An id
+		// can be reported twice (a registry entry using the registry's own id).
+		updated := make(map[string]struct{})
 		for _, source := range report.Sources {
-			if body, ok := bodies[source.ID]; ok && source.Outcome != "Updated" {
+			if source.Outcome == "Updated" {
+				updated[source.ID] = struct{}{}
+			}
+		}
+		for _, source := range report.Sources {
+			if _, ok := updated[source.ID]; ok {
+				continue
+			}
+			if body, ok := bodies[source.ID]; ok {
 				held -= int64(len(body))
 				delete(bodies, source.ID)
 			}
