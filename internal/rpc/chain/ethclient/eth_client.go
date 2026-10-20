@@ -4,6 +4,7 @@ package ethclient
 
 import (
 	"context"
+	"encoding/json"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum"
@@ -59,6 +60,8 @@ type BaseEthClientInterface interface {
 	FeeHistory(ctx context.Context, blockCount uint64, lastBlock *big.Int, rewardPercentiles []float64) (*ethereum.FeeHistory, error)
 	BlockNumber(ctx context.Context) (uint64, error)
 	LineaEstimateGas(ctx context.Context, msg ethereum.CallMsg) (*ethclient.LineaEstimateGasResult, error)
+	// CallContractRaw is CallContract with the call argument already encoded as JSON.
+	CallContractRaw(ctx context.Context, callArg json.RawMessage, blockNumber *big.Int) ([]byte, error)
 	// Internal calls
 	Close()
 }

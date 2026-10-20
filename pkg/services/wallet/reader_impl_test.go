@@ -875,3 +875,36 @@ func TestReader_RefreshKeepsCachedBalanceForUnansweredToken(t *testing.T) {
 		t.Fatal("expected UI cache refresh after the fetch event")
 	}
 }
+
+// The live storage returns one shared zero big.Int for every zero balance;
+// the reader must only read the balances it gets.
+func TestGetCachedBalances_DoesNotMutateLiveBalances(t *testing.T) {
+	reader, tokenManager, tokenBalancesStorage, mockCtrl := setupReader(t)
+	defer mockCtrl.Finish()
+
+	account := testAccAddress1
+	chainID := uint64(4663)
+	held := &tokenTypes.Token{Token: &wsdktypes.Token{Address: common.HexToAddress("0x01"), Symbol: "HELD", Decimals: 18, ChainID: chainID}}
+	zeroA := &tokenTypes.Token{Token: &wsdktypes.Token{Address: common.HexToAddress("0x02"), Symbol: "ZA", Decimals: 6, ChainID: chainID}}
+	zeroB := &tokenTypes.Token{Token: &wsdktypes.Token{Address: common.HexToAddress("0x03"), Symbol: "ZB", Decimals: 18, ChainID: chainID}}
+	allTokens := []*tokenTypes.Token{held, zeroA, zeroB}
+	cachedTokens := map[common.Address][]tokenTypes.StorageToken{
+		account: {{TokenAddress: zeroA.Address, TokenChainID: chainID, RawBalance: "5", Balance: big.NewFloat(5)}},
+	}
+	sharedZero := new(big.Int)
+	heldBalance := big.NewInt(42)
+	storageBalances := map[uint64]map[common.Address]map[common.Address]*big.Int{
+		chainID: {account: {held.Address: heldBalance, zeroA.Address: sharedZero, zeroB.Address: sharedZero}},
+	}
+
+	tokenManager.EXPECT().GetCachedBalances().Return(cachedTokens, nil)
+	tokenManager.EXPECT().GetTokensByKeys(gomock.Any()).Return(allTokens, nil)
+	tokenBalancesStorage.EXPECT().GetBalances(gomock.Any(), allTokens, []common.Address{account}).Return(storageBalances, nil)
+
+	tokens, err := reader.GetCachedBalances([]uint64{chainID}, []common.Address{account})
+	require.NoError(t, err)
+	require.NotEmpty(t, tokens[account])
+	require.Zero(t, sharedZero.Sign())
+	require.Zero(t, sharedZero.BitLen())
+	require.Equal(t, int64(42), heldBalance.Int64())
+}

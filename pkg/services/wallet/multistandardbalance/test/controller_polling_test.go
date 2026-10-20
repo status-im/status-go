@@ -47,7 +47,7 @@ func newPollingController(t *testing.T) (*multistandardbalance.Controller, *atom
 	networksProvider.EXPECT().GetActiveNetworks().Return([]*params.Network{{ChainID: 1}}, nil).AnyTimes()
 	networksProvider.EXPECT().GetPublisher().Return(pubsub.NewPublisher()).AnyTimes()
 	storage.EXPECT().GetNativeBalance(gomock.Any(), key).Return(big.NewInt(1), stale, nil).AnyTimes()
-	storage.EXPECT().GetERC20Balances(gomock.Any(), key).Return(map[multistandardbalance.ContractAddress]*big.Int{}, stale, nil).AnyTimes()
+	storage.EXPECT().GetERC20Balances(gomock.Any(), key).Return(multistandardbalance.ERC20Balances{}, stale, nil).AnyTimes()
 	storage.EXPECT().GetERC721Balances(gomock.Any(), key).Return(map[multistandardbalance.ContractAddress]*big.Int{}, stale, nil).AnyTimes()
 	storage.EXPECT().GetERC1155Balances(gomock.Any(), key).Return(map[multistandardbalance.HashableCollectibleID]*big.Int{}, stale, nil).AnyTimes()
 	storage.EXPECT().ClearMissingAccounts(gomock.Any(), gomock.Any()).AnyTimes()
