@@ -11,6 +11,16 @@ pipeline {
       description: 'Label for targetted CI slave host.',
       defaultValue: params.AGENT_LABEL ?: jenkins.getAgentLabelFromJob(),
     )
+    string(
+      name: 'BRANCH',
+      defaultValue: 'develop',
+      description: 'Name of branch to build.'
+    )
+    booleanParam(
+      name: 'RELEASE',
+      defaultValue: false,
+      description: 'Enable to create build for release.',
+    )
   }
 
   options {
