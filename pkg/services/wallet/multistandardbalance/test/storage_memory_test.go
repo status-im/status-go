@@ -115,13 +115,13 @@ func TestStorageMemory_UpdateERC20Balances(t *testing.T) {
 	}
 
 	// Test first update (initial update always reports a balance change)
-	balanceChanged, oldState, err := storage.UpdateERC20Balances(ctx, key, multistandardbalance.ERC20Balances{Balances: balances}, state)
+	balanceChanged, oldState, err := storage.UpdateERC20Balances(ctx, key, nil, balances, nil, state)
 	require.NoError(t, err)
 	assert.True(t, balanceChanged)
 	assert.Equal(t, multistandardbalance.NeverFetched, oldState.FetchedAt)
 
 	// Test update with same balances
-	balanceChanged, oldState, err = storage.UpdateERC20Balances(ctx, key, multistandardbalance.ERC20Balances{Balances: balances}, state)
+	balanceChanged, oldState, err = storage.UpdateERC20Balances(ctx, key, nil, balances, nil, state)
 	require.NoError(t, err)
 	assert.False(t, balanceChanged)
 
@@ -137,7 +137,7 @@ func TestStorageMemory_UpdateERC20Balances(t *testing.T) {
 		FetchedAt:     time.Now().Unix(),
 	}
 
-	balanceChanged, oldState, err = storage.UpdateERC20Balances(ctx, key, multistandardbalance.ERC20Balances{Balances: newBalances}, newState)
+	balanceChanged, oldState, err = storage.UpdateERC20Balances(ctx, key, nil, newBalances, nil, newState)
 	require.NoError(t, err)
 	assert.True(t, balanceChanged)
 }
@@ -169,7 +169,7 @@ func TestStorageMemory_GetERC20Balances(t *testing.T) {
 		FetchedAt:     time.Now().Unix(),
 	}
 
-	_, _, err = storage.UpdateERC20Balances(ctx, key, multistandardbalance.ERC20Balances{Balances: expectedBalances}, expectedState)
+	_, _, err = storage.UpdateERC20Balances(ctx, key, nil, expectedBalances, nil, expectedState)
 	require.NoError(t, err)
 
 	stored, state, err = storage.GetERC20Balances(ctx, key)
@@ -490,7 +490,7 @@ func TestStorageMemory_UpdateERC20Balances_WithNilBlockNumber(t *testing.T) {
 		FetchedAt:     time.Now().Unix(),
 	}
 
-	_, _, err := storage.UpdateERC20Balances(ctx, key, multistandardbalance.ERC20Balances{Balances: initialBalances}, initialState)
+	_, _, err := storage.UpdateERC20Balances(ctx, key, nil, initialBalances, nil, initialState)
 	require.NoError(t, err)
 
 	// Now try to update with a nil block number - this should cause an error
@@ -503,7 +503,7 @@ func TestStorageMemory_UpdateERC20Balances_WithNilBlockNumber(t *testing.T) {
 		FetchedAt:     time.Now().Unix(),
 	}
 
-	balanceChanged, oldState, err := storage.UpdateERC20Balances(ctx, key, multistandardbalance.ERC20Balances{Balances: newBalances}, stateWithNilBlockNumber)
+	balanceChanged, oldState, err := storage.UpdateERC20Balances(ctx, key, nil, newBalances, nil, stateWithNilBlockNumber)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "new state at block number is nil")
 	assert.False(t, balanceChanged)

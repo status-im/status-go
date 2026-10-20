@@ -373,7 +373,7 @@ func TestController_BasicFlow(t *testing.T) {
 	storage.EXPECT().UpdateNativeBalance(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(false, multistandardbalance.State{}, nil).AnyTimes()
 
 	// Mock ERC20, ERC721, and ERC1155 storage update methods
-	storage.EXPECT().UpdateERC20Balances(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(false, multistandardbalance.State{}, nil).AnyTimes()
+	storage.EXPECT().UpdateERC20Balances(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(false, multistandardbalance.State{}, nil).AnyTimes()
 	storage.EXPECT().UpdateERC721Balances(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(false, multistandardbalance.State{}, nil).AnyTimes()
 	storage.EXPECT().UpdateERC1155Balances(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(false, multistandardbalance.State{}, nil).AnyTimes()
 

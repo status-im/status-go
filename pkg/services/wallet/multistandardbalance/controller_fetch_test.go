@@ -10,6 +10,8 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/go-wallet-sdk/pkg/balance/multistandardfetcher"
+
+	"github.com/status-im/status-go/pkg/pubsub"
 )
 
 type countingTokenListProvider struct {
@@ -132,4 +134,44 @@ func TestHandleERC20Result_FailedWithoutKnownBalanceIsUnknown(t *testing.T) {
 	stored := storedERC20Balances(t, c, account)
 	require.NotContains(t, stored.Balances, fails)
 	require.NotContains(t, stored.Answered, fails, "unknown, not zero")
+}
+
+// interleavingStorage runs onFirstERC20Update before the first ERC20 update
+// reaches the store.
+type interleavingStorage struct {
+	Storage
+	onFirstERC20Update func()
+}
+
+func (s *interleavingStorage) UpdateERC20Balances(ctx context.Context, key BalancesKey, asked []ContractAddress, fetched map[ContractAddress]*big.Int, failed []ContractAddress, state State) (bool, State, error) {
+	if hook := s.onFirstERC20Update; hook != nil {
+		s.onFirstERC20Update = nil
+		hook()
+	}
+	return s.Storage.UpdateERC20Balances(ctx, key, asked, fetched, failed, state)
+}
+
+// A stale chain fetch still handling a result while the newer fetch of the
+// same chain handles one for the same account must not drop the newer
+// fetch's answers, and must report its own answers as a change.
+func TestHandleERC20Result_OverlappingFetchesKeepEachOthersAnswers(t *testing.T) {
+	account := common.Address{19: 1}
+	staleToken := common.Address{0x70, 19: 1}
+	newerToken := common.Address{0x70, 19: 2}
+	ctx := context.Background()
+	storage := &interleavingStorage{Storage: NewStorageMemory()}
+	c := NewController(DefaultControllerConfig(), storage, nil, nil, nil, nil, nil, nil, noopLastBlockManager{}, nil, zap.NewNop())
+	finishedCh, unsub := pubsub.Subscribe[EventBalanceFetchFinished](c.GetPublisher(), 10)
+	defer unsub()
+
+	storage.onFirstERC20Update = func() {
+		c.handleFetchResult(ctx, 1, erc20Config(account, newerToken), erc20FetchResult(2, account, map[common.Address]*big.Int{}))
+		<-finishedCh
+	}
+	c.handleFetchResult(ctx, 1, erc20Config(account, staleToken), erc20FetchResult(3, account, map[common.Address]*big.Int{}))
+
+	stored := storedERC20Balances(t, c, account)
+	require.Contains(t, stored.Answered, newerToken)
+	require.Contains(t, stored.Answered, staleToken)
+	require.True(t, (<-finishedCh).BalanceChanged, "answering a new token is a change")
 }

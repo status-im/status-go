@@ -24,14 +24,15 @@ func BenchmarkGetBalances(b *testing.B) {
 	}
 	accounts := []common.Address{{19: 1}, {19: 2}}
 	for _, account := range accounts {
-		stored := multistandardbalance.ERC20Balances{Balances: map[common.Address]*big.Int{}, Answered: map[common.Address]struct{}{}}
+		asked := make([]common.Address, 0, len(tokens))
+		fetched := map[common.Address]*big.Int{}
 		for i, token := range tokens {
-			stored.Answered[token.Address] = struct{}{}
+			asked = append(asked, token.Address)
 			if i%97 == 3 {
-				stored.Balances[token.Address] = big.NewInt(int64(i))
+				fetched[token.Address] = big.NewInt(int64(i))
 			}
 		}
-		_, _, err := storage.UpdateERC20Balances(context.Background(), multistandardbalance.BalancesKey{Account: account, ChainID: chainID}, stored, fetchedState())
+		_, _, err := storage.UpdateERC20Balances(context.Background(), multistandardbalance.BalancesKey{Account: account, ChainID: chainID}, asked, fetched, nil, fetchedState())
 		require.NoError(b, err)
 	}
 	reader := tokenbalances.NewStorageMultistandardBalance(storage)

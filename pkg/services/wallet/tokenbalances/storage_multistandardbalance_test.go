@@ -45,10 +45,10 @@ func TestGetBalances_ERC20Fetched_AnsweredMissingTokenIsZero(t *testing.T) {
 	knownToken := erc20Token(chainID, "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913")
 	zeroToken := erc20Token(chainID, "0x820C137fA9D5348B4B9B2E229CBeD970E8e7E360")
 
-	_, _, err := storage.UpdateERC20Balances(context.Background(), key, multistandardbalance.ERC20Balances{
-		Balances: map[common.Address]*big.Int{knownToken.Address: big.NewInt(42)},
-		Answered: map[common.Address]struct{}{knownToken.Address: {}, zeroToken.Address: {}},
-	}, fetchedState())
+	_, _, err := storage.UpdateERC20Balances(context.Background(), key,
+		[]common.Address{knownToken.Address, zeroToken.Address},
+		map[common.Address]*big.Int{knownToken.Address: big.NewInt(42)},
+		nil, fetchedState())
 	require.NoError(t, err)
 
 	balances, err := adapter.GetBalances(context.Background(), []*tokentypes.Token{knownToken, zeroToken}, []common.Address{account})
@@ -73,7 +73,7 @@ func TestGetBalances_ERC20Fetched_UnansweredTokenIsUnknown(t *testing.T) {
 	key := multistandardbalance.BalancesKey{Account: account, ChainID: chainID}
 	unansweredToken := erc20Token(chainID, "0x820C137fA9D5348B4B9B2E229CBeD970E8e7E360")
 
-	_, _, err := storage.UpdateERC20Balances(context.Background(), key, multistandardbalance.ERC20Balances{}, fetchedState())
+	_, _, err := storage.UpdateERC20Balances(context.Background(), key, nil, nil, nil, fetchedState())
 	require.NoError(t, err)
 
 	balances, err := adapter.GetBalances(context.Background(), []*tokentypes.Token{unansweredToken}, []common.Address{account})

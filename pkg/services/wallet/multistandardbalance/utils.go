@@ -83,7 +83,8 @@ func mergeERC20Balances(previous ERC20Balances, asked []ContractAddress, fetched
 	return ERC20Balances{Balances: fetched, Answered: answered}
 }
 
-// isERC20BalancesEqual relies on Answered only ever growing.
+// isERC20BalancesEqual relies on Answered only ever growing: b2 is merged from
+// b1 under the storage lock.
 func isERC20BalancesEqual(b1 ERC20Balances, b2 ERC20Balances) bool {
 	return len(b1.Answered) == len(b2.Answered) && isBigIntMapEqual(b1.Balances, b2.Balances)
 }

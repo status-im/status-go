@@ -29,15 +29,10 @@ func (c *Controller) handleERC20Result(ctx context.Context, chainID uint64, aske
 		FetchedAt:     time.Now().Unix(),
 	}
 
-	previous, _, prevErr := c.storage.GetERC20Balances(ctx, key)
-	if prevErr != nil {
-		previous = ERC20Balances{}
-	}
-	balances := mergeERC20Balances(previous, asked, result.Results, result.Failed)
 	if len(result.Failed) > 0 {
 		c.logger.Warn("ERC20 balance calls failed, keeping the last known balances", zap.String("address", logutils.TruncateWithDot(key.Account.String())), zap.Uint64("chainID", key.ChainID), zap.Int("failed", len(result.Failed)))
 	}
-	balanceChanged, oldState, err := c.storage.UpdateERC20Balances(ctx, key, balances, state)
+	balanceChanged, oldState, err := c.storage.UpdateERC20Balances(ctx, key, asked, result.Results, result.Failed, state)
 	if err != nil {
 		c.logger.Error("failed to update ERC20 balance", zap.String("address", logutils.TruncateWithDot(key.Account.String())), zap.Uint64("chainID", key.ChainID), zap.Error(err))
 		c.sendEventBalanceFetchError(key, resultType, err)

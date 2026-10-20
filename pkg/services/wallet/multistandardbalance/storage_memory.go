@@ -84,10 +84,11 @@ func (s *StorageMemory) GetNativeBalance(ctx context.Context, key BalancesKey) (
 	return
 }
 
-func (s *StorageMemory) UpdateERC20Balances(ctx context.Context, key BalancesKey, balances ERC20Balances, state State) (balanceChanged bool, oldState State, err error) {
+func (s *StorageMemory) UpdateERC20Balances(ctx context.Context, key BalancesKey, asked []ContractAddress, fetched map[ContractAddress]*big.Int, failed []ContractAddress, state State) (balanceChanged bool, oldState State, err error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	balances := mergeERC20Balances(s.erc20Balances[key].balance, asked, fetched, failed)
 	return updateIfNeeded(s.erc20Balances, key, balanceEntry[ERC20Balances]{balance: balances, state: state}, isERC20BalancesEqual)
 }
 
