@@ -45,6 +45,7 @@ const (
 	Alchemy           = "alchemy"
 	DirectInfura      = "direct-infura"
 	DirectGrove       = "direct-grove"
+	DirectAlchemy     = "direct-alchemy"
 	DirectCustom      = "direct-custom"
 	DirectKatana      = "direct-katana"
 	DirectConduit     = "direct-conduit"

@@ -85,3 +85,46 @@ func TestBuildDefaultNetworks(t *testing.T) {
 		}
 	}
 }
+
+func countDirectAlchemy(networks []params.Network) (count int, providers []params.RpcProvider) {
+	for _, n := range networks {
+		for _, p := range n.RpcProviders {
+			if p.Name == common.DirectAlchemy {
+				count++
+				providers = append(providers, p)
+			}
+		}
+	}
+	return count, providers
+}
+
+func TestBuildDefaultNetworksDirectAlchemy(t *testing.T) {
+	t.Run("absent without a key", func(t *testing.T) {
+		count, _ := countDirectAlchemy(BuildDefaultNetworks(&params.WalletConfig{}, true))
+		require.Zero(t, count)
+	})
+
+	t.Run("added next to every smart proxy alchemy provider with the key", func(t *testing.T) {
+		alchemyKey := security.NewSensitiveString("alchemy-key")
+		networks := BuildDefaultNetworks(&params.WalletConfig{AlchemyAPIKey: alchemyKey}, true)
+
+		proxyCount := 0
+		for _, n := range networks {
+			for _, p := range n.RpcProviders {
+				if p.Name == common.SmartProxyAlchemy {
+					proxyCount++
+				}
+			}
+		}
+
+		count, providers := countDirectAlchemy(networks)
+		require.Equal(t, proxyCount, count)
+		for _, p := range providers {
+			require.Equal(t, params.EmbeddedDirectProviderType, p.Type)
+			require.True(t, p.Enabled)
+			require.Equal(t, params.TokenAuth, p.AuthType)
+			require.Equal(t, alchemyKey, p.AuthToken)
+			require.True(t, strings.HasSuffix(p.GetHost(), ".g.alchemy.com"))
+		}
+	})
+}
