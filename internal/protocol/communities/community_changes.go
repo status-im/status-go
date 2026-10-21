@@ -526,7 +526,26 @@ func CoalesceCommunityChanges(changes []*CommunityChanges) []*CommunityChanges {
 			merged.Merge(entry)
 		}
 		merged.Community = group[len(group)-1].Community
+		syncChatPlacement(merged)
 		result = append(result, merged)
 	}
 	return result
+}
+
+// syncChatPlacement sets the category and position of each modified chat
+// from the merged community, as merging cannot tell a reset to the zero
+// value from a change that left them unset.
+func syncChatPlacement(changes *CommunityChanges) {
+	chats := changes.Community.Chats()
+	for chatID, chatChanges := range changes.ChatsModified {
+		chat, ok := chats[chatID]
+		if !ok {
+			continue
+		}
+		// Merge may share the entry with an input change.
+		synced := *chatChanges
+		synced.CategoryModified = chat.CategoryId
+		synced.PositionModified = int(chat.Position)
+		changes.ChatsModified[chatID] = &synced
+	}
 }

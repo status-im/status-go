@@ -402,6 +402,33 @@ func (s *CommunitySuite) TestCoalesceCommunityChanges() {
 	s.Require().Contains(added.MembersAdded, s.member3Key, "inputs are not mutated")
 }
 
+// A later change that moves a chat out of its category or to the first
+// position carries the zero value, which must not lose to the earlier one.
+func (s *CommunitySuite) TestCoalesceCommunityChangesKeepsCategoryAndPositionResets() {
+	atState := func(clock uint64, categoryID string, position int32) *Community {
+		c := s.rosterCommunity().CreateDeepCopy()
+		c.config.CommunityDescription.Clock = clock
+		c.config.CommunityDescription.Chats[testChatID1].CategoryId = categoryID
+		c.config.CommunityDescription.Chats[testChatID1].Position = position
+		return c
+	}
+	categorized := EmptyCommunityChanges()
+	categorized.Community = atState(10, "category", 2)
+	categorized.chatChanges(testChatID1).CategoryModified = "category"
+	categorized.chatChanges(testChatID1).PositionModified = 2
+	reset := EmptyCommunityChanges()
+	reset.Community = atState(11, "", 0)
+	reset.chatChanges(testChatID1).CategoryModified = ""
+	reset.chatChanges(testChatID1).PositionModified = 0
+
+	coalesced := CoalesceCommunityChanges([]*CommunityChanges{categorized, reset})
+
+	s.Require().Len(coalesced, 1)
+	s.Require().Equal("", coalesced[0].ChatsModified[testChatID1].CategoryModified)
+	s.Require().Equal(0, coalesced[0].ChatsModified[testChatID1].PositionModified)
+	s.Require().Equal("category", categorized.ChatsModified[testChatID1].CategoryModified, "inputs are not mutated")
+}
+
 func (s *CommunitySuite) TestAddMemberToChatChangesSerializeEmptyMaps() {
 	community := s.rosterCommunity()
 
