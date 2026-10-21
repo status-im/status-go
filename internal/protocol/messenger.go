@@ -3930,22 +3930,29 @@ func (m *Messenger) prepareTokenData(tokenData *ActivityTokenData, s *media.Serv
 }
 
 // resolveMentionedNames fills MentionedNames from the in-memory contacts map
-// with the client's name priority. Alias-only entries are left to the client.
+// with the client's name priority, falling back to the generated alias for
+// keys without a contact. Mentions that are not public keys are skipped.
 func (m *Messenger) resolveMentionedNames(msg *common.Message) {
 	msg.MentionedNames = nil
 	for _, pubKey := range msg.Mentions {
-		contact, ok := m.allContacts.loadIncludingSelf(pubKey)
-		if !ok || contact == nil {
+		if pubKey == common.EveryoneMentionTag {
 			continue
 		}
-		names := contact.Names()
-		if len(names) < 2 {
-			continue
+		var name string
+		if contact, ok := m.allContacts.loadIncludingSelf(pubKey); ok && contact != nil {
+			name = contact.PrimaryName()
+		}
+		if name == "" {
+			generated, err := alias.GenerateFromPublicKeyString(pubKey)
+			if err != nil {
+				continue
+			}
+			name = generated
 		}
 		if msg.MentionedNames == nil {
 			msg.MentionedNames = make(map[string]string, len(msg.Mentions))
 		}
-		msg.MentionedNames[pubKey] = names[0]
+		msg.MentionedNames[pubKey] = name
 	}
 }
 

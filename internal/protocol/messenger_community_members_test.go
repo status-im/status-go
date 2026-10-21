@@ -14,6 +14,7 @@ import (
 	"github.com/status-im/status-go/internal/protocol/common"
 	"github.com/status-im/status-go/internal/protocol/communities"
 	"github.com/status-im/status-go/internal/protocol/contacts"
+	"github.com/status-im/status-go/internal/protocol/identity/alias"
 	"github.com/status-im/status-go/internal/protocol/protobuf"
 	"github.com/status-im/status-go/internal/protocol/requests"
 )
@@ -105,7 +106,9 @@ func (s *MessengerCommunitiesSuite) TestMentionedNames() {
 	text := fmt.Sprintf("@%s @%s @%s @%s", ownerID, bobID, unknownID, common.EveryoneMentionTag)
 	sent := sendChatMessage(&s.Suite, s.bob, chat.ID, text)
 
-	expected := map[string]string{ownerID: "owner-contact", bobID: "Bobby"}
+	unknownAlias, err := alias.GenerateFromPublicKeyString(unknownID)
+	s.Require().NoError(err)
+	expected := map[string]string{ownerID: "owner-contact", bobID: "Bobby", unknownID: unknownAlias}
 	_, err = WaitOnMessengerResponse(s.alice, func(r *MessengerResponse) bool {
 		for _, msg := range r.Messages() {
 			if msg.ID == sent.ID {
@@ -138,14 +141,23 @@ func (s *MessengerCommunitiesSuite) TestResolveMentionedNamesPriority() {
 	s.owner.allContacts.Store("0xunverified", &contacts.Contact{ID: "0xunverified", Alias: "a", DisplayName: "plain", EnsName: "fake.eth"})
 	s.owner.allContacts.Store("0xaliasonly", &contacts.Contact{ID: "0xaliasonly", Alias: "a"})
 
+	unknownKey, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+	unknownID := crypto.PubkeyToHex(&unknownKey.PublicKey)
+	unknownAlias, err := alias.GenerateFromPublicKeyString(unknownID)
+	s.Require().NoError(err)
+
 	msg := common.NewMessage()
-	msg.Mentions = []string{"0xnick", "0xens", "0xunverified", "0xaliasonly", s.owner.IdentityPublicKeyString()}
+	msg.Mentions = []string{"0xnick", "0xens", "0xunverified", "0xaliasonly", s.owner.IdentityPublicKeyString(),
+		unknownID, "0xnotakey", common.EveryoneMentionTag}
 	s.owner.resolveMentionedNames(msg)
 	s.Require().Equal(map[string]string{
 		"0xnick":                          "nick",
 		"0xens":                           "name.eth",
 		"0xunverified":                    "plain",
+		"0xaliasonly":                     "a",
 		s.owner.IdentityPublicKeyString(): "Charlie",
+		unknownID:                         unknownAlias,
 	}, msg.MentionedNames)
 }
 
