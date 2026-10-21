@@ -11,14 +11,16 @@ import (
 	"github.com/status-im/status-go/internal/logutils"
 )
 
-func (c *Controller) handleERC20Result(ctx context.Context, chainID uint64, result multistandardfetcher.ERC20Result) {
+// handleERC20Result stores result and reports whether it succeeded. It warns
+// about stored tokens missing from a result that should have covered them.
+func (c *Controller) handleERC20Result(ctx context.Context, chainID uint64, result multistandardfetcher.ERC20Result, coversStored bool) bool {
 	key := BalancesKey{Account: result.Account, ChainID: chainID}
 	resultType := multistandardfetcher.ResultTypeERC20
 
 	if result.Err != nil {
 		c.logger.Error("failed to get ERC20 balance", zap.String("address", logutils.TruncateWithDot(key.Account.String())), zap.Uint64("chainID", key.ChainID), zap.Error(result.Err))
 		c.sendEventBalanceFetchError(key, resultType, result.Err)
-		return
+		return false
 	}
 
 	c.lastBlockManager.SetLatestBlockNumber(chainID, result.AtBlockNumber.Uint64())
@@ -30,7 +32,7 @@ func (c *Controller) handleERC20Result(ctx context.Context, chainID uint64, resu
 	}
 
 	balances := result.Results
-	if stored, _, storedErr := c.storage.GetERC20Balances(ctx, key); storedErr == nil {
+	if stored, _, storedErr := c.storage.GetERC20Balances(ctx, key); coversStored && storedErr == nil {
 		if missing := countMissing(stored, balances); missing > 0 {
 			c.logger.Warn("ERC20 balances missing from the fetch result, keeping the last known ones", zap.String("address", logutils.TruncateWithDot(key.Account.String())), zap.Uint64("chainID", key.ChainID), zap.Int("kept", missing), zap.Int("answered", len(balances)))
 		}
@@ -39,8 +41,10 @@ func (c *Controller) handleERC20Result(ctx context.Context, chainID uint64, resu
 	if err != nil {
 		c.logger.Error("failed to update ERC20 balance", zap.String("address", logutils.TruncateWithDot(key.Account.String())), zap.Uint64("chainID", key.ChainID), zap.Error(err))
 		c.sendEventBalanceFetchError(key, resultType, err)
-		return
+		return false
 	}
+	c.forgetDetected(key, balances)
 	c.logger.Debug("finished updating ERC20 balance", zap.String("address", logutils.TruncateWithDot(key.Account.String())), zap.Uint64("chainID", key.ChainID), zap.Bool("balanceChanged", balanceChanged))
 	c.sendEventBalanceFetchFinished(key, resultType, balanceChanged, oldState, state)
+	return true
 }

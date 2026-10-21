@@ -43,9 +43,9 @@ func TestController_DebounceTiming(t *testing.T) {
 	networksProvider.EXPECT().GetActiveNetworks().Return([]*params.Network{network1}, nil).AnyTimes()
 	networksProvider.EXPECT().GetPublisher().Return(pubsub.NewPublisher()).AnyTimes()
 	lastReturnedBlockNumber := atomic.NewUint64(100)
-	lastBlockProvider.EXPECT().GetEstimatedLatestBlockNumber(gomock.Any(), uint64(1)).DoAndReturn(func(ctx context.Context, chainID uint64) (uint64, error) {
+	lastBlockProvider.EXPECT().GetReadBlocks(uint64(1)).DoAndReturn(func(chainID uint64) (uint64, uint64, bool) {
 		lastReturnedBlockNumber.Add(100)
-		return lastReturnedBlockNumber.Load(), nil
+		return 200, lastReturnedBlockNumber.Load(), true
 	}).AnyTimes()
 
 	// Track fetch calls
@@ -73,7 +73,6 @@ func TestController_DebounceTiming(t *testing.T) {
 	// Create controller with short debounce time for testing
 	config := transferdetector.ControllerConfig{
 		FetchDebounceTime: 100 * time.Millisecond,
-		FetchPeriod:       1 * time.Hour, // Long period to avoid interference
 	}
 
 	controller := transferdetector.NewController(
@@ -117,104 +116,6 @@ func TestController_DebounceTiming(t *testing.T) {
 	resetFetchCalls()
 }
 
-func TestController_FetchPeriod(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	fetcher := mock_transferdetector.NewMockFilterProvider(ctrl)
-	accountsProvider := mock_transferdetector.NewMockAccountsProvider(ctrl)
-	accountsPublisher := pubsub.NewPublisher()
-	networksProvider := mock_transferdetector.NewMockNetworksProvider(ctrl)
-	lastBlockProvider := mock_transferdetector.NewMockLastBlockProvider(ctrl)
-	logger := zap.NewNop()
-
-	// Mock accounts and networks
-	address1 := types.Address{0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11}
-	network1 := &params.Network{ChainID: 1}
-
-	accountsProvider.EXPECT().GetWalletAddresses().Return([]types.Address{address1}, nil).AnyTimes()
-	networksProvider.EXPECT().GetActiveNetworks().Return([]*params.Network{network1}, nil).AnyTimes()
-	networksProvider.EXPECT().GetPublisher().Return(pubsub.NewPublisher()).AnyTimes()
-	lastReturnedBlockNumber := atomic.NewUint64(100)
-	lastBlockProvider.EXPECT().GetEstimatedLatestBlockNumber(gomock.Any(), uint64(1)).DoAndReturn(func(ctx context.Context, chainID uint64) (uint64, error) {
-		lastReturnedBlockNumber.Add(100)
-		return lastReturnedBlockNumber.Load(), nil
-	}).AnyTimes()
-
-	// Track fetch calls
-	var fetchCalls int
-	var fetchMutex sync.Mutex
-	fetcher.EXPECT().FilterTransfers(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, chainID uint64, config eventfilter.TransferQueryConfig) ([]eventlog.Event, error) {
-		fetchMutex.Lock()
-		fetchCalls++
-		fetchMutex.Unlock()
-		return []eventlog.Event{}, nil
-	}).AnyTimes()
-
-	getFetchCalls := func() int {
-		fetchMutex.Lock()
-		defer fetchMutex.Unlock()
-		return fetchCalls
-	}
-
-	resetFetchCalls := func() {
-		fetchMutex.Lock()
-		fetchCalls = 0
-		fetchMutex.Unlock()
-	}
-
-	// Create controller with short times for testing
-	config := transferdetector.ControllerConfig{
-		FetchDebounceTime: 0 * time.Millisecond,   // No debounce for this test
-		FetchPeriod:       500 * time.Millisecond, // Short period for testing
-	}
-
-	controller := transferdetector.NewController(
-		config,
-		fetcher,
-		accountsProvider,
-		accountsPublisher,
-		networksProvider,
-		lastBlockProvider,
-		logger,
-	)
-
-	resetFetchCalls()
-
-	controller.Start()
-	defer controller.Stop()
-
-	// After calling Start, the initial block should be set but no actual fetch should occur
-	// since lastFetchedBlockNumber starts at 0
-	time.Sleep(100 * time.Millisecond)
-	require.Equal(t, 0, getFetchCalls(), "Expected no fetch calls after Start (initial block setting only)")
-	resetFetchCalls()
-
-	// Set up a block difference to trigger fetching
-	lastBlockProvider.EXPECT().GetEstimatedLatestBlockNumber(gomock.Any(), uint64(1)).Return(uint64(150), nil).AnyTimes()
-
-	// Wait for period time (500ms)
-	time.Sleep(600 * time.Millisecond)
-	require.Eventually(t, func() bool {
-		return getFetchCalls() == 1
-	}, 200*time.Millisecond, 50*time.Millisecond, "Expected 1 fetch call after fetch period")
-	resetFetchCalls()
-
-	// Trigger fetch manually
-	controller.TriggerFetch()
-	require.Eventually(t, func() bool {
-		return getFetchCalls() == 1
-	}, 200*time.Millisecond, 50*time.Millisecond, "Expected 1 fetch call after TriggerFetch")
-	resetFetchCalls()
-
-	// Periodic ticker should've been reset, so no extra calls until the next period
-	time.Sleep(600 * time.Millisecond)
-	require.Eventually(t, func() bool {
-		return getFetchCalls() == 1
-	}, 200*time.Millisecond, 50*time.Millisecond, "Expected 1 fetch call after next period")
-	resetFetchCalls()
-}
-
 func TestController_TransferDetection(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -238,13 +139,13 @@ func TestController_TransferDetection(t *testing.T) {
 	lastReturnedBlockNumber1 := atomic.NewUint64(100)
 	lastReturnedBlockNumber2 := atomic.NewUint64(200)
 
-	lastBlockProvider.EXPECT().GetEstimatedLatestBlockNumber(gomock.Any(), uint64(1)).DoAndReturn(func(ctx context.Context, chainID uint64) (uint64, error) {
+	lastBlockProvider.EXPECT().GetReadBlocks(uint64(1)).DoAndReturn(func(chainID uint64) (uint64, uint64, bool) {
 		lastReturnedBlockNumber1.Add(100)
-		return lastReturnedBlockNumber1.Load(), nil
+		return 200, lastReturnedBlockNumber1.Load(), true
 	}).AnyTimes()
-	lastBlockProvider.EXPECT().GetEstimatedLatestBlockNumber(gomock.Any(), uint64(2)).DoAndReturn(func(ctx context.Context, chainID uint64) (uint64, error) {
+	lastBlockProvider.EXPECT().GetReadBlocks(uint64(2)).DoAndReturn(func(chainID uint64) (uint64, uint64, bool) {
 		lastReturnedBlockNumber2.Add(100)
-		return lastReturnedBlockNumber2.Load(), nil
+		return 300, lastReturnedBlockNumber2.Load(), true
 	}).AnyTimes()
 
 	// Mock transfer events
@@ -299,7 +200,6 @@ func TestController_TransferDetection(t *testing.T) {
 	// Create controller with short debounce time for testing
 	config := transferdetector.ControllerConfig{
 		FetchDebounceTime: 100 * time.Millisecond,
-		FetchPeriod:       1 * time.Hour, // Long period to avoid interference
 	}
 
 	controller := transferdetector.NewController(
@@ -460,143 +360,4 @@ func TestController_TransferDetection(t *testing.T) {
 	require.True(t, finishedChainIDs[1], "Expected finished event for chain 1")
 	require.True(t, finishedChainIDs[2], "Expected finished event for chain 2")
 	eventsMutex.Unlock()
-}
-
-func TestController_BlockNumberTracking(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	fetcher := mock_transferdetector.NewMockFilterProvider(ctrl)
-	accountsProvider := mock_transferdetector.NewMockAccountsProvider(ctrl)
-	accountsPublisher := pubsub.NewPublisher()
-	networksProvider := mock_transferdetector.NewMockNetworksProvider(ctrl)
-	lastBlockProvider := mock_transferdetector.NewMockLastBlockProvider(ctrl)
-	logger := zap.NewNop()
-
-	// Mock accounts and networks
-	address1 := types.Address{0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11}
-	network1 := &params.Network{ChainID: 1}
-
-	accountsProvider.EXPECT().GetWalletAddresses().Return([]types.Address{address1}, nil).AnyTimes()
-	networksProvider.EXPECT().GetActiveNetworks().Return([]*params.Network{network1}, nil).AnyTimes()
-	networksProvider.EXPECT().GetPublisher().Return(pubsub.NewPublisher()).AnyTimes()
-
-	// Track fetch calls and verify block ranges
-	var fetchCalls []struct {
-		ChainID   uint64
-		FromBlock uint64
-		ToBlock   uint64
-	}
-	var fetchMutex sync.Mutex
-	fetcher.EXPECT().FilterTransfers(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, chainID uint64, config eventfilter.TransferQueryConfig) ([]eventlog.Event, error) {
-		fetchMutex.Lock()
-		fetchCalls = append(fetchCalls, struct {
-			ChainID   uint64
-			FromBlock uint64
-			ToBlock   uint64
-		}{
-			ChainID:   chainID,
-			FromBlock: config.FromBlock.Uint64(),
-			ToBlock:   config.ToBlock.Uint64(),
-		})
-		fetchMutex.Unlock()
-		return []eventlog.Event{}, nil
-	}).AnyTimes()
-
-	getFetchCalls := func() []struct {
-		ChainID   uint64
-		FromBlock uint64
-		ToBlock   uint64
-	} {
-		fetchMutex.Lock()
-		defer fetchMutex.Unlock()
-		result := make([]struct {
-			ChainID   uint64
-			FromBlock uint64
-			ToBlock   uint64
-		}, len(fetchCalls))
-		copy(result, fetchCalls)
-		return result
-	}
-
-	resetFetchCalls := func() {
-		fetchMutex.Lock()
-		fetchCalls = nil
-		fetchMutex.Unlock()
-	}
-
-	// Create controller with short debounce time for testing
-	config := transferdetector.ControllerConfig{
-		FetchDebounceTime: 100 * time.Millisecond,
-		FetchPeriod:       1 * time.Hour, // Long period to avoid interference
-	}
-
-	controller := transferdetector.NewController(
-		config,
-		fetcher,
-		accountsProvider,
-		accountsPublisher,
-		networksProvider,
-		lastBlockProvider,
-		logger,
-	)
-
-	// Test initial fetch - should set initial block number
-	lastBlockProvider.EXPECT().GetEstimatedLatestBlockNumber(gomock.Any(), uint64(1)).Return(uint64(100), nil).Times(1)
-
-	resetFetchCalls()
-	controller.Start()
-	defer controller.Stop()
-
-	// Wait for initial setup (no actual fetch should occur since lastFetchedBlockNumber is 0)
-	time.Sleep(100 * time.Millisecond)
-	initialCalls := getFetchCalls()
-	require.Len(t, initialCalls, 0, "Expected no initial fetch call (just sets initial block)")
-
-	// Test subsequent fetch - should filter from last fetched block + 1
-	resetFetchCalls()
-	lastBlockProvider.EXPECT().GetEstimatedLatestBlockNumber(gomock.Any(), uint64(1)).Return(uint64(150), nil).Times(1)
-
-	controller.TriggerFetch()
-
-	// Wait for fetch
-	require.Eventually(t, func() bool {
-		calls := getFetchCalls()
-		return len(calls) == 1
-	}, 2*time.Second, 50*time.Millisecond, "Expected 1 fetch call after TriggerFetch")
-
-	// Verify the block range is correct
-	subsequentCalls := getFetchCalls()
-	require.Len(t, subsequentCalls, 1, "Expected 1 subsequent fetch call")
-
-	call := subsequentCalls[0]
-	require.Equal(t, uint64(1), call.ChainID, "Expected chain ID 1")
-	require.Equal(t, uint64(101), call.FromBlock, "Expected from block to be 101 (last fetched + 1)")
-	require.Equal(t, uint64(150), call.ToBlock, "Expected to block to be 150 (latest block)")
-
-	// Test that if latest block is same as last fetched, no filtering occurs
-	resetFetchCalls()
-	lastBlockProvider.EXPECT().GetEstimatedLatestBlockNumber(gomock.Any(), uint64(1)).Return(uint64(150), nil).Times(1)
-
-	controller.TriggerFetch()
-
-	// Wait a bit to ensure no fetch occurs
-	time.Sleep(200 * time.Millisecond)
-
-	// Should not have any new fetch calls since latest block equals last fetched
-	noNewCalls := getFetchCalls()
-	require.Len(t, noNewCalls, 0, "Expected no new fetch calls when latest block equals last fetched")
-
-	// Test that if latest block is less than last fetched, no filtering occurs
-	resetFetchCalls()
-	lastBlockProvider.EXPECT().GetEstimatedLatestBlockNumber(gomock.Any(), uint64(1)).Return(uint64(140), nil).Times(1)
-
-	controller.TriggerFetch()
-
-	// Wait a bit to ensure no fetch occurs
-	time.Sleep(200 * time.Millisecond)
-
-	// Should not have any new fetch calls since latest block is less than last fetched
-	noNewCalls2 := getFetchCalls()
-	require.Len(t, noNewCalls2, 0, "Expected no new fetch calls when latest block is less than last fetched")
 }

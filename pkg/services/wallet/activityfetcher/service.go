@@ -11,6 +11,8 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
 
+	"github.com/status-im/go-wallet-sdk/pkg/balance/multistandardfetcher"
+
 	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
 	"github.com/status-im/status-go/internal/logutils"
 	"github.com/status-im/status-go/internal/panics"
@@ -22,12 +24,13 @@ import (
 	"github.com/status-im/status-go/pkg/services/wallet/common"
 	"github.com/status-im/status-go/pkg/services/wallet/multistandardbalance"
 	"github.com/status-im/status-go/pkg/services/wallet/pendingtxtracker"
+	"github.com/status-im/status-go/pkg/services/wallet/transferdetector"
 	"github.com/status-im/status-go/pkg/services/wallet/walletevent"
 )
 
-const (
-	activityFetchInterval = 10 * time.Minute
-)
+// activityFetchInterval is how old the last fetch of an account and chain has
+// to be for a change of accounts or networks to fetch it again.
+const activityFetchInterval = 10 * time.Minute
 
 const (
 	EventActivityFetchComplete        walletevent.EventType = "wallet-activity-fetch-complete"
@@ -48,6 +51,8 @@ type Service struct {
 	networksPublisher             *pubsub.Publisher
 	accountsPublisher             *pubsub.Publisher
 	multistandardBalancePublisher *pubsub.Publisher
+	transferDetectorPublisher     *pubsub.Publisher
+	knownTokens                   transferdetector.KnownTokensProvider
 	eventFeed                     *event.Feed
 	checkRefetchCh                chan bool
 
@@ -59,6 +64,7 @@ type Service struct {
 	subscriptions   event.Subscription
 	ch              chan walletevent.Event
 	targetedFetchCh chan []fetcherID
+	causes          *causes
 }
 
 func NewService(
@@ -69,6 +75,8 @@ func NewService(
 	ethClientGetter rpc.EthClientGetter,
 	eventFeed *event.Feed,
 	multistandardBalancePublisher *pubsub.Publisher,
+	transferDetectorPublisher *pubsub.Publisher,
+	knownTokens transferdetector.KnownTokensProvider,
 ) *Service {
 	logger := logutils.ZapLogger().Named("ActivityFetcher")
 
@@ -80,6 +88,8 @@ func NewService(
 		networksPublisher:             networksGetter.GetPublisher(),
 		accountsPublisher:             accountsPublisher,
 		multistandardBalancePublisher: multistandardBalancePublisher,
+		transferDetectorPublisher:     transferDetectorPublisher,
+		knownTokens:                   knownTokens,
 		eventFeed:                     eventFeed,
 		checkRefetchCh:                make(chan bool),
 		cancelFnMap:                   make(map[fetcherID]context.CancelFunc),
@@ -145,19 +155,13 @@ func (s *Service) handleWalletEvent(event walletevent.Event) {
 			return
 		}
 
-		// Trigger immediate fetch when transaction succeeds - bypass interval check
 		if payload.Status == ac.Success {
-			// Instead of triggering a refetch for all accounts and chains, we trigger a fetch for the specific fetcher IDs
-			// This approach saves a lot of rpc calls and speeds up the fetch process
 			ids, err := s.buildFetcherIDsFromTransactionStatus(&payload)
 			if err != nil {
 				s.logger.Error("Failed to build fetcher IDs from transaction status", zap.Error(err))
 				return
 			}
-			if len(ids) > 0 {
-				s.targetedFetchCh <- ids
-				return
-			}
+			s.causes.add(ids...)
 		}
 	}
 }
@@ -202,13 +206,16 @@ func (s *Service) startAccountWatcher() {
 	}()
 }
 
-// startBalanceChangeWatcher subscribes to multistandardbalance fetch-finished events and triggers activity fetch
+// startBalanceChangeWatcher fetches activity when a native balance changes,
+// and asks again a failed fetch at the next native balance read. Token balances
+// change without a transfer (rebasing tokens), so they are left to transfer
+// detection.
 func (s *Service) startBalanceChangeWatcher() {
 	if s.multistandardBalancePublisher == nil {
 		return
 	}
 
-	ch, unsub := pubsub.Subscribe[multistandardbalance.EventBalanceFetchFinished](s.multistandardBalancePublisher, 10)
+	ch, unsub := pubsub.Subscribe[multistandardbalance.EventBalanceFetchFinished](s.multistandardBalancePublisher, 100)
 	go func() {
 		defer panics.LogOnPanic()
 		defer unsub()
@@ -220,45 +227,97 @@ func (s *Service) startBalanceChangeWatcher() {
 				if !ok {
 					return
 				}
-				if !event.BalanceChanged {
+				if event.ResultType != multistandardfetcher.ResultTypeNative {
 					continue
 				}
-				if !s.activityFetcherManager.IsChainSupported(event.Key.ChainID) {
+				id := fetcherID{account: event.Key.Account, chainID: event.Key.ChainID}
+				if event.BalanceChanged && event.OldState.AtBlockNumber != nil {
+					s.causes.add(id)
 					continue
 				}
-				ids := []fetcherID{{account: event.Key.Account, chainID: event.Key.ChainID}}
-				select {
-				case s.targetedFetchCh <- ids:
-				case <-s.stopCh:
-					return
-				}
+				s.causes.balanceRead(id)
 			}
 		}
 	}()
 }
 
+// startTransferDetectionWatcher fetches activity of the accounts transfer
+// detection found a transfer of, and of every account of a range it failed to
+// look at.
+func (s *Service) startTransferDetectionWatcher() {
+	if s.transferDetectorPublisher == nil {
+		return
+	}
+
+	finishedCh, unsubFinished := pubsub.Subscribe[transferdetector.EventTransferDetectionFinished](s.transferDetectorPublisher, 100)
+	failedCh, unsubFailed := pubsub.Subscribe[transferdetector.EventTransferDetectionError](s.transferDetectorPublisher, 100)
+	go func() {
+		defer panics.LogOnPanic()
+		defer unsubFinished()
+		defer unsubFailed()
+		for {
+			select {
+			case <-s.stopCh:
+				return
+			case ev, ok := <-finishedCh:
+				if !ok {
+					return
+				}
+				if len(ev.Events) > 0 {
+					s.causes.add(transferCauses(ev, s.knownToken(ev.ChainID))...)
+				}
+			case ev, ok := <-failedCh:
+				if !ok {
+					return
+				}
+				s.causes.add(gapCauses(ev)...)
+			}
+		}
+	}()
+}
+
+func (s *Service) knownToken(chainID uint64) func(gethcommon.Address) bool {
+	known := make(map[gethcommon.Address]struct{})
+	if s.knownTokens != nil {
+		tokens, err := s.knownTokens.GetTokenContractAddresses(chainID)
+		if err != nil {
+			s.logger.Error("Failed to get known tokens", zap.Uint64("chainID", chainID), zap.Error(err))
+		}
+		for _, token := range tokens {
+			known[token] = struct{}{}
+		}
+	}
+	return func(token gethcommon.Address) bool {
+		_, ok := known[token]
+		return ok
+	}
+}
+
 func (s *Service) Start(ctx context.Context) {
 	s.logger.Info("Starting activity fetcher")
-	s.stopCh = make(chan struct{})
+	stopCh := make(chan struct{})
+	s.stopCh = stopCh
+	s.causes = newCauses(func(ids []fetcherID) {
+		select {
+		case s.targetedFetchCh <- ids:
+		case <-stopCh:
+		}
+	})
 
 	s.startNetworkWatcher()
 	s.startAccountWatcher()
 	s.startTransactionWatcher()
 	s.startBalanceChangeWatcher()
+	s.startTransferDetectionWatcher()
 
 	go func() {
 		defer panics.LogOnPanic()
-
-		ticker := time.NewTicker(activityFetchInterval)
-		defer ticker.Stop()
 
 		for {
 			select {
 			case <-ctx.Done():
 				s.stop()
 				return
-			case <-ticker.C:
-				s.fetchActivityForAllAccountsAndChains(ctx, false)
 			case bypassIntervalCheck := <-s.checkRefetchCh:
 				s.fetchActivityForAllAccountsAndChains(ctx, !bypassIntervalCheck)
 			case ids := <-s.targetedFetchCh:
@@ -354,6 +413,10 @@ func (s *Service) stop() {
 	if s.stopCh != nil {
 		close(s.stopCh)
 		s.stopCh = nil
+	}
+
+	if s.causes != nil {
+		s.causes.stop()
 	}
 
 	if s.subscriptions != nil {
@@ -567,33 +630,36 @@ func (s *Service) startFetchActivity(ctx context.Context, fetcherID fetcherID) {
 	go func() {
 		defer panics.LogOnPanic()
 		defer s.runAndRemoveCancelFn(fetcherID)
-		s.fetchActivity(tmpCtx, fetcherID.chainID, fetcherID.account)
+		err := s.fetchActivity(tmpCtx, fetcherID.chainID, fetcherID.account)
+		switch {
+		case tmpCtx.Err() != nil:
+		case err != nil:
+			s.logger.Error("Failed to fetch activity", zap.Uint64("chainID", fetcherID.chainID), zap.Error(err))
+			s.causes.fetchFailed(fetcherID)
+		default:
+			s.causes.fetchSucceeded(fetcherID)
+		}
 	}()
 }
 
-func (s *Service) fetchActivity(ctx context.Context, chainID uint64, account gethcommon.Address) {
-
-	// Get current block
+func (s *Service) fetchActivity(ctx context.Context, chainID uint64, account gethcommon.Address) error {
 	ethClient, err := s.ethClientGetter.EthClient(chainID)
 	if err != nil {
-		s.logger.Error("Failed to get rpc client", zap.Error(err))
-		return
+		return err
 	}
 	currentBlock, err := ethClient.BlockNumber(ctx)
 	if err != nil {
-		s.logger.Error("Failed to get current block", zap.Error(err))
-		return
+		return err
 	}
 
 	container, err := s.activityFetcherManager.FetchActivity(ctx, chainID, account, currentBlock)
 	if err != nil {
-		s.logger.Error("Failed to fetch activity", zap.Error(err))
-		return
+		return err
 	}
 	if len(container.Items) > 0 {
-		// at least one new transfer for detected, so trigger a balance refresh
 		s.emitNewTransfersDetected(chainID, account, len(container.Items))
 	}
+	return nil
 }
 
 func (s *Service) emitNewTransfersDetected(chainID uint64, account gethcommon.Address, count int) {

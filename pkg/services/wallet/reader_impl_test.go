@@ -13,12 +13,15 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/ethereum/go-ethereum/common"
+	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
 
 	"github.com/status-im/go-wallet-sdk/pkg/tokens/types"
 	wsdktypes "github.com/status-im/go-wallet-sdk/pkg/tokens/types"
 
 	"github.com/status-im/go-wallet-sdk/pkg/balance/multistandardfetcher"
+	"github.com/status-im/go-wallet-sdk/pkg/balance/refresh"
+	"github.com/status-im/go-wallet-sdk/pkg/contracts/erc20"
 
 	"github.com/status-im/status-go/internal/rpc/chain/ethclient"
 	"github.com/status-im/status-go/pkg/pubsub"
@@ -874,4 +877,20 @@ func TestReader_RefreshKeepsCachedBalanceForUnansweredToken(t *testing.T) {
 	case <-time.After(time.Second):
 		t.Fatal("expected UI cache refresh after the fetch event")
 	}
+}
+
+func TestProcessERC20TransferEvent_SkipsNativeTransferLogs(t *testing.T) {
+	reader, tokenManager, _, mockCtrl := setupReader(t)
+	defer mockCtrl.Finish()
+
+	account := common.HexToAddress("0xa1")
+	usdc := common.HexToAddress("0xc0")
+
+	tokenManager.EXPECT().FindOrCreateTokenByAddress(gomock.Any(), uint64(1), usdc).Return(&tokenTypes.Token{Token: &wsdktypes.Token{Address: usdc, ChainID: 1}}, nil)
+
+	transfer := func(token common.Address) erc20.Erc20Transfer {
+		return erc20.Erc20Transfer{From: common.HexToAddress("0x5e"), To: account, Value: big.NewInt(1), Raw: ethtypes.Log{Address: token}}
+	}
+	require.NoError(t, reader.processERC20TransferEvent(1, transfer(refresh.NativeTransferLogAddress)))
+	require.NoError(t, reader.processERC20TransferEvent(1, transfer(usdc)))
 }

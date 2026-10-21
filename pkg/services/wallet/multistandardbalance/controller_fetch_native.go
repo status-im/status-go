@@ -11,14 +11,14 @@ import (
 	"github.com/status-im/status-go/internal/logutils"
 )
 
-func (c *Controller) handleNativeResult(ctx context.Context, chainID uint64, result multistandardfetcher.NativeResult) {
+func (c *Controller) handleNativeResult(ctx context.Context, chainID uint64, result multistandardfetcher.NativeResult) bool {
 	key := BalancesKey{Account: result.Account, ChainID: chainID}
 	resultType := multistandardfetcher.ResultTypeNative
 
 	if result.Err != nil {
 		c.logger.Error("failed to get native balance", zap.String("address", logutils.TruncateWithDot(key.Account.String())), zap.Uint64("chainID", key.ChainID), zap.Error(result.Err))
 		c.sendEventBalanceFetchError(key, resultType, result.Err)
-		return
+		return false
 	}
 
 	c.lastBlockManager.SetLatestBlockNumber(chainID, result.AtBlockNumber.Uint64())
@@ -34,8 +34,9 @@ func (c *Controller) handleNativeResult(ctx context.Context, chainID uint64, res
 	if err != nil {
 		c.logger.Error("failed to update native balance", zap.String("address", logutils.TruncateWithDot(key.Account.String())), zap.Uint64("chainID", key.ChainID), zap.Error(err))
 		c.sendEventBalanceFetchError(key, resultType, err)
-		return
+		return false
 	}
 	c.logger.Debug("finished updating native balance", zap.String("address", logutils.TruncateWithDot(key.Account.String())), zap.Uint64("chainID", key.ChainID), zap.Bool("balanceChanged", balanceChanged))
 	c.sendEventBalanceFetchFinished(key, resultType, balanceChanged, oldState, state)
+	return true
 }
