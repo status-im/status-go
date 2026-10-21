@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"fmt"
+	"maps"
 	"sync"
 	"time"
 
@@ -2893,13 +2894,16 @@ func (m *Messenger) HandleChatIdentity(ctx context.Context, state *ReceivedMessa
 	contactModified := false
 
 	if imagesChanged {
-		for imageType, image := range ci.Images {
-			if contact.Images == nil {
-				contact.Images = make(map[string]images.IdentityImage)
-			}
-			contact.Images[imageType] = images.IdentityImage{Name: imageType, Payload: image.Payload, Clock: ci.Clock}
-
+		// Readers use the contact's image map without locks, so replace it
+		// rather than write to it.
+		updated := maps.Clone(contact.Images)
+		if updated == nil {
+			updated = make(map[string]images.IdentityImage, len(ci.Images))
 		}
+		for imageType, image := range ci.Images {
+			updated[imageType] = images.IdentityImage{Name: imageType, Payload: image.Payload, Clock: ci.Clock}
+		}
+		contact.Images = updated
 		if err = m.updateContactImagesURL(contact); err != nil {
 			return err
 		}
