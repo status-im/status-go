@@ -34,6 +34,6 @@ in rec {
     inherit pkgs meta version;
   };
   backend = pkgs.callPackage ./backend {
-    inherit self pkgs meta version;
+    inherit pkgs meta version;
   };
 }

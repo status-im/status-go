@@ -1,6 +1,5 @@
 {
   pkgs,
-  self,
   meta,
   version,
   stdenv,
@@ -16,16 +15,26 @@ in pkgs.buildGoModule {
   src = builtins.path { path = ./../../../..; name = "status-go-backend"; };
 
   # WARNING: Needs to be updated when go.mod is changed.
-  vendorHash = "sha256-4p6TpVM5nmTjYy0aaCUyK0rsMF1GKsf7SmXdGbSuYQw=";
+  vendorHash = builtins.readFile ../vendorHash.sha256;
 
   inherit meta version;
+
+  NIM_TKL_INC_DIR = "${pkgs.libtkl}/include";
+  NIM_TKL_LIB_DIR = "${pkgs.libtkl}/lib";
+
+
 
   nativeBuildInputs = with pkgs; [
     mockgen
     protobuf_36
-  ];
+  ] ++ lib.optionals stdenv.isDarwin [ darwin.cctools ];
 
-  phases = ["unpackPhase" "configurePhase" "buildPhase"];
+  phases = ["unpackPhase" "patchPhase" "configurePhase" "buildPhase"];
+
+
+  postPatch = ''
+    patchShebangs --build scripts
+  '';
 
   # https://pkg.go.dev/net#hdr-Name_Resolution
   # https://github.com/status-im/status-mobile/issues/19736
