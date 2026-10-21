@@ -49,10 +49,10 @@ pipeline {
           linux = jenkins.Build('status-go/platforms/linux-nix')
         } } }
         stage('MacOS') { steps { script {
-          linux = jenkins.Build('status-go/platforms/macos-nix')
+          macos = jenkins.Build('status-go/platforms/macos-nix')
         } } }
         stage('Windows') { steps { script {
-          linux = jenkins.Build('status-go/platforms/windows')
+          windows = jenkins.Build('status-go/platforms/windows')
         } } }
         stage('Docker') { steps { script {
           dock = jenkins.Build('status-go/platforms/docker')
@@ -64,7 +64,7 @@ pipeline {
       steps { script {
         sh "rm -fr ${env.RELEASE_DIR}"
         sh "mkdir ${env.RELEASE_DIR}"
-        [ios, android, linux].each { platformBuild ->
+        [linux, macos, windows].each { platformBuild ->
           jenkins.copyArts(platformBuild)
         }
         dir(env.RELEASE_DIR) {
