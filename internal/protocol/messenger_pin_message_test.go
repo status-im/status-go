@@ -183,3 +183,87 @@ func (s *MessengerPinMessageSuite) TestPinMessageOutOfOrder() {
 
 	s.Require().Len(handlePinMessageResponse.PinMessages(), 0)
 }
+
+func (s *MessengerPinMessageSuite) TestSendPinMessageRejectsThreadMessage() {
+	chat := CreateOneToOneChat("thread-message", &s.m.identity.PublicKey, s.m.getTimesource())
+	s.Require().NoError(s.m.SaveChat(chat))
+
+	threadID := "thread-id"
+	threadMessage := buildTestMessage(*chat)
+	threadMessage.ID = "thread-message-id"
+	threadMessage.ChatMessage.ThreadId = &threadID
+	s.Require().NoError(s.m.SaveMessages([]*common.Message{threadMessage}))
+
+	pinMessage := common.NewPinMessage()
+	pinMessage.ChatId = chat.ID
+	pinMessage.MessageId = threadMessage.ID
+	pinMessage.Pinned = true
+	_, err := s.m.SendPinMessage(context.Background(), pinMessage)
+	s.Require().ErrorIs(err, ErrThreadMessagePinningUnsupported)
+
+	pinnedMessages, _, err := s.m.PinnedMessageByChatID(chat.ID, "", 10)
+	s.Require().NoError(err)
+	s.Require().Empty(pinnedMessages)
+}
+
+func (s *MessengerPinMessageSuite) TestHandlePinMessageBeforeTarget() {
+	theirMessenger := s.newMessenger()
+	theirChat := CreateOneToOneChat("missing-pin-target", &s.privateKey.PublicKey, s.m.getTimesource())
+	s.Require().NoError(theirMessenger.SaveChat(theirChat))
+
+	target := buildTestMessage(*theirChat)
+	target.ID = "pending-message-id"
+
+	pinMessage := &protobuf.PinMessage{
+		ChatId:      theirChat.ID,
+		MessageId:   target.ID,
+		Pinned:      true,
+		Clock:       1,
+		MessageType: protobuf.MessageType_ONE_TO_ONE,
+	}
+	response := &MessengerResponse{}
+	err := theirMessenger.handlePinMessage(
+		&contacts.Contact{ID: s.m.myHexIdentity()},
+		1000,
+		response,
+		pinMessage,
+		false,
+	)
+	s.Require().NoError(err)
+	s.Require().Len(response.PinMessages(), 1)
+	s.Require().Equal(target.ID, response.PinMessages()[0].MessageId)
+	s.Require().Len(response.Messages(), 1)
+
+	pinnedMessages, _, err := theirMessenger.PinnedMessageByChatID(theirChat.ID, "", 10)
+	s.Require().NoError(err)
+	s.Require().Empty(pinnedMessages)
+
+	s.Require().NoError(theirMessenger.SaveMessages([]*common.Message{target}))
+
+	pinnedMessages, _, err = theirMessenger.PinnedMessageByChatID(theirChat.ID, "", 10)
+	s.Require().NoError(err)
+	s.Require().Len(pinnedMessages, 1)
+	s.Require().Equal(target.ID, pinnedMessages[0].Message.ID)
+}
+
+func (s *MessengerPinMessageSuite) TestSendPinMessageRejectsTargetFromAnotherChat() {
+	targetChat := CreatePublicChat("pin-target-chat", s.m.getTimesource())
+	pinChat := CreatePublicChat("pin-message-chat", s.m.getTimesource())
+	s.Require().NoError(s.m.SaveChat(targetChat))
+	s.Require().NoError(s.m.SaveChat(pinChat))
+
+	target := buildTestMessage(*targetChat)
+	target.ID = "target-message-id"
+	s.Require().NoError(s.m.SaveMessages([]*common.Message{target}))
+
+	pinMessage := common.NewPinMessage()
+	pinMessage.ChatId = pinChat.ID
+	pinMessage.MessageId = target.ID
+	pinMessage.Pinned = true
+	_, err := s.m.SendPinMessage(context.Background(), pinMessage)
+	s.Require().ErrorIs(err, ErrPinMessageTargetChatMismatch)
+
+	pinnedMessages, _, err := s.m.PinnedMessageByChatID(pinChat.ID, "", 10)
+	s.Require().NoError(err)
+	s.Require().Empty(pinnedMessages)
+}
