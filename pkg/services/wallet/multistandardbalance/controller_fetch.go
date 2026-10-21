@@ -11,14 +11,17 @@ import (
 
 func (c *Controller) buildMultiStandardFetcherFetchConfigs(balancesToFetch map[BalancesKey][]multistandardfetcher.ResultType) map[uint64]multistandardfetcher.FetchConfig {
 	fetchConfigs := make(map[uint64]multistandardfetcher.FetchConfig)
+	// One token list per chain, shared by all the accounts of the fetch.
+	tokensByChain := make(map[uint64][]ContractAddress)
 
 	for balancesKey, resultTypes := range balancesToFetch {
 		if _, exists := fetchConfigs[balancesKey.ChainID]; !exists {
 			fetchConfigs[balancesKey.ChainID] = multistandardfetcher.FetchConfig{
-				Native:  make([]AccountAddress, 0),
-				ERC20:   make(map[AccountAddress][]ContractAddress),
-				ERC721:  make(map[AccountAddress][]ContractAddress),
-				ERC1155: make(map[AccountAddress][]CollectibleID),
+				Native:                make([]AccountAddress, 0),
+				ERC20:                 make(map[AccountAddress][]ContractAddress),
+				ERC721:                make(map[AccountAddress][]ContractAddress),
+				ERC1155:               make(map[AccountAddress][]CollectibleID),
+				OmitZeroERC20Balances: true,
 			}
 		}
 
@@ -34,10 +37,15 @@ func (c *Controller) buildMultiStandardFetcherFetchConfigs(balancesToFetch map[B
 		}
 		if hasERC20 {
 			fetchConfig := fetchConfigs[balancesKey.ChainID]
-			tokens, err := c.tokenListProvider.GetTokenContractAddresses(balancesKey.ChainID)
-			if err != nil {
-				c.logger.Error("failed to get token contract addresses", zap.Error(err))
-				continue
+			tokens, ok := tokensByChain[balancesKey.ChainID]
+			if !ok {
+				var err error
+				tokens, err = c.tokenListProvider.GetTokenContractAddresses(balancesKey.ChainID)
+				if err != nil {
+					c.logger.Error("failed to get token contract addresses", zap.Error(err))
+					continue
+				}
+				tokensByChain[balancesKey.ChainID] = tokens
 			}
 			fetchConfig.ERC20[balancesKey.Account] = tokens
 			fetchConfigs[balancesKey.ChainID] = fetchConfig
@@ -66,7 +74,7 @@ func (c *Controller) buildMultiStandardFetcherFetchConfigs(balancesToFetch map[B
 	return fetchConfigs
 }
 
-func (c *Controller) handleFetchResult(ctx context.Context, chainID uint64, fetchResult multistandardfetcher.FetchResult) {
+func (c *Controller) handleFetchResult(ctx context.Context, chainID uint64, config multistandardfetcher.FetchConfig, fetchResult multistandardfetcher.FetchResult) {
 	c.logger.Debug("processing result", zap.Uint64("chainID", chainID), zap.String("fetchResult.ResultType", string(fetchResult.ResultType)))
 	switch fetchResult.ResultType {
 	case multistandardfetcher.ResultTypeNative:
@@ -82,7 +90,7 @@ func (c *Controller) handleFetchResult(ctx context.Context, chainID uint64, fetc
 			c.logger.Error("failed to parse ERC20 result", zap.Any("result", fetchResult.Result))
 			return
 		}
-		c.handleERC20Result(ctx, chainID, result)
+		c.handleERC20Result(ctx, chainID, config.ERC20[result.Account], result)
 	case multistandardfetcher.ResultTypeERC721:
 		result, ok := fetchResult.Result.(multistandardfetcher.ERC721Result)
 		if !ok {

@@ -9,17 +9,15 @@ import (
 	"fmt"
 	"math/big"
 	"slices"
+	"sync"
 	"time"
 
 	"go.uber.org/zap"
 
 	"golang.org/x/exp/maps"
 
-	"github.com/status-im/go-wallet-sdk/pkg/tokens/autofetcher"
-	"github.com/status-im/go-wallet-sdk/pkg/tokens/fetcher"
-	"github.com/status-im/go-wallet-sdk/pkg/tokens/manager"
-	"github.com/status-im/go-wallet-sdk/pkg/tokens/parsers"
-	"github.com/status-im/go-wallet-sdk/pkg/tokens/types"
+	"github.com/status-im/status-go/pkg/services/wallet/token/tklmanager"
+	types "github.com/status-im/status-go/pkg/services/wallet/token/tokenlist"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -32,9 +30,8 @@ import (
 	"github.com/status-im/status-go/internal/db/multiaccounts/settings"
 	"github.com/status-im/status-go/internal/logutils"
 	"github.com/status-im/status-go/internal/panics"
+	"github.com/status-im/status-go/internal/pausable"
 	"github.com/status-im/status-go/internal/rpc"
-	"github.com/status-im/status-go/internal/signal"
-	"github.com/status-im/status-go/internal/traffic"
 	"github.com/status-im/status-go/pkg/pubsub"
 	"github.com/status-im/status-go/pkg/services/accounts/accountsevent"
 	"github.com/status-im/status-go/pkg/services/communitytokens/communitytokensdatabase"
@@ -43,7 +40,6 @@ import (
 	"github.com/status-im/status-go/pkg/services/wallet/community"
 	defaulttokenlists "github.com/status-im/status-go/pkg/services/wallet/token/local-token-lists/default-lists"
 	tokentypes "github.com/status-im/status-go/pkg/services/wallet/token/types"
-	"github.com/status-im/status-go/pkg/services/wallet/walletevent"
 )
 
 const (
@@ -68,7 +64,8 @@ type CommunityTokenImageBuilder interface {
 
 type ManagerInterface interface {
 	GetTokenByChainAddress(chainID uint64, address common.Address) (*tokentypes.Token, error)
-	GetTokensByChains(chainIDs []uint64) ([]*tokentypes.Token, error)
+	GetTokensByChainAddresses(ids []types.ChainAddress) ([]*tokentypes.Token, error)
+	GetChainTokens(chainIDs []uint64, dst []tokentypes.ChainToken) ([]tokentypes.ChainToken, error)
 	GetTokensByKeys(tokenKeys []string) ([]*tokentypes.Token, error)
 	GetCachedBalances() (map[common.Address][]tokentypes.StorageToken, error)
 	CacheBalances(balances map[common.Address][]tokentypes.StorageToken) error
@@ -91,10 +88,17 @@ type Manager struct {
 	accountsPublisher          *pubsub.Publisher
 	tokenBalancesStorage       balanceStorage
 
-	tokensManager manager.Manager
+	tokensManager *tklmanager.Manager
 
-	stopCh   chan struct{}
-	notifyCh chan struct{}
+	stopCh      chan struct{}
+	lifecycleMu sync.Mutex
+	workers     sync.WaitGroup
+	stopped     bool // Stop is terminal; a new node/profile constructs a new Manager.
+}
+
+// CataloguePausable exposes the refresh scheduler to the node registry.
+func (tm *Manager) CataloguePausable() pausable.Pausable {
+	return tm.tokensManager
 }
 
 func NewTokenManager(
@@ -142,8 +146,7 @@ func NewTokenManager(
 		return nil, err
 	}
 
-	tokensManager, err := setUpTokenListsManager(manager, walletDB, enabledChains, lastTokensUpdate, autoRefreshInterval,
-		autoRefreshCheckInterval)
+	tokensManager, err := newTKLRefreshManager(manager, enabledChains, lastTokensUpdate, nil, autoRefreshInterval, autoRefreshCheckInterval)
 	if err != nil {
 		logutils.ZapLogger().Error("Failed to create token lists manager", zap.Error(err))
 		return nil, err
@@ -205,63 +208,26 @@ func initialListIDsFromEmbedded() []string {
 	return maps.Keys(defaulttokenlists.TokensSources)
 }
 
-func setUpTokenListsManager(mng *Manager, walletDB *sql.DB, enabledChains []uint64, lastUpdate time.Time,
-	autoRefreshInterval time.Duration, autoRefreshCheckInterval time.Duration) (manager.Manager, error) {
-
-	fetcherConfig := fetcher.DefaultConfig()
-	fetcherConfig.Transport = traffic.Transport
-	wsdkFetcher := fetcher.New(fetcherConfig)
-
-	contentStore := NewContentStore(walletDB)
-
-	customTokenStore := NewCustomTokenStore(mng)
-
-	config := &manager.Config{
-		AutoFetcherConfig: &autofetcher.ConfigRemoteListOfTokenLists{
-			Config: autofetcher.Config{
-				LastUpdate:               lastUpdate,
-				AutoRefreshInterval:      autoRefreshInterval,
-				AutoRefreshCheckInterval: autoRefreshCheckInterval,
-			},
-			RemoteListOfTokenListsFetchDetails: types.ListDetails{
-				ID:        remoteListOfTokenListsID,
-				SourceURL: remoteListOfTokenLists,
-				Schema:    fetcher.ListOfTokenListsSchema,
-			},
-			RemoteListOfTokenListsParser: &parsers.StatusListOfTokenListsParser{},
-		},
-
-		MainListID: walletcommon.StatusTokenListID,
-
-		InitialListIDs:      initialListIDsFromEmbedded(),
-		InitialListProvider: initialListProviderFromEmbedded,
-
-		CustomParsers: map[string]parsers.TokenListParser{
-			walletcommon.StatusTokenListID: &parsers.StatusTokenListParser{},
-		},
-
-		Chains: enabledChains,
-
-		SkippedTokenKeys: walletcommon.SkippedTokenKeys(),
-
-		AdditionalAddressesForNativeToken: walletcommon.AdditionalNativeTokenAddresses(),
-	}
-
-	return manager.New(config, wsdkFetcher, contentStore, customTokenStore)
-}
-
 func (tm *Manager) Start(ctx context.Context) error {
+	tm.lifecycleMu.Lock()
+	defer tm.lifecycleMu.Unlock()
+	if tm.stopped {
+		return errors.New("token manager is stopped")
+	}
+	if tm.stopCh != nil {
+		return nil
+	}
 	stopCh := make(chan struct{})
+	if err := tm.startTokenLists(ctx); err != nil {
+		return err
+	}
 	tm.stopCh = stopCh
 	tm.startAccountsWatcher(stopCh)
 	tm.startNetworksWatcher(stopCh)
-
-	notifyCh := make(chan struct{}, 1)
-	tm.notifyCh = notifyCh
-	return tm.startTokenListsNotifier(ctx, stopCh, notifyCh)
+	return nil
 }
 
-func (tm *Manager) startTokenListsNotifier(ctx context.Context, stopCh <-chan struct{}, notifyCh chan struct{}) error {
+func (tm *Manager) startTokenLists(ctx context.Context) error {
 	thirdpartyServicesEnabled, err := tm.settings.ThirdpartyServicesEnabled()
 	if err != nil {
 		logutils.ZapLogger().Error("failed to get if thirdparty services are enabled", zap.Error(err))
@@ -274,43 +240,10 @@ func (tm *Manager) startTokenListsNotifier(ctx context.Context, stopCh <-chan st
 	}
 
 	autoRefresh := thirdpartyServicesEnabled && autoRefreshEnabled
-
-	err = tm.tokensManager.Start(ctx, autoRefresh, notifyCh)
-	if err != nil {
-		logutils.ZapLogger().Error("failed to start token lists notifier", zap.Error(err))
+	if err := tm.tokensManager.SetNetworkAllowed(thirdpartyServicesEnabled); err != nil {
 		return err
 	}
-
-	go func() {
-		defer panics.LogOnPanic()
-		for {
-			select {
-			case <-stopCh:
-				err := tm.tokensManager.Stop()
-				if err != nil {
-					logutils.ZapLogger().Error("failed to stop token lists notifier", zap.Error(err))
-				}
-				return
-			case <-notifyCh:
-				err := tm.setLastTokenListsRefreshTime(time.Now().UTC())
-				if err != nil {
-					logutils.ZapLogger().Error("failed to set last tokens update", zap.Error(err))
-				}
-				signal.SendWalletEvent(signal.TokenListsUpdated, nil)
-				if tm.walletFeed != nil {
-					// Send from a separate goroutine: Feed.Send blocks until every
-					// subscriber has consumed the value, and a stalled notifier loop
-					// would miss stopCh and drop follow-up notifications.
-					go func() {
-						defer panics.LogOnPanic()
-						tm.walletFeed.Send(walletevent.Event{Type: walletevent.EventTokenListsUpdated})
-					}()
-				}
-			}
-		}
-	}()
-
-	return nil
+	return tm.tokensManager.Start(ctx, autoRefresh, nil)
 }
 
 func (tm *Manager) startAccountsWatcher(stopCh <-chan struct{}) {
@@ -319,8 +252,10 @@ func (tm *Manager) startAccountsWatcher(stopCh <-chan struct{}) {
 	}
 
 	ch, unsubFn := pubsub.Subscribe[accountsevent.AccountsRemovedEvent](tm.accountsPublisher, 10)
+	tm.workers.Add(1)
 	go func() {
 		defer panics.LogOnPanic()
+		defer tm.workers.Done()
 		defer unsubFn()
 		for {
 			select {
@@ -343,8 +278,10 @@ func (tm *Manager) startNetworksWatcher(stopCh <-chan struct{}) {
 
 	ch, unsubFn := pubsub.Subscribe[networks.EventActiveNetworksChanged](tm.networkManager.GetPublisher(), 10)
 
+	tm.workers.Add(1)
 	go func() {
 		defer panics.LogOnPanic()
+		defer tm.workers.Done()
 		defer unsubFn()
 		for {
 			select {
@@ -374,10 +311,22 @@ func (tm *Manager) onActiveNetworksChanged() {
 }
 
 func (tm *Manager) Stop() {
+	tm.lifecycleMu.Lock()
+	defer tm.lifecycleMu.Unlock()
+	if tm.stopped {
+		return
+	}
+	tm.stopped = true
 	if tm.stopCh != nil {
 		close(tm.stopCh)
 		tm.stopCh = nil
 	}
+	if tm.tokensManager != nil {
+		if err := tm.tokensManager.Stop(); err != nil {
+			logutils.ZapLogger().Error("failed to stop token catalogue", zap.Error(err))
+		}
+	}
+	tm.workers.Wait()
 }
 
 func (tm *Manager) GetTokenByChainAddress(chainID uint64, address common.Address) (*tokentypes.Token, error) {
@@ -392,6 +341,36 @@ func (tm *Manager) GetTokenByChainAddress(chainID uint64, address common.Address
 		return nil, err
 	}
 	return communityToken, nil
+}
+
+// GetTokensByChainAddresses is a batch GetTokenByChainAddress: the result is
+// aligned with ids and nil where neither the catalogue nor a custom token matches.
+// A custom-token read error only leaves the catalogue misses nil.
+func (tm *Manager) GetTokensByChainAddresses(ids []types.ChainAddress) ([]*tokentypes.Token, error) {
+	found := tm.tokensManager.GetTokensByChainAddresses(ids)
+	result := make([]*tokentypes.Token, len(ids))
+	var customs []*tokentypes.Token
+	customsLoaded := false
+	for i, token := range found {
+		if token != nil {
+			result[i] = &tokentypes.Token{Token: token}
+			continue
+		}
+		if !customsLoaded {
+			var err error
+			if customs, err = tm.GetCustoms(true); err != nil {
+				logutils.ZapLogger().Error("failed to get custom tokens", zap.Error(err))
+			}
+			customsLoaded = true
+		}
+		for _, custom := range customs {
+			if custom.Address == ids[i].Address && custom.ChainID == ids[i].ChainID {
+				result[i] = custom
+				break
+			}
+		}
+	}
+	return result, nil
 }
 
 func (tm *Manager) GetTokensByKeys(tokenKeys []string) ([]*tokentypes.Token, error) {
@@ -456,12 +435,10 @@ func (tm *Manager) GetTokensByChain(chainID uint64) ([]*tokentypes.Token, error)
 }
 
 func (tm *Manager) GetTokensByChains(chainIDs []uint64) ([]*tokentypes.Token, error) {
-	allWsdkTokens := tm.tokensManager.UniqueTokens()
-	tokens := make([]*tokentypes.Token, 0)
-	for _, token := range allWsdkTokens {
-		if slices.Contains(chainIDs, token.ChainID) {
-			tokens = append(tokens, &tokentypes.Token{Token: token})
-		}
+	catalogueTokens := tm.tokensManager.GetTokensByChains(chainIDs)
+	tokens := make([]*tokentypes.Token, 0, len(catalogueTokens))
+	for _, token := range catalogueTokens {
+		tokens = append(tokens, &tokentypes.Token{Token: token})
 	}
 
 	communityTokens, err := tm.GetCustoms(true)
@@ -473,6 +450,25 @@ func (tm *Manager) GetTokensByChains(chainIDs []uint64) ([]*tokentypes.Token, er
 			continue
 		}
 		tokens = append(tokens, token)
+	}
+
+	return tokens, nil
+}
+
+// GetChainTokens is GetTokensByChains narrowed to what balance fetching reads.
+// It appends to dst[:0].
+func (tm *Manager) GetChainTokens(chainIDs []uint64, dst []tokentypes.ChainToken) ([]tokentypes.ChainToken, error) {
+	tokens := tm.tokensManager.GetChainTokens(chainIDs, dst)
+
+	communityTokens, err := tm.GetCustoms(true)
+	if err != nil {
+		return nil, err
+	}
+	for _, token := range communityTokens {
+		if !slices.Contains(chainIDs, token.ChainID) {
+			continue
+		}
+		tokens = append(tokens, token.ChainToken())
 	}
 
 	return tokens, nil
@@ -495,6 +491,57 @@ func (tm *Manager) GetTokensForActiveNetworksMode() ([]*tokentypes.Token, error)
 	return tm.GetTokensByChains(chainIDs)
 }
 
+// GetTokenBySymbolOnChain returns the first token of GetTokensByChain(chainID)
+// whose symbol or name equals symbol ignoring ASCII case, or nil. Legacy payment
+// requests name their token this way.
+func (tm *Manager) GetTokenBySymbolOnChain(chainID uint64, symbol string) (*tokentypes.Token, error) {
+	var candidates []*tokentypes.Token
+	if symbol == "" {
+		// The catalogue query rejects an empty symbol, yet some tokens lack one.
+		tokens, err := tm.GetTokensByChain(chainID)
+		if err != nil {
+			return nil, err
+		}
+		candidates = tokens
+	} else {
+		if token, ok := tm.tokensManager.GetTokenBySymbolOnChain(chainID, symbol); ok {
+			return &tokentypes.Token{Token: token}, nil
+		}
+		communityTokens, err := tm.GetCustoms(true)
+		if err != nil {
+			return nil, err
+		}
+		candidates = communityTokens
+	}
+
+	for _, token := range candidates {
+		if token.ChainID == chainID && (equalFoldASCII(token.Symbol, symbol) || equalFoldASCII(token.Name, symbol)) {
+			return token, nil
+		}
+	}
+
+	return nil, nil
+}
+
+func equalFoldASCII(a, b string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := 0; i < len(a); i++ {
+		x, y := a[i], b[i]
+		if 'A' <= x && x <= 'Z' {
+			x += 'a' - 'A'
+		}
+		if 'A' <= y && y <= 'Z' {
+			y += 'a' - 'A'
+		}
+		if x != y {
+			return false
+		}
+	}
+	return true
+}
+
 // addTokensSharingCrossChainIDsToUsedTokenKeys adds all tokens that share the same cross chain id to the used tokens keys.
 func (tm *Manager) addTokensSharingCrossChainIDsToUsedTokenKeys(usedTokensKeys map[string]interface{}, testnetMode bool) error {
 	tokens, err := tm.GetTokensByKeys(maps.Keys(usedTokensKeys))
@@ -514,29 +561,11 @@ func (tm *Manager) addTokensSharingCrossChainIDsToUsedTokenKeys(usedTokensKeys m
 		return nil
 	}
 
-	tokensByCrossChainIDs := make(map[string][]*tokentypes.Token)
-	wsdkTokens := tm.tokensManager.UniqueTokens()
-
-	for _, token := range wsdkTokens {
-		if token.CrossChainID == "" ||
-			testnetMode && walletcommon.ChainID(token.ChainID).IsMainnet() ||
-			!testnetMode && !walletcommon.ChainID(token.ChainID).IsMainnet() {
+	for _, token := range tm.tokensManager.GetCrossChainTokens(crossChainIDs, nil) {
+		if walletcommon.ChainID(token.ChainID).IsMainnet() == testnetMode {
 			continue
 		}
-		tokensByCrossChainIDs[token.CrossChainID] = append(tokensByCrossChainIDs[token.CrossChainID], &tokentypes.Token{Token: token})
-	}
-
-	for _, crossChainID := range crossChainIDs {
-		tokens, ok := tokensByCrossChainIDs[crossChainID]
-		if !ok {
-			continue
-		}
-		for _, token := range tokens {
-			if _, ok := usedTokensKeys[token.Key()]; ok {
-				continue
-			}
-			usedTokensKeys[token.Key()] = nil
-		}
+		usedTokensKeys[types.TokenKey(token.ChainID, token.Address)] = nil
 	}
 
 	return nil
@@ -627,22 +656,25 @@ func (tm *Manager) GetTokensByKeysForFetchingMarketData(tokenKeys []string) ([]*
 	}
 
 	// Test tokens handling...
-	// Use corresponding mainnet tokens for the test tokens that contains the same cross chain id
-	mainnetTokenKeysByCrossChainIDs := make(map[string][]string, 0) // keeps token keys of all mainnet tokens by cross chain id
-	allWsdkTokens := tm.tokensManager.UniqueTokens()
-	tokens := make([]*tokentypes.Token, 0)
-	for _, token := range allWsdkTokens {
-		if token.CrossChainID != "" && walletcommon.ChainID(token.ChainID).IsMainnet() {
-			mainnetTokenKeysByCrossChainIDs[token.CrossChainID] = append(mainnetTokenKeysByCrossChainIDs[token.CrossChainID], token.Key())
-		}
-		if !slices.Contains(tokenKeys, token.Key()) {
+	// Use corresponding mainnet tokens for the test tokens that contains the same cross chain id.
+	// Only catalogue tokens whose key is requested verbatim count, once each.
+	catalogueTokens, err := tm.tokensManager.GetTokensByKeys(tokenKeys)
+	if err != nil {
+		return nil, err
+	}
+	requested := make(map[string]bool, len(tokenKeys))
+	for _, key := range tokenKeys {
+		requested[key] = true
+	}
+	tokens := make([]*tokentypes.Token, 0, len(catalogueTokens))
+	crossChainIDs := make([]string, 0, len(catalogueTokens))
+	for _, token := range catalogueTokens {
+		key := token.Key()
+		if !requested[key] {
 			continue
 		}
+		delete(requested, key)
 		tokens = append(tokens, &tokentypes.Token{Token: token})
-	}
-
-	mainnetTokenKeys := make([]string, 0) // keeps token keys of mainnet tokens that have the same cross chain id as the test tokens
-	for _, token := range tokens {
 		crossChainID := token.CrossChainID
 		if crossChainID == "" {
 			continue
@@ -651,10 +683,14 @@ func (tm *Manager) GetTokensByKeysForFetchingMarketData(tokenKeys []string) ([]*
 		if crossChainID == walletcommon.StatusTestTokenCrossChainID {
 			crossChainID = walletcommon.StatusMainnetTokenCrossChainID
 		}
-		if _, ok := mainnetTokenKeysByCrossChainIDs[crossChainID]; !ok {
-			continue
+		crossChainIDs = append(crossChainIDs, crossChainID)
+	}
+
+	mainnetTokenKeys := make([]string, 0) // keeps token keys of mainnet tokens that have the same cross chain id as the test tokens
+	for _, token := range tm.tokensManager.GetCrossChainTokens(crossChainIDs, nil) {
+		if walletcommon.ChainID(token.ChainID).IsMainnet() {
+			mainnetTokenKeys = append(mainnetTokenKeys, types.TokenKey(token.ChainID, token.Address))
 		}
-		mainnetTokenKeys = append(mainnetTokenKeys, mainnetTokenKeysByCrossChainIDs[crossChainID]...)
 	}
 
 	mainnetTokens, err := tm.GetTokensByKeys(mainnetTokenKeys)
@@ -747,10 +783,6 @@ func (tm *Manager) GetCachedBalances() (map[common.Address][]tokentypes.StorageT
 
 func (tm *Manager) CacheBalances(balances map[common.Address][]tokentypes.StorageToken) error {
 	return tm.tokenBalancesStorage.saveBalances(balances)
-}
-
-func (tm *Manager) setLastTokenListsRefreshTime(time time.Time) error {
-	return tm.settings.SaveSettingField(settings.LastTokensUpdate, time)
 }
 
 func (tm *Manager) FindOrCreateTokenByAddress(ctx context.Context, chainID uint64, address common.Address) (*tokentypes.Token, error) {
@@ -885,15 +917,25 @@ func (tm *Manager) GetPreviouslyOwnedTokens() (map[common.Address][]*tokentypes.
 		return nil, err
 	}
 
-	tokens := make(map[common.Address][]*tokentypes.Token)
+	// Map iteration order is not stable; remember each lookup's account.
+	var ids []types.ChainAddress
+	var owners []common.Address
 	for account, balances := range balancesPerAccount {
 		for _, balance := range balances {
-			token, err := tm.GetTokenByChainAddress(balance.TokenChainID, balance.TokenAddress)
-			if err != nil {
-				return nil, err
-			}
-			tokens[account] = append(tokens[account], token)
+			ids = append(ids, types.ChainAddress{ChainID: balance.TokenChainID, Address: balance.TokenAddress})
+			owners = append(owners, account)
 		}
+	}
+	found, err := tm.GetTokensByChainAddresses(ids)
+	if err != nil {
+		return nil, err
+	}
+	tokens := make(map[common.Address][]*tokentypes.Token)
+	for i, token := range found {
+		if token == nil {
+			return nil, fmt.Errorf("custom token not found: chainID %d, address %s", ids[i].ChainID, ids[i].Address)
+		}
+		tokens[owners[i]] = append(tokens[owners[i]], token)
 	}
 
 	return tokens, nil

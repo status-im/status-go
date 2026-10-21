@@ -175,9 +175,9 @@ func thirdpartyActivityEntriesToEntries(deps FilterDependencies, activityEntries
 			interactedContractAddress: ae.ContractAddress,
 		}
 
-		entry.symbolOut, entry.symbolIn = lookupAndFillInTokens(deps, entry.tokenOut, entry.tokenIn)
 		entries = append(entries, entry)
 	}
+	fillInTokenSymbols(deps, entries)
 
 	return entries
 }

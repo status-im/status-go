@@ -31,6 +31,6 @@ let
   ];
 in rec {
   library = pkgs.callPackage ./library {
-    inherit self pkgs meta version;
+    inherit pkgs meta version;
   };
 }

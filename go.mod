@@ -99,9 +99,9 @@ require (
 	github.com/prometheus/client_model v0.6.2
 	github.com/schollz/peerdiscovery v1.7.0
 	github.com/status-im/extkeys v1.4.0
-	github.com/status-im/go-wallet-sdk v0.0.0-20261009132208-3d3f0817ecd8
+	github.com/status-im/go-wallet-sdk v0.0.0-20261019112701-6526440499f4
 	github.com/waku-org/go-waku v0.10.3
-	github.com/waku-org/sds-go-bindings v0.3.1
+	github.com/waku-org/sds-go-bindings v0.3.2
 	github.com/wk8/go-ordered-map/v2 v2.1.7
 	go.uber.org/atomic v1.11.0
 	go.uber.org/mock v0.6.0
@@ -452,6 +452,7 @@ require (
 	github.com/spf13/viper v1.21.0 // indirect
 	github.com/ssgreg/nlreturn/v2 v2.2.1 // indirect
 	github.com/status-im/goroutine-defer-guard v0.3.1 // indirect
+	github.com/status-im/nim-token-lists/go/tkl v0.0.0-20261020130707-5d72b476563f
 	github.com/stbenjam/no-sprintf-host-port v0.3.1 // indirect
 	github.com/stretchr/objx v0.5.3 // indirect
 	github.com/subosito/gotenv v1.6.0 // indirect

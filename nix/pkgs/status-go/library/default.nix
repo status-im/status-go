@@ -1,13 +1,11 @@
 {
   pkgs,
-  self,
   meta,
   version,
   stdenv,
 }:
 
 let
-  optionalString = pkgs.lib.optionalString;
 
   # Fixes fatal: not a git repository (or any of the parent directories): .git
   fakeGit = pkgs.writeScriptBin "git" "echo ${version}";
@@ -16,16 +14,23 @@ in pkgs.buildGoModule {
   src = builtins.path { path = ./../../../..; name = "status-go-library"; };
 
   # WARNING: Needs to be updated when go.mod is changed.
-  vendorHash = "sha256-CPcumXkQAiglhv9aS25WWZfP3vE6KcPz4xN9MZ1sIS4=";
+  vendorHash = builtins.readFile ./vendorHash.sha256;
 
   inherit meta version;
+
+  NIM_TKL_INC_DIR = "${pkgs.libtkl}/include";
+  NIM_TKL_LIB_DIR = "${pkgs.libtkl}/lib";
 
   nativeBuildInputs = with pkgs; [
     mockgen
     protobuf_36
-  ];
+  ] ++ lib.optionals stdenv.isDarwin [ darwin.cctools ];
 
-  phases = ["unpackPhase" "configurePhase" "buildPhase"];
+  phases = ["unpackPhase" "patchPhase" "configurePhase" "buildPhase"];
+
+  postPatch = ''
+    patchShebangs --build scripts
+  '';
 
   # https://pkg.go.dev/net#hdr-Name_Resolution
   # https://github.com/status-im/status-mobile/issues/19736

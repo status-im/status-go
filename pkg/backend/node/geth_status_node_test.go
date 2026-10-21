@@ -5,6 +5,9 @@ import (
 	"path"
 	"testing"
 
+	types "github.com/status-im/status-go/pkg/services/wallet/token/tokenlist"
+	tokentypes "github.com/status-im/status-go/pkg/services/wallet/token/types"
+
 	"github.com/ethereum/go-ethereum/common"
 	"go.uber.org/zap"
 
@@ -17,6 +20,34 @@ import (
 )
 
 func TestStatusNodeStart(t *testing.T) {
+	testStatusNodeStart(t)
+}
+
+func TestStatusNodeStopAfterCatalogueSetupFailure(t *testing.T) {
+	testStatusNodeStopAfterCatalogueSetupFailure(t)
+}
+
+func testStatusNodeStopAfterCatalogueSetupFailure(t *testing.T) {
+	config, err := params.NewNodeConfig("", walletcommon.EthereumSepolia)
+	require.NoError(t, err)
+	config.Networks = testutil.MinimalActiveNetworks()
+	// An invalid persisted custom must fail before initServices.
+	config.WalletConfig.CustomTokens = []*tokentypes.Token{{Token: &types.Token{ChainID: 1, Decimals: 256}}}
+	n := New(nil, nil, testutils.MustCreateTestLogger())
+	app, wallet, cleanup, err := setupTestDBs()
+	require.NoError(t, err)
+	defer func() { require.NoError(t, cleanup()) }()
+	n.appDB, n.walletDB = app, wallet
+	defer func() { require.NoError(t, n.StopMediaServer()) }()
+	require.Error(t, n.Start(config))
+	require.Nil(t, n.timeSourceSrvc)
+	require.NotPanics(t, func() { require.NoError(t, n.Stop()) })
+	require.False(t, n.IsRunning())
+	require.Nil(t, n.RPCClient())
+	require.Equal(t, ErrNoRunningNode, n.Stop())
+}
+
+func testStatusNodeStart(t *testing.T) {
 	config, err := params.NewNodeConfig("", walletcommon.EthereumSepolia)
 	require.NoError(t, err)
 
@@ -52,6 +83,8 @@ func TestStatusNodeStart(t *testing.T) {
 	nativeToken, err := n.TokenManager().GetTokenByChainAddress(walletcommon.EthereumMainnet, common.Address{})
 	require.NoError(t, err)
 	require.NotNil(t, nativeToken)
+	require.NoError(t, n.serviceRegistry.Pause("token-lists"))
+	require.NoError(t, n.serviceRegistry.Resume("token-lists"))
 
 	// try to start already started node
 	require.EqualError(t, n.Start(config), ErrNodeRunning.Error())

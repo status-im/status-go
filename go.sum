@@ -2359,8 +2359,8 @@ github.com/status-im/extkeys v1.4.0 h1:HiB/vQXZrGveZbGy3W6hI4T0CfCt0uP4xvGwjXL4c
 github.com/status-im/extkeys v1.4.0/go.mod h1:AZGS9vJKbME5tovNqYH/LrfHu8t9ad9nxl76fbLG5PY=
 github.com/status-im/go-sqlcipher/v4 v4.5.5 h1:Sq+785b/GEI3jJTHr9sXOQ8gTsogzE+/LgkCkB5pl2Y=
 github.com/status-im/go-sqlcipher/v4 v4.5.5/go.mod h1:mF2UmIpBnzFeBdu/ypTDb/LdbS0nk0dfSN1WUsWTjMA=
-github.com/status-im/go-wallet-sdk v0.0.0-20261009132208-3d3f0817ecd8 h1:yFt93b2CjWQJnlDuzXtx28miyfsei5BZIhZns5/7O+w=
-github.com/status-im/go-wallet-sdk v0.0.0-20261009132208-3d3f0817ecd8/go.mod h1:E4E1D0mflc2pcjsutZpvMYSjI+a231uBHQf8UjdT1Ug=
+github.com/status-im/go-wallet-sdk v0.0.0-20261019112701-6526440499f4 h1:Qwx5esbyUZI5TqOKF8o8O9Nw7nEaaMfxCN6+m0ImNbI=
+github.com/status-im/go-wallet-sdk v0.0.0-20261019112701-6526440499f4/go.mod h1:E4E1D0mflc2pcjsutZpvMYSjI+a231uBHQf8UjdT1Ug=
 github.com/status-im/gomoji v1.1.3-0.20220213022530-e5ac4a8732d4 h1:CtobZoiNdHpx+xurFxnuJ1xsGm3oKMfcZkB3vmomJmA=
 github.com/status-im/gomoji v1.1.3-0.20220213022530-e5ac4a8732d4/go.mod h1:hmpnZzkzSZJbFYWAUkrPV8I36x7mdYiPhPqnALP4fKA=
 github.com/status-im/goroutine-defer-guard v0.3.1 h1:cZhcJ3gO6OgMYBOfEaAAUZaZgKZeSzMlGNEjMyejuRo=
@@ -2371,6 +2371,8 @@ github.com/status-im/migrate/v4 v4.6.2-status.3 h1:Khwjb59NzniloUr5i9s9AtkEyqBbQ
 github.com/status-im/migrate/v4 v4.6.2-status.3/go.mod h1:c/kc90n47GZu/58nnz1OMLTf7uE4Da4gZP5qmU+A/v8=
 github.com/status-im/mvds v0.0.27-0.20251219201002-7226facd5aaf h1:CKUQmbtf0fodAQRwAcORa8Fk2Ej6x6PMn/yKipK14Es=
 github.com/status-im/mvds v0.0.27-0.20251219201002-7226facd5aaf/go.mod h1:2fiAx0q9XYIPKYRq2B1oiO9zZESy/n4D32gWw6lMDsE=
+github.com/status-im/nim-token-lists/go/tkl v0.0.0-20261020130707-5d72b476563f h1:0qG2fozsTqpZlqclSAq9ijSnN12VgMrqo8H/EDlpzuI=
+github.com/status-im/nim-token-lists/go/tkl v0.0.0-20261020130707-5d72b476563f/go.mod h1:d4xQErrfMen2+tZSXPT0ckaUwZwWHsZH9ddayOJUe/c=
 github.com/status-im/zxcvbn-go v0.0.0-20220311183720-5e8676676857 h1:sPkzT7Z7uLmejOsBRlZ0kwDWpqjpHJsp834o5nbhqho=
 github.com/status-im/zxcvbn-go v0.0.0-20220311183720-5e8676676857/go.mod h1:lq9I5ROto5tcua65GmCE6SIW7VE0ucdEBs1fn4z7uWU=
 github.com/stbenjam/no-sprintf-host-port v0.3.1 h1:AyX7+dxI4IdLBPtDbsGAyqiTSLpCP9hWRrXQDU4Cm/g=
@@ -2511,8 +2513,8 @@ github.com/waku-org/go-zerokit-rln-arm v0.0.0-20230916171929-1dd9494ff065 h1:Sd7
 github.com/waku-org/go-zerokit-rln-arm v0.0.0-20230916171929-1dd9494ff065/go.mod h1:7cSGUoGVIla1IpnChrLbkVjkYgdOcr7rcifEfh4ReR4=
 github.com/waku-org/go-zerokit-rln-x86_64 v0.0.0-20230916171518-2a77c3734dd1 h1:4HSdWMFMufpRo3ECTX6BrvA+VzKhXZf7mS0rTa5cCWU=
 github.com/waku-org/go-zerokit-rln-x86_64 v0.0.0-20230916171518-2a77c3734dd1/go.mod h1:+LeEYoW5/uBUTVjtBGLEVCUe9mOYAlu5ZPkIxLOSr5Y=
-github.com/waku-org/sds-go-bindings v0.3.1 h1:u4k0XHxGnjLIwJsgtelSBA5GmN4YMiDfzpk2wfpexf4=
-github.com/waku-org/sds-go-bindings v0.3.1/go.mod h1:GW6bN8Ski1GCOb2f5JbKKstH70wlPen1h8f1nzSDfSI=
+github.com/waku-org/sds-go-bindings v0.3.2 h1:3ZBy5SanoT6eHlANDkkSrON01avDEEe2zsT+xq+jSa0=
+github.com/waku-org/sds-go-bindings v0.3.2/go.mod h1:GW6bN8Ski1GCOb2f5JbKKstH70wlPen1h8f1nzSDfSI=
 github.com/wealdtech/go-ens/v3 v3.6.0 h1:EAByZlHRQ3vxqzzwNi0GvEq1AjVozfWO4DMldHcoVg8=
 github.com/wealdtech/go-ens/v3 v3.6.0/go.mod h1:hcmMr9qPoEgVSEXU2Bwzrn/9NczTWZ1rE53jIlqUpzw=
 github.com/wealdtech/go-multicodec v1.4.0 h1:iq5PgxwssxnXGGPTIK1srvt6U5bJwIp7k6kBrudIWxg=

@@ -2,6 +2,7 @@ package multistandardbalance
 
 import (
 	"math/big"
+	"reflect"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -277,39 +278,49 @@ func TestIsBigIntMapEqualWithDifferentTypes(t *testing.T) {
 	assert.True(t, isBigIntMapEqual(collectibleMap1, collectibleMap2))
 }
 
-func TestKeepLastKnownBalances(t *testing.T) {
+func answeredSet(tokens ...common.Address) map[common.Address]struct{} {
+	set := make(map[common.Address]struct{}, len(tokens))
+	for _, token := range tokens {
+		set[token] = struct{}{}
+	}
+	return set
+}
+
+func TestMergeERC20Balances(t *testing.T) {
 	a := common.HexToAddress("0x1")
 	b := common.HexToAddress("0x2")
 	c := common.HexToAddress("0x3")
+	d := common.HexToAddress("0x4")
 
-	t.Run("a token the batch did not answer keeps its last known balance", func(t *testing.T) {
-		previous := map[common.Address]*big.Int{a: big.NewInt(10), b: big.NewInt(20)}
-		fetched := map[common.Address]*big.Int{a: big.NewInt(11)}
-		merged, kept := keepLastKnownBalances(previous, fetched)
-		assert.Equal(t, 1, kept)
-		assert.Equal(t, big.NewInt(11), merged[a]) // answered: the fresh value wins
-		assert.Equal(t, big.NewInt(20), merged[b]) // unanswered: carried over
+	t.Run("asked and missing is an answered zero", func(t *testing.T) {
+		previous := ERC20Balances{Balances: map[common.Address]*big.Int{a: big.NewInt(10)}, Answered: answeredSet(a)}
+		merged := mergeERC20Balances(previous, []common.Address{a, b, c}, map[common.Address]*big.Int{c: big.NewInt(5)}, nil)
+		assert.Equal(t, map[common.Address]*big.Int{c: big.NewInt(5)}, merged.Balances)
+		assert.Equal(t, answeredSet(a, b, c), merged.Answered)
 	})
 
-	t.Run("an answered zero is a real zero, not a miss", func(t *testing.T) {
-		previous := map[common.Address]*big.Int{a: big.NewInt(10)}
-		fetched := map[common.Address]*big.Int{a: big.NewInt(0)}
-		merged, kept := keepLastKnownBalances(previous, fetched)
-		assert.Equal(t, 0, kept)
-		assert.Equal(t, big.NewInt(0), merged[a])
+	t.Run("a failed call keeps the stored balance and is not answered", func(t *testing.T) {
+		previous := ERC20Balances{Balances: map[common.Address]*big.Int{a: big.NewInt(10)}, Answered: answeredSet(a)}
+		merged := mergeERC20Balances(previous, []common.Address{a, b}, nil, []common.Address{a, b})
+		assert.Equal(t, map[common.Address]*big.Int{a: big.NewInt(10)}, merged.Balances)
+		assert.Equal(t, answeredSet(a), merged.Answered)
 	})
 
-	t.Run("nothing stored yet leaves the result untouched", func(t *testing.T) {
-		fetched := map[common.Address]*big.Int{c: big.NewInt(5)}
-		merged, kept := keepLastKnownBalances(nil, fetched)
-		assert.Equal(t, 0, kept)
-		assert.Equal(t, fetched, merged)
+	t.Run("tokens not asked keep their stored state", func(t *testing.T) {
+		previous := ERC20Balances{Balances: map[common.Address]*big.Int{d: big.NewInt(40)}, Answered: answeredSet(c, d)}
+		merged := mergeERC20Balances(previous, []common.Address{a}, map[common.Address]*big.Int{a: big.NewInt(1)}, nil)
+		assert.Equal(t, map[common.Address]*big.Int{a: big.NewInt(1), d: big.NewInt(40)}, merged.Balances)
+		assert.Equal(t, answeredSet(a, c, d), merged.Answered)
 	})
 
-	t.Run("a nil result still carries the stored balances", func(t *testing.T) {
-		previous := map[common.Address]*big.Int{a: big.NewInt(10)}
-		merged, kept := keepLastKnownBalances(previous, nil)
-		assert.Equal(t, 1, kept)
-		assert.Equal(t, big.NewInt(10), merged[a])
+	t.Run("the answered set is reused while it does not grow", func(t *testing.T) {
+		previous := ERC20Balances{Balances: map[common.Address]*big.Int{}, Answered: answeredSet(a, b)}
+		merged := mergeERC20Balances(previous, []common.Address{a, b}, nil, nil)
+		assert.Equal(t, reflect.ValueOf(previous.Answered).Pointer(), reflect.ValueOf(merged.Answered).Pointer())
+		assert.True(t, isERC20BalancesEqual(previous, merged))
+
+		grown := mergeERC20Balances(merged, []common.Address{a, b, c}, nil, nil)
+		assert.Equal(t, answeredSet(a, b), previous.Answered, "previous set untouched")
+		assert.False(t, isERC20BalancesEqual(merged, grown))
 	})
 }

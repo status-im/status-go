@@ -8,13 +8,13 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
-	"github.com/status-im/go-wallet-sdk/pkg/tokens/types"
+	types "github.com/status-im/status-go/pkg/services/wallet/token/tokenlist"
 
 	walletcommon "github.com/status-im/status-go/pkg/services/wallet/common"
 )
 
 const (
-	tokenKeySeparator = "-" // export this from wallet-sdk
+	tokenKeySeparator = "-"
 )
 
 type Token struct {
@@ -45,6 +45,17 @@ type StorageToken struct {
 	AssetWebsiteURL         string                       `json:"assetWebsiteUrl"`
 	BuiltOn                 string                       `json:"builtOn"`
 	MarketValuesPerCurrency map[string]TokenMarketValues `json:"marketValuesPerCurrency"`
+}
+
+type ChainToken = types.ChainToken
+
+// ChainTokens narrows tokens to what balance fetching reads.
+func ChainTokens(tokens []*Token) []ChainToken {
+	result := make([]ChainToken, len(tokens))
+	for i, token := range tokens {
+		result[i] = token.ChainToken()
+	}
+	return result
 }
 
 type TokenList struct {

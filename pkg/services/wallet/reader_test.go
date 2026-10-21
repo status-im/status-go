@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
-	"github.com/status-im/go-wallet-sdk/pkg/tokens/types"
+	types "github.com/status-im/status-go/pkg/services/wallet/token/tokenlist"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
@@ -132,7 +132,7 @@ func TestGetCachedBalances(t *testing.T) {
 
 	tokenManager.EXPECT().GetCachedBalances().Return(cachedTokens, nil)
 	tokenManager.EXPECT().GetTokensByKeys(testutils.NewStringSliceElementsMatcher(tokensOfInterest)).Return(allTokens, nil)
-	tokenBalancesStorage.EXPECT().GetBalances(gomock.Any(), allTokens, addresses).Return(
+	tokenBalancesStorage.EXPECT().GetBalances(gomock.Any(), tokentypes.ChainTokens(allTokens), addresses).Return(
 		map[uint64]map[common.Address]map[common.Address]*big.Int{}, nil,
 	)
 	tokens, err := reader.GetCachedBalances(chainIDs, addresses)
@@ -214,7 +214,7 @@ func TestFetchBalances(t *testing.T) {
 	// Test GetCachedBalances with cached data
 	tokenManager.EXPECT().GetCachedBalances().Return(cachedTokens, nil)
 	tokenManager.EXPECT().GetTokensByKeys(testutils.NewStringSliceElementsMatcher(tokensOfInterest)).Return(allTokens, nil)
-	tokenBalancesStorage.EXPECT().GetBalances(gomock.Any(), allTokens, addresses).Return(
+	tokenBalancesStorage.EXPECT().GetBalances(gomock.Any(), tokentypes.ChainTokens(allTokens), addresses).Return(
 		map[uint64]map[common.Address]map[common.Address]*big.Int{}, nil,
 	)
 

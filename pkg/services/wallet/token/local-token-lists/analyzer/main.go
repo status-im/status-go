@@ -6,8 +6,12 @@ import (
 
 	"golang.org/x/exp/maps"
 
-	"github.com/status-im/go-wallet-sdk/pkg/tokens/parsers"
-	"github.com/status-im/go-wallet-sdk/pkg/tokens/types"
+	"context"
+
+	"github.com/status-im/nim-token-lists/go/tkl"
+
+	"github.com/status-im/status-go/pkg/services/wallet/token/tklmanager"
+	types "github.com/status-im/status-go/pkg/services/wallet/token/tokenlist"
 
 	walletcommon "github.com/status-im/status-go/pkg/services/wallet/common"
 	defaulttokenlists "github.com/status-im/status-go/pkg/services/wallet/token/local-token-lists/default-lists"
@@ -150,28 +154,35 @@ func main() {
 func rebuildTokensMap(fetchedLists []defaulttokenlists.DownloadedTokenList) (map[string]*types.TokenList, error) {
 	tokensLists := make(map[string]*types.TokenList)
 	for _, fetchedTokenList := range fetchedLists {
-		var parser parsers.TokenListParser
-		parser = &parsers.StandardTokenListParser{}
+		format := tkl.StandardFormat
 		if fetchedTokenList.ID == walletcommon.StatusTokenListID {
-			parser = &parsers.StatusTokenListParser{}
+			format = tkl.StatusFormat
 		}
-
-		list, err := parser.Parse(fetchedTokenList.JsonData, walletcommon.AllChainIDsAsUint64())
+		catalogue, err := tklmanager.New(tkl.Config{
+			Chains:     walletcommon.AllChainIDsAsUint64(),
+			MainListID: fetchedTokenList.ID,
+			InitialLists: []tkl.ListContent{{ID: fetchedTokenList.ID, Format: format,
+				Source: fetchedTokenList.SourceURL, FetchedTimestamp: fetchedTokenList.Fetched.Format(time.RFC3339)}},
+		}, func(context.Context) (tkl.Bootstrap, []tkl.ListBody, error) {
+			return tkl.Bootstrap{}, []tkl.ListBody{{ID: fetchedTokenList.ID, Origin: tkl.Bundled, Data: fetchedTokenList.JsonData}}, nil
+		})
 		if err != nil {
 			fmt.Printf("Failed to parse token list %s: %v\n", fetchedTokenList.ID, err)
 			continue
 		}
-		list.Source = fetchedTokenList.SourceURL
-		list.FetchedTimestamp = fetchedTokenList.Fetched.Format(time.RFC3339)
-
-		// remove tokens if not in supported chains
-		for i := 0; i < len(list.Tokens); {
-			token := list.Tokens[i]
-			if !walletcommon.IsSupportedChainID(token.ChainID) {
-				list.Tokens = append(list.Tokens[:i], list.Tokens[i+1:]...)
-			} else {
-				i++
-			}
+		err = catalogue.Start(context.Background(), false, nil)
+		if err != nil {
+			_ = catalogue.Stop()
+			fmt.Printf("Failed to parse token list %s: %v\n", fetchedTokenList.ID, err)
+			continue
+		}
+		list, ok := catalogue.TokenList(fetchedTokenList.ID)
+		if err := catalogue.Stop(); err != nil {
+			return nil, err
+		}
+		if !ok {
+			fmt.Printf("Failed to parse token list %s\n", fetchedTokenList.ID)
+			continue
 		}
 
 		tokensLists[fetchedTokenList.ID] = list

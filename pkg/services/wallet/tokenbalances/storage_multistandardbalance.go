@@ -8,6 +8,9 @@ import (
 	tokentypes "github.com/status-im/status-go/pkg/services/wallet/token/types"
 )
 
+// zeroBalance is returned for every answered zero balance; the reader only reads balances.
+var zeroBalance = new(big.Int)
+
 type StorageMultistandardBalance struct {
 	multistandardbalanceStorage multistandardbalance.Storage
 }
@@ -16,11 +19,11 @@ func NewStorageMultistandardBalance(multistandardbalanceStorage multistandardbal
 	return &StorageMultistandardBalance{multistandardbalanceStorage: multistandardbalanceStorage}
 }
 
-func (s *StorageMultistandardBalance) GetBalances(ctx context.Context, tokens []*tokentypes.Token, accountAddresses []AccountAddress) (
+func (s *StorageMultistandardBalance) GetBalances(ctx context.Context, tokens []tokentypes.ChainToken, accountAddresses []AccountAddress) (
 	map[uint64]map[AccountAddress]map[ContractAddress]*big.Int, error) {
 	ret := make(map[uint64]map[AccountAddress]map[ContractAddress]*big.Int)
 
-	tokensPerChain := make(map[uint64][]*tokentypes.Token)
+	tokensPerChain := make(map[uint64][]tokentypes.ChainToken)
 	for _, token := range tokens {
 		tokensPerChain[token.ChainID] = append(tokensPerChain[token.ChainID], token)
 	}
@@ -38,13 +41,14 @@ func (s *StorageMultistandardBalance) GetBalances(ctx context.Context, tokens []
 				if token.IsNative() {
 					needsNative = true
 				}
-				if balance, exists := erc20balances[token.Address]; exists {
+				if balance, exists := erc20balances.Balances[token.Address]; exists {
 					ret[chainID][account][token.Address] = balance
+				} else if _, answered := erc20balances.Answered[token.Address]; answered {
+					ret[chainID][account][token.Address] = zeroBalance
 				} else if erc20State.FetchedAt != multistandardbalance.NeverFetched {
-					// The fetch keeps zero balances, so a token missing from a fetched
-					// map is one the batch did not answer for. Report it as unknown
-					// (present, nil) rather than as zero: the reader keeps the last
-					// persisted value for it and reads zero only when there is none.
+					// A token no fetch answered for is unknown (present, nil): the
+					// reader keeps the last persisted value for it and reads zero
+					// only when there is none.
 					ret[chainID][account][token.Address] = nil
 				}
 			}

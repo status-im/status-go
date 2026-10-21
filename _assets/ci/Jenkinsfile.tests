@@ -117,6 +117,13 @@ pipeline {
       } }
     }
 
+    stage('Token Library Coexistence') {
+      when { expression { !params.UNIT_TEST_DRY_RUN } }
+      steps { script {
+        nix.develop('make test-libtkl-coexistence', pure: false)
+      } }
+    }
+
     stage('Unit Tests') {
       environment {
         TEST_POSTGRES_PORT = "${env.DB_PORT}"

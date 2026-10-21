@@ -15,6 +15,7 @@ from resources.constants import (
 )
 from resources.constants import BURN_ADDRESS
 from utils import wallet_utils
+from utils.anvil_lock import anvil_lock
 
 EventActivityFilteringDone = "wallet-activity-filtering-done"
 EventActivityFilteringUpdate = "wallet-activity-filtering-entries-updated"
@@ -51,8 +52,9 @@ class TestWalletActivitySession:
 
     def mint_snt(self, address, amount):
         snt_controller = self.get_snt_token_controller()
-        tx_hash = snt_controller.functions.generateTokens(address, amount).transact()
-        self.anvil_client.eth.wait_for_transaction_receipt(tx_hash)
+        with anvil_lock():
+            tx_hash = snt_controller.functions.generateTokens(address, amount).transact()
+            self.anvil_client.eth.wait_for_transaction_receipt(tx_hash)
 
     @pytest.fixture(autouse=True)
     def setup_backend(self, funded_new_profile, anvil_client, multicall3_deployer, snt_addresses):

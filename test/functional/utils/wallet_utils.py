@@ -4,7 +4,9 @@ import uuid as uuid_lib
 
 import resources.constants as constants
 from clients.signals import SignalType, WalletEventType
+from clients.wallet_pending_tx_status import WalletPendingTxStatus
 
+from utils.anvil_lock import anvil_lock
 from utils.config import Config
 
 
@@ -58,12 +60,15 @@ def build_transactions_from_route(rpc_client, uuid):
     return wallet_router_sign_transactions
 
 
-def sign_messages(rpc_client, hashes, address):
+def sign_messages(rpc_client, hashes, address, password=None):
+    if password is None:
+        password = getattr(rpc_client, "password", None) or Config.password
+
     tx_signatures = {}
 
     for hash in hashes:
 
-        response = rpc_client.wallet_service.sign_message(hash, address, Config.password)
+        response = rpc_client.wallet_service.sign_message(hash, address, password)
 
         assert response and response.startswith("0x"), f"Invalid transaction signature for hash {hash}: {response}"
 
@@ -136,19 +141,64 @@ def check_fees_for_path(path_name, gas_fee_mode, check_approval, route):
         )
 
 
+def _pending_tx_status(signal: dict) -> dict | None:
+    event = signal.get("event") or {}
+    if event.get("type") != WalletEventType.TRANSACTIONS_PENDING_TRANSACTION_STATUS_CHANGED.value:
+        return None
+    try:
+        tx_status = json.loads(event.get("message", "{}").replace("'", '"'))
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(tx_status, dict):
+        return None
+    return tx_status
+
+
+def _record_terminal_status(signal: dict, sent_hashes: list[str], statuses: dict[str, dict]) -> bool:
+    tx_status = _pending_tx_status(signal)
+    if not sent_hashes or tx_status is None:
+        return False
+    tx_hash = str(tx_status.get("hash", "")).lower()
+    if tx_hash not in sent_hashes or tx_status.get("status") not in (WalletPendingTxStatus.SUCCESS, WalletPendingTxStatus.FAILED):
+        return False
+    statuses[tx_hash] = tx_status
+    return set(sent_hashes) <= set(statuses)
+
+
 def send_router_transactions_with_signatures(rpc_client, uuid, tx_signatures):
-    with rpc_client.expect_signal(
+    sent_hashes: list[str] = []
+    statuses: dict[str, dict] = {}
+
+    def _capture_sent_hashes(signal: dict) -> bool:
+        event = signal.get("event") or {}
+        if event.get("uuid") != uuid and (event.get("sendDetails") or {}).get("uuid") != uuid:
+            return False
+        sent_hashes.extend(str(tx["hash"]).lower() for tx in event.get("sentTransactions", []) if tx.get("hash"))
+        return True
+
+    with anvil_lock(), rpc_client.expect_signal(
         SignalType.WALLET,
         timeout=60,
-        accept_fn=lambda signal: signal["event"]["type"] == WalletEventType.TRANSACTIONS_PENDING_TRANSACTION_STATUS_CHANGED.value,
-    ) as exp:
-        _ = rpc_client.wallet_service.send_router_transactions_with_signatures(uuid, tx_signatures)
-    event_response = exp.result["event"]
-    tx_status = json.loads(event_response["message"].replace("'", '"'))
+        accept_fn=lambda signal: _record_terminal_status(signal, sent_hashes, statuses),
+    ):
+        with rpc_client.expect_signal(
+            SignalType.WALLET_ROUTER_TRANSACTIONS_SENT,
+            timeout=60,
+            accept_fn=_capture_sent_hashes,
+        ) as sent_exp:
+            _ = rpc_client.wallet_service.send_router_transactions_with_signatures(uuid, tx_signatures)
 
-    assert tx_status["status"] == "Success"
+        sent_signal = sent_exp.result
+        assert isinstance(sent_signal, dict), f"Unexpected sent signal payload: {sent_signal}"
+        event = sent_signal.get("event") or {}
+        error_response = (event.get("sendDetails") or {}).get("errorResponse") or event.get("errorResponse")
+        assert not error_response, f"Router failed to send transactions: {error_response}"
+        assert sent_hashes, f"Router reported success without transaction hashes: {event}"
 
-    return tx_status
+    assert set(sent_hashes) <= set(statuses), f"Missing terminal statuses for {sent_hashes}: {statuses}"
+    failed = [statuses[tx_hash] for tx_hash in sent_hashes if statuses[tx_hash].get("status") != WalletPendingTxStatus.SUCCESS]
+    assert not failed, failed
+    return statuses[sent_hashes[-1]]
 
 
 def collectible_token_key(chain_id, contract_address, token_id):
@@ -181,14 +231,15 @@ def send_collectible_transfer(rpc_client, send_type, addr_from, contract_address
 
 
 def send_router_transaction(rpc_client, **kwargs):
-    routes = get_suggested_routes(rpc_client, **kwargs)
-    assert "Route" in routes, f"No route found: {routes}"
+    with anvil_lock():
+        routes = get_suggested_routes(rpc_client, **kwargs)
+        assert "Route" in routes, f"No route found: {routes}"
 
-    build_tx = build_transactions_from_route(rpc_client, kwargs.get("uuid"))
+        build_tx = build_transactions_from_route(rpc_client, kwargs.get("uuid"))
 
-    tx_signatures = sign_messages(rpc_client, build_tx["signingDetails"]["hashes"], kwargs.get("addrFrom"))
+        tx_signatures = sign_messages(rpc_client, build_tx["signingDetails"]["hashes"], kwargs.get("addrFrom"))
 
-    tx_status = send_router_transactions_with_signatures(rpc_client, routes["Uuid"], tx_signatures)
+        tx_status = send_router_transactions_with_signatures(rpc_client, routes["Uuid"], tx_signatures)
     return {
         "routes": routes,
         "build_tx": build_tx,

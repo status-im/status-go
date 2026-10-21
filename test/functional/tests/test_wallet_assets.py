@@ -6,6 +6,7 @@ import resources.constants as constants
 
 from clients.signals import SignalType, WalletEventType
 from utils import wallet_utils
+from utils.anvil_lock import anvil_lock
 from clients.services.wallet import WalletService
 
 
@@ -41,12 +42,6 @@ class TestWalletAssets:
             "slippagePercentage": 0,
         }
 
-        # Prepare to send tx
-        routes = wallet_utils.get_suggested_routes(self.rpc_client, **input_params)
-        assert "Route" in routes, f"No route found: {routes}"
-        build_tx = wallet_utils.build_transactions_from_route(self.rpc_client, input_params.get("uuid"))
-        tx_signatures = wallet_utils.sign_messages(self.rpc_client, build_tx["signingDetails"]["hashes"], input_params.get("addrFrom"))
-
         # Send tx, listen to reload tick signal
         def accept_fn(signal):
             match signal["event"]["type"]:
@@ -58,12 +53,18 @@ class TestWalletAssets:
                 case _:
                     return False
 
-        with self.rpc_client.expect_signal(
-            SignalType.WALLET,
-            count=2,
-            accept_fn=accept_fn,
-        ) as exp:
-            _ = self.rpc_client.wallet_service.send_router_transactions_with_signatures(uuid, tx_signatures)
+        with anvil_lock():
+            routes = wallet_utils.get_suggested_routes(self.rpc_client, **input_params)
+            assert "Route" in routes, f"No route found: {routes}"
+            build_tx = wallet_utils.build_transactions_from_route(self.rpc_client, input_params.get("uuid"))
+            tx_signatures = wallet_utils.sign_messages(self.rpc_client, build_tx["signingDetails"]["hashes"], input_params.get("addrFrom"))
+
+            with self.rpc_client.expect_signal(
+                SignalType.WALLET,
+                count=2,
+                accept_fn=accept_fn,
+            ) as exp:
+                _ = self.rpc_client.wallet_service.send_router_transactions_with_signatures(uuid, tx_signatures)
         signals = exp.result
 
         # Verify

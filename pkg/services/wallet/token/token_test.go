@@ -12,7 +12,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 
-	"github.com/status-im/go-wallet-sdk/pkg/tokens/types"
+	types "github.com/status-im/status-go/pkg/services/wallet/token/tokenlist"
 
 	"go.uber.org/mock/gomock"
 
@@ -45,18 +45,23 @@ func setupTestTokenDB(t *testing.T) (*Manager, func()) {
 	walletDb, err := testutils.SetupTestMemorySQLDB(walletdb.DbInitializer{})
 	require.NoError(t, err)
 
-	return &Manager{
-			walletDB:             walletDb,
-			ethClientGetter:      nil,
-			ContractMaker:        nil,
-			networkManager:       nil,
-			communityTokensDB:    nil,
-			communityManager:     nil,
-			tokenBalancesStorage: balanceStorage{walletDB: walletDb},
-		}, func() {
-			require.NoError(t, appDb.Close())
-			require.NoError(t, walletDb.Close())
-		}
+	m := &Manager{
+		walletDB:             walletDb,
+		ethClientGetter:      nil,
+		ContractMaker:        nil,
+		networkManager:       nil,
+		communityTokensDB:    nil,
+		communityManager:     nil,
+		tokenBalancesStorage: balanceStorage{walletDB: walletDb},
+	}
+	facade, err := newTKLReadManager(m, append(walletcommon.AllChainIDsAsUint64(), 777), time.Time{})
+	require.NoError(t, err)
+	m.tokensManager = facade
+	return m, func() {
+		require.NoError(t, facade.Stop())
+		require.NoError(t, appDb.Close())
+		require.NoError(t, walletDb.Close())
+	}
 }
 
 func setupTestTokenManager(t *testing.T) (*Manager, *pubsub.Publisher, func()) {
@@ -99,15 +104,8 @@ func setupTestTokenManager(t *testing.T) (*Manager, *pubsub.Publisher, func()) {
 		accountsDB, 1*time.Hour, 1*time.Hour)
 	require.NoError(t, err)
 
-	lastTokensUpdate := time.Time{}
-
-	activeChains, err := getEnabledChains(nm)
-	require.NoError(t, err)
-	tokensManager, err := setUpTokenListsManager(manager, walletDB, activeChains, lastTokensUpdate, 1*time.Hour, 1*time.Hour)
-	require.NoError(t, err)
-	manager.tokensManager = tokensManager
-
 	return manager, accountsPublisher, func() {
+		manager.Stop()
 		mockCtrl.Finish()
 		require.NoError(t, appDB.Close())
 		require.NoError(t, walletDB.Close())
@@ -226,6 +224,9 @@ func TestCommunityTokensPrivilegesAndSoulbound(t *testing.T) {
 		walletDB:          walletDb,
 		communityTokensDB: communitytokensdatabase.NewCommunityTokensDatabase(appDb),
 	}
+	manager.tokensManager, err = newTKLReadManager(manager, []uint64{777}, time.Time{})
+	require.NoError(t, err)
+	defer func() { require.NoError(t, manager.tokensManager.Stop()) }()
 
 	addMintedToken := func(address string, tokenType protobuf.CommunityTokenType, transferable bool, level communitytoken.PrivilegesLevel) {
 		_, err := appDb.Exec(`INSERT INTO community_tokens (community_id, address, type, name, symbol, description, supply_str,
@@ -353,6 +354,10 @@ func TestMarkAsPreviouslyOwnedToken(t *testing.T) {
 }
 
 func Test_removeTokenBalanceOnEventAccountRemoved(t *testing.T) {
+	testRemoveTokenBalanceOnEventAccountRemoved(t)
+}
+
+func testRemoveTokenBalanceOnEventAccountRemoved(t *testing.T) {
 	manager, accountsPublisher, stop := setupTestTokenManager(t)
 	defer stop()
 
@@ -411,6 +416,10 @@ func Test_removeTokenBalanceOnEventAccountRemoved(t *testing.T) {
 }
 
 func Test_tokensListsValidity(t *testing.T) {
+	testTokenListsValidity(t)
+}
+
+func testTokenListsValidity(t *testing.T) {
 	manager, _, stop := setupTestTokenManager(t)
 	defer stop()
 
@@ -456,6 +465,10 @@ func Test_tokensListsValidity(t *testing.T) {
 }
 
 func TestGetTokensOfInterestForActiveNetworksMode_AddsCrossChainAndMandatoryTokens(t *testing.T) {
+	testTokensOfInterest(t)
+}
+
+func testTokensOfInterest(t *testing.T) {
 	manager, _, stop := setupTestTokenManager(t)
 	defer stop()
 
