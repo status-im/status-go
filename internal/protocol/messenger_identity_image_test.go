@@ -474,3 +474,36 @@ var profilePicViewSettingsMap = map[settings.ProfilePicturesVisibilityType]strin
 	settings.ProfilePicturesVisibilityEveryone:     "ViewFromEveryone",
 	settings.ProfilePicturesVisibilityNone:         "ViewFromNone",
 }
+
+// Readers such as the community roster use the contact's image map without
+// locks, so a received identity must replace the map rather than write to it.
+func (s *MessengerProfilePictureHandlerSuite) TestChatIdentityReplacesContactImages() {
+	payloads := make(map[string][]byte)
+	for _, ii := range fake.IdentityImages() {
+		payloads[ii.Name] = ii.Payload
+	}
+	contact, err := contacts.BuildContactFromPublicKey(s.bob.IdentityPublicKey())
+	s.Require().NoError(err)
+	contact.Images = map[string]images.IdentityImage{
+		images.SmallDimName: {Name: images.SmallDimName, Payload: payloads[images.SmallDimName], Clock: 1},
+	}
+	s.alice.allContacts.Store(contact.ID, contact)
+	previous := contact.Images
+
+	state := s.alice.buildMessageState()
+	state.CurrentMessageState = &CurrentMessageState{
+		Contact:   contact,
+		PublicKey: s.bob.IdentityPublicKey(),
+	}
+	ci := &protobuf.ChatIdentity{
+		Clock: uint64(time.Now().Unix()),
+		Images: map[string]*protobuf.IdentityImage{
+			images.LargeDimName: {Payload: payloads[images.LargeDimName]},
+		},
+	}
+	s.Require().NoError(s.alice.HandleChatIdentity(context.Background(), state, ci, nil))
+
+	s.Require().Contains(contact.Images, images.LargeDimName)
+	s.Require().Len(previous, 1)
+	s.Require().NotContains(previous, images.LargeDimName)
+}

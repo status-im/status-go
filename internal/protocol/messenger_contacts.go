@@ -13,6 +13,7 @@ import (
 	"github.com/status-im/status-go/internal/crypto"
 	"github.com/status-im/status-go/internal/crypto/types"
 	multiaccountscommon "github.com/status-im/status-go/internal/db/multiaccounts/common"
+	"github.com/status-im/status-go/internal/images"
 	"github.com/status-im/status-go/internal/logutils"
 	"github.com/status-im/status-go/internal/protocol/common"
 	"github.com/status-im/status-go/internal/protocol/contacts"
@@ -752,7 +753,8 @@ func (m *Messenger) RemoveContact(ctx context.Context, pubKey string) (*Messenge
 }
 
 func (m *Messenger) updateContactImagesURL(contact *contacts.Contact) error {
-	if m.httpServer != nil {
+	if m.httpServer != nil && len(contact.Images) > 0 {
+		updated := make(map[string]images.IdentityImage, len(contact.Images))
 		for k, v := range contact.Images {
 			publicKey, err := contact.PublicKey()
 			if err != nil {
@@ -760,8 +762,9 @@ func (m *Messenger) updateContactImagesURL(contact *contacts.Contact) error {
 			}
 			v.LocalURL = m.httpServer.MakeContactImageURL(crypto.PubkeyToHex(publicKey), k, v.Clock)
 			v.Payload = nil
-			contact.Images[k] = v
+			updated[k] = v
 		}
+		contact.Images = updated
 	}
 	return nil
 }
