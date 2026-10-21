@@ -131,16 +131,18 @@ func (s *Service) refreshToken(ctx context.Context) (string, error) {
 		return "", fmt.Errorf("failed to submit solution: %w", err)
 	}
 
+	issuedAt := time.Now()
 	expiresAt, err := time.Parse(time.RFC3339, tokenResp.ExpiresAt)
 	if err != nil {
 		logutils.ZapLogger().Warn("Failed to parse token expiry, using 1 hour default",
 			zap.Error(err))
-		expiresAt = time.Now().Add(1 * time.Hour)
+		expiresAt = issuedAt.Add(1 * time.Hour)
 	}
 
 	s.mu.Lock()
 	s.tokenCache = &TokenData{
 		Token:     tokenResp.Token,
+		IssuedAt:  issuedAt,
 		ExpiresAt: expiresAt,
 	}
 	s.mu.Unlock()

@@ -133,7 +133,21 @@ func fakeMulticallResponse(data []byte) ([]byte, error) {
 	return nil, fmt.Errorf("unexpected method %s", method.Name)
 }
 
+// serveFakeMulticallRPC answers the puzzle-auth endpoints like the proxy does and
+// eth_call for the multicall contract.
 func serveFakeMulticallRPC(w http.ResponseWriter, r *http.Request) {
+	switch r.URL.Path {
+	case "/auth/puzzle":
+		_ = json.NewEncoder(w).Encode(puzzleauth.Puzzle{
+			Challenge:    "fake",
+			Salt:         "00",
+			Argon2Params: puzzleauth.Argon2Params{MemoryKB: 8, Time: 1, Threads: 1, KeyLen: 32},
+		})
+		return
+	case "/auth/solve":
+		_ = json.NewEncoder(w).Encode(puzzleauth.TokenResponse{Token: "fake", ExpiresAt: time.Now().Add(time.Hour).Format(time.RFC3339)})
+		return
+	}
 	var req struct {
 		ID     json.RawMessage   `json:"id"`
 		Method string            `json:"method"`
