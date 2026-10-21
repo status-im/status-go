@@ -1585,6 +1585,17 @@ func (db sqlitePersistence) LatestContactRequests() ([]LatestContactRequest, err
 // Ordering is accomplished using two concatenated values: ClockValue and ID.
 // These two values are also used to compose a cursor which is returned to the result.
 func (db sqlitePersistence) AllMessageByChatIDWhichMatchTerm(chatID string, searchTerm string, caseSensitive bool) ([]*common.Message, error) {
+	return db.messagesByChatIDWhichMatchTerm(chatID, "", searchTerm, caseSensitive)
+}
+
+func (db sqlitePersistence) AllMessagesFromThreadWhichMatchTerm(chatID, threadID, searchTerm string, caseSensitive bool) ([]*common.Message, error) {
+	if chatID == "" || threadID == "" {
+		return nil, fmt.Errorf("chat and thread IDs are required")
+	}
+	return db.messagesByChatIDWhichMatchTerm(chatID, threadID, searchTerm, caseSensitive)
+}
+
+func (db sqlitePersistence) messagesByChatIDWhichMatchTerm(chatID, threadID, searchTerm string, caseSensitive bool) ([]*common.Message, error) {
 	if searchTerm == "" {
 		return nil, fmt.Errorf("empty search term")
 	}
@@ -1596,19 +1607,27 @@ func (db sqlitePersistence) AllMessageByChatIDWhichMatchTerm(chatID string, sear
 		searchCond = "AND " + caseInsensitiveSearchCond
 	}
 
+	locationCond := "m1.local_chat_id = ?"
+	args := []interface{}{chatID}
+	if threadID != "" {
+		// Use the chat/thread index for replies and include the root shown in the thread.
+		// An OR on the outer query would scan the entire parent chat.
+		locationCond = `m1.id IN (
+			SELECT id FROM user_messages WHERE local_chat_id = ? AND thread_id = ?
+			UNION SELECT root.id FROM threads t
+			JOIN user_messages root ON root.id = t.parent_message_id
+			WHERE t.chat_id = ? AND t.thread_id = ? AND root.local_chat_id = t.chat_id
+		)`
+		args = []interface{}{chatID, threadID, chatID, threadID}
+	}
+	args = append(args, searchTerm, searchTerm, searchTerm)
+
 	where := fmt.Sprintf(`
             WHERE
-                NOT(m1.hide) AND m1.local_chat_id = ? %s
-            ORDER BY cursor DESC`, searchCond)
-
+                NOT(m1.hide) AND %s %s
+            ORDER BY cursor DESC`, locationCond, searchCond)
 	query := db.buildMessagesQueryWithAdditionalFields(cursorField, where)
-	rows, err := db.db.Query(
-		query,
-		chatID,
-		searchTerm,
-		searchTerm,
-		searchTerm,
-	)
+	rows, err := db.db.Query(query, args...)
 
 	if err != nil {
 		return nil, err
