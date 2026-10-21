@@ -134,8 +134,10 @@ type Controller struct {
 	detectedMu sync.Mutex
 	detected   map[BalancesKey]map[common.Address]struct{}
 
-	chainFetchMu      sync.Mutex
-	chainFetchCancels map[uint64]context.CancelFunc
+	// chainFetches are the fetches in flight by chain. A chain reads one fetch
+	// at a time; reads for it wait for the fetch in flight to end.
+	chainFetchMu sync.Mutex
+	chainFetches map[uint64]*chainFetchState
 
 	logger *zap.Logger
 }
@@ -169,7 +171,7 @@ func NewController(
 		lastBlockManager:        lastBlockManager,
 		publisher:               pubsub.NewPublisher(),
 		policy:                  refresh.NewPolicy(policyConfig(config)),
-		chainFetchCancels:       make(map[uint64]context.CancelFunc),
+		chainFetches:            make(map[uint64]*chainFetchState),
 		detected:                make(map[BalancesKey]map[common.Address]struct{}),
 		walletFeed:              walletFeed,
 		logger:                  logger,
@@ -294,23 +296,50 @@ func (c *Controller) setTimer(wakeAt time.Time) {
 	c.timer.Reset(time.Until(wakeAt))
 }
 
-func (c *Controller) startChainFetch(chainID uint64) (context.Context, context.CancelFunc) {
+type chainFetchState struct {
+	cancel context.CancelFunc
+	// waiting are the reads asked for while the fetch was in flight.
+	waiting []refresh.Read
+}
+
+// startChainFetch starts a fetch of chainID, or keeps reads for later when a
+// fetch of chainID is in flight.
+func (c *Controller) startChainFetch(chainID uint64, reads []refresh.Read) (context.Context, *chainFetchState, bool) {
 	c.chainFetchMu.Lock()
 	defer c.chainFetchMu.Unlock()
-	if cancel, ok := c.chainFetchCancels[chainID]; ok {
-		cancel()
+	if state, ok := c.chainFetches[chainID]; ok {
+		state.waiting = append(state.waiting, reads...)
+		return nil, nil, false
 	}
 	ctx, cancel := context.WithCancel(traffic.WithSource(context.Background(), traffic.Balances))
-	c.chainFetchCancels[chainID] = cancel
-	return ctx, cancel
+	state := &chainFetchState{cancel: cancel}
+	c.chainFetches[chainID] = state
+	return ctx, state, true
+}
+
+// endChainFetch makes the reads that waited for the fetch of chainID.
+func (c *Controller) endChainFetch(chainID uint64, state *chainFetchState) {
+	c.chainFetchMu.Lock()
+	state.cancel()
+	if c.chainFetches[chainID] != state {
+		c.chainFetchMu.Unlock()
+		return
+	}
+	delete(c.chainFetches, chainID)
+	waiting := state.waiting
+	c.chainFetchMu.Unlock()
+
+	if len(waiting) > 0 {
+		c.readOn(waiting, &chainID)
+	}
 }
 
 func (c *Controller) cancelAllChainFetches() {
 	c.chainFetchMu.Lock()
 	defer c.chainFetchMu.Unlock()
-	for chainID, cancel := range c.chainFetchCancels {
-		cancel()
-		delete(c.chainFetchCancels, chainID)
+	for chainID, state := range c.chainFetches {
+		state.cancel()
+		delete(c.chainFetches, chainID)
 	}
 }
 
@@ -508,9 +537,14 @@ func (c *Controller) getAllNetworks() ([]uint64, error) {
 	return chains, nil
 }
 
-// read makes the reads of one decision with one fetch per chain, so that they
-// do not cancel each other.
+// read makes the reads of one decision with one fetch per chain.
 func (c *Controller) read(reads []refresh.Read) {
+	c.readOn(reads, nil)
+}
+
+// readOn makes reads, only on chain when it is set. What a read covers is
+// worked out now, from what storage holds.
+func (c *Controller) readOn(reads []refresh.Read, chain *uint64) {
 	if len(reads) == 0 {
 		return
 	}
@@ -534,10 +568,17 @@ func (c *Controller) read(reads []refresh.Read) {
 	for _, r := range reads {
 		c.addRead(plan, r, accounts, networks)
 	}
-	c.executeChainFetches(c.buildChainFetches(plan))
+	if chain != nil {
+		for key := range plan.pairs {
+			if key.ChainID != *chain {
+				delete(plan.pairs, key)
+			}
+		}
+	}
+	c.executeChainFetches(c.buildChainFetches(plan), reads)
 }
 
-func (c *Controller) executeChainFetches(fetches map[uint64]*chainFetch) {
+func (c *Controller) executeChainFetches(fetches map[uint64]*chainFetch, reads []refresh.Read) {
 	for chainID, fetch := range fetches {
 		chainFetchConfig := fetch.config
 		for _, address := range chainFetchConfig.Native {
@@ -572,11 +613,15 @@ func (c *Controller) executeChainFetches(fetches map[uint64]*chainFetch) {
 			)
 		}
 
-		ctx, cancel := c.startChainFetch(chainID)
+		ctx, state, started := c.startChainFetch(chainID, reads)
+		if !started {
+			c.logger.Debug("balance read waits for the fetch in flight", zap.Uint64("chainID", chainID))
+			continue
+		}
 
 		resultsCh, err := c.fetcher.FetchBalances(ctx, chainID, chainFetchConfig)
 		if err != nil {
-			cancel()
+			c.endChainFetch(chainID, state)
 			c.logger.Error("failed to fetch balances", zap.Uint64("chainID", chainID), zap.Error(err))
 			c.sendEventBalanceFetchFailedToStart(chainID, chainFetchConfig, err)
 			c.fullRefreshFailed(chainID, fetch)
@@ -586,9 +631,9 @@ func (c *Controller) executeChainFetches(fetches map[uint64]*chainFetch) {
 		c.logger.Debug("fetch started", zap.Uint64("chainID", chainID))
 		c.sendEventBalanceFetchStarted(chainID, chainFetchConfig)
 
-		go func(fetchChainID uint64, ctx context.Context, cancel context.CancelFunc) {
+		go func(fetchChainID uint64, ctx context.Context, state *chainFetchState) {
 			defer panics.LogOnPanic()
-			defer cancel()
+			defer c.endChainFetch(fetchChainID, state)
 			failed := false
 			for {
 				select {
@@ -607,7 +652,7 @@ func (c *Controller) executeChainFetches(fetches map[uint64]*chainFetch) {
 					}
 				}
 			}
-		}(chainID, ctx, cancel)
+		}(chainID, ctx, state)
 	}
 }
 

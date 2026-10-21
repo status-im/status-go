@@ -139,6 +139,9 @@ type refreshHarness struct {
 	erring  map[uint64]bool
 	block   int64
 	reads   []read
+	// holds keep the results of the fetches of a chain until closed.
+	holds    map[uint64]chan struct{}
+	contexts map[uint64][]context.Context
 }
 
 func newRefreshHarness(t *testing.T) *refreshHarness {
@@ -166,6 +169,8 @@ func newRefreshHarness(t *testing.T) *refreshHarness {
 		balances:   make(map[balanceOf]*big.Int),
 		failing:    make(map[uint64]bool),
 		erring:     make(map[uint64]bool),
+		holds:      make(map[uint64]chan struct{}),
+		contexts:   make(map[uint64][]context.Context),
 	}
 
 	accountsProvider.EXPECT().GetWalletAddresses().DoAndReturn(func() ([]types.Address, error) {
@@ -205,9 +210,10 @@ func newRefreshHarness(t *testing.T) *refreshHarness {
 	return h
 }
 
-func (h *refreshHarness) fetch(_ context.Context, chain uint64, config multistandardfetcher.FetchConfig) (<-chan multistandardfetcher.FetchResult, error) {
+func (h *refreshHarness) fetch(ctx context.Context, chain uint64, config multistandardfetcher.FetchConfig) (<-chan multistandardfetcher.FetchResult, error) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
+	h.contexts[chain] = append(h.contexts[chain], ctx)
 	if h.failing[chain] {
 		return nil, errors.New("fetch failed to start")
 	}
@@ -240,7 +246,39 @@ func (h *refreshHarness) fetch(_ context.Context, chain uint64, config multistan
 	if len(balances) > 0 {
 		h.reads = append(h.reads, read{at: time.Since(h.start), chain: chain, balances: balances})
 	}
+	if hold, ok := h.holds[chain]; ok {
+		held := make(chan multistandardfetcher.FetchResult)
+		go func() {
+			defer close(held)
+			select {
+			case <-hold:
+			case <-ctx.Done():
+				return
+			}
+			for result := range results {
+				held <- result
+			}
+		}()
+		return held, nil
+	}
 	return results, nil
+}
+
+// hold keeps the results of the fetches of chain until the returned channel
+// is closed.
+func (h *refreshHarness) hold(chain uint64) chan struct{} {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	release := make(chan struct{})
+	h.holds[chain] = release
+	return release
+}
+
+// fetchContexts are the contexts the fetches of chain were made with.
+func (h *refreshHarness) fetchContexts(chain uint64) []context.Context {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return slices.Clone(h.contexts[chain])
 }
 
 func (h *refreshHarness) balance(account common.Address, chain uint64, token common.Address) *big.Int {
@@ -522,6 +560,30 @@ func TestRefresh_TokensNewToTheListsAreReadAfterDebounce(t *testing.T) {
 			}})
 		}
 		requireReads(t, reads, h.takeReads())
+	})
+}
+
+func TestRefresh_ReadOfAChainWaitsForTheFetchInFlightOfThatChain(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		h := newRefreshHarness(t)
+		release := h.hold(1)
+		h.controller.Start()
+		defer h.controller.Stop()
+		h.takeReads()
+
+		// The lists change while the full refresh of chain 1 is in flight.
+		h.addToken(weth)
+		time.Sleep(15 * time.Second)
+		for _, r := range h.takeReads() {
+			require.NotEqual(t, uint64(1), r.chain, "chain 1 is read while its full refresh is in flight")
+		}
+		require.NoError(t, h.fetchContexts(1)[0].Err(), "the full refresh in flight is not canceled")
+
+		// What waited is worked out once the full refresh is stored.
+		close(release)
+		requireReads(t, []read{{at: 15 * time.Second, chain: 1, balances: map[string][]common.Address{
+			alice.Hex(): {weth}, bob.Hex(): {weth}, carol.Hex(): {weth},
+		}}}, h.takeReads())
 	})
 }
 
