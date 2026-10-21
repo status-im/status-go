@@ -371,7 +371,12 @@ func NewService(
 		routeExecutionManager:          routeExecutionManager,
 		leaderboardService:             leaderboardService,
 		activityFetcherService:         activityFetcherService,
-		started:                        false,
+		transferHistory: &transferHistory{
+			fetcher:      activityFetcherService,
+			storage:      alchemyFetcherDb,
+			fetchTimeout: transfersFetchTimeout,
+		},
+		started: false,
 	}, nil
 }
 
@@ -514,6 +519,7 @@ type Service struct {
 	routeExecutionManager          *routeexecution.Manager
 	leaderboardService             *leaderboard.MarketDataService
 	activityFetcherService         *activityfetcher.Service
+	transferHistory                *transferHistory
 	started                        bool
 	paused                         bool
 	mu                             sync.Mutex

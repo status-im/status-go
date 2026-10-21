@@ -858,6 +858,36 @@ func (api *API) GetFollowingStats(ctx context.Context, userAddress common.Addres
 	return api.s.followingManager.FetchFollowingStats(ctx, userAddress)
 }
 
+// GetTransfers returns the mined transfers of the addresses on the chains, newest first, one entry per token
+// moved. It reads the history the activity fetcher stores for the app. Before reading, it fetches new transfers
+// for each (address, chain), or waits for the fetch already running, for up to 30s; coverage reports the pairs
+// that did not finish as complete=false.
+//
+// Categories are external and erc20, plus erc721, erc1155 and specialnft with includeCollectibles. Internal
+// transfers are not included, nor are gas fees. A transfer between two requested addresses gives one entry for
+// each; a transfer to self gives one "self" entry with an unsigned amount.
+//
+// History is limited: the first fetch of an address on a chain keeps about the newest 1000 transfers in each
+// direction, and older ones are not fetched later.
+//
+// limit defaults to 100 (at most 1000), offset to 0. It fails with "no history provider for chain X" when the
+// chain has no enabled Alchemy provider.
+func (api *API) GetTransfers(ctx context.Context, addresses []common.Address, chainIDs []uint64, includeCollectibles *bool, limit *int, offset *int) (*TransfersResponse, error) {
+	logutils.ZapLogger().Debug("call to GetTransfers",
+		zap.Int("addresses", len(addresses)),
+		zap.Uint64s("chainIDs", chainIDs))
+
+	l := transfersDefaultLimit
+	if limit != nil {
+		l = *limit
+	}
+	o := 0
+	if offset != nil {
+		o = *offset
+	}
+	return api.s.transferHistory.getTransfers(ctx, addresses, chainIDs, includeCollectibles != nil && *includeCollectibles, l, o)
+}
+
 func (api *API) RefetchTxHistory() error {
 	logutils.ZapLogger().Debug("call to RefetchTxHistory")
 	return api.s.activityFetcherService.RefetchTxHistory()

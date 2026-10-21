@@ -3,6 +3,7 @@ package activityfetcher
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"sync"
 	"time"
 
@@ -39,6 +40,19 @@ type fetcherID struct {
 	chainID uint64
 }
 
+// FetchKey names the history of one account on one chain.
+type FetchKey struct {
+	Address gethcommon.Address
+	ChainID uint64
+}
+
+// fetchRun is one fetch of one fetcherID. done is closed when it ends, err is set before that.
+type fetchRun struct {
+	cancel context.CancelFunc
+	done   chan struct{}
+	err    error
+}
+
 type Service struct {
 	activityFetcherManager ManagerIface
 	networksGetter         networks.GetterInterface
@@ -51,8 +65,9 @@ type Service struct {
 	eventFeed                     *event.Feed
 	checkRefetchCh                chan bool
 
-	cancelFnMap      map[fetcherID]context.CancelFunc
+	cancelFnMap      map[fetcherID]*fetchRun
 	cancelFnMapMutex sync.RWMutex
+	ctx              context.Context
 
 	logger          *zap.Logger
 	stopCh          chan struct{}
@@ -82,7 +97,7 @@ func NewService(
 		multistandardBalancePublisher: multistandardBalancePublisher,
 		eventFeed:                     eventFeed,
 		checkRefetchCh:                make(chan bool),
-		cancelFnMap:                   make(map[fetcherID]context.CancelFunc),
+		cancelFnMap:                   make(map[fetcherID]*fetchRun),
 		targetedFetchCh:               make(chan []fetcherID),
 		logger:                        logger,
 		ch:                            make(chan walletevent.Event, 100),
@@ -240,6 +255,9 @@ func (s *Service) startBalanceChangeWatcher() {
 func (s *Service) Start(ctx context.Context) {
 	s.logger.Info("Starting activity fetcher")
 	s.stopCh = make(chan struct{})
+	s.cancelFnMapMutex.Lock()
+	s.ctx = ctx
+	s.cancelFnMapMutex.Unlock()
 
 	s.startNetworkWatcher()
 	s.startAccountWatcher()
@@ -400,8 +418,8 @@ func (s *Service) cancelFetcherIDs(fetcherIDs []fetcherID) {
 	defer s.cancelFnMapMutex.Unlock()
 
 	for _, fetcherID := range fetcherIDs {
-		if cancelFn, ok := s.cancelFnMap[fetcherID]; ok {
-			cancelFn()
+		if run, ok := s.cancelFnMap[fetcherID]; ok {
+			run.cancel()
 			delete(s.cancelFnMap, fetcherID)
 		}
 	}
@@ -502,33 +520,35 @@ func (s *Service) fetchActivityForAllAccountsAndChains(ctx context.Context, chec
 	}
 }
 
-// Upserts the cancel function for a given account and chainID
+// Upserts the run for a given account and chainID
 // If the task is running, it will be cancelled before creating a new one
-func (s *Service) upsertCancelFn(ctx context.Context, fetcherID fetcherID) context.Context {
-	// If the task is running, cancel it before creating a new one
-	s.runAndRemoveCancelFn(fetcherID)
-
+func (s *Service) upsertCancelFn(ctx context.Context, fetcherID fetcherID) (context.Context, *fetchRun) {
 	s.cancelFnMapMutex.Lock()
 	defer s.cancelFnMapMutex.Unlock()
 
-	tmpCtx, cancelFn := context.WithCancel(ctx)
-	s.cancelFnMap[fetcherID] = cancelFn
-	return tmpCtx
+	// If the task is running, cancel it before creating a new one
+	if run, ok := s.cancelFnMap[fetcherID]; ok {
+		run.cancel()
+	}
+	return s.newRunLocked(ctx, fetcherID)
 }
 
-// Removes the cancel function for a given account and chainID, running it if it exists
-// Also ensures proper initialization of the map
-func (s *Service) runAndRemoveCancelFn(fetcherID fetcherID) {
+func (s *Service) newRunLocked(ctx context.Context, fetcherID fetcherID) (context.Context, *fetchRun) {
+	tmpCtx, cancelFn := context.WithCancel(ctx)
+	run := &fetchRun{cancel: cancelFn, done: make(chan struct{})}
+	s.cancelFnMap[fetcherID] = run
+	return tmpCtx, run
+}
+
+// Cancels the run and removes it for a given account and chainID, unless a newer run replaced it
+func (s *Service) runAndRemoveCancelFn(fetcherID fetcherID, run *fetchRun) {
 	s.cancelFnMapMutex.Lock()
 	defer s.cancelFnMapMutex.Unlock()
 
-	var cancelFn context.CancelFunc
-	var ok bool
-	if cancelFn, ok = s.cancelFnMap[fetcherID]; !ok {
+	run.cancel()
+	if current, ok := s.cancelFnMap[fetcherID]; !ok || current != run {
 		return
 	}
-
-	cancelFn()
 	delete(s.cancelFnMap, fetcherID)
 
 	// Check if all fetchers have completed
@@ -554,46 +574,127 @@ func (s *Service) removeAllCancelFns() {
 	s.cancelFnMapMutex.Lock()
 	defer s.cancelFnMapMutex.Unlock()
 
-	for fetcherID := range s.cancelFnMap {
-		s.cancelFnMap[fetcherID]()
+	for fetcherID, run := range s.cancelFnMap {
+		run.cancel()
 		delete(s.cancelFnMap, fetcherID)
 	}
 }
 
 // Starts or restarts fetching activity for a given account and chainID
 func (s *Service) startFetchActivity(ctx context.Context, fetcherID fetcherID) {
-	tmpCtx := s.upsertCancelFn(ctx, fetcherID)
+	tmpCtx, run := s.upsertCancelFn(ctx, fetcherID)
+	s.runFetch(tmpCtx, fetcherID, run)
+}
 
+func (s *Service) runFetch(ctx context.Context, fetcherID fetcherID, run *fetchRun) {
 	go func() {
 		defer panics.LogOnPanic()
-		defer s.runAndRemoveCancelFn(fetcherID)
-		s.fetchActivity(tmpCtx, fetcherID.chainID, fetcherID.account)
+		defer s.runAndRemoveCancelFn(fetcherID, run)
+		defer close(run.done)
+		run.err = s.fetchActivity(ctx, fetcherID.chainID, fetcherID.account)
 	}()
 }
 
-func (s *Service) fetchActivity(ctx context.Context, chainID uint64, account gethcommon.Address) {
+// runningOrNewFetch returns the running fetch of fetcherID, or starts one.
+func (s *Service) runningOrNewFetch(fetcherID fetcherID) (*fetchRun, error) {
+	s.cancelFnMapMutex.Lock()
+	if run, ok := s.cancelFnMap[fetcherID]; ok {
+		s.cancelFnMapMutex.Unlock()
+		return run, nil
+	}
+	if s.ctx == nil {
+		s.cancelFnMapMutex.Unlock()
+		return nil, errors.New("activity fetcher is not started")
+	}
+	tmpCtx, run := s.newRunLocked(s.ctx, fetcherID)
+	s.cancelFnMapMutex.Unlock()
+
+	s.runFetch(tmpCtx, fetcherID, run)
+	return run, nil
+}
+
+func (s *Service) currentRun(fetcherID fetcherID) *fetchRun {
+	s.cancelFnMapMutex.RLock()
+	defer s.cancelFnMapMutex.RUnlock()
+	return s.cancelFnMap[fetcherID]
+}
+
+// IsChainSupported reports whether a history provider is available for the chain.
+func (s *Service) IsChainSupported(chainID uint64) bool {
+	return s.activityFetcherManager.IsChainSupported(chainID)
+}
+
+// FetchAndWait fetches new transfers for each key, or waits for the fetch already running, until ctx ends.
+// It reports which keys finished a fetch without an error.
+func (s *Service) FetchAndWait(ctx context.Context, keys []FetchKey) map[FetchKey]bool {
+	complete := make(map[FetchKey]bool, len(keys))
+	var mutex sync.Mutex
+	var wg sync.WaitGroup
+	for _, key := range keys {
+		id := fetcherID{account: key.Address, chainID: key.ChainID}
+		run, err := s.runningOrNewFetch(id)
+		if err != nil {
+			s.logger.Error("Failed to start activity fetch", zap.Error(err))
+			complete[key] = false
+			continue
+		}
+		wg.Add(1)
+		go func() {
+			defer panics.LogOnPanic()
+			defer wg.Done()
+			ok := s.waitForFetch(ctx, id, run)
+			mutex.Lock()
+			complete[key] = ok
+			mutex.Unlock()
+		}()
+	}
+	wg.Wait()
+	return complete
+}
+
+// waitForFetch waits for run, and for the runs that replace it, until one succeeds.
+func (s *Service) waitForFetch(ctx context.Context, id fetcherID, run *fetchRun) bool {
+	for {
+		select {
+		case <-ctx.Done():
+			return false
+		case <-run.done:
+		}
+		if run.err == nil {
+			return true
+		}
+		next := s.currentRun(id)
+		if next == nil || next == run {
+			return false
+		}
+		run = next
+	}
+}
+
+func (s *Service) fetchActivity(ctx context.Context, chainID uint64, account gethcommon.Address) error {
 
 	// Get current block
 	ethClient, err := s.ethClientGetter.EthClient(chainID)
 	if err != nil {
 		s.logger.Error("Failed to get rpc client", zap.Error(err))
-		return
+		return err
 	}
 	currentBlock, err := ethClient.BlockNumber(ctx)
 	if err != nil {
 		s.logger.Error("Failed to get current block", zap.Error(err))
-		return
+		return err
 	}
 
 	container, err := s.activityFetcherManager.FetchActivity(ctx, chainID, account, currentBlock)
 	if err != nil {
 		s.logger.Error("Failed to fetch activity", zap.Error(err))
-		return
+		return err
 	}
 	if len(container.Items) > 0 {
 		// at least one new transfer for detected, so trigger a balance refresh
 		s.emitNewTransfersDetected(chainID, account, len(container.Items))
 	}
+	return nil
 }
 
 func (s *Service) emitNewTransfersDetected(chainID uint64, account gethcommon.Address, count int) {
