@@ -66,8 +66,8 @@ type MediaServerConfig struct {
 type Server struct {
 	*httpserver.Server
 
-	// providersMu guards db, walletDB and downloader, which are swapped at
-	// teardown while handlers are still running.
+	// providersMu guards db, walletDB, downloader and the community readers,
+	// which are set or swapped while handlers are already running.
 	providersMu                 sync.RWMutex
 	db                          *sql.DB
 	downloader                  *ipfs.Downloader
@@ -247,36 +247,57 @@ func (s *Server) Start() error {
 }
 
 func (s *Server) SetCommunityImageVersionReader(getFunc func(communityID string) uint32) {
+	s.providersMu.Lock()
+	defer s.providersMu.Unlock()
+
 	s.communityImageVersionReader = getFunc
 }
 
 func (s *Server) getCommunityImageVersion(communityID string) uint32 {
-	if s.communityImageVersionReader == nil {
+	s.providersMu.RLock()
+	reader := s.communityImageVersionReader
+	s.providersMu.RUnlock()
+
+	if reader == nil {
 		return 0
 	}
-	return s.communityImageVersionReader(communityID)
+	return reader(communityID)
 }
 
 func (s *Server) SetCommunityImageReader(getFunc func(communityID string) (map[string]*protobuf.IdentityImage, error)) {
+	s.providersMu.Lock()
+	defer s.providersMu.Unlock()
+
 	s.communityImagesReader = getFunc
 }
 
 func (s *Server) getCommunityImage(communityID string) (map[string]*protobuf.IdentityImage, error) {
-	if s.communityImagesReader == nil {
+	s.providersMu.RLock()
+	reader := s.communityImagesReader
+	s.providersMu.RUnlock()
+
+	if reader == nil {
 		return nil, errors.New("community image reader not set")
 	}
-	return s.communityImagesReader(communityID)
+	return reader(communityID)
 }
 
 func (s *Server) SetCommunityTokensReader(getFunc func(communityID string) ([]*protobuf.CommunityTokenMetadata, error)) {
+	s.providersMu.Lock()
+	defer s.providersMu.Unlock()
+
 	s.communityTokenReader = getFunc
 }
 
 func (s *Server) getCommunityTokens(communityID string) ([]*protobuf.CommunityTokenMetadata, error) {
-	if s.communityTokenReader == nil {
+	s.providersMu.RLock()
+	reader := s.communityTokenReader
+	s.providersMu.RUnlock()
+
+	if reader == nil {
 		return nil, errors.New("community token reader not set")
 	}
-	return s.communityTokenReader(communityID)
+	return reader(communityID)
 }
 
 func (s *Server) MakeImageServerURL() string {
