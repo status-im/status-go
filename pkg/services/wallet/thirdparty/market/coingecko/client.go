@@ -37,6 +37,8 @@ type Client struct {
 	// isMarketProxy marks a client pointed at the Status market proxy, which
 	// understands convert_currency and normalizes vs_currency to usd.
 	isMarketProxy bool
+
+	coinsList coinsListCache
 }
 
 type Params struct {
@@ -89,13 +91,8 @@ func (c *Client) ID() string {
 	return "coingecko"
 }
 
-// getCoingeckoTokensByTokenKey returns a map of token keys to coingecko tokens
-func (c *Client) getCoingeckoTokensByTokenKey() (map[string]GeckoToken, error) {
-	tokens, err := c.fetchTokens(traffic.WithSource(context.Background(), traffic.MarketTokenList))
-	if err != nil {
-		return nil, err
-	}
-
+// buildCoingeckoTokensByTokenKey returns a map of token keys to coingecko tokens
+func buildCoingeckoTokensByTokenKey(tokens []GeckoToken) map[string]GeckoToken {
 	coingeckoTokensByTokenKey := make(map[string]GeckoToken)
 
 	// for native tokens, platform is empty (zero address), but the id is ethereum, that's why we need to add it manually
@@ -124,7 +121,7 @@ func (c *Client) getCoingeckoTokensByTokenKey() (map[string]GeckoToken, error) {
 		}
 	}
 
-	return coingeckoTokensByTokenKey, nil
+	return coingeckoTokensByTokenKey
 }
 
 // mapTokensToIds maps wallet sdk tokens to coingecko tokens
