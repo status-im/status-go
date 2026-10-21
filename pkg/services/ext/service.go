@@ -383,6 +383,8 @@ func buildMessengerOptions(
 		options = append(options, protocol.WithDatasync())
 	}
 
+	options = append(options, protocol.WithThreads())
+
 	if config.ShhextConfig.AllowForceCommunityMembersReevaluation {
 		options = append(options, protocol.WithCommunityManagerOptions([]communities.ManagerOption{
 			communities.WithAllowForcingCommunityMembersReevaluation(true),
