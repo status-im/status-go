@@ -116,27 +116,28 @@ func TestFetchAndWaitReportsFailure(t *testing.T) {
 	require.False(t, complete[testKey])
 }
 
-func TestFetchAndWaitFollowsRestartedFetch(t *testing.T) {
+func TestRestartKeepsNewFetch(t *testing.T) {
 	manager := &fakeManager{release: make(chan struct{})}
 	s := newTestService(t, manager)
 	id := fetcherID{account: testKey.Address, chainID: testKey.ChainID}
 
 	s.startFetchActivity(s.ctx, id)
 	require.Eventually(t, func() bool { return manager.calls.Load() == 1 }, time.Second, time.Millisecond)
+	s.cancelFnMapMutex.RLock()
+	first := s.cancelFnMap[id]
+	s.cancelFnMapMutex.RUnlock()
 
-	result := make(chan bool)
-	go func() {
-		result <- s.FetchAndWait(context.Background(), []FetchKey{testKey})[testKey]
-	}()
-	time.Sleep(10 * time.Millisecond)
-
-	// A restart cancels the first fetch; the waiter follows the new one.
+	// The cancelled first fetch must not remove or cancel the second one.
 	s.startFetchActivity(s.ctx, id)
+	s.cancelFnMapMutex.RLock()
+	second := s.cancelFnMap[id]
+	s.cancelFnMapMutex.RUnlock()
+	<-first.done
 	require.Eventually(t, func() bool { return manager.calls.Load() == 2 }, time.Second, time.Millisecond)
-	require.NotNil(t, s.currentRun(id))
-	close(manager.release)
 
-	require.True(t, <-result)
+	close(manager.release)
+	<-second.done
+	require.NoError(t, second.err)
 }
 
 func TestFetchAndWaitNotStarted(t *testing.T) {

@@ -89,7 +89,7 @@ func TestSaveTransfers(t *testing.T) {
 		name      string
 		chainIDs  []uint64
 		addresses []common.Address
-		limit     uint64
+		limit     int
 		expected  int // expected number of activities
 	}{
 		{
@@ -103,15 +103,15 @@ func TestSaveTransfers(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			retrievedTransfers, err := persistence.GetTransfers(tc.chainIDs, tc.addresses, tc.limit)
+			retrievedTransfers, err := persistence.GetHistory(context.Background(), tc.chainIDs, tc.addresses, allCategories, tc.limit, 0)
 			require.NoError(t, err)
 			require.Len(t, retrievedTransfers, tc.expected)
 
 			if tc.expected > 0 {
 				// Verify the content of retrieved activities
-				for _, transfer := range retrievedTransfers {
-					require.NotEmpty(t, transfer.Hash)
-					require.NotNil(t, transfer.BlockNum)
+				for _, entry := range retrievedTransfers {
+					require.NotEmpty(t, entry.Transfer.Hash)
+					require.NotNil(t, entry.Transfer.BlockNum)
 				}
 			}
 		})

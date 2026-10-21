@@ -76,7 +76,7 @@ func TestGetTransfers(t *testing.T) {
 	}
 	h := newTestTransferHistory(t, fetcher)
 
-	response, err := h.getTransfers(context.Background(), []common.Address{transfersOwner, transfersOwner}, []uint64{1, 10}, false, 100, 0)
+	response, err := h.getTransfers(context.Background(), []common.Address{transfersOwner}, []uint64{1, 10}, false, 100, 0)
 	require.NoError(t, err)
 	require.ElementsMatch(t, []activityfetcher.FetchKey{ownerMainnet, ownerOptimism}, fetcher.keys)
 	require.True(t, fetcher.deadline)

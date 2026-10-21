@@ -613,12 +613,6 @@ func (s *Service) runningOrNewFetch(fetcherID fetcherID) (*fetchRun, error) {
 	return run, nil
 }
 
-func (s *Service) currentRun(fetcherID fetcherID) *fetchRun {
-	s.cancelFnMapMutex.RLock()
-	defer s.cancelFnMapMutex.RUnlock()
-	return s.cancelFnMap[fetcherID]
-}
-
 // IsChainSupported reports whether a history provider is available for the chain.
 func (s *Service) IsChainSupported(chainID uint64) bool {
 	return s.activityFetcherManager.IsChainSupported(chainID)
@@ -627,48 +621,26 @@ func (s *Service) IsChainSupported(chainID uint64) bool {
 // FetchAndWait fetches new transfers for each key, or waits for the fetch already running, until ctx ends.
 // It reports which keys finished a fetch without an error.
 func (s *Service) FetchAndWait(ctx context.Context, keys []FetchKey) map[FetchKey]bool {
-	complete := make(map[FetchKey]bool, len(keys))
-	var mutex sync.Mutex
-	var wg sync.WaitGroup
+	runs := make(map[FetchKey]*fetchRun, len(keys))
 	for _, key := range keys {
-		id := fetcherID{account: key.Address, chainID: key.ChainID}
-		run, err := s.runningOrNewFetch(id)
+		run, err := s.runningOrNewFetch(fetcherID{account: key.Address, chainID: key.ChainID})
 		if err != nil {
 			s.logger.Error("Failed to start activity fetch", zap.Error(err))
-			complete[key] = false
 			continue
 		}
-		wg.Add(1)
-		go func() {
-			defer panics.LogOnPanic()
-			defer wg.Done()
-			ok := s.waitForFetch(ctx, id, run)
-			mutex.Lock()
-			complete[key] = ok
-			mutex.Unlock()
-		}()
+		runs[key] = run
 	}
-	wg.Wait()
-	return complete
-}
 
-// waitForFetch waits for run, and for the runs that replace it, until one succeeds.
-func (s *Service) waitForFetch(ctx context.Context, id fetcherID, run *fetchRun) bool {
-	for {
+	complete := make(map[FetchKey]bool, len(keys))
+	for key, run := range runs {
 		select {
 		case <-ctx.Done():
-			return false
+			return complete
 		case <-run.done:
+			complete[key] = run.err == nil
 		}
-		if run.err == nil {
-			return true
-		}
-		next := s.currentRun(id)
-		if next == nil || next == run {
-			return false
-		}
-		run = next
 	}
+	return complete
 }
 
 func (s *Service) fetchActivity(ctx context.Context, chainID uint64, account gethcommon.Address) error {

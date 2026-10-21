@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"strings"
 	"time"
 
@@ -73,55 +72,6 @@ func saveTransfer(creator sqlite.StatementCreator, id string, transfer Transfer,
 
 	_, err = stmt.Exec(args...)
 	return err
-}
-
-func (p *Persistence) GetTransfers(chainIDs []uint64, addresses []common.Address, limit uint64) ([]Transfer, error) {
-	q := sq.Select("e.transfer").
-		From("fetched_alchemy_transfers e").
-		Where(sq.And{
-			sq.Eq{"e.chain_id": chainIDs},
-			sq.Eq{"e.address": addresses}})
-
-	if limit > 0 {
-		q = q.Limit(limit)
-	}
-
-	query, args, err := q.ToSql()
-	if err != nil {
-		return nil, err
-	}
-
-	stmt, err := p.db.Prepare(query)
-	if err != nil {
-		return nil, err
-	}
-	defer stmt.Close()
-
-	rows, err := stmt.Query(args...)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	return rowsToTransfers(rows)
-}
-
-func rowsToTransfers(rows *sql.Rows) ([]Transfer, error) {
-	var transfers []Transfer
-	for rows.Next() {
-		var transfer Transfer
-		var transferJSON = sqlite.ToJSONBlob(&transfer)
-		err := rows.Scan(transferJSON)
-		fmt.Println("Scanned json:", transferJSON)
-		if err != nil {
-			return nil, err
-		}
-		if !transferJSON.Valid {
-			return nil, errors.New("invalid entry")
-		}
-		transfers = append(transfers, transfer)
-	}
-	return transfers, nil
 }
 
 func (p *Persistence) GetLastFetchedBlockAndTimestamp(ctx context.Context, chainID uint64, address common.Address) (*rpc.BlockNumber, *time.Time, error) {

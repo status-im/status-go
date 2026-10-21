@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	gethrpc "github.com/ethereum/go-ethereum/rpc"
 
 	"github.com/status-im/status-go/pkg/services/wallet/activityfetcher"
 	"github.com/status-im/status-go/pkg/services/wallet/thirdparty/activity/alchemy"
@@ -39,20 +38,13 @@ type transferFetcher interface {
 	FetchAndWait(ctx context.Context, keys []activityfetcher.FetchKey) map[activityfetcher.FetchKey]bool
 }
 
-type transferStorage interface {
-	GetHistory(ctx context.Context, chainIDs []uint64, addresses []common.Address, categories []alchemy.TransferCategory, limit, offset int) ([]alchemy.StoredTransfer, error)
-	GetLastFetchedBlockAndTimestamp(ctx context.Context, chainID uint64, address common.Address) (*gethrpc.BlockNumber, *time.Time, error)
-}
-
 type transferHistory struct {
 	fetcher      transferFetcher
-	storage      transferStorage
+	storage      *alchemy.Persistence
 	fetchTimeout time.Duration
 }
 
 func (h *transferHistory) getTransfers(ctx context.Context, addresses []common.Address, chainIDs []uint64, includeCollectibles bool, limit, offset int) (*TransfersResponse, error) {
-	addresses = unique(addresses)
-	chainIDs = unique(chainIDs)
 	if len(addresses) == 0 {
 		return nil, errors.New("no addresses")
 	}
@@ -110,17 +102,4 @@ func (h *transferHistory) getTransfers(ctx context.Context, addresses []common.A
 		response.Coverage = append(response.Coverage, coverage)
 	}
 	return response, nil
-}
-
-func unique[T comparable](values []T) []T {
-	seen := make(map[T]struct{}, len(values))
-	result := make([]T, 0, len(values))
-	for _, v := range values {
-		if _, ok := seen[v]; ok {
-			continue
-		}
-		seen[v] = struct{}{}
-		result = append(result, v)
-	}
-	return result
 }

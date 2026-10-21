@@ -5,12 +5,7 @@ import (
 	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
-
-	"github.com/status-im/status-go/pkg/services/wallet/bigint"
 )
-
-// Larger decimals are treated as unknown.
-const maxDecimals = 255
 
 type HistoryDirection string
 
@@ -46,19 +41,20 @@ type HistoryTransfer struct {
 
 func ToHistoryTransfer(stored StoredTransfer) HistoryTransfer {
 	t := stored.Transfer
-	result := HistoryTransfer{
-		Address:   stored.Address,
-		ChainID:   stored.ChainID,
-		Hash:      t.Hash,
-		UniqueID:  t.UniqueID,
-		From:      t.FromAddress,
-		To:        t.ToAddress,
-		Category:  t.Category,
-		Symbol:    t.Asset,
-		Timestamp: t.Metadata.BlockTimestamp.Unix(),
+	if stored.Erc1155 != nil {
+		t.Erc1155Metadata = []Erc1155Metadata{*stored.Erc1155}
 	}
-	if t.BlockNum != nil && t.BlockNum.Int != nil {
-		result.BlockNumber = t.BlockNum.Uint64()
+	result := HistoryTransfer{
+		Address:     stored.Address,
+		ChainID:     stored.ChainID,
+		BlockNumber: t.BlockNum.Uint64(),
+		Timestamp:   t.Metadata.BlockTimestamp.Unix(),
+		Hash:        t.Hash,
+		UniqueID:    t.UniqueID,
+		From:        t.FromAddress,
+		To:          t.ToAddress,
+		Category:    t.Category,
+		Symbol:      t.Asset,
 	}
 
 	switch {
@@ -70,30 +66,37 @@ func ToHistoryTransfer(stored StoredTransfer) HistoryTransfer {
 		result.Direction = HistoryDirectionIn
 	}
 
-	if t.Category != TransferCategoryExternal && t.RawContract.Address != nil {
-		result.TokenAddress = *t.RawContract.Address
+	amount := big.NewInt(0)
+	if data := extractTransferTokenAndValue(t, stored.ChainID); len(data) > 0 {
+		result.TokenAddress = data[0].Token.Address
+		if data[0].Token.TokenID != nil {
+			tokenID := data[0].Token.TokenID.ToInt().String()
+			result.TokenID = &tokenID
+		}
+		if data[0].Value != nil {
+			amount.Set(data[0].Value.ToInt())
+		}
 	}
 
-	amount := big.NewInt(0)
 	var decimals *uint64
 	switch t.Category {
-	case TransferCategoryErc721, TransferCategorySpecialNft:
+	case TransferCategoryErc721:
 		amount.SetInt64(1)
 		decimals = new(uint64)
-		result.TokenID = decimalString(t.TokenID)
+	case TransferCategorySpecialNft:
+		amount.SetInt64(1)
+		decimals = new(uint64)
+		if t.RawContract.Address != nil {
+			result.TokenAddress = *t.RawContract.Address
+		}
+		if t.TokenID != nil {
+			tokenID := t.TokenID.String()
+			result.TokenID = &tokenID
+		}
 	case TransferCategoryErc1155:
 		decimals = new(uint64)
-		if stored.Erc1155 != nil {
-			if stored.Erc1155.Value != nil && stored.Erc1155.Value.Int != nil {
-				amount.Set(stored.Erc1155.Value.Int)
-			}
-			result.TokenID = decimalString(stored.Erc1155.TokenID)
-		}
 	default:
-		if t.RawContract.Value != nil && t.RawContract.Value.Int != nil {
-			amount.Set(t.RawContract.Value.Int)
-		}
-		if t.RawContract.Decimal != nil && t.RawContract.Decimal.Int != nil && t.RawContract.Decimal.IsUint64() && t.RawContract.Decimal.Uint64() <= maxDecimals {
+		if t.RawContract.Decimal != nil {
 			d := t.RawContract.Decimal.Uint64()
 			decimals = &d
 		}
@@ -111,32 +114,12 @@ func ToHistoryTransfer(stored StoredTransfer) HistoryTransfer {
 	return result
 }
 
-func decimalString(v *bigint.VarHexBigInt) *string {
-	if v == nil || v.Int == nil {
-		return nil
-	}
-	s := v.String()
-	return &s
-}
-
 // formatUnits returns amount / 10^decimals as an exact decimal string without trailing zeros.
 func formatUnits(amount *big.Int, decimals uint64) string {
-	abs := new(big.Int).Abs(amount)
-	digits := abs.String()
-	sign := ""
-	if amount.Sign() < 0 {
-		sign = "-"
+	denominator := new(big.Int).Exp(big.NewInt(10), new(big.Int).SetUint64(decimals), nil)
+	value := new(big.Rat).SetFrac(amount, denominator).FloatString(int(decimals))
+	if strings.Contains(value, ".") {
+		value = strings.TrimRight(strings.TrimRight(value, "0"), ".")
 	}
-	if decimals == 0 {
-		return sign + digits
-	}
-	if uint64(len(digits)) <= decimals {
-		digits = strings.Repeat("0", int(decimals)-len(digits)+1) + digits
-	}
-	split := len(digits) - int(decimals)
-	fraction := strings.TrimRight(digits[split:], "0")
-	if fraction == "" {
-		return sign + digits[:split]
-	}
-	return sign + digits[:split] + "." + fraction
+	return value
 }
