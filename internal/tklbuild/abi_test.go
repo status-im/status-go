@@ -7,7 +7,7 @@ import (
 )
 
 func TestPublicLibraryABI(t *testing.T) {
-	if got := tkl.ABIVersion(); got != 2 {
+	if got := tkl.ABIVersion(); got != 3 {
 		t.Fatalf("unexpected token-library ABI version: %d", got)
 	}
 }

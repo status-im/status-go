@@ -16,7 +16,7 @@ import (
 	"github.com/status-im/status-go/pkg/services/wallet/walletevent"
 )
 
-func putTKLBatch(ctx context.Context, db *sql.DB, writes []tkl.ListContent) error {
+func putTKLBatch(ctx context.Context, db *sql.DB, writes []tklmanager.Write) error {
 	if len(writes) == 0 {
 		return ctx.Err()
 	}
@@ -38,7 +38,7 @@ func putTKLBatch(ctx context.Context, db *sql.DB, writes []tkl.ListContent) erro
 				fetched = stamp.UTC()
 			}
 		}
-		_, err = tx.ExecContext(ctx, `INSERT INTO token_lists (id,source,etag,tokens_json,fetched) VALUES (?,?,?,?,?)`, row.ID, row.Source, row.ETag, []byte(row.Body), fetched)
+		_, err = tx.ExecContext(ctx, `INSERT INTO token_lists (id,source,etag,tokens_json,fetched) VALUES (?,?,?,?,?)`, row.ID, row.Source, row.ETag, row.Body, fetched)
 		if err != nil {
 			return err
 		}
@@ -50,7 +50,7 @@ func putTKLBatch(ctx context.Context, db *sql.DB, writes []tkl.ListContent) erro
 func newTKLRefreshManager(mng *Manager, chains []uint64, lastSuccess time.Time, client *http.Client, refreshInterval, checkInterval time.Duration) (*tklmanager.Manager, error) {
 	options := tklmanager.RefreshOptions{
 		Client: client, RefreshInterval: refreshInterval, CheckInterval: checkInterval,
-		Persist: func(ctx context.Context, writes []tkl.ListContent) error {
+		Persist: func(ctx context.Context, writes []tklmanager.Write) error {
 			return putTKLBatch(ctx, mng.walletDB, writes)
 		},
 		OnSuccess: mng.settings.SaveLastTokensUpdate,

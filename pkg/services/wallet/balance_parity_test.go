@@ -277,8 +277,8 @@ func newParityHarness(t *testing.T) *parityHarness {
 	tokenManager := mock_token.NewMockManagerInterface(mockCtrl)
 	tokenManager.EXPECT().GetCachedBalances().DoAndReturn(cache.get).AnyTimes()
 	tokenManager.EXPECT().CacheBalances(gomock.Any()).DoAndReturn(cache.save).AnyTimes()
-	tokenManager.EXPECT().GetTokensByChains(gomock.Any()).DoAndReturn(func([]uint64) ([]*tokenTypes.Token, error) {
-		return tokenList.tokens(), nil
+	tokenManager.EXPECT().GetChainTokens(gomock.Any(), gomock.Any()).DoAndReturn(func(_ []uint64, dst []tokenTypes.ChainToken) ([]tokenTypes.ChainToken, error) {
+		return append(dst[:0], tokenTypes.ChainTokens(tokenList.tokens())...), nil
 	}).AnyTimes()
 	tokenManager.EXPECT().GetTokensByKeys(gomock.Any()).DoAndReturn(func(keys []string) ([]*tokenTypes.Token, error) {
 		tokens := make([]*tokenTypes.Token, 0, len(keys))

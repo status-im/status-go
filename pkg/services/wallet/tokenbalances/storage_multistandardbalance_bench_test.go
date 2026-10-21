@@ -40,7 +40,7 @@ func BenchmarkGetBalances(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, err := reader.GetBalances(context.Background(), tokens, accounts)
+		_, err := reader.GetBalances(context.Background(), tokentypes.ChainTokens(tokens), accounts)
 		require.NoError(b, err)
 	}
 }
