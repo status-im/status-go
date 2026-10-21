@@ -2235,18 +2235,24 @@ func (m *Manager) rosterClockFloor(idString string) uint64 {
 // prevLatestClock, as when the description is older than the community
 // events it cleared or an admin's event clock is skewed. Roster changes
 // get a clock past prevLatestClock so clients order them after the state
-// they last saw.
-func (m *Manager) keepRosterClockMonotonic(community *Community, prevLatestClock uint64, changes *CommunityChanges) {
+// they last saw. It reports whether it raised the floor; callers publish it
+// with publishRosterClockFloor once the community is persisted, so readers
+// never pair the floor with the state it supersedes.
+func (m *Manager) keepRosterClockMonotonic(community *Community, prevLatestClock uint64, changes *CommunityChanges) bool {
 	latestClock := community.latestClock()
 	floor := prevLatestClock
 	if changes.HasRosterChanges() {
 		floor++
 	}
 	if latestClock >= floor {
-		return
+		return false
 	}
 	community.clockFloor = floor
-	m.rosterClockFloors.Store(community.IDString(), floor)
+	return true
+}
+
+func (m *Manager) publishRosterClockFloor(community *Community) {
+	m.rosterClockFloors.Store(community.IDString(), community.clockFloor)
 }
 
 func (m *Manager) handleCommunityDescriptionMessageCommon(community *Community, description *protobuf.CommunityDescription, payload []byte, newControlNode *ecdsa.PublicKey) (*CommunityResponse, error) {
@@ -2337,7 +2343,7 @@ func (m *Manager) handleCommunityDescriptionMessageCommon(community *Community, 
 		}
 		community.config.EventsData = nil
 	}
-	m.keepRosterClockMonotonic(community, prevLatestClock, changes)
+	floorRaised := m.keepRosterClockMonotonic(community, prevLatestClock, changes)
 
 	// Set Joined if we are part of the member list
 	if !community.Joined() && community.hasMember(&m.identity.PublicKey) {
@@ -2347,6 +2353,9 @@ func (m *Manager) handleCommunityDescriptionMessageCommon(community *Community, 
 	err = m.SaveCommunity(community)
 	if err != nil {
 		return nil, err
+	}
+	if floorRaised {
+		m.publishRosterClockFloor(community)
 	}
 
 	if len(community.CommunityTokensMetadata()) > 0 {
@@ -2438,7 +2447,7 @@ func (m *Manager) HandleCommunityEventsMessage(signer *ecdsa.PublicKey, message 
 	}
 
 	changes := EvaluateCommunityChanges(originCommunity, community)
-	m.keepRosterClockMonotonic(community, prevLatestClock, changes)
+	floorRaised := m.keepRosterClockMonotonic(community, prevLatestClock, changes)
 
 	err = m.SaveCommunity(community)
 	if err != nil {
@@ -2450,12 +2459,18 @@ func (m *Manager) HandleCommunityEventsMessage(signer *ecdsa.PublicKey, message 
 		if err != nil {
 			return nil, err
 		}
+		if floorRaised {
+			m.publishRosterClockFloor(community)
+		}
 
 		m.publish(&Subscription{Community: community})
 	} else {
 		err = m.saveCommunityEvents(community)
 		if err != nil {
 			return nil, err
+		}
+		if floorRaised {
+			m.publishRosterClockFloor(community)
 		}
 	}
 

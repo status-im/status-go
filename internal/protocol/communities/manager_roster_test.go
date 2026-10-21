@@ -371,3 +371,52 @@ func (s *ManagerSuite) TestRosterClockFloorDroppedOnDeleteAndLeave() {
 	s.Require().NoError(err)
 	s.Require().Zero(s.manager.rosterClockFloor(left.IDString()))
 }
+
+// A reader decoding the row not yet saved must not pair it with the raised
+// clock floor, or its snapshot would match the next delta's clock.
+func (s *ManagerSuite) TestRosterClockFloorPublishedAfterDescriptionSave() {
+	community := s.addRosterMember(s.createRosterCommunity().ID())
+	s.Require().NoError(s.manager.SaveCommunity(community))
+	prevClock := community.Clock()
+	community.config.EventsData = &EventsData{Events: []CommunityEvent{{CommunityEventClock: prevClock + 100}}}
+
+	removal := proto.Clone(community.Description()).(*protobuf.CommunityDescription)
+	for pk := range removal.Members {
+		if pk != crypto.PubkeyToHex(&s.manager.identity.PublicKey) {
+			delete(removal.Members, pk)
+		}
+	}
+	removal.Clock = prevClock + 50
+
+	var during *CommunityMembers
+	s.manager.testHooks.beforeCommunityWrite = func() {
+		s.manager.testHooks.beforeCommunityWrite = nil
+		var err error
+		during, err = s.manager.GetCommunityMembers(community.ID())
+		s.Require().NoError(err)
+	}
+	response, err := s.manager.handleCommunityDescriptionMessageCommon(community, removal, nil, nil)
+	s.Require().NoError(err)
+	s.Require().NotNil(during)
+	s.Require().Less(during.Clock, s.rosterDeltaClock(response.Changes))
+}
+
+func (s *ManagerSuite) TestRosterClockFloorPublishedAfterEventsSave() {
+	community, admins, member, channels := s.setUpEventsReceiver()
+	firstClock := community.Clock() + 100
+
+	_, err := s.manager.HandleCommunityEventsMessage(&admins[0].PublicKey, s.channelMemberEventsMessage(community, admins[0], channels[0], member, firstClock))
+	s.Require().NoError(err)
+
+	var during *CommunityMembers
+	s.manager.testHooks.beforeCommunityWrite = func() {
+		s.manager.testHooks.beforeCommunityWrite = nil
+		var err error
+		during, err = s.manager.GetCommunityMembers(community.ID())
+		s.Require().NoError(err)
+	}
+	response, err := s.manager.HandleCommunityEventsMessage(&admins[1].PublicKey, s.channelMemberEventsMessage(community, admins[1], channels[1], member, firstClock-5))
+	s.Require().NoError(err)
+	s.Require().NotNil(during)
+	s.Require().Less(during.Clock, s.rosterDeltaClock(response.Changes))
+}
