@@ -621,6 +621,14 @@ func (api *PublicAPI) AllMessagesFromChatWhichMatchTerm(chatID, searchTerm strin
 	}, nil
 }
 
+func (api *PublicAPI) AllMessagesFromThreadWhichMatchTerm(chatID, threadID, searchTerm string, caseSensitive bool) (*ApplicationMessagesResponse, error) {
+	messages, err := api.service.messenger.AllMessagesFromThreadWhichMatchTerm(chatID, threadID, searchTerm, caseSensitive)
+	if err != nil {
+		return nil, err
+	}
+	return &ApplicationMessagesResponse{Messages: messages}, nil
+}
+
 func (api *PublicAPI) AllMessagesFromChatsAndCommunitiesWhichMatchTerm(communityIds []string, chatIds []string, searchTerm string, caseSensitive bool) (*ApplicationMessagesResponse, error) {
 	messages, err := api.service.messenger.AllMessagesFromChatsAndCommunitiesWhichMatchTerm(communityIds, chatIds, searchTerm, caseSensitive)
 	if err != nil {

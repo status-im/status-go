@@ -4023,6 +4023,17 @@ func (m *Messenger) AllMessageByChatIDWhichMatchTerm(chatID string, searchTerm s
 
 }
 
+func (m *Messenger) AllMessagesFromThreadWhichMatchTerm(chatID, threadID, searchTerm string, caseSensitive bool) ([]*common.Message, error) {
+	if _, err := m.persistence.ThreadByID(chatID, threadID); err != nil {
+		return nil, err
+	}
+	messages, err := m.persistence.AllMessagesFromThreadWhichMatchTerm(chatID, threadID, searchTerm, caseSensitive)
+	if err != nil {
+		return nil, err
+	}
+	return m.filterOutHiddenChatMessages(messages)
+}
+
 func (m *Messenger) AllMessagesFromChatsAndCommunitiesWhichMatchTerm(communityIds []string, chatIds []string, searchTerm string, caseSensitive bool) ([]*common.Message, error) {
 	messages, err := m.persistence.AllMessagesFromChatsAndCommunitiesWhichMatchTerm(communityIds, chatIds, searchTerm, caseSensitive)
 	if err != nil {
