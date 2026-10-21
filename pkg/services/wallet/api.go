@@ -871,7 +871,7 @@ func (api *API) GetFollowingStats(ctx context.Context, userAddress common.Addres
 // direction, and older ones are not fetched later.
 //
 // limit defaults to 100 (at most 1000), offset to 0. It fails with "no history provider for chain X" when the
-// chain has no enabled Alchemy provider.
+// chain has neither a direct Alchemy key (alchemyApiKey at login) nor an enabled Status proxy.
 func (api *API) GetTransfers(ctx context.Context, addresses []common.Address, chainIDs []uint64, includeCollectibles *bool, limit *int, offset *int) (*TransfersResponse, error) {
 	logutils.ZapLogger().Debug("call to GetTransfers",
 		zap.Int("addresses", len(addresses)),

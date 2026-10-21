@@ -18,7 +18,7 @@ def stub_network(port):
         "rpcProviders": [
             {
                 "chainId": STUB_CHAIN_ID,
-                "name": "smart-proxy-alchemy",
+                "name": "direct-alchemy",
                 "url": f"http://{host}:{port}/",
                 "enableRpsLimiter": False,
                 "type": "embedded-direct",
