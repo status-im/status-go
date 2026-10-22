@@ -127,6 +127,22 @@ func (s *TestMessengerProfileShowcase) verifiedContact(theirMessenger *Messenger
 	s.Require().Equal(common.ContactVerificationStateTrusted, resp.Messages()[0].ContactVerificationState)
 }
 
+// waitForShowcaseCommunities waits until the contact's stored showcase holds the
+// expected communities. Waiting on any showcase update is not enough: an earlier
+// chat identity without the communities (or one whose entries are still being
+// validated) also reports one (see status-im/status-go#3869).
+func (s *TestMessengerProfileShowcase) waitForShowcaseCommunities(m *Messenger, contactID string, expected int) {
+	_, err := WaitOnMessengerResponse(
+		m,
+		func(r *MessengerResponse) bool {
+			ps, e := m.GetProfileShowcaseForContact(contactID, true)
+			return e == nil && ps != nil && len(ps.Communities) == expected
+		},
+		"profile showcase with the expected communities not received",
+	)
+	s.Require().NoError(err)
+}
+
 func (s *TestMessengerProfileShowcase) TestSaveAndGetProfileShowcasePreferences() {
 	request := DummyProfileShowcasePreferences(true)
 
@@ -569,14 +585,7 @@ func (s *TestMessengerProfileShowcase) TestProfileShowcaseProofOfMembershipUnenc
 	s.Require().NoError(err)
 
 	contactID := types.EncodeHex(crypto.FromECDSAPub(&alice.identity.PublicKey))
-	_, err = WaitOnMessengerResponse(
-		bob,
-		func(r *MessengerResponse) bool {
-			return r.updatedProfileShowcaseContactIDs[contactID] == true
-		},
-		"no messages",
-	)
-	s.Require().NoError(err)
+	s.waitForShowcaseCommunities(bob, contactID, 2)
 
 	profileShowcase, err := bob.GetProfileShowcaseForContact(contactID, true)
 	s.Require().NoError(err)
@@ -637,21 +646,7 @@ func (s *TestMessengerProfileShowcase) TestProfileShowcaseProofOfMembershipEncry
 	s.Require().NoError(err)
 
 	contactID := types.EncodeHex(crypto.FromECDSAPub(&alice.identity.PublicKey))
-	// The showcased communities are validated and populated asynchronously: the
-	// first profile-showcase update can arrive before bob has validated alice's
-	// membership in the encrypted community, so the entry may not be present yet.
-	// Wait until both showcased communities are stored before asserting, rather
-	// than on the first showcase update — otherwise the result is reception-order
-	// dependent (see status-im/status-go#3869).
-	_, err = WaitOnMessengerResponse(
-		bob,
-		func(r *MessengerResponse) bool {
-			ps, e := bob.GetProfileShowcaseForContact(contactID, true)
-			return e == nil && ps != nil && len(ps.Communities) == 2
-		},
-		"profile showcase with 2 communities not received",
-	)
-	s.Require().NoError(err)
+	s.waitForShowcaseCommunities(bob, contactID, 2)
 
 	profileShowcase, err := bob.GetProfileShowcaseForContact(contactID, true)
 	s.Require().NoError(err)
@@ -714,14 +709,7 @@ func (s *TestMessengerProfileShowcase) TestProfileShowcaseCommuniesGrantExpires(
 
 	// 5) Bob gets the community from Alice's profile showcase and tries to validate community's membership with expired grant
 	contactID := types.EncodeHex(crypto.FromECDSAPub(&alice.identity.PublicKey))
-	_, err = WaitOnMessengerResponse(
-		bob,
-		func(r *MessengerResponse) bool {
-			return r.updatedProfileShowcaseContactIDs[contactID] == true
-		},
-		"no messages",
-	)
-	s.Require().NoError(err)
+	s.waitForShowcaseCommunities(bob, contactID, 1)
 
 	profileShowcase, err := bob.GetProfileShowcaseForContact(contactID, true)
 	s.Require().NoError(err)
@@ -804,14 +792,7 @@ func (s *TestMessengerProfileShowcase) TestProfileShowcaseCommuniesDispatchOnGra
 
 	// 5) Bob gets the community from Alice's profile showcase and validates community's membership with grant
 	contactID := types.EncodeHex(crypto.FromECDSAPub(&alice.identity.PublicKey))
-	_, err = WaitOnMessengerResponse(
-		bob,
-		func(r *MessengerResponse) bool {
-			return r.updatedProfileShowcaseContactIDs[contactID] == true
-		},
-		"no messages",
-	)
-	s.Require().NoError(err)
+	s.waitForShowcaseCommunities(bob, contactID, 1)
 
 	profileShowcase, err := bob.GetProfileShowcaseForContact(contactID, true)
 	s.Require().NoError(err)
