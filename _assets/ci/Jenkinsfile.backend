@@ -65,7 +65,10 @@ pipeline {
         sh "rm -fr ${env.RELEASE_DIR}"
         sh "mkdir ${env.RELEASE_DIR}"
         [linux, macos, windows].each { platformBuild ->
-          jenkins.copyArts(platformBuild)
+          sh "echo 'running for plateform' + platformBuild"
+          jenkins.copyArts(
+            projectName: platformBuild,
+            targert: "result")
         }
         dir(env.RELEASE_DIR) {
           /* generate sha256 checksums for upload */
