@@ -133,7 +133,11 @@ func ValidateReceivedPairInstallation(message *protobuf.SyncPairInstallation, wh
 }
 
 func ValidateText(text string) error {
-	if len(strings.TrimSpace(text)) == 0 {
+	return validateText(text, false)
+}
+
+func validateText(text string, allowEmpty bool) error {
+	if !allowEmpty && len(strings.TrimSpace(text)) == 0 {
 		return errors.New("text can't be empty")
 	}
 
@@ -156,7 +160,8 @@ func ValidateReceivedChatMessage(message *protobuf.ChatMessage, whisperTimestamp
 	if message.ContentType != protobuf.ChatMessage_DISCORD_MESSAGE &&
 		message.ContentType != protobuf.ChatMessage_BRIDGE_MESSAGE &&
 		(message.ContentType != protobuf.ChatMessage_IMAGE || message.Text != "") {
-		if err := ValidateText(message.Text); err != nil {
+		allowEmpty := message.ContentType == protobuf.ChatMessage_TEXT_PLAIN && len(message.PaymentRequests) > 0
+		if err := validateText(message.Text, allowEmpty); err != nil {
 			return err
 		}
 	}
