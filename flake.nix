@@ -37,7 +37,7 @@
     nixpkgs-nimble.url = "github:NixOS/nixpkgs/34ab99075ac4f7e40cf037eef32cb1c360bb85e9";
     # logos-delivery pins the same nixpkgs rev as we do, so following is safe.
     logos-delivery = {
-      url = "git+https://github.com/logos-messaging/logos-delivery?submodules=1&rev=45910f37cb4a8714f71d2e12ee81f40c746d7e4d";
+      url = "git+https://github.com/logos-messaging/logos-delivery?submodules=1&rev=a0087c1881fdaf80f2ef7ace1cd7272b6021743a";
       inputs.nixpkgs.follows = "nixpkgs";
     };
   };
