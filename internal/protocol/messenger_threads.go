@@ -5,7 +5,11 @@ import (
 	"crypto/ecdsa"
 	"database/sql"
 	"errors"
+	"time"
 
+	"go.uber.org/zap"
+
+	"github.com/status-im/status-go/internal/crypto"
 	"github.com/status-im/status-go/internal/protocol/common"
 	"github.com/status-im/status-go/internal/protocol/contacts"
 	"github.com/status-im/status-go/internal/protocol/protobuf"
@@ -210,6 +214,94 @@ func (m *Messenger) CreateThread(chatID string, parentMessageID string) (*Messen
 	response := &MessengerResponse{}
 	response.AddThread(thread)
 	return response, nil
+}
+
+const (
+	// pendingThreadMetadataTTL roughly matches store-node history retention:
+	// creation metadata older than this is unlikely to still arrive.
+	pendingThreadMetadataTTL          = 30 * 24 * time.Hour
+	maxPendingThreadMetadataPerSigner = 10
+	maxPendingThreadMetadataPerChat   = 100
+)
+
+// bufferPendingThreadMetadata stores a rename that cannot be authorized until
+// the thread's creation metadata arrives. The buffer is bounded per signer and
+// per chat, and entries expire, so renames for thread IDs that never get
+// created cannot grow the database indefinitely. Renames over quota are dropped.
+func (m *Messenger) bufferPendingThreadMetadata(chat *Chat, metadata *ThreadMetadata, name string) error {
+	if metadata.SigPubKey == nil {
+		return ErrThreadSenderRequired
+	}
+	now := m.getTimesource().GetCurrentTime()
+	ttl := uint64(pendingThreadMetadataTTL.Milliseconds())
+	expireBefore := uint64(0)
+	if now > ttl {
+		expireBefore = now - ttl
+	}
+	stored, err := m.persistence.SavePendingThreadMetadata(&PendingThreadMetadata{
+		ChatID:       chat.ID,
+		ThreadID:     metadata.ThreadId,
+		SignerPubKey: crypto.CompressPubkey(metadata.SigPubKey),
+		Name:         name,
+		Clock:        metadata.Clock,
+		ReceivedAt:   now,
+	}, PendingThreadMetadataLimits{
+		MaxPerSigner: maxPendingThreadMetadataPerSigner,
+		MaxPerChat:   maxPendingThreadMetadataPerChat,
+		ExpireBefore: expireBefore,
+	})
+	if err != nil {
+		return err
+	}
+	if !stored {
+		m.logger.Debug("dropping pending thread rename over quota",
+			zap.String("chatID", chat.ID), zap.String("threadID", metadata.ThreadId))
+	}
+	return nil
+}
+
+// applyPendingThreadMetadata replays renames buffered before the creation
+// metadata, now that the creator is known. Renames from signers that are not
+// allowed to edit the thread, or not newer than the creation, are discarded.
+// All buffered renames for the thread are removed afterwards.
+func (m *Messenger) applyPendingThreadMetadata(chat *Chat, threadID string, creationClock uint64) (bool, error) {
+	pending, err := m.persistence.PendingThreadMetadata(chat.ID, threadID)
+	if err != nil || len(pending) == 0 {
+		return false, err
+	}
+	thread, err := m.persistence.ThreadByID(chat.ID, threadID)
+	if err != nil {
+		return false, err
+	}
+
+	applied := false
+	for _, rename := range pending {
+		logger := m.logger.With(zap.String("chatID", chat.ID), zap.String("threadID", threadID), zap.Uint64("clock", rename.Clock))
+		if rename.Clock <= creationClock {
+			logger.Debug("discarding stale pending thread rename")
+			continue
+		}
+		signer, err := crypto.DecompressPubkey(rename.SignerPubKey)
+		if err != nil {
+			logger.Debug("discarding pending thread rename with invalid signer", zap.Error(err))
+			continue
+		}
+		allowed, err := m.senderCanEditThread(chat, thread, signer)
+		if err != nil {
+			return false, err
+		}
+		if !allowed {
+			logger.Debug("discarding unauthorized pending thread rename")
+			continue
+		}
+		updated, err := m.persistence.UpdateThreadMetadata(chat.ID, threadID, rename.Name, rename.Clock)
+		if err != nil {
+			return false, err
+		}
+		applied = applied || updated
+	}
+
+	return applied, m.persistence.DeletePendingThreadMetadata(chat.ID, threadID)
 }
 
 func (m *Messenger) dispatchThreadCreationMetadata(ctx context.Context, chat *Chat, threadID, name string) error {

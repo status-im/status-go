@@ -222,6 +222,11 @@ func (db sqlitePersistence) DeleteChat(chatID string) (err error) {
 	}
 
 	_, err = tx.Exec(`DELETE FROM user_messages WHERE local_chat_id = ?`, chatID)
+	if err != nil {
+		return
+	}
+
+	_, err = tx.Exec(`DELETE FROM pending_thread_metadata WHERE chat_id = ?`, chatID)
 	return
 }
 

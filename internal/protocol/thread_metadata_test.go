@@ -377,3 +377,117 @@ func TestPendingThreadCreatorClaims(t *testing.T) {
 		require.False(t, thread.CreatorPending)
 	})
 }
+
+func TestPendingThreadMetadataPersistence(t *testing.T) {
+	db, err := openTestDB()
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, db.Close()) })
+	p := newSQLitePersistence(db)
+
+	chat := CreatePublicChat("pending-metadata-chat", &testTimeSource{})
+	require.NoError(t, p.SaveChats([]*Chat{chat}))
+
+	save := func(signer []byte, name string, clock uint64) {
+		stored, err := p.SavePendingThreadMetadata(&PendingThreadMetadata{
+			ChatID: chat.ID, ThreadID: "thread", SignerPubKey: signer, Name: name, Clock: clock, ReceivedAt: 1,
+		}, PendingThreadMetadataLimits{MaxPerSigner: 10, MaxPerChat: 10})
+		require.NoError(t, err)
+		require.True(t, stored)
+	}
+	save([]byte{1}, "First", 10)
+	save([]byte{1}, "Older", 5)
+	save([]byte{1}, "Latest", 20)
+	save([]byte{2}, "Other", 15)
+
+	pending, err := p.PendingThreadMetadata(chat.ID, "thread")
+	require.NoError(t, err)
+	require.Len(t, pending, 2)
+	require.Equal(t, "Other", pending[0].Name)
+	require.Equal(t, uint64(15), pending[0].Clock)
+	require.Equal(t, "Latest", pending[1].Name)
+	require.Equal(t, uint64(20), pending[1].Clock)
+
+	require.NoError(t, p.DeletePendingThreadMetadata(chat.ID, "thread"))
+	pending, err = p.PendingThreadMetadata(chat.ID, "thread")
+	require.NoError(t, err)
+	require.Empty(t, pending)
+
+	save([]byte{1}, "Deleted with chat", 30)
+	require.NoError(t, p.DeleteChat(chat.ID))
+	pending, err = p.PendingThreadMetadata(chat.ID, "thread")
+	require.NoError(t, err)
+	require.Empty(t, pending)
+}
+
+func TestPendingThreadMetadataLimits(t *testing.T) {
+	db, err := openTestDB()
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, db.Close()) })
+	p := newSQLitePersistence(db)
+
+	chat := CreatePublicChat("pending-metadata-limits-chat", &testTimeSource{})
+	other := CreatePublicChat("pending-metadata-limits-other", &testTimeSource{})
+	require.NoError(t, p.SaveChats([]*Chat{chat, other}))
+
+	limits := PendingThreadMetadataLimits{MaxPerSigner: 2, MaxPerChat: 3, ExpireBefore: 100}
+	save := func(chatID, threadID string, signer byte, name string, clock, receivedAt uint64) bool {
+		stored, err := p.SavePendingThreadMetadata(&PendingThreadMetadata{
+			ChatID: chatID, ThreadID: threadID, SignerPubKey: []byte{signer}, Name: name, Clock: clock, ReceivedAt: receivedAt,
+		}, limits)
+		require.NoError(t, err)
+		return stored
+	}
+	count := func(chatID string) int {
+		var n int
+		require.NoError(t, db.QueryRow(`SELECT COUNT(*) FROM pending_thread_metadata WHERE chat_id = ?`, chatID).Scan(&n))
+		return n
+	}
+
+	t.Run("per signer quota", func(t *testing.T) {
+		require.True(t, save(chat.ID, "a", 1, "A", 1, 200))
+		require.True(t, save(chat.ID, "b", 1, "B", 1, 200))
+		require.False(t, save(chat.ID, "c", 1, "C", 1, 200))
+		pending, err := p.PendingThreadMetadata(chat.ID, "c")
+		require.NoError(t, err)
+		require.Empty(t, pending)
+
+		// Updating an existing row is allowed at the quota.
+		require.True(t, save(chat.ID, "a", 1, "A2", 2, 200))
+		pending, err = p.PendingThreadMetadata(chat.ID, "a")
+		require.NoError(t, err)
+		require.Len(t, pending, 1)
+		require.Equal(t, "A2", pending[0].Name)
+
+		// The quota is per chat.
+		require.True(t, save(other.ID, "c", 1, "C", 1, 200))
+	})
+
+	t.Run("per chat quota", func(t *testing.T) {
+		require.True(t, save(chat.ID, "a", 2, "A", 1, 200))
+		require.Equal(t, 3, count(chat.ID))
+		require.False(t, save(chat.ID, "b", 3, "B", 1, 200))
+		require.Equal(t, 3, count(chat.ID))
+		require.True(t, save(chat.ID, "b", 1, "B2", 2, 200))
+	})
+
+	t.Run("expired rows are pruned", func(t *testing.T) {
+		require.NoError(t, db.Close())
+		db, err = openTestDB()
+		require.NoError(t, err)
+		p = newSQLitePersistence(db)
+		require.NoError(t, p.SaveChats([]*Chat{chat, other}))
+
+		limits.ExpireBefore = 0
+		require.True(t, save(chat.ID, "old", 1, "Old", 1, 50))
+		require.True(t, save(other.ID, "old", 1, "Old", 1, 50))
+		require.True(t, save(chat.ID, "fresh", 1, "Fresh", 1, 150))
+
+		limits.ExpireBefore = 100
+		require.True(t, save(chat.ID, "new", 1, "New", 1, 200))
+		pending, err := p.PendingThreadMetadata(chat.ID, "old")
+		require.NoError(t, err)
+		require.Empty(t, pending)
+		require.Zero(t, count(other.ID))
+		require.Equal(t, 2, count(chat.ID))
+	})
+}

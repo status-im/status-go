@@ -1084,6 +1084,120 @@ func (db sqlitePersistence) UpdateThreadMetadata(chatID, threadID, name string, 
 	return affected > 0, nil
 }
 
+// PendingThreadMetadata is a thread rename received before the thread's
+// creation metadata, so it could not be authorized yet.
+type PendingThreadMetadata struct {
+	ChatID       string
+	ThreadID     string
+	SignerPubKey []byte
+	Name         string
+	Clock        uint64
+	// ReceivedAt is the local time in milliseconds the rename was buffered.
+	ReceivedAt uint64
+}
+
+// PendingThreadMetadataLimits bounds the pending_thread_metadata table.
+type PendingThreadMetadataLimits struct {
+	// MaxPerSigner is the maximum number of distinct threads a signer may
+	// have pending renames for in a single chat.
+	MaxPerSigner int
+	// MaxPerChat is the maximum number of pending renames in a single chat.
+	MaxPerChat int
+	// ExpireBefore removes pending renames received before this time (ms).
+	ExpireBefore uint64
+}
+
+// SavePendingThreadMetadata buffers a rename, keeping only the latest clock per signer.
+// Expired rows are pruned first. Updating an already buffered (chat, thread, signer)
+// row is always allowed; new rows are dropped once a quota is reached, so existing
+// buffered renames cannot be evicted. It returns whether the rename was stored.
+func (db sqlitePersistence) SavePendingThreadMetadata(pending *PendingThreadMetadata, limits PendingThreadMetadataLimits) (stored bool, err error) {
+	tx, err := db.db.BeginTx(context.Background(), &sql.TxOptions{})
+	if err != nil {
+		return false, err
+	}
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		_ = tx.Rollback()
+	}()
+
+	if _, err = tx.Exec(`DELETE FROM pending_thread_metadata WHERE received_at < ?`, limits.ExpireBefore); err != nil {
+		return false, err
+	}
+
+	var exists bool
+	err = tx.QueryRow(
+		`SELECT EXISTS(SELECT 1 FROM pending_thread_metadata WHERE chat_id = ? AND thread_id = ? AND signer_pubkey = ?)`,
+		pending.ChatID, pending.ThreadID, pending.SignerPubKey,
+	).Scan(&exists)
+	if err != nil {
+		return false, err
+	}
+
+	if !exists {
+		var signerCount, chatCount int
+		err = tx.QueryRow(
+			`SELECT COUNT(*) FROM pending_thread_metadata WHERE chat_id = ? AND signer_pubkey = ?`,
+			pending.ChatID, pending.SignerPubKey,
+		).Scan(&signerCount)
+		if err != nil {
+			return false, err
+		}
+		if signerCount >= limits.MaxPerSigner {
+			return false, nil
+		}
+		err = tx.QueryRow(`SELECT COUNT(*) FROM pending_thread_metadata WHERE chat_id = ?`, pending.ChatID).Scan(&chatCount)
+		if err != nil {
+			return false, err
+		}
+		if chatCount >= limits.MaxPerChat {
+			return false, nil
+		}
+	}
+
+	_, err = tx.Exec(
+		`INSERT INTO pending_thread_metadata(chat_id, thread_id, signer_pubkey, name, clock, received_at) VALUES (?, ?, ?, ?, ?, ?)
+		 ON CONFLICT(chat_id, thread_id, signer_pubkey) DO UPDATE SET name = excluded.name, clock = excluded.clock, received_at = excluded.received_at
+		 WHERE excluded.clock > pending_thread_metadata.clock
+		 OR (excluded.clock = pending_thread_metadata.clock AND excluded.name < pending_thread_metadata.name)`,
+		pending.ChatID, pending.ThreadID, pending.SignerPubKey, pending.Name, pending.Clock, pending.ReceivedAt,
+	)
+	if err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+func (db sqlitePersistence) PendingThreadMetadata(chatID, threadID string) ([]*PendingThreadMetadata, error) {
+	rows, err := db.db.Query(
+		`SELECT chat_id, thread_id, signer_pubkey, name, clock, received_at FROM pending_thread_metadata
+		 WHERE chat_id = ? AND thread_id = ? ORDER BY clock`,
+		chatID, threadID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var result []*PendingThreadMetadata
+	for rows.Next() {
+		pending := &PendingThreadMetadata{}
+		if err := rows.Scan(&pending.ChatID, &pending.ThreadID, &pending.SignerPubKey, &pending.Name, &pending.Clock, &pending.ReceivedAt); err != nil {
+			return nil, err
+		}
+		result = append(result, pending)
+	}
+	return result, rows.Err()
+}
+
+func (db sqlitePersistence) DeletePendingThreadMetadata(chatID, threadID string) error {
+	_, err := db.db.Exec(`DELETE FROM pending_thread_metadata WHERE chat_id = ? AND thread_id = ?`, chatID, threadID)
+	return err
+}
+
 func (db sqlitePersistence) updateThreadNameFromParentIfNeeded(tx *sql.Tx, threadID, chatID, parentText string) error {
 	if threadID == "" || chatID == "" {
 		return nil

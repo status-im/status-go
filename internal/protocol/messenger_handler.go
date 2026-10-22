@@ -1962,6 +1962,10 @@ func (m *Messenger) HandleThreadMetadata(ctx context.Context, state *ReceivedMes
 			return requests.ErrEditThreadNameTooLong
 		}
 		thread, err := m.persistence.ThreadByID(chat.ID, metadata.ThreadId)
+		if errors.Is(err, common.ErrRecordNotFound) {
+			// The creation metadata has not arrived yet; replay once it does.
+			return m.bufferPendingThreadMetadata(chat, metadata, name)
+		}
 		if err != nil {
 			return err
 		}
@@ -1970,6 +1974,11 @@ func (m *Messenger) HandleThreadMetadata(ctx context.Context, state *ReceivedMes
 			return err
 		}
 		if !allowed {
+			if thread.CreatorPending {
+				// The signer may turn out to be the creator once the creation
+				// metadata claims this placeholder.
+				return m.bufferPendingThreadMetadata(chat, metadata, name)
+			}
 			return errors.New(threadEditPermissionError)
 		}
 		metadata.Name = name
@@ -1987,7 +1996,14 @@ func (m *Messenger) HandleThreadMetadata(ctx context.Context, state *ReceivedMes
 	if err != nil {
 		return err
 	}
-	if !updated {
+	replayed := false
+	if metadata.CreatorId != "" {
+		replayed, err = m.applyPendingThreadMetadata(chat, metadata.ThreadId, metadata.Clock)
+		if err != nil {
+			return err
+		}
+	}
+	if !updated && !replayed {
 		return nil
 	}
 	thread, err := m.persistence.ThreadWithSummaryByID(chat.ID, metadata.ThreadId)
