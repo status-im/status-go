@@ -12,6 +12,7 @@ import (
 
 	_ "github.com/mutecomm/go-sqlcipher/v4" // require go-sqlcipher that overrides default implementation
 	"github.com/stretchr/testify/suite"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/status-im/status-go/internal/crypto"
 	"github.com/status-im/status-go/internal/crypto/types"
@@ -350,6 +351,58 @@ func (s *MessengerSuite) TestSendPrivateOneToOne() {
 	s.Require().Equal(outputMessage.OutgoingStatus, common.OutgoingStatusSending, "it marks the message as sending")
 	s.Require().NotEmpty(outputMessage.ID, "it sets the ID field")
 	s.Require().Equal(protobuf.MessageType_ONE_TO_ONE, outputMessage.MessageType)
+}
+
+func (s *MessengerSuite) TestReceivePaymentRequestWithoutText() {
+	alice := s.m
+	bob := s.newMessenger()
+
+	s.Require().NoError(makeMutualContact(alice, &bob.identity.PublicKey))
+	s.Require().NoError(makeMutualContact(bob, &alice.identity.PublicKey))
+
+	aliceChat := CreateOneToOneChat("bob", &bob.identity.PublicKey, alice.getTimesource())
+	s.Require().NoError(alice.SaveChat(aliceChat))
+	_, err := alice.Join(aliceChat)
+	s.Require().NoError(err)
+
+	bobChat := CreateOneToOneChat("alice", &alice.identity.PublicKey, bob.getTimesource())
+	s.Require().NoError(bob.SaveChat(bobChat))
+	_, err = bob.Join(bobChat)
+	s.Require().NoError(err)
+
+	message := buildTestMessage(*aliceChat)
+	message.Text = ""
+	message.PaymentRequests = []*protobuf.PaymentRequest{
+		{
+			Amount:   "1.123",
+			Symbol:   "ETH",
+			Receiver: "0x123",
+			ChainId:  1,
+			TokenKey: "1-0x0000000000000000000000000000000000000000",
+		},
+	}
+	sent, err := alice.SendChatMessage(context.Background(), message)
+	s.Require().NoError(err)
+	s.Require().Len(sent.Messages(), 1)
+
+	response, err := WaitOnMessengerResponse(
+		bob,
+		func(r *MessengerResponse) bool { return len(r.Messages()) > 0 },
+		"payment request not received",
+	)
+	s.Require().NoError(err)
+	s.Require().Len(response.Messages(), 1)
+	received := response.Messages()[0]
+	s.Require().Equal(sent.Messages()[0].ID, received.ID)
+	s.Require().Empty(received.Text)
+	s.Require().Len(received.PaymentRequests, 1)
+	s.Require().True(proto.Equal(message.PaymentRequests[0], received.PaymentRequests[0]))
+
+	saved, err := bob.persistence.MessageByID(received.ID)
+	s.Require().NoError(err)
+	s.Require().Empty(saved.Text)
+	s.Require().Len(saved.PaymentRequests, 1)
+	s.Require().True(proto.Equal(message.PaymentRequests[0], saved.PaymentRequests[0]))
 }
 
 func (s *MessengerSuite) TestSendPrivateGroup() {
