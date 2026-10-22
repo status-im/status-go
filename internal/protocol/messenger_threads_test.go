@@ -2,6 +2,7 @@ package protocol
 
 import (
 	"context"
+	"crypto/ecdsa"
 	"fmt"
 	"strings"
 	"testing"
@@ -1534,4 +1535,165 @@ func (s *MessengerThreadsSuite) TestThreadCreationMetadataClaimsOnlyPendingPlace
 	s.Require().NoError(err)
 	s.Require().Empty(thread.CreatorID)
 	s.Require().Equal("Legacy", thread.Name)
+}
+
+func (s *MessengerThreadsSuite) newThreadMetadataHandler() (*ecdsa.PrivateKey, *Chat, func(*protobuf.ThreadMetadata) (*MessengerResponse, error)) {
+	creator, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+	chat := CreateOneToOneChat("out-of-order-"+crypto.PubkeyToHex(&creator.PublicKey)[:10], &creator.PublicKey, s.m.getTimesource())
+	s.Require().NoError(s.m.SaveChat(chat))
+
+	handle := func(metadata *protobuf.ThreadMetadata) (*MessengerResponse, error) {
+		metadata.ChatId = chat.ID
+		metadata.MessageType = protobuf.MessageType_ONE_TO_ONE
+		state := &ReceivedMessageState{
+			Response: &MessengerResponse{},
+			CurrentMessageState: &CurrentMessageState{
+				PublicKey:        &creator.PublicKey,
+				WhisperTimestamp: metadata.Clock,
+			},
+		}
+		err := s.m.HandleThreadMetadata(context.Background(), state, metadata, nil)
+		return state.Response, err
+	}
+	return creator, chat, handle
+}
+
+func (s *MessengerThreadsSuite) TestThreadRenameBeforeCreationKeepsLatestName() {
+	creator, chat, handle := s.newThreadMetadataHandler()
+	creatorID := contacts.ContactIDFromPublicKey(&creator.PublicKey)
+
+	// The rename arrives before the thread exists and is buffered.
+	response, err := handle(&protobuf.ThreadMetadata{Clock: 20, ThreadId: "thread", Name: "Renamed"})
+	s.Require().NoError(err)
+	s.Require().Empty(response.Threads())
+	_, err = s.m.persistence.ThreadByID(chat.ID, "thread")
+	s.Require().ErrorIs(err, common.ErrRecordNotFound)
+
+	response, err = handle(&protobuf.ThreadMetadata{Clock: 10, ThreadId: "thread", Name: "Created", CreatorId: creatorID})
+	s.Require().NoError(err)
+	s.Require().Len(response.Threads(), 1)
+	s.Require().Equal("Renamed", response.Threads()[0].Name)
+
+	thread, err := s.m.persistence.ThreadByID(chat.ID, "thread")
+	s.Require().NoError(err)
+	s.Require().Equal("Renamed", thread.Name)
+	s.Require().Equal(creatorID, thread.CreatorID)
+	pending, err := s.m.persistence.PendingThreadMetadata(chat.ID, "thread")
+	s.Require().NoError(err)
+	s.Require().Empty(pending)
+}
+
+func (s *MessengerThreadsSuite) TestThreadRenameOnPendingPlaceholderBeforeCreationKeepsLatestName() {
+	creator, chat, handle := s.newThreadMetadataHandler()
+	creatorID := contacts.ContactIDFromPublicKey(&creator.PublicKey)
+
+	// A reply created the placeholder, so the creator is not known yet.
+	s.Require().NoError(s.m.persistence.UpsertPendingCreatorThread("thread", chat.ID, "thread", "Parent text"))
+	_, err := handle(&protobuf.ThreadMetadata{Clock: 20, ThreadId: "thread", Name: "Renamed"})
+	s.Require().NoError(err)
+	thread, err := s.m.persistence.ThreadByID(chat.ID, "thread")
+	s.Require().NoError(err)
+	s.Require().Equal("Parent text", thread.Name)
+
+	response, err := handle(&protobuf.ThreadMetadata{Clock: 10, ThreadId: "thread", Name: "Created", CreatorId: creatorID})
+	s.Require().NoError(err)
+	s.Require().Len(response.Threads(), 1)
+	thread, err = s.m.persistence.ThreadByID(chat.ID, "thread")
+	s.Require().NoError(err)
+	s.Require().Equal("Renamed", thread.Name)
+	s.Require().Equal(creatorID, thread.CreatorID)
+	s.Require().False(thread.CreatorPending)
+}
+
+func (s *MessengerThreadsSuite) TestPendingThreadRenamesDiscardStaleAndUnauthorized() {
+	creator, chat, handle := s.newThreadMetadataHandler()
+	creatorID := contacts.ContactIDFromPublicKey(&creator.PublicKey)
+
+	// Stale: older than the creation metadata.
+	_, err := handle(&protobuf.ThreadMetadata{Clock: 5, ThreadId: "thread", Name: "Stale"})
+	s.Require().NoError(err)
+	// Unauthorized: in a one-to-one chat only the creator may rename.
+	s.savePendingThreadMetadata(&PendingThreadMetadata{
+		ChatID: chat.ID, ThreadID: "thread", SignerPubKey: crypto.CompressPubkey(&s.m.identity.PublicKey),
+		Name: "Unauthorized", Clock: 30,
+	})
+	pending, err := s.m.persistence.PendingThreadMetadata(chat.ID, "thread")
+	s.Require().NoError(err)
+	s.Require().Len(pending, 2)
+
+	response, err := handle(&protobuf.ThreadMetadata{Clock: 10, ThreadId: "thread", Name: "Created", CreatorId: creatorID})
+	s.Require().NoError(err)
+	s.Require().Len(response.Threads(), 1)
+	thread, err := s.m.persistence.ThreadByID(chat.ID, "thread")
+	s.Require().NoError(err)
+	s.Require().Equal("Created", thread.Name)
+	pending, err = s.m.persistence.PendingThreadMetadata(chat.ID, "thread")
+	s.Require().NoError(err)
+	s.Require().Empty(pending)
+}
+
+func (s *MessengerThreadsSuite) TestPendingThreadRenamesApplyOnlyValidEntries() {
+	creator, chat, handle := s.newThreadMetadataHandler()
+	creatorID := contacts.ContactIDFromPublicKey(&creator.PublicKey)
+
+	_, err := handle(&protobuf.ThreadMetadata{Clock: 20, ThreadId: "thread", Name: "Valid"})
+	s.Require().NoError(err)
+	s.savePendingThreadMetadata(&PendingThreadMetadata{
+		ChatID: chat.ID, ThreadID: "thread", SignerPubKey: crypto.CompressPubkey(&s.m.identity.PublicKey),
+		Name: "Unauthorized", Clock: 40,
+	})
+	other, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+	s.savePendingThreadMetadata(&PendingThreadMetadata{
+		ChatID: chat.ID, ThreadID: "thread", SignerPubKey: crypto.CompressPubkey(&other.PublicKey),
+		Name: "Stale", Clock: 10,
+	})
+
+	_, err = handle(&protobuf.ThreadMetadata{Clock: 15, ThreadId: "thread", Name: "Created", CreatorId: creatorID})
+	s.Require().NoError(err)
+	thread, err := s.m.persistence.ThreadByID(chat.ID, "thread")
+	s.Require().NoError(err)
+	s.Require().Equal("Valid", thread.Name)
+	pending, err := s.m.persistence.PendingThreadMetadata(chat.ID, "thread")
+	s.Require().NoError(err)
+	s.Require().Empty(pending)
+}
+
+func (s *MessengerThreadsSuite) savePendingThreadMetadata(pending *PendingThreadMetadata) {
+	pending.ReceivedAt = s.m.getTimesource().GetCurrentTime()
+	stored, err := s.m.persistence.SavePendingThreadMetadata(pending, PendingThreadMetadataLimits{
+		MaxPerSigner: maxPendingThreadMetadataPerSigner,
+		MaxPerChat:   maxPendingThreadMetadataPerChat,
+	})
+	s.Require().NoError(err)
+	s.Require().True(stored)
+}
+
+func (s *MessengerThreadsSuite) TestPendingThreadRenamesForUnknownThreadsAreBounded() {
+	_, chat, handle := s.newThreadMetadataHandler()
+
+	for i := 0; i < maxPendingThreadMetadataPerSigner+5; i++ {
+		_, err := handle(&protobuf.ThreadMetadata{Clock: uint64(20 + i), ThreadId: fmt.Sprintf("unknown-%d", i), Name: "Spam"})
+		s.Require().NoError(err)
+	}
+
+	var count int
+	s.Require().NoError(s.m.persistence.db.QueryRow(
+		`SELECT COUNT(*) FROM pending_thread_metadata WHERE chat_id = ?`, chat.ID,
+	).Scan(&count))
+	s.Require().Equal(maxPendingThreadMetadataPerSigner, count)
+
+	// A dropped rename for an unknown thread is not buffered.
+	pending, err := s.m.persistence.PendingThreadMetadata(chat.ID, fmt.Sprintf("unknown-%d", maxPendingThreadMetadataPerSigner))
+	s.Require().NoError(err)
+	s.Require().Empty(pending)
+
+	// Renames for an already buffered thread still update at the quota.
+	_, err = handle(&protobuf.ThreadMetadata{Clock: 100, ThreadId: "unknown-0", Name: "Updated"})
+	s.Require().NoError(err)
+	pending, err = s.m.persistence.PendingThreadMetadata(chat.ID, "unknown-0")
+	s.Require().NoError(err)
+	s.Require().Len(pending, 1)
+	s.Require().Equal("Updated", pending[0].Name)
 }
