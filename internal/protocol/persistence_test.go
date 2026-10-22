@@ -30,6 +30,111 @@ func TestTableUserMessagesAllFieldsCount(t *testing.T) {
 	require.Equal(t, expected, db.tableUserMessagesAllFieldsCount())
 }
 
+func TestBackedUpMessagesPreserveThreadID(t *testing.T) {
+	db, err := openTestDB()
+	require.NoError(t, err)
+	defer db.Close()
+	p := newSQLitePersistence(db)
+
+	require.NoError(t, insertMinimalMessage(p, "parent"))
+	require.NoError(t, insertMinimalThreadMessage(p, "reply", "thread"))
+	_, err = db.Exec(`UPDATE user_messages SET thread_id = NULL WHERE id = 'parent'`)
+	require.NoError(t, err)
+
+	messages, err := p.AllMessagesForBackup()
+	require.NoError(t, err)
+	require.Len(t, messages, 2)
+	require.Empty(t, messages[0].ThreadId)
+	require.Equal(t, "thread", messages[1].ThreadId)
+
+	restoredDB, err := openTestDB()
+	require.NoError(t, err)
+	defer restoredDB.Close()
+	restored := newSQLitePersistence(restoredDB)
+	require.NoError(t, restored.SaveBackedUpMessages(messages))
+	parent, err := restored.MessageByID("parent")
+	require.NoError(t, err)
+	require.Empty(t, parent.GetThreadId())
+	reply, err := restored.MessageByID("reply")
+	require.NoError(t, err)
+	require.Equal(t, "thread", reply.GetThreadId())
+}
+
+func TestBackedUpThreadsRoundTripAndMerge(t *testing.T) {
+	db, err := openTestDB()
+	require.NoError(t, err)
+	defer db.Close()
+	p := newSQLitePersistence(db)
+
+	threads := []*protobuf.BackedUpThread{
+		{ThreadId: "empty", ChatId: testPublicChatID, ParentMessageId: "absent-parent", Name: "Empty thread"},
+		{ThreadId: "placeholder", ChatId: testPublicChatID, ParentMessageId: "placeholder", ReadMessagesAtClockValue: 42},
+	}
+	require.NoError(t, p.SaveBackedUpThreads(threads))
+	exported, err := p.AllThreadsForBackup()
+	require.NoError(t, err)
+	require.Equal(t, threads, exported)
+
+	restoredDB, err := openTestDB()
+	require.NoError(t, err)
+	defer restoredDB.Close()
+	restored := newSQLitePersistence(restoredDB)
+	require.NoError(t, restored.SaveBackedUpThreads(exported))
+	require.NoError(t, restored.SaveBackedUpThreads(exported))
+	actual, err := restored.AllThreadsForBackup()
+	require.NoError(t, err)
+	require.Equal(t, exported, actual)
+
+	require.NoError(t, restored.SaveBackedUpThreads([]*protobuf.BackedUpThread{
+		{ThreadId: "empty", ChatId: testPublicChatID, ParentMessageId: "different-parent", Name: "Different name", ReadMessagesAtClockValue: 10},
+		{ThreadId: "placeholder", ChatId: testPublicChatID, ParentMessageId: "different-parent", Name: "Filled name", ReadMessagesAtClockValue: 20},
+	}))
+	thread, err := restored.ThreadByID(testPublicChatID, "empty")
+	require.NoError(t, err)
+	require.Equal(t, "Empty thread", thread.Name)
+	require.Equal(t, "absent-parent", thread.ParentMessageID)
+	require.EqualValues(t, 10, thread.ReadMessagesAtClockValue)
+	thread, err = restored.ThreadByID(testPublicChatID, "placeholder")
+	require.NoError(t, err)
+	require.Equal(t, "Filled name", thread.Name)
+	require.Equal(t, "placeholder", thread.ParentMessageID)
+	require.EqualValues(t, 42, thread.ReadMessagesAtClockValue)
+
+	_, err = restoredDB.Exec(`UPDATE threads SET parent_message_id = '' WHERE thread_id = 'empty'`)
+	require.NoError(t, err)
+	require.NoError(t, restored.SaveBackedUpThreads([]*protobuf.BackedUpThread{{
+		ThreadId: "empty", ChatId: testPublicChatID, ParentMessageId: "filled-parent", ReadMessagesAtClockValue: 99,
+	}}))
+	thread, err = restored.ThreadByID(testPublicChatID, "empty")
+	require.NoError(t, err)
+	require.Equal(t, "filled-parent", thread.ParentMessageID)
+	require.EqualValues(t, 99, thread.ReadMessagesAtClockValue)
+}
+
+func TestBackedUpThreadsRejectInvalidRecordsAndRollBack(t *testing.T) {
+	for _, invalid := range []*protobuf.BackedUpThread{
+		nil,
+		{ChatId: testPublicChatID},
+		{ThreadId: "missing-chat"},
+		{ThreadId: "existing", ChatId: "different-chat"},
+	} {
+		db, err := openTestDB()
+		require.NoError(t, err)
+		p := newSQLitePersistence(db)
+		require.NoError(t, p.UpsertThread("existing", testPublicChatID, "parent", "Existing"))
+		require.Error(t, p.SaveBackedUpThreads([]*protobuf.BackedUpThread{
+			{ThreadId: "new", ChatId: testPublicChatID, Name: "New"},
+			invalid,
+		}))
+		_, err = p.ThreadByID(testPublicChatID, "new")
+		require.ErrorIs(t, err, common.ErrRecordNotFound)
+		thread, err := p.ThreadByID(testPublicChatID, "existing")
+		require.NoError(t, err)
+		require.Equal(t, "Existing", thread.Name)
+		require.NoError(t, db.Close())
+	}
+}
+
 func TestNormalizeThreadNameDoesNotSplitGraphemeClusters(t *testing.T) {
 	const familyEmoji = "👨‍👩‍👧‍👦"
 	input := strings.Repeat("a", 49) + familyEmoji + "x"
