@@ -11,6 +11,7 @@ import (
 	types "github.com/status-im/status-go/pkg/services/wallet/token/tokenlist"
 
 	walletcommon "github.com/status-im/status-go/pkg/services/wallet/common"
+	"github.com/status-im/status-go/pkg/services/wallet/thirdparty"
 )
 
 const (
@@ -45,20 +46,28 @@ func (gt *GeckoToken) keys() []string {
 }
 
 func (c *Client) fetchTokens(ctx context.Context) ([]GeckoToken, error) {
+	tokens, _, _, err := c.fetchTokensWithEtag(ctx, "")
+	return tokens, err
+}
 
+// fetchTokensWithEtag sends If-None-Match when etag is set and reports a 304 as notModified.
+func (c *Client) fetchTokensWithEtag(ctx context.Context, etag string) (tokens []GeckoToken, newEtag string, notModified bool, err error) {
 	params := netUrl.Values{}
 	params.Add("include_platform", "true")
 	url := fmt.Sprintf(coinsListURL, c.baseURL)
-	response, err := c.doGetRequestWithOptionalAuth(ctx, url, params)
+	response, newEtag, err := c.httpClient.DoGetRequestWithEtag(ctx, url, c.mergeCoingeckoQueryKey(params), etag,
+		thirdparty.WithCredentials(c.creds))
 	if err != nil {
-		return nil, err
+		return nil, "", false, err
+	}
+	if etag != "" && len(response) == 0 {
+		return nil, newEtag, true, nil
 	}
 
-	var tokens []GeckoToken
 	err = json.Unmarshal(response, &tokens)
 	if err != nil {
-		return nil, err
+		return nil, "", false, err
 	}
 
-	return tokens, nil
+	return tokens, newEtag, false, nil
 }
