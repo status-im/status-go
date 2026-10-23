@@ -22,6 +22,12 @@ requires "https://github.com/logos-messaging/sds-go-bindings#25831865"
 # The untagged chronos commit nim-ffi needs; the libsds compile uses this tree.
 requires "chronos#0de7b335d0ad5557ad5ba71a4b7662f7b201750e"
 
+# Pins the logos-delivery revision whose C ABI the bindings match.
+requires "https://github.com/logos-messaging/logos-delivery-go-bindings#e2953049"
+
+# nim-nat-traversal has no tags; the commit logos-delivery locks skips version discovery.
+requires "nat_traversal#860e18c37667b5dd005b94c63264560c35d88004"
+
 
 ### Helpers
 
@@ -56,3 +62,7 @@ task libsdsAndroid, "Build libsds for Android; ARCH selects the architecture":
 task libsdsIOS, "Build libsds for iOS":
   runBindingsTask("libsdsIOS")
 
+task liblogosdelivery, "Build the liblogosdelivery status-go links against":
+  ## LIBLOGOSDELIVERY_OUT and NIM_PARAMS come from the caller.
+  withDir nimblePkgDir("logos_delivery_go_bindings"):
+    exec nimbleExe() & " liblogosdelivery"
