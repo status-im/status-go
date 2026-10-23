@@ -96,6 +96,21 @@ func OverrideBasicAuth(networks []params.Network, providerType params.RpcProvide
 	return updatedNetworks
 }
 
+// removeProvider drops the providers with the given name from every network.
+func removeProvider(networks []params.Network, name string) []params.Network {
+	updatedNetworks := deepCopyNetworks(networks)
+	for i := range updatedNetworks {
+		providers := updatedNetworks[i].RpcProviders[:0]
+		for _, provider := range updatedNetworks[i].RpcProviders {
+			if provider.Name != name {
+				providers = append(providers, provider)
+			}
+		}
+		updatedNetworks[i].RpcProviders = providers
+	}
+	return updatedNetworks
+}
+
 func deepCopyNetworks(networks []params.Network) []params.Network {
 	updatedNetworks := make([]params.Network, len(networks))
 	for i, network := range networks {
