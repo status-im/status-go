@@ -429,10 +429,10 @@ func TestSystemTimeChangeDetection(t *testing.T) {
 	time3 := ts.Now()
 	assert.Equal(t, currentTime.Add(testOffset), time3,
 		"Time should be adjusted by offset after backward time change")
-	assert.Equal(t, currentTime, ts.lastMonotonic,
-		"lastMonotonic should be updated after backward time change")
 	assert.Eventually(t, updated, time.Second, time.Millisecond,
 		"UpdateOffset should be called when backward time change is detected")
+	assert.Equal(t, currentTime, ts.lastMonotonic,
+		"lastMonotonic should be updated after backward time change")
 
 	// Test case 4: Large forward time change
 	// -------------------------------------------------------------------------
@@ -450,10 +450,10 @@ func TestSystemTimeChangeDetection(t *testing.T) {
 	time4 := ts.Now()
 	assert.Equal(t, currentTime.Add(testOffset), time4,
 		"Time should be adjusted by offset after forward time change")
-	assert.Equal(t, currentTime, ts.lastMonotonic,
-		"lastMonotonic should be updated after forward time change")
 	assert.Eventually(t, updated, time.Second, time.Millisecond,
 		"UpdateOffset should be called when forward time change is detected")
+	assert.Equal(t, currentTime, ts.lastMonotonic,
+		"lastMonotonic should be updated after forward time change")
 }
 
 func TestTimeTrackingInitialization(t *testing.T) {
@@ -495,7 +495,9 @@ func TestTimeTrackingInitialization(t *testing.T) {
 	}()
 
 	// Verify that time tracking fields are initialized
+	ts.timeDataMu.RLock()
 	assert.Equal(t, fixedTime, ts.lastMonotonic, "lastMonotonic should be initialized to current time")
+	ts.timeDataMu.RUnlock()
 
 	// Verify that the time source is marked as started
 	assert.True(t, ts.started, "Time source should be marked as started")
