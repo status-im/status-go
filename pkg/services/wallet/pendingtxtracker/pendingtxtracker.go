@@ -261,17 +261,23 @@ func (tm *PendingTxTracker) updateTxDetails(txDetails *TxDetails, chainID uint64
 		}
 
 		for _, pd := range routeData.PathsData {
+			processorName := ""
+			if pd.RouterPath != nil {
+				processorName = pd.RouterPath.ProcessorName
+			}
 			if pd.IsApprovalPlaced() && pd.ApprovalTxData.SentHash == txHash {
 				txDetails.SentTransactions = append(txDetails.SentTransactions, responses.NewRouterSentTransaction(
 					pd.ApprovalTxData.TxArgs,
 					pd.ApprovalTxData.SentHash,
-					true))
+					true,
+					processorName))
 			}
 			if pd.IsTxPlaced() && pd.TxData.SentHash == txHash {
 				txDetails.SentTransactions = append(txDetails.SentTransactions, responses.NewRouterSentTransaction(
 					pd.TxData.TxArgs,
 					pd.TxData.SentHash,
-					false))
+					false,
+					processorName))
 			}
 		}
 	}
