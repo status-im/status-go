@@ -1,10 +1,10 @@
 #!/usr/bin/env groovy
 // vim: ft=groovy
-library 'status-jenkins-lib@v1.10.1'
+library 'status-jenkins-lib@v1.10.2'
 
 pipeline {
   /* This way we run the same Jenkinsfile on different platforms. */
-  agent { label "${params.AGENT_LABEL} && go-1.26" }
+  agent { label "${params.AGENT_LABEL} && nix && go-1.26" }
 
   parameters {
     string(
@@ -189,4 +189,3 @@ def cleanTmp() {
     dir("${env.WORKSPACE}@tmp") { deleteDir() }
   }
 }
-
