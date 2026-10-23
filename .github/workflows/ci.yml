@@ -51,6 +51,12 @@ jobs:
           key: gomod-${{ matrix.os }}-${{ hashFiles('go.sum') }}
           restore-keys: gomod-${{ matrix.os }}-
 
+      # The token library's Nim; before Nimble, so its bundled nimble doesn't shadow it.
+      - uses: jiro4989/setup-nim-action@189b145833368cc92f1e7b3e166a25a3e057a693
+        with:
+          nim-version: '2.2.10'
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
       - uses: nim-lang/setup-nimble-action@b2eed48dc4ff7b6c1c5704fe9237ab6736c561cb # master: arch detection (#16)
         with:
           nimble-version: ${{ env.NIMBLE_VERSION }}
@@ -143,6 +149,12 @@ jobs:
           path: ${{ steps.go-env.outputs.modcache }}
           key: gomod-${{ matrix.target }}-${{ hashFiles('go.sum') }}
           restore-keys: gomod-${{ matrix.target }}-
+
+      # The token library's Nim; before Nimble, so its bundled nimble doesn't shadow it.
+      - uses: jiro4989/setup-nim-action@189b145833368cc92f1e7b3e166a25a3e057a693
+        with:
+          nim-version: '2.2.10'
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
 
       - uses: nim-lang/setup-nimble-action@b2eed48dc4ff7b6c1c5704fe9237ab6736c561cb # master: arch detection (#16)
         with:
