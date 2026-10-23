@@ -4220,6 +4220,7 @@ func (m *Messenger) MarkMessageAsUnread(chatID string, messageID string) (*Messe
 	if err != nil {
 		return nil, err
 	}
+	m.populateActivityCenterThreadNames(notifications)
 
 	response.AddActivityCenterNotifications(notifications)
 
@@ -4267,6 +4268,7 @@ func (m *Messenger) MarkMessagesSeen(chatID string, ids []string) (uint64, uint6
 	if err != nil {
 		return 0, 0, nil, err
 	}
+	m.populateActivityCenterThreadNames(notifications)
 
 	return count, countWithMentions, notifications, nil
 }
@@ -4301,6 +4303,7 @@ func (m *Messenger) MarkMessagesRead(chatID string, ids []string) (*MessengerRes
 	if err != nil {
 		return nil, err
 	}
+	m.populateActivityCenterThreadNames(notifications)
 
 	response.AddActivityCenterNotifications(notifications)
 
