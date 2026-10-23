@@ -160,14 +160,16 @@ NIMBLE_LIB := $(CURDIR)/build/liblogosdelivery.$(LIB_EXT)
 
 # Leopard's CMake would otherwise pick MSVC from vcvars, whose flags MSYS mangles.
 ifeq ($(detected_OS),Windows)
-LEOPARD_CC_ENV := CC=gcc CXX=g++
+LEOPARD_CC_ENV := CC=gcc CXX=g++ CMAKE_GENERATOR="MSYS Makefiles"
+# winlibs' only libgomp is static and needs dlopen.
+LEOPARD_NIM_PARAMS := -d:LeopardCmakeFlags=-DENABLE_OPENMP=off -d:LeopardExtraCompilerFlags=-fno-openmp -d:LeopardExtraLinkerFlags=-fno-openmp
 endif
 
 .PHONY: liblogosdelivery-nimble statusgo-nim-delivery
 
 $(NIMBLE_LIB): | nimble.paths
 	$(LEOPARD_CC_ENV) LIBLOGOSDELIVERY_OUT="$(CURDIR)/build" \
-		NIM_PARAMS="--skipParentCfg $$NIM_PARAMS -d:disable_rln $$(tr '\n' ' ' < $(CURDIR)/nimble.paths)" \
+		NIM_PARAMS="--skipParentCfg $$NIM_PARAMS $(LEOPARD_NIM_PARAMS) -d:disable_rln $$(tr '\n' ' ' < $(CURDIR)/nimble.paths)" \
 		$(NIMBLE) liblogosdelivery
 	@test -f $@ || (echo "ERROR: $@ was not produced" && exit 1)
 
