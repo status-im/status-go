@@ -57,7 +57,7 @@ func (s *MessengerThreadsSuite) TestCreateThreadRequiresParentMessage() {
 	s.Require().Contains(err.Error(), "parent message not found")
 }
 
-func (s *MessengerThreadsSuite) TestSenderCanCreateThreadRequiresPrivilegedCommunityMember() {
+func (s *MessengerThreadsSuite) TestSenderCanCreateThreadAllowsCommunityMembersAndRejectsNonMembers() {
 	communityResponse, err := s.m.CreateCommunity(&requests.CreateCommunity{
 		Membership:  protobuf.CommunityPermissions_AUTO_ACCEPT,
 		Name:        "test community",
@@ -67,6 +67,7 @@ func (s *MessengerThreadsSuite) TestSenderCanCreateThreadRequiresPrivilegedCommu
 	s.Require().NoError(err)
 
 	community := communityResponse.Communities()[0]
+	s.Require().False(community.AllowsAllMembersToCreateThread())
 	chatResponse, err := s.m.CreateCommunityChat(community.ID(), &protobuf.CommunityChat{
 		Permissions: &protobuf.CommunityPermissions{Access: protobuf.CommunityPermissions_AUTO_ACCEPT},
 		Identity:    &protobuf.ChatIdentity{DisplayName: "test chat"},
@@ -74,7 +75,18 @@ func (s *MessengerThreadsSuite) TestSenderCanCreateThreadRequiresPrivilegedCommu
 	s.Require().NoError(err)
 	chat := chatResponse.Chats()[0]
 
+	member, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+	_, err = community.AddMember(&member.PublicKey, nil, community.Clock())
+	s.Require().NoError(err)
+	s.Require().NoError(s.m.communitiesManager.SaveCommunity(community))
+	s.Require().False(community.IsPrivilegedMember(&member.PublicKey))
+
 	allowed, err := s.m.senderCanCreateThread(chat, &s.m.identity.PublicKey)
+	s.Require().NoError(err)
+	s.Require().True(allowed)
+
+	allowed, err = s.m.senderCanCreateThread(chat, &member.PublicKey)
 	s.Require().NoError(err)
 	s.Require().True(allowed)
 
