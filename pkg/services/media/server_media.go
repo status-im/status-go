@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"os"
 	"strconv"
+	"sync"
 
 	"go.uber.org/zap"
 
@@ -65,6 +66,9 @@ type MediaServerConfig struct {
 type Server struct {
 	*httpserver.Server
 
+	// providersMu guards db, walletDB, downloader and the community readers,
+	// which are set or swapped while handlers are already running.
+	providersMu                 sync.RWMutex
 	db                          *sql.DB
 	downloader                  *ipfs.Downloader
 	multiaccountsDB             *multiaccounts.Database
@@ -192,10 +196,38 @@ func NewServer(db *sql.DB, downloader *ipfs.Downloader, multiaccountsDB *multiac
 	return s, nil
 }
 
+// SetDataProviders swaps the backing data sources. It is called during node
+// teardown while handlers are still in flight, so the fields are only ever
+// touched under providersMu; handlers must read them via the accessors below
+// and keep the result, never re-reading between a nil check and a use.
 func (s *Server) SetDataProviders(db *sql.DB, walletDB *sql.DB, downloader *ipfs.Downloader) {
+	s.providersMu.Lock()
+	defer s.providersMu.Unlock()
+
 	s.db = db
 	s.walletDB = walletDB
 	s.downloader = downloader
+}
+
+func (s *Server) appDatabase() *sql.DB {
+	s.providersMu.RLock()
+	defer s.providersMu.RUnlock()
+
+	return s.db
+}
+
+func (s *Server) walletDatabase() *sql.DB {
+	s.providersMu.RLock()
+	defer s.providersMu.RUnlock()
+
+	return s.walletDB
+}
+
+func (s *Server) ipfsDownloader() *ipfs.Downloader {
+	s.providersMu.RLock()
+	defer s.providersMu.RUnlock()
+
+	return s.downloader
 }
 
 func (s *Server) Start() error {
@@ -215,36 +247,57 @@ func (s *Server) Start() error {
 }
 
 func (s *Server) SetCommunityImageVersionReader(getFunc func(communityID string) uint32) {
+	s.providersMu.Lock()
+	defer s.providersMu.Unlock()
+
 	s.communityImageVersionReader = getFunc
 }
 
 func (s *Server) getCommunityImageVersion(communityID string) uint32 {
-	if s.communityImageVersionReader == nil {
+	s.providersMu.RLock()
+	reader := s.communityImageVersionReader
+	s.providersMu.RUnlock()
+
+	if reader == nil {
 		return 0
 	}
-	return s.communityImageVersionReader(communityID)
+	return reader(communityID)
 }
 
 func (s *Server) SetCommunityImageReader(getFunc func(communityID string) (map[string]*protobuf.IdentityImage, error)) {
+	s.providersMu.Lock()
+	defer s.providersMu.Unlock()
+
 	s.communityImagesReader = getFunc
 }
 
 func (s *Server) getCommunityImage(communityID string) (map[string]*protobuf.IdentityImage, error) {
-	if s.communityImagesReader == nil {
+	s.providersMu.RLock()
+	reader := s.communityImagesReader
+	s.providersMu.RUnlock()
+
+	if reader == nil {
 		return nil, errors.New("community image reader not set")
 	}
-	return s.communityImagesReader(communityID)
+	return reader(communityID)
 }
 
 func (s *Server) SetCommunityTokensReader(getFunc func(communityID string) ([]*protobuf.CommunityTokenMetadata, error)) {
+	s.providersMu.Lock()
+	defer s.providersMu.Unlock()
+
 	s.communityTokenReader = getFunc
 }
 
 func (s *Server) getCommunityTokens(communityID string) ([]*protobuf.CommunityTokenMetadata, error) {
-	if s.communityTokenReader == nil {
+	s.providersMu.RLock()
+	reader := s.communityTokenReader
+	s.providersMu.RUnlock()
+
+	if reader == nil {
 		return nil, errors.New("community token reader not set")
 	}
-	return s.communityTokenReader(communityID)
+	return reader(communityID)
 }
 
 func (s *Server) MakeImageServerURL() string {

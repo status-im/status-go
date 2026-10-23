@@ -610,7 +610,8 @@ func (s *Server) handleAccountInitials(w http.ResponseWriter, r *http.Request) {
 
 // handleContactImages render contacts custom profile image
 func (s *Server) handleContactImages(w http.ResponseWriter, r *http.Request) {
-	if s.db == nil {
+	db := s.appDatabase()
+	if db == nil {
 		s.GetLogger().Warn("can't handle media request without appdb")
 		w.WriteHeader(http.StatusServiceUnavailable)
 		return
@@ -635,7 +636,7 @@ func (s *Server) handleContactImages(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var payload []byte
-	err := s.db.QueryRow(`SELECT payload FROM chat_identity_contacts WHERE contact_id = ? and image_type = ?`, parsed.PublicKey, parsed.ImageName).Scan(&payload)
+	err := db.QueryRow(`SELECT payload FROM chat_identity_contacts WHERE contact_id = ? and image_type = ?`, parsed.PublicKey, parsed.ImageName).Scan(&payload)
 	if err != nil {
 		s.GetLogger().Error("failed to load image.", zap.String("contact id", logutils.TruncateWithDot(parsed.PublicKey)), zap.String("image type", parsed.ImageName), zap.Error(err))
 		return
@@ -723,7 +724,8 @@ func getTheme(params url.Values, logger *zap.Logger) ring.Theme {
 }
 
 func (s *Server) handleDiscordAuthorAvatar(w http.ResponseWriter, r *http.Request) {
-	if s.db == nil {
+	db := s.appDatabase()
+	if db == nil {
 		s.GetLogger().Warn("can't handle media request without appdb")
 		w.WriteHeader(http.StatusServiceUnavailable)
 		return
@@ -738,7 +740,7 @@ func (s *Server) handleDiscordAuthorAvatar(w http.ResponseWriter, r *http.Reques
 	}
 
 	var image []byte
-	err := s.db.QueryRow(`SELECT avatar_image_payload FROM discord_message_authors WHERE id = ?`, parsed.AuthorID).Scan(&image)
+	err := db.QueryRow(`SELECT avatar_image_payload FROM discord_message_authors WHERE id = ?`, parsed.AuthorID).Scan(&image)
 	if err != nil {
 		s.GetLogger().Error("failed to find image", zap.Error(err))
 		return
@@ -762,7 +764,8 @@ func (s *Server) handleDiscordAuthorAvatar(w http.ResponseWriter, r *http.Reques
 }
 
 func (s *Server) handleDiscordAttachment(w http.ResponseWriter, r *http.Request) {
-	if s.db == nil {
+	db := s.appDatabase()
+	if db == nil {
 		s.GetLogger().Warn("can't handle media request without appdb")
 		w.WriteHeader(http.StatusServiceUnavailable)
 		return
@@ -781,7 +784,7 @@ func (s *Server) handleDiscordAttachment(w http.ResponseWriter, r *http.Request)
 	}
 
 	var image []byte
-	err := s.db.QueryRow(`SELECT payload FROM discord_message_attachments WHERE discord_message_id = ? AND id = ?`, parsed.MessageID, parsed.AttachmentID).Scan(&image)
+	err := db.QueryRow(`SELECT payload FROM discord_message_attachments WHERE discord_message_id = ? AND id = ?`, parsed.MessageID, parsed.AttachmentID).Scan(&image)
 	if err != nil {
 		s.GetLogger().Error("failed to find image", zap.Error(err))
 		return
@@ -805,7 +808,8 @@ func (s *Server) handleDiscordAttachment(w http.ResponseWriter, r *http.Request)
 }
 
 func (s *Server) handleImage(w http.ResponseWriter, r *http.Request) {
-	if s.db == nil {
+	db := s.appDatabase()
+	if db == nil {
 		s.GetLogger().Warn("can't handle media request without appdb")
 		w.WriteHeader(http.StatusServiceUnavailable)
 		return
@@ -820,7 +824,7 @@ func (s *Server) handleImage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var image []byte
-	err := s.db.QueryRow(`SELECT image_payload FROM user_messages WHERE id = ?`, parsed.MessageID).Scan(&image)
+	err := db.QueryRow(`SELECT image_payload FROM user_messages WHERE id = ?`, parsed.MessageID).Scan(&image)
 	if err != nil {
 		s.GetLogger().Error("failed to find image", zap.Error(err))
 		return
@@ -844,7 +848,8 @@ func (s *Server) handleImage(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleAudio(w http.ResponseWriter, r *http.Request) {
-	if s.db == nil {
+	db := s.appDatabase()
+	if db == nil {
 		s.GetLogger().Warn("can't handle media request without appdb")
 		w.WriteHeader(http.StatusServiceUnavailable)
 		return
@@ -859,7 +864,7 @@ func (s *Server) handleAudio(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var audio []byte
-	err := s.db.QueryRow(`SELECT audio_payload FROM user_messages WHERE id = ?`, parsed.MessageID).Scan(&audio)
+	err := db.QueryRow(`SELECT audio_payload FROM user_messages WHERE id = ?`, parsed.MessageID).Scan(&audio)
 	if err != nil {
 		s.GetLogger().Error("failed to find image", zap.Error(err))
 		return
@@ -879,7 +884,8 @@ func (s *Server) handleAudio(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleIPFS(w http.ResponseWriter, r *http.Request) {
-	if s.downloader == nil {
+	downloader := s.ipfsDownloader()
+	if downloader == nil {
 		s.GetLogger().Warn("can't handle media request without ipfs downloader")
 		w.WriteHeader(http.StatusServiceUnavailable)
 		return
@@ -893,7 +899,7 @@ func (s *Server) handleIPFS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	content, err := s.downloader.Get(parsed.Hash, parsed.Download)
+	content, err := downloader.Get(parsed.Hash, parsed.Download)
 	if err != nil {
 		s.GetLogger().Error("could not download hash", zap.Error(err))
 		return
@@ -909,7 +915,8 @@ func (s *Server) handleIPFS(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleCommunityTokenImages(w http.ResponseWriter, r *http.Request) {
-	if s.db == nil {
+	db := s.appDatabase()
+	if db == nil {
 		s.GetLogger().Warn("can't handle media request without appdb")
 		w.WriteHeader(http.StatusServiceUnavailable)
 		return
@@ -937,7 +944,7 @@ func (s *Server) handleCommunityTokenImages(w http.ResponseWriter, r *http.Reque
 	}
 
 	var base64Image string
-	err = s.db.QueryRow("SELECT image_base64 FROM community_tokens WHERE community_id = ? AND chain_id = ? AND symbol = ?", params["communityID"][0], chainID, params["symbol"][0]).Scan(&base64Image)
+	err = db.QueryRow("SELECT image_base64 FROM community_tokens WHERE community_id = ? AND chain_id = ? AND symbol = ?", params["communityID"][0], chainID, params["symbol"][0]).Scan(&base64Image)
 	if err != nil {
 		s.GetLogger().Error("failed to find community token image", zap.Error(err))
 		return
@@ -966,7 +973,7 @@ func (s *Server) handleCommunityTokenImages(w http.ResponseWriter, r *http.Reque
 }
 
 func (s *Server) handleCommunityDescriptionImages(w http.ResponseWriter, r *http.Request) {
-	if s.db == nil {
+	if s.appDatabase() == nil {
 		s.GetLogger().Warn("can't handle media request without appdb")
 		w.WriteHeader(http.StatusServiceUnavailable)
 		return
@@ -1015,7 +1022,7 @@ func (s *Server) handleCommunityDescriptionImages(w http.ResponseWriter, r *http
 }
 
 func (s *Server) handleCommunityDescriptionTokenImages(w http.ResponseWriter, r *http.Request) {
-	if s.db == nil {
+	if s.appDatabase() == nil {
 		s.GetLogger().Warn("can't handle media request without appdb")
 		w.WriteHeader(http.StatusServiceUnavailable)
 		return
@@ -1070,7 +1077,8 @@ func (s *Server) handleCommunityDescriptionTokenImages(w http.ResponseWriter, r 
 }
 
 func (s *Server) handleWalletCommunityImages(w http.ResponseWriter, r *http.Request) {
-	if s.walletDB == nil {
+	walletDB := s.walletDatabase()
+	if walletDB == nil {
 		s.GetLogger().Warn("can't handle media request without wallet db")
 		w.WriteHeader(http.StatusServiceUnavailable)
 		return
@@ -1084,7 +1092,7 @@ func (s *Server) handleWalletCommunityImages(w http.ResponseWriter, r *http.Requ
 	}
 
 	var image []byte
-	err := s.walletDB.QueryRow(`SELECT image_payload FROM community_data_cache WHERE id = ?`, params["communityID"][0]).Scan(&image)
+	err := walletDB.QueryRow(`SELECT image_payload FROM community_data_cache WHERE id = ?`, params["communityID"][0]).Scan(&image)
 	if err != nil {
 		s.GetLogger().Error("failed to find wallet community image", zap.Error(err))
 		return
@@ -1108,7 +1116,8 @@ func (s *Server) handleWalletCommunityImages(w http.ResponseWriter, r *http.Requ
 }
 
 func (s *Server) handleWalletCollectionImages(w http.ResponseWriter, r *http.Request) {
-	if s.walletDB == nil {
+	walletDB := s.walletDatabase()
+	if walletDB == nil {
 		s.GetLogger().Warn("can't handle media request without wallet db")
 		w.WriteHeader(http.StatusServiceUnavailable)
 		return
@@ -1138,7 +1147,7 @@ func (s *Server) handleWalletCollectionImages(w http.ResponseWriter, r *http.Req
 	}
 
 	var image []byte
-	err = s.walletDB.QueryRow(`SELECT image_payload FROM collection_data_cache WHERE chain_id = ? AND contract_address = ?`,
+	err = walletDB.QueryRow(`SELECT image_payload FROM collection_data_cache WHERE chain_id = ? AND contract_address = ?`,
 		chainID,
 		contractAddress).Scan(&image)
 	if err != nil {
@@ -1164,7 +1173,8 @@ func (s *Server) handleWalletCollectionImages(w http.ResponseWriter, r *http.Req
 }
 
 func (s *Server) handleWalletCollectibleImages(w http.ResponseWriter, r *http.Request) {
-	if s.walletDB == nil {
+	walletDB := s.walletDatabase()
+	if walletDB == nil {
 		s.GetLogger().Warn("can't handle media request without wallet db")
 		w.WriteHeader(http.StatusServiceUnavailable)
 		return
@@ -1204,7 +1214,7 @@ func (s *Server) handleWalletCollectibleImages(w http.ResponseWriter, r *http.Re
 	}
 
 	var image []byte
-	err = s.walletDB.QueryRow(`SELECT image_payload FROM collectible_data_cache WHERE chain_id = ? AND contract_address = ? AND token_id = ?`,
+	err = walletDB.QueryRow(`SELECT image_payload FROM collectible_data_cache WHERE chain_id = ? AND contract_address = ? AND token_id = ?`,
 		chainID,
 		contractAddress,
 		(*bigint.SQLBigIntBytes)(tokenID)).Scan(&image)
