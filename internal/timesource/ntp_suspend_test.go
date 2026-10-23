@@ -2,6 +2,7 @@ package timesource
 
 import (
 	"context"
+	"errors"
 	"net"
 	"sync"
 	"sync/atomic"
@@ -104,4 +105,53 @@ func TestComputeOffsetStopsWaitingForNameResolution(t *testing.T) {
 		require.Positive(t, dials.Load(), "blocked before reaching the resolver")
 		t.Fatalf("computeOffset with a %v deadline still running after %v, stuck in name resolution", deadline, 5*deadline)
 	}
+}
+
+// A failed sync after a clock jump must be retried at the fast period,
+// not an hour later at the slow one.
+func TestFailedSyncAfterClockJumpRetriesAtFastPeriod(t *testing.T) {
+	var queries atomic.Int32
+	source := &ntpTimeSource{
+		servers:         []string{"ntp1"},
+		allowedFailures: 0,
+		timeQuery: func(string, ntp.QueryOptions) (*ntp.Response, error) {
+			queries.Add(1)
+			return nil, errors.New("offline")
+		},
+		fastNTPSyncPeriod: 20 * time.Millisecond,
+		slowNTPSyncPeriod: time.Hour,
+		now:               func() time.Time { return time.Now().Add(time.Hour) },
+		lastMonotonic:     time.Now(),
+		fastRetry:         make(chan struct{}, 1),
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	// The last sync succeeded, so the periodic loop is on the slow period.
+	source.runPeriodically(ctx, source.updateOffset, true)
+
+	source.Now()
+
+	require.Eventually(t, func() bool { return queries.Load() >= 2 }, time.Second, 5*time.Millisecond,
+		"sync was not retried after the clock-jump sync failed")
+}
+
+// The wall clock drifts against the monotonic clock while the OS disciplines it.
+// A successful sync must move the reference, so drift accumulated before it is
+// not mistaken for a clock change later.
+func TestSuccessfulSyncResetsClockJumpReference(t *testing.T) {
+	start := time.Now()
+	syncTime := start.Add(800 * time.Millisecond)
+	source := &ntpTimeSource{
+		servers:         []string{"ntp1"},
+		allowedFailures: 0,
+		timeQuery: func(string, ntp.QueryOptions) (*ntp.Response, error) {
+			return &ntp.Response{Stratum: 1}, nil
+		},
+		now:           func() time.Time { return syncTime },
+		lastMonotonic: start,
+	}
+
+	require.NoError(t, source.updateOffset())
+	require.Equal(t, syncTime, source.lastMonotonic, "reference was not moved to the sync time")
 }

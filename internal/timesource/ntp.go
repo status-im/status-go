@@ -144,6 +144,7 @@ var defaultNTPTimeSource = &ntpTimeSource{
 	slowNTPSyncPeriod: SlowNTPSyncPeriod,
 	timeQuery:         ntp.QueryWithOptions,
 	now:               time.Now,
+	fastRetry:         make(chan struct{}, 1),
 }
 
 // ntpTimeSource provides source of time that tries to be resistant to time skews.
@@ -167,6 +168,8 @@ type ntpTimeSource struct {
 	lastMonotonic time.Time
 
 	offsetUpdating atomic.Bool
+	// fastRetry asks the periodic sync to retry at the fast period.
+	fastRetry chan struct{}
 }
 
 // Now returns time adjusted by latest known offset
@@ -214,8 +217,12 @@ func (s *ntpTimeSource) requestOffsetUpdate() {
 	go func() {
 		defer panics.LogOnPanic()
 		defer s.offsetUpdating.Store(false)
-		// Ignore error as it's logged in updateOffset
-		_ = s.updateOffset()
+		if err := s.updateOffset(); err != nil {
+			select {
+			case s.fastRetry <- struct{}{}:
+			default:
+			}
+		}
 	}()
 }
 
@@ -229,6 +236,10 @@ func (s *ntpTimeSource) updateOffset() error {
 	s.timeDataMu.Lock()
 	defer s.timeDataMu.Unlock()
 	s.latestOffset = offset
+	// The fresh offset covers any drift so far, so measure clock changes from here.
+	if !s.lastMonotonic.IsZero() {
+		s.lastMonotonic = s.now()
+	}
 	//TBD: if we found offset is too large, we should notify user that system time might not be accurate via emit signal,
 	// and because go-waku doesn't use ntpTimeSource ATM (it just use time.Now()), this might be a problem for MissingMessageVerifier work normally.
 	// e.g. might get errInvalidTimeRange when validate StoreQueryRequest
@@ -276,6 +287,11 @@ func (s *ntpTimeSource) runPeriodically(ctx context.Context, fn func() error, st
 					period = s.slowNTPSyncPeriod
 				}
 				resetTimer(period)
+			case <-s.fastRetry:
+				if !paused {
+					period = s.fastNTPSyncPeriod
+					resetTimer(period)
+				}
 			case <-timer.C:
 				if paused {
 					resetTimer(period)
@@ -307,8 +323,9 @@ func (s *ntpTimeSource) Start(ctx context.Context) error {
 	}
 
 	// Initialize time tracking fields immediately
-	currentTime := s.now()
-	s.lastMonotonic = currentTime
+	s.timeDataMu.Lock()
+	s.lastMonotonic = s.now()
+	s.timeDataMu.Unlock()
 	ctx, cancel := context.WithCancel(ctx)
 	s.cancel = cancel
 	s.started = true
