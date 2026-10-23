@@ -476,10 +476,10 @@ class WakuextService(Service):
             "contentType": content_type,
             "responseTo": responseTo,
         }
-        if image_path:
-            payload["imagePath"] = image_path
         if thread_id:
             payload["threadId"] = thread_id
+        if image_path:
+            payload["imagePath"] = image_path
         if payment_requests:
             payload["paymentRequests"] = [_payment_request_payload(request) for request in payment_requests]
         params = [payload]
@@ -544,6 +544,40 @@ class WakuextService(Service):
     def chat_thread_messages(self, chat_id: str, thread_id: str, cursor: str = "", limit: int = 10):
         return self.rpc_request("chatMessagesV2", [chat_id, thread_id, cursor, limit])
 
+    def chat_messages_in_thread(self, chat_id: str, thread_id: str, cursor="", limit=10):
+        params = [chat_id, thread_id, cursor, limit]
+        response = self.rpc_request("chatMessagesV2", params)
+        return response
+
+    def chat_thread_summaries_by_parent_message_ids(self, chat_id: str, parent_message_ids: list[str], participants_preview_limit: int = 6):
+        params = [chat_id, parent_message_ids, participants_preview_limit]
+        response = self.rpc_request("chatThreadSummariesByParentMessageIDs", params)
+        return response
+
+    def start_thread_from_new_message(self, chat_id: str, message: str, thread_name: str):
+        params = [
+            {
+                "message": {
+                    "chatId": chat_id,
+                    "text": message,
+                    "contentType": MessageContentType.TEXT_PLAIN.value,
+                },
+                "threadName": thread_name,
+            }
+        ]
+        response = self.rpc_request("startThreadFromNewMessage", params)
+        return response
+
+    def mark_all_read(self, chat_id: str):
+        params = [chat_id]
+        response = self.rpc_request("markAllRead", params)
+        return response
+
+    def mark_all_read_in_community(self, community_id: str):
+        params = [community_id]
+        response = self.rpc_request("markAllReadInCommunity", params)
+        return response
+
     def mark_thread_read(self, chat_id: str, thread_id: str):
         return self.rpc_request("markThreadRead", [chat_id, thread_id])
 
@@ -555,6 +589,11 @@ class WakuextService(Service):
     def all_messages_from_chat_which_match_term(self, chat_id: str, searchTerm: str, caseSensitive: bool):
         params = [chat_id, searchTerm, caseSensitive]
         response = self.rpc_request("allMessagesFromChatWhichMatchTerm", params)
+        return response
+
+    def all_messages_from_thread_which_match_term(self, chat_id: str, thread_id: str, searchTerm: str, caseSensitive: bool):
+        params = [chat_id, thread_id, searchTerm, caseSensitive]
+        response = self.rpc_request("allMessagesFromThreadWhichMatchTerm", params)
         return response
 
     def all_messages_from_chats_and_communities_which_match_term(
@@ -798,6 +837,11 @@ class WakuextService(Service):
     def emoji_reactions_by_chat_id(self, sender_chat_id: str, limit: int):
         params = [sender_chat_id, None, limit]
         response = self.rpc_request(method="emojiReactionsByChatID", params=params)
+        return list_or_empty(response)
+
+    def emoji_reactions_by_chat_id_v2(self, chat_id: str, thread_id: str, limit: int):
+        params = [chat_id, thread_id, "", limit]
+        response = self.rpc_request(method="emojiReactionsByChatIDV2", params=params)
         return list_or_empty(response)
 
     def emoji_reactions_by_chat_id_message_id(self, sender_chat_id: str, message_id: str):
