@@ -120,8 +120,8 @@ class TestWakuextThreads:
         )
         assert summary["messagesCount"] == 2
         assert summary["lastMessage"]["text"] == reply_text
-        assert summary["participantsCount"] >= 1
-        assert summary["participantsPreviewIds"]
+        assert summary["participantsCount"] == 1
+        assert summary["participantsPreviewIds"] == [sender.public_key]
 
         with pytest.raises(ApiResponseError, match="can't pin a message in a thread"):
             sender.wakuext_service.send_pin_message({"chat_id": sender_chat_id, "message_id": reply_id, "pinned": True})
@@ -198,11 +198,15 @@ class TestWakuextThreadExtras:
         reply_text = f"reply-{uuid4()}"
         sender_chat_id, receiver_chat_id, parent_id, reply_id = await _one_to_one_thread(sender, receiver, parent_text, reply_text)
 
+        parent_reaction = receiver.wakuext_service.send_emoji_reaction(receiver_chat_id, parent_id, "1f44d")
+        parent_emoji_id = parent_reaction["emojiReactions"][0]["id"]
+        await sender.wait_for_signal(SignalType.MESSAGES_NEW, pattern=parent_emoji_id, timeout=60, check_buffer=True)
         reaction = receiver.wakuext_service.send_emoji_reaction(receiver_chat_id, reply_id, "2764")
         emoji_id = reaction["emojiReactions"][0]["id"]
         await sender.wait_for_signal(SignalType.MESSAGES_NEW, pattern=emoji_id, timeout=60, check_buffer=True)
 
         parent_reactions = sender.wakuext_service.emoji_reactions_by_chat_id(sender_chat_id, 20)
+        assert any(item.get("messageId") == parent_id and item.get("emoji") == "1f44d" for item in parent_reactions)
         assert all(item.get("messageId") != reply_id for item in parent_reactions)
         thread_reactions = sender.wakuext_service.emoji_reactions_by_chat_id_v2(sender_chat_id, parent_id, 20)
         assert any(item.get("messageId") == reply_id and item.get("emoji") == "2764" for item in thread_reactions)
@@ -226,6 +230,23 @@ class TestWakuextThreadExtras:
         assert reply_text in _texts(found)
         missed = receiver.wakuext_service.all_messages_from_thread_which_match_term(chat_id, parent_id, sibling_text, False)
         assert sibling_text not in _texts(missed)
+
+    async def test_community_member_cannot_create_thread(self, sender, receiver):
+        sender_chat_id, receiver_chat_id, _ = await _open_shared_chat(sender, receiver, ChatKind.COMMUNITY)
+        parent_text = f"parent-{uuid4()}"
+        parent_response = sender.wakuext_service.send_chat_message(sender_chat_id, parent_text)
+        parent_id = _message_by_text(parent_response, parent_text)["id"]
+        await receiver.wait_for_signal(SignalType.MESSAGES_NEW, pattern=parent_id, timeout=60, check_buffer=True)
+
+        with pytest.raises(ApiResponseError, match="only admins can create threads in this community"):
+            receiver.wakuext_service.create_thread(receiver_chat_id, parent_id)
+        with pytest.raises(ApiResponseError, match="only admins can create threads in this community"):
+            receiver.wakuext_service.send_chat_message(receiver_chat_id, f"reply-{uuid4()}", thread_id=parent_id)
+        thread_name = f"Named-{uuid4()}"
+        with pytest.raises(ApiResponseError, match="only admins can create threads in this community"):
+            receiver.wakuext_service.start_thread_from_new_message(receiver_chat_id, f"first-{uuid4()}", thread_name)
+        assert not (receiver.wakuext_service.chat_threads(receiver_chat_id) or {}).get("threads")
+        assert thread_name not in _texts(receiver.wakuext_service.chat_messages(receiver_chat_id, limit=20))
 
 
 @pytest.mark.rpc
