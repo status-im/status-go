@@ -300,6 +300,12 @@ def communities_list(communities_response):
     return communities_response or []
 
 
+def community_members(backend, community_id: str) -> dict:
+    """Return the roster of *community_id* as seen by *backend*, keyed by member public key."""
+    snapshot = backend.wakuext_service.get_community_members(community_id) or {}
+    return {member["pubKey"]: member for member in snapshot.get("members") or []}
+
+
 def wallet_address(backend):
     """Return the non-chat (wallet) account address for *backend*."""
     accounts = backend.accounts_service.get_accounts()

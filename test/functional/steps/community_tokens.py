@@ -337,7 +337,7 @@ def wait_for_member_role(
             (c for c in messenger.communities_list(communities) if c.get("id") == community_id),
             None,
         )
-        roles = (community or {}).get("members", {}).get(member_key, {}).get("roles", [])
+        roles = messenger.community_members(backend, community_id).get(member_key, {}).get("roles", []) if community else []
         if role in roles:
             assert community is not None, "Community not found"
             return community
@@ -345,7 +345,7 @@ def wait_for_member_role(
 
     if required:
         assert community is not None, "Community not found"
-        roles = community.get("members", {}).get(member_key, {}).get("roles", [])
+        roles = messenger.community_members(backend, community_id).get(member_key, {}).get("roles", [])
         assert role in roles, f"Member {member_key} did not receive role {role} after {attempts} attempts; roles={roles}"
         return community
     else:

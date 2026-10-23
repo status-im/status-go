@@ -5,6 +5,8 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/status-im/status-go/internal/images"
+	"github.com/status-im/status-go/internal/protocol/communities"
 	"github.com/status-im/status-go/internal/protocol/contacts"
 	"github.com/status-im/status-go/internal/protocol/protobuf"
 	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
@@ -94,6 +96,32 @@ func (cm *contactMap) Delete(contactID string) {
 		return
 	}
 	cm.sm.Delete(contactID)
+}
+
+// loadIncludingSelf is Load without the own-identity warning.
+func (cm *contactMap) loadIncludingSelf(pubKey string) (*contacts.Contact, bool) {
+	if pubKey == cm.me.ID {
+		return cm.me, true
+	}
+	value, ok := cm.sm.Load(pubKey)
+	if !ok || value == nil {
+		return nil, false
+	}
+	return value.(*contacts.Contact), true
+}
+
+// MemberProfile implements communities.MemberProfileProvider.
+func (cm *contactMap) MemberProfile(pubKey string) (communities.MemberProfile, bool) {
+	contact, ok := cm.loadIncludingSelf(pubKey)
+	if !ok {
+		return communities.MemberProfile{}, false
+	}
+	return communities.MemberProfile{
+		DisplayName:         contact.DisplayName,
+		EnsName:             contact.EnsName,
+		EnsVerified:         contact.ENSVerified,
+		ThumbnailImageClock: contact.Images[images.SmallDimName].Clock,
+	}, true
 }
 
 func (cm *contactMap) Len() int {

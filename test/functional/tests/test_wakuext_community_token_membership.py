@@ -73,8 +73,9 @@ class TestCommunityTokenMembership:
         communities = owner_backend.wakuext_service.communities()
         owner_community = next((c for c in messenger.communities_list(communities) if c.get("id") == community_id), None)
         assert owner_community is not None
-        assert member_public_key in owner_community.get("members", {}), f"Member {member_public_key} not found in community members"
-        member_roles = owner_community["members"][member_public_key].get("roles", [])
+        members = messenger.community_members(owner_backend, community_id)
+        assert member_public_key in members, f"Member {member_public_key} not found in community members"
+        member_roles = members[member_public_key].get("roles", [])
         assert CommunityRoles.ROLE_ADMIN.value not in member_roles, "Member should join without admin role"
 
     def test_admin_token_permissions_with_valid_tokens(self, owner_backend, member_with_snt_backend, foundry_client):
@@ -124,7 +125,8 @@ class TestCommunityTokenMembership:
         )
         assert owner_community
 
-        assert member_key in owner_community.get("members", {})
+        members = messenger.community_members(owner_backend, community_id)
+        assert member_key in members
 
-        assert owner_key in owner_community.get("members", {})
-        assert CommunityRoles.ROLE_OWNER.value in owner_community["members"][owner_key].get("roles", [])
+        assert owner_key in members
+        assert CommunityRoles.ROLE_OWNER.value in members[owner_key].get("roles", [])

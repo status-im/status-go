@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"fmt"
+	"maps"
 	"sync"
 	"time"
 
@@ -812,7 +813,7 @@ func (m *Messenger) HandleSyncThreadMessagesRead(ctx context.Context, state *Rec
 
 	thread, err := m.persistence.ThreadByID(message.ChatId, message.ThreadId)
 	if errors.Is(err, common.ErrRecordNotFound) {
-		err = m.persistence.UpsertThread(message.ThreadId, message.ChatId, message.ThreadId, "")
+		err = m.persistence.UpsertPendingCreatorThread(message.ThreadId, message.ChatId, message.ThreadId, "")
 		if err != nil {
 			return err
 		}
@@ -1785,6 +1786,7 @@ func (m *Messenger) HandleCommunityRequestToLeave(ctx context.Context, state *Re
 	if len(response.Communities()) > 0 {
 		state.Response.AddCommunity(response.Communities()[0])
 	}
+	state.Response.CommunityChanges = append(state.Response.CommunityChanges, response.CommunityChanges...)
 
 	return nil
 }
@@ -1890,6 +1892,128 @@ func (m *Messenger) HandleEditMessage(ctx context.Context, state *ReceivedMessag
 		ID:          state.CurrentMessageState.MessageID,
 		SigPubKey:   state.CurrentMessageState.PublicKey,
 	})
+}
+
+func (m *Messenger) HandleThreadMetadata(ctx context.Context, state *ReceivedMessageState, metadataProto *protobuf.ThreadMetadata, statusMessage *common.StatusMessage) error {
+	if !m.featureFlags.Threads {
+		return ErrThreadFeatureDisabled
+	}
+	if metadataProto == nil || metadataProto.ChatId == "" || metadataProto.ThreadId == "" || metadataProto.Clock == 0 {
+		return errors.New("invalid thread metadata")
+	}
+	if err := validateClockValue(metadataProto.Clock, state.CurrentMessageState.WhisperTimestamp); err != nil {
+		return err
+	}
+	metadata := &ThreadMetadata{ThreadMetadata: metadataProto, SigPubKey: state.CurrentMessageState.PublicKey}
+	chat, err := m.matchChatEntity(metadata, protobuf.ApplicationMetadataMessage_THREAD_METADATA)
+	if err != nil {
+		return err
+	}
+	if chat.ChatType != ChatTypeOneToOne && chat.ID != metadata.ChatId {
+		return errors.New("thread metadata chat does not match message chat")
+	}
+
+	senderID := contacts.ContactIDFromPublicKey(metadata.SigPubKey)
+	if metadata.CreatorId != "" {
+		if metadata.CreatorId != senderID {
+			return errors.New("thread creator does not match signer")
+		}
+		metadata.Name, _ = common.NormalizeThreadName(metadata.Name, true)
+		allowed, err := m.senderCanCreateThread(chat, metadata.SigPubKey)
+		if err != nil {
+			return err
+		}
+		if !allowed {
+			return errors.New(adminOnlyThreadCreationError)
+		}
+		existing, err := m.persistence.ThreadByID(chat.ID, metadata.ThreadId)
+		if err != nil && !errors.Is(err, common.ErrRecordNotFound) {
+			return err
+		}
+		switch {
+		case err != nil:
+			if err := m.persistence.UpsertThread(metadata.ThreadId, chat.ID, metadata.ThreadId, metadata.Name); err != nil {
+				return err
+			}
+			if err := m.persistence.SetThreadCreator(metadata.ThreadId, chat.ID, senderID); err != nil {
+				return err
+			}
+		case existing.CreatorID == senderID:
+		case existing.CreatorID != "":
+			return errors.New("thread creator cannot be changed")
+		case !existing.CreatorPending:
+			// Legacy creator-unknown threads can never be claimed.
+			return nil
+		default:
+			// The thread was created from a reply or read sync before this
+			// metadata arrived; the first valid creation claim wins.
+			claimed, err := m.persistence.ClaimPendingThreadCreator(chat.ID, metadata.ThreadId, senderID)
+			if err != nil {
+				return err
+			}
+			if !claimed {
+				return nil
+			}
+		}
+	} else {
+		name, overlong := common.NormalizeThreadName(metadata.Name, false)
+		if name == "" {
+			return requests.ErrEditThreadInvalidName
+		}
+		if overlong {
+			return requests.ErrEditThreadNameTooLong
+		}
+		thread, err := m.persistence.ThreadByID(chat.ID, metadata.ThreadId)
+		if errors.Is(err, common.ErrRecordNotFound) {
+			// The creation metadata has not arrived yet; replay once it does.
+			return m.bufferPendingThreadMetadata(chat, metadata, name)
+		}
+		if err != nil {
+			return err
+		}
+		allowed, err := m.senderCanEditThread(chat, thread, metadata.SigPubKey)
+		if err != nil {
+			return err
+		}
+		if !allowed {
+			if thread.CreatorPending {
+				// The signer may turn out to be the creator once the creation
+				// metadata claims this placeholder.
+				return m.bufferPendingThreadMetadata(chat, metadata, name)
+			}
+			return errors.New(threadEditPermissionError)
+		}
+		metadata.Name = name
+	}
+
+	if chat.LastClockValue < metadata.Clock {
+		chat.LastClockValue = metadata.Clock
+		if err := m.saveChat(chat); err != nil {
+			return err
+		}
+		state.Response.AddChat(chat)
+	}
+
+	updated, err := m.persistence.UpdateThreadMetadata(chat.ID, metadata.ThreadId, metadata.Name, metadata.Clock)
+	if err != nil {
+		return err
+	}
+	replayed := false
+	if metadata.CreatorId != "" {
+		replayed, err = m.applyPendingThreadMetadata(chat, metadata.ThreadId, metadata.Clock)
+		if err != nil {
+			return err
+		}
+	}
+	if !updated && !replayed {
+		return nil
+	}
+	thread, err := m.persistence.ThreadWithSummaryByID(chat.ID, metadata.ThreadId)
+	if err != nil {
+		return err
+	}
+	state.Response.AddThread(thread)
+	return nil
 }
 
 func (m *Messenger) handleDeleteMessage(ctx context.Context, state *ReceivedMessageState, deleteMessage *DeleteMessage) error {
@@ -2892,13 +3016,16 @@ func (m *Messenger) HandleChatIdentity(ctx context.Context, state *ReceivedMessa
 	contactModified := false
 
 	if imagesChanged {
-		for imageType, image := range ci.Images {
-			if contact.Images == nil {
-				contact.Images = make(map[string]images.IdentityImage)
-			}
-			contact.Images[imageType] = images.IdentityImage{Name: imageType, Payload: image.Payload, Clock: ci.Clock}
-
+		// Readers use the contact's image map without locks, so replace it
+		// rather than write to it.
+		updated := maps.Clone(contact.Images)
+		if updated == nil {
+			updated = make(map[string]images.IdentityImage, len(ci.Images))
 		}
+		for imageType, image := range ci.Images {
+			updated[imageType] = images.IdentityImage{Name: imageType, Payload: image.Payload, Clock: ci.Clock}
+		}
+		contact.Images = updated
 		if err = m.updateContactImagesURL(contact); err != nil {
 			return err
 		}

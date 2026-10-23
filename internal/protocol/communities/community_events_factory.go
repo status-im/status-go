@@ -181,27 +181,5 @@ func (o *Community) ToAddTokenMetadataCommunityEvent(tokenMetadata *protobuf.Com
 }
 
 func (o *Community) nextEventClock() uint64 {
-	latestEventClock := uint64(0)
-	if o.config.EventsData != nil {
-		for _, event := range o.config.EventsData.Events {
-			if event.CommunityEventClock > latestEventClock {
-				latestEventClock = event.CommunityEventClock
-			}
-		}
-	}
-
-	clock := o.config.CommunityDescription.Clock
-	if latestEventClock > clock {
-		clock = latestEventClock
-	}
-
-	// lamport timestamp
-	timestamp := o.timesource.GetCurrentTime()
-	if clock == 0 || clock < timestamp {
-		clock = timestamp
-	} else {
-		clock = clock + 1
-	}
-
-	return clock
+	return o.nextClock()
 }

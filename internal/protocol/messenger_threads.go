@@ -5,13 +5,19 @@ import (
 	"crypto/ecdsa"
 	"database/sql"
 	"errors"
+	"time"
 
+	"go.uber.org/zap"
+
+	"github.com/status-im/status-go/internal/crypto"
 	"github.com/status-im/status-go/internal/protocol/common"
+	"github.com/status-im/status-go/internal/protocol/contacts"
 	"github.com/status-im/status-go/internal/protocol/protobuf"
 	"github.com/status-im/status-go/internal/protocol/requests"
 )
 
 const adminOnlyThreadCreationError = "only admins can create threads in this community"
+const threadEditPermissionError = "only the thread creator or an admin can edit this thread"
 
 type MessagePageWithThreadSummaries struct {
 	Messages             []*common.Message `json:"messages"`
@@ -93,6 +99,41 @@ func (m *Messenger) senderCanCreateThread(chat *Chat, sender *ecdsa.PublicKey) (
 	return community.AllowsAllMembersToCreateThread() || (sender != nil && community.IsPrivilegedMember(sender)), nil
 }
 
+func (m *Messenger) senderCanEditThread(chat *Chat, thread *Thread, sender *ecdsa.PublicKey) (bool, error) {
+	if !chat.SupportsThreads() {
+		return false, ErrThreadsNotSupportedForChatType
+	}
+	if sender == nil {
+		return false, ErrThreadSenderRequired
+	}
+
+	senderID := contacts.ContactIDFromPublicKey(sender)
+	switch chat.ChatType {
+	case ChatTypeOneToOne:
+		return thread.CreatorID != "" && thread.CreatorID == senderID, nil
+	case ChatTypePrivateGroupChat:
+		group, err := newProtocolGroupFromChat(chat)
+		if err != nil {
+			return false, err
+		}
+		if !stringSliceContains(group.Members(), senderID) {
+			return false, nil
+		}
+		return thread.CreatorID == senderID || stringSliceContains(group.Admins(), senderID), nil
+	case ChatTypeCommunityChat:
+		community, err := m.communitiesManager.GetByIDString(chat.CommunityID)
+		if err != nil {
+			return false, err
+		}
+		if !community.CanView(sender, chat.CommunityChatID()) {
+			return false, nil
+		}
+		return thread.CreatorID == senderID || community.IsPrivilegedMember(sender), nil
+	default:
+		return false, ErrThreadsNotSupportedForChatType
+	}
+}
+
 // CreateThread creates thread metadata for an existing parent message in a chat.
 // The parent message must already be stored locally. Permission rules (admin-only
 // vs all-members) are enforced for community chats.
@@ -110,9 +151,22 @@ func (m *Messenger) CreateThread(chatID string, parentMessageID string) (*Messen
 		return nil, ErrChatNotFoundError
 	}
 
-	// Check if thread already exists for this parent message
-	_, threadErr := m.persistence.ThreadByID(chatID, parentMessageID)
+	// Retry delivery of creator provenance when a prior creation dispatch
+	// failed after persisting the local thread.
+	thread, threadErr := m.persistence.ThreadByID(chatID, parentMessageID)
 	if threadErr == nil {
+		if thread.CreatorID == contacts.ContactIDFromPublicKey(&m.identity.PublicKey) {
+			if err := m.dispatchThreadCreationMetadata(context.Background(), chat, thread.ThreadID, thread.Name); err != nil {
+				return nil, err
+			}
+			thread, err := m.persistence.ThreadWithSummaryByID(chatID, parentMessageID)
+			if err != nil {
+				return nil, err
+			}
+			response := &MessengerResponse{}
+			response.AddThread(thread)
+			return response, nil
+		}
 		return nil, errors.New("thread already exists for this message")
 	}
 	if !errors.Is(threadErr, common.ErrRecordNotFound) {
@@ -141,16 +195,195 @@ func (m *Messenger) CreateThread(chatID string, parentMessageID string) (*Messen
 		return nil, ErrThreadParentInThread
 	}
 
-	name := normalizeThreadName(parentMsg.Text)
+	name, _ := common.NormalizeThreadName(parentMsg.Text, true)
 	if err := m.persistence.UpsertThread(parentMessageID, chatID, parentMessageID, name); err != nil {
 		return nil, err
 	}
+	if err := m.persistence.SetThreadCreator(parentMessageID, chatID, contacts.ContactIDFromPublicKey(&m.identity.PublicKey)); err != nil {
+		return nil, err
+	}
+	if err := m.dispatchThreadCreationMetadata(context.Background(), chat, parentMessageID, name); err != nil {
+		return nil, err
+	}
 
-	thread, err := m.persistence.ThreadWithSummaryByID(chatID, parentMessageID)
+	thread, err = m.persistence.ThreadWithSummaryByID(chatID, parentMessageID)
 	if err != nil {
 		return nil, err
 	}
 
+	response := &MessengerResponse{}
+	response.AddThread(thread)
+	return response, nil
+}
+
+const (
+	// pendingThreadMetadataTTL roughly matches store-node history retention:
+	// creation metadata older than this is unlikely to still arrive.
+	pendingThreadMetadataTTL          = 30 * 24 * time.Hour
+	maxPendingThreadMetadataPerSigner = 10
+	maxPendingThreadMetadataPerChat   = 100
+)
+
+// bufferPendingThreadMetadata stores a rename that cannot be authorized until
+// the thread's creation metadata arrives. The buffer is bounded per signer and
+// per chat, and entries expire, so renames for thread IDs that never get
+// created cannot grow the database indefinitely. Renames over quota are dropped.
+func (m *Messenger) bufferPendingThreadMetadata(chat *Chat, metadata *ThreadMetadata, name string) error {
+	if metadata.SigPubKey == nil {
+		return ErrThreadSenderRequired
+	}
+	now := m.getTimesource().GetCurrentTime()
+	ttl := uint64(pendingThreadMetadataTTL.Milliseconds())
+	expireBefore := uint64(0)
+	if now > ttl {
+		expireBefore = now - ttl
+	}
+	stored, err := m.persistence.SavePendingThreadMetadata(&PendingThreadMetadata{
+		ChatID:       chat.ID,
+		ThreadID:     metadata.ThreadId,
+		SignerPubKey: crypto.CompressPubkey(metadata.SigPubKey),
+		Name:         name,
+		Clock:        metadata.Clock,
+		ReceivedAt:   now,
+	}, PendingThreadMetadataLimits{
+		MaxPerSigner: maxPendingThreadMetadataPerSigner,
+		MaxPerChat:   maxPendingThreadMetadataPerChat,
+		ExpireBefore: expireBefore,
+	})
+	if err != nil {
+		return err
+	}
+	if !stored {
+		m.logger.Debug("dropping pending thread rename over quota",
+			zap.String("chatID", chat.ID), zap.String("threadID", metadata.ThreadId))
+	}
+	return nil
+}
+
+// applyPendingThreadMetadata replays renames buffered before the creation
+// metadata, now that the creator is known. Renames from signers that are not
+// allowed to edit the thread, or not newer than the creation, are discarded.
+// All buffered renames for the thread are removed afterwards.
+func (m *Messenger) applyPendingThreadMetadata(chat *Chat, threadID string, creationClock uint64) (bool, error) {
+	pending, err := m.persistence.PendingThreadMetadata(chat.ID, threadID)
+	if err != nil || len(pending) == 0 {
+		return false, err
+	}
+	thread, err := m.persistence.ThreadByID(chat.ID, threadID)
+	if err != nil {
+		return false, err
+	}
+
+	applied := false
+	for _, rename := range pending {
+		logger := m.logger.With(zap.String("chatID", chat.ID), zap.String("threadID", threadID), zap.Uint64("clock", rename.Clock))
+		if rename.Clock <= creationClock {
+			logger.Debug("discarding stale pending thread rename")
+			continue
+		}
+		signer, err := crypto.DecompressPubkey(rename.SignerPubKey)
+		if err != nil {
+			logger.Debug("discarding pending thread rename with invalid signer", zap.Error(err))
+			continue
+		}
+		allowed, err := m.senderCanEditThread(chat, thread, signer)
+		if err != nil {
+			return false, err
+		}
+		if !allowed {
+			logger.Debug("discarding unauthorized pending thread rename")
+			continue
+		}
+		updated, err := m.persistence.UpdateThreadMetadata(chat.ID, threadID, rename.Name, rename.Clock)
+		if err != nil {
+			return false, err
+		}
+		applied = applied || updated
+	}
+
+	return applied, m.persistence.DeletePendingThreadMetadata(chat.ID, threadID)
+}
+
+func (m *Messenger) dispatchThreadCreationMetadata(ctx context.Context, chat *Chat, threadID, name string) error {
+	clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
+	metadata := &ThreadMetadata{ThreadMetadata: &protobuf.ThreadMetadata{
+		Clock: clock, ChatId: chat.ID, ThreadId: threadID, Name: name,
+		CreatorId: contacts.ContactIDFromPublicKey(&m.identity.PublicKey),
+	}}
+	encoded, err := m.encodeChatEntity(chat, metadata)
+	if err != nil {
+		return err
+	}
+	updated, err := m.persistence.UpdateThreadMetadata(chat.ID, threadID, name, clock)
+	if err != nil {
+		return err
+	}
+	if !updated {
+		return errors.New("thread creation metadata update was superseded")
+	}
+	_, err = m.dispatchMessage(ctx, common.RawMessage{
+		LocalChatID: chat.ID, Payload: encoded,
+		MessageType:          protobuf.ApplicationMetadataMessage_THREAD_METADATA,
+		SkipGroupMessageWrap: true, ResendType: chat.DefaultResendType(),
+	})
+	return err
+}
+
+func (m *Messenger) EditThread(ctx context.Context, request *requests.EditThread) (*MessengerResponse, error) {
+	if !m.featureFlags.Threads {
+		return nil, ErrThreadFeatureDisabled
+	}
+	if err := request.Validate(); err != nil {
+		return nil, err
+	}
+	name, overlong := common.NormalizeThreadName(*request.Name, false)
+	if name == "" {
+		return nil, requests.ErrEditThreadInvalidName
+	}
+	if overlong {
+		return nil, requests.ErrEditThreadNameTooLong
+	}
+	chat, ok := m.allChats.Load(request.ChatID)
+	if !ok {
+		return nil, ErrChatNotFoundError
+	}
+	thread, err := m.persistence.ThreadByID(request.ChatID, request.ThreadID)
+	if err != nil {
+		return nil, err
+	}
+	allowed, err := m.senderCanEditThread(chat, thread, &m.identity.PublicKey)
+	if err != nil {
+		return nil, err
+	}
+	if !allowed {
+		return nil, errors.New(threadEditPermissionError)
+	}
+	clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
+	metadata := &ThreadMetadata{ThreadMetadata: &protobuf.ThreadMetadata{
+		Clock: clock, ChatId: chat.ID, ThreadId: thread.ThreadID, Name: name,
+	}}
+	encoded, err := m.encodeChatEntity(chat, metadata)
+	if err != nil {
+		return nil, err
+	}
+	updated, err := m.persistence.UpdateThreadMetadata(chat.ID, thread.ThreadID, name, clock)
+	if err != nil {
+		return nil, err
+	}
+	if !updated {
+		return nil, errors.New("thread metadata update was superseded")
+	}
+	if _, err := m.dispatchMessage(ctx, common.RawMessage{
+		LocalChatID: chat.ID, Payload: encoded,
+		MessageType:          protobuf.ApplicationMetadataMessage_THREAD_METADATA,
+		SkipGroupMessageWrap: true, ResendType: chat.DefaultResendType(),
+	}); err != nil {
+		return nil, err
+	}
+	thread, err = m.persistence.ThreadWithSummaryByID(chat.ID, thread.ThreadID)
+	if err != nil {
+		return nil, err
+	}
 	response := &MessengerResponse{}
 	response.AddThread(thread)
 	return response, nil
@@ -182,9 +415,9 @@ func (m *Messenger) StartThreadFromNewMessage(ctx context.Context, request *requ
 		return nil, errors.New(adminOnlyThreadCreationError)
 	}
 
-	rootText := normalizeThreadName(request.ThreadName)
+	rootText, _ := common.NormalizeThreadName(request.ThreadName, true)
 	if rootText == "" {
-		rootText = normalizeThreadName(message.Text)
+		rootText, _ = common.NormalizeThreadName(message.Text, true)
 	}
 	if rootText == "" {
 		return nil, errors.New("thread name or message text is required")

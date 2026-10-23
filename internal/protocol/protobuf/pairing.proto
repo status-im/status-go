@@ -512,6 +512,9 @@ message BackedUpThread {
   string parent_message_id = 3;
   string name = 4;
   uint64 read_messages_at_clock_value = 5;
+  string creator_id = 6;
+  uint64 metadata_clock = 7;
+  bool creator_pending = 8;
 }
 
 message BackedUpMessageBatch {

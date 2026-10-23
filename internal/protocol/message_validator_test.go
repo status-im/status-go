@@ -540,6 +540,108 @@ func (s *MessageValidatorSuite) TestValidatePlainTextMessage() {
 	}
 }
 
+func (s *MessageValidatorSuite) TestValidatePaymentRequestMessage() {
+	paymentRequests := []*protobuf.PaymentRequest{
+		{
+			Amount:   "1.123",
+			Symbol:   "ETH",
+			Receiver: "0x123",
+			ChainId:  1,
+			TokenKey: "1-0x0000000000000000000000000000000000000000",
+		},
+	}
+	testCases := []struct {
+		Name            string
+		Text            string
+		PaymentRequests []*protobuf.PaymentRequest
+		ContentType     protobuf.ChatMessage_ContentType
+		ExpectedError   string
+	}{
+		{
+			Name:            "Payment request without text",
+			PaymentRequests: paymentRequests,
+			ContentType:     protobuf.ChatMessage_TEXT_PLAIN,
+		},
+		{
+			Name:            "Payment request with blank text",
+			Text:            "  \n \t \n  ",
+			PaymentRequests: paymentRequests,
+			ContentType:     protobuf.ChatMessage_TEXT_PLAIN,
+		},
+		{
+			Name:            "Payment request with text",
+			Text:            "Please send ETH",
+			PaymentRequests: paymentRequests,
+			ContentType:     protobuf.ChatMessage_TEXT_PLAIN,
+		},
+		{
+			Name:            "Payment request with maximum length text",
+			Text:            strings.Repeat("É", maxChatMessageTextLength),
+			PaymentRequests: paymentRequests,
+			ContentType:     protobuf.ChatMessage_TEXT_PLAIN,
+		},
+		{
+			Name:            "Payment request with too long text",
+			Text:            strings.Repeat("É", maxChatMessageTextLength+1),
+			PaymentRequests: paymentRequests,
+			ContentType:     protobuf.ChatMessage_TEXT_PLAIN,
+			ExpectedError:   "text shouldn't be longer than 4096",
+		},
+		{
+			Name:            "Payment request with too long blank text",
+			Text:            strings.Repeat(" ", maxChatMessageTextLength+1),
+			PaymentRequests: paymentRequests,
+			ContentType:     protobuf.ChatMessage_TEXT_PLAIN,
+			ExpectedError:   "text shouldn't be longer than 4096",
+		},
+		{
+			Name:            "Empty payment request list without text",
+			PaymentRequests: []*protobuf.PaymentRequest{},
+			ContentType:     protobuf.ChatMessage_TEXT_PLAIN,
+			ExpectedError:   "text can't be empty",
+		},
+		{
+			Name:            "Empty payment request list with blank text",
+			Text:            "  \n \t \n  ",
+			PaymentRequests: []*protobuf.PaymentRequest{},
+			ContentType:     protobuf.ChatMessage_TEXT_PLAIN,
+			ExpectedError:   "text can't be empty",
+		},
+		{
+			Name:            "Payment request does not bypass sticker text validation",
+			PaymentRequests: paymentRequests,
+			ContentType:     protobuf.ChatMessage_STICKER,
+			ExpectedError:   "text can't be empty",
+		},
+		{
+			Name:            "Payment request does not bypass image payload validation",
+			PaymentRequests: paymentRequests,
+			ContentType:     protobuf.ChatMessage_IMAGE,
+			ExpectedError:   "no image content",
+		},
+	}
+
+	for _, tc := range testCases {
+		s.Run(tc.Name, func() {
+			message := &protobuf.ChatMessage{
+				ChatId:          "a",
+				Clock:           1,
+				Timestamp:       2,
+				Text:            tc.Text,
+				MessageType:     protobuf.MessageType_ONE_TO_ONE,
+				ContentType:     tc.ContentType,
+				PaymentRequests: tc.PaymentRequests,
+			}
+			err := ValidateReceivedChatMessage(message, 2)
+			if tc.ExpectedError == "" {
+				s.NoError(err)
+			} else {
+				s.EqualError(err, tc.ExpectedError)
+			}
+		})
+	}
+}
+
 func (s *MessageValidatorSuite) TestValidateEmojiReaction() {
 	testCases := []struct {
 		Name             string

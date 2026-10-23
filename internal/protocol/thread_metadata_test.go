@@ -291,3 +291,203 @@ func TestThreadMetadataQueryUsesThreadIndex(t *testing.T) {
 	require.NoError(t, rows.Err())
 	require.True(t, indexedThreadLookup, "bulk metadata query must use indexed thread lookups")
 }
+
+func TestPendingThreadCreatorClaims(t *testing.T) {
+	db, err := openTestDB()
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, db.Close()) })
+	p := newSQLitePersistence(db)
+
+	chat := CreatePublicChat("pending-creator-chat", &testTimeSource{})
+	require.NoError(t, p.SaveChats([]*Chat{chat}))
+
+	t.Run("legacy thread cannot be claimed", func(t *testing.T) {
+		require.NoError(t, p.UpsertThread("legacy", chat.ID, "legacy", "Legacy"))
+		claimed, err := p.ClaimPendingThreadCreator(chat.ID, "legacy", "creator")
+		require.NoError(t, err)
+		require.False(t, claimed)
+
+		thread, err := p.ThreadByID(chat.ID, "legacy")
+		require.NoError(t, err)
+		require.Empty(t, thread.CreatorID)
+		require.False(t, thread.CreatorPending)
+	})
+
+	t.Run("first claim wins", func(t *testing.T) {
+		require.NoError(t, p.UpsertPendingCreatorThread("pending", chat.ID, "pending", ""))
+		thread, err := p.ThreadByID(chat.ID, "pending")
+		require.NoError(t, err)
+		require.True(t, thread.CreatorPending)
+
+		claimed, err := p.ClaimPendingThreadCreator(chat.ID, "pending", "creator")
+		require.NoError(t, err)
+		require.True(t, claimed)
+		claimed, err = p.ClaimPendingThreadCreator(chat.ID, "pending", "rival")
+		require.NoError(t, err)
+		require.False(t, claimed)
+
+		thread, err = p.ThreadByID(chat.ID, "pending")
+		require.NoError(t, err)
+		require.Equal(t, "creator", thread.CreatorID)
+		require.False(t, thread.CreatorPending)
+	})
+
+	t.Run("existing thread stays non-pending", func(t *testing.T) {
+		require.NoError(t, p.UpsertPendingCreatorThread("legacy", chat.ID, "legacy", ""))
+		thread, err := p.ThreadByID(chat.ID, "legacy")
+		require.NoError(t, err)
+		require.False(t, thread.CreatorPending)
+	})
+
+	t.Run("backup round trip", func(t *testing.T) {
+		require.NoError(t, p.UpsertPendingCreatorThread("backed-up-pending", chat.ID, "backed-up-pending", ""))
+		backedUp, err := p.AllThreadsForBackup()
+		require.NoError(t, err)
+		byID := make(map[string]*protobuf.BackedUpThread, len(backedUp))
+		for _, thread := range backedUp {
+			byID[thread.ThreadId] = thread
+		}
+		require.True(t, byID["backed-up-pending"].CreatorPending)
+		require.False(t, byID["legacy"].CreatorPending)
+		require.False(t, byID["pending"].CreatorPending)
+
+		restoredDB, err := openTestDB()
+		require.NoError(t, err)
+		t.Cleanup(func() { require.NoError(t, restoredDB.Close()) })
+		restored := newSQLitePersistence(restoredDB)
+		require.NoError(t, restored.SaveChats([]*Chat{chat}))
+		// A local legacy thread stays protected unless the backup knows the creator.
+		require.NoError(t, restored.UpsertThread("legacy", chat.ID, "legacy", "Legacy"))
+		require.NoError(t, restored.SaveBackedUpThreads(backedUp))
+
+		for threadID, wantPending := range map[string]bool{"backed-up-pending": true, "legacy": false, "pending": false} {
+			thread, err := restored.ThreadByID(chat.ID, threadID)
+			require.NoError(t, err)
+			require.Equal(t, wantPending, thread.CreatorPending, threadID)
+		}
+
+		// A backed-up creator resolves a local pending placeholder.
+		require.NoError(t, restored.UpsertPendingCreatorThread("resolved", chat.ID, "resolved", ""))
+		require.NoError(t, restored.SaveBackedUpThreads([]*protobuf.BackedUpThread{
+			{ChatId: chat.ID, ThreadId: "resolved", ParentMessageId: "resolved", CreatorId: "creator", MetadataClock: 1},
+		}))
+		thread, err := restored.ThreadByID(chat.ID, "resolved")
+		require.NoError(t, err)
+		require.Equal(t, "creator", thread.CreatorID)
+		require.False(t, thread.CreatorPending)
+	})
+}
+
+func TestPendingThreadMetadataPersistence(t *testing.T) {
+	db, err := openTestDB()
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, db.Close()) })
+	p := newSQLitePersistence(db)
+
+	chat := CreatePublicChat("pending-metadata-chat", &testTimeSource{})
+	require.NoError(t, p.SaveChats([]*Chat{chat}))
+
+	save := func(signer []byte, name string, clock uint64) {
+		stored, err := p.SavePendingThreadMetadata(&PendingThreadMetadata{
+			ChatID: chat.ID, ThreadID: "thread", SignerPubKey: signer, Name: name, Clock: clock, ReceivedAt: 1,
+		}, PendingThreadMetadataLimits{MaxPerSigner: 10, MaxPerChat: 10})
+		require.NoError(t, err)
+		require.True(t, stored)
+	}
+	save([]byte{1}, "First", 10)
+	save([]byte{1}, "Older", 5)
+	save([]byte{1}, "Latest", 20)
+	save([]byte{2}, "Other", 15)
+
+	pending, err := p.PendingThreadMetadata(chat.ID, "thread")
+	require.NoError(t, err)
+	require.Len(t, pending, 2)
+	require.Equal(t, "Other", pending[0].Name)
+	require.Equal(t, uint64(15), pending[0].Clock)
+	require.Equal(t, "Latest", pending[1].Name)
+	require.Equal(t, uint64(20), pending[1].Clock)
+
+	require.NoError(t, p.DeletePendingThreadMetadata(chat.ID, "thread"))
+	pending, err = p.PendingThreadMetadata(chat.ID, "thread")
+	require.NoError(t, err)
+	require.Empty(t, pending)
+
+	save([]byte{1}, "Deleted with chat", 30)
+	require.NoError(t, p.DeleteChat(chat.ID))
+	pending, err = p.PendingThreadMetadata(chat.ID, "thread")
+	require.NoError(t, err)
+	require.Empty(t, pending)
+}
+
+func TestPendingThreadMetadataLimits(t *testing.T) {
+	db, err := openTestDB()
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, db.Close()) })
+	p := newSQLitePersistence(db)
+
+	chat := CreatePublicChat("pending-metadata-limits-chat", &testTimeSource{})
+	other := CreatePublicChat("pending-metadata-limits-other", &testTimeSource{})
+	require.NoError(t, p.SaveChats([]*Chat{chat, other}))
+
+	limits := PendingThreadMetadataLimits{MaxPerSigner: 2, MaxPerChat: 3, ExpireBefore: 100}
+	save := func(chatID, threadID string, signer byte, name string, clock, receivedAt uint64) bool {
+		stored, err := p.SavePendingThreadMetadata(&PendingThreadMetadata{
+			ChatID: chatID, ThreadID: threadID, SignerPubKey: []byte{signer}, Name: name, Clock: clock, ReceivedAt: receivedAt,
+		}, limits)
+		require.NoError(t, err)
+		return stored
+	}
+	count := func(chatID string) int {
+		var n int
+		require.NoError(t, db.QueryRow(`SELECT COUNT(*) FROM pending_thread_metadata WHERE chat_id = ?`, chatID).Scan(&n))
+		return n
+	}
+
+	t.Run("per signer quota", func(t *testing.T) {
+		require.True(t, save(chat.ID, "a", 1, "A", 1, 200))
+		require.True(t, save(chat.ID, "b", 1, "B", 1, 200))
+		require.False(t, save(chat.ID, "c", 1, "C", 1, 200))
+		pending, err := p.PendingThreadMetadata(chat.ID, "c")
+		require.NoError(t, err)
+		require.Empty(t, pending)
+
+		// Updating an existing row is allowed at the quota.
+		require.True(t, save(chat.ID, "a", 1, "A2", 2, 200))
+		pending, err = p.PendingThreadMetadata(chat.ID, "a")
+		require.NoError(t, err)
+		require.Len(t, pending, 1)
+		require.Equal(t, "A2", pending[0].Name)
+
+		// The quota is per chat.
+		require.True(t, save(other.ID, "c", 1, "C", 1, 200))
+	})
+
+	t.Run("per chat quota", func(t *testing.T) {
+		require.True(t, save(chat.ID, "a", 2, "A", 1, 200))
+		require.Equal(t, 3, count(chat.ID))
+		require.False(t, save(chat.ID, "b", 3, "B", 1, 200))
+		require.Equal(t, 3, count(chat.ID))
+		require.True(t, save(chat.ID, "b", 1, "B2", 2, 200))
+	})
+
+	t.Run("expired rows are pruned", func(t *testing.T) {
+		require.NoError(t, db.Close())
+		db, err = openTestDB()
+		require.NoError(t, err)
+		p = newSQLitePersistence(db)
+		require.NoError(t, p.SaveChats([]*Chat{chat, other}))
+
+		limits.ExpireBefore = 0
+		require.True(t, save(chat.ID, "old", 1, "Old", 1, 50))
+		require.True(t, save(other.ID, "old", 1, "Old", 1, 50))
+		require.True(t, save(chat.ID, "fresh", 1, "Fresh", 1, 150))
+
+		limits.ExpireBefore = 100
+		require.True(t, save(chat.ID, "new", 1, "New", 1, 200))
+		pending, err := p.PendingThreadMetadata(chat.ID, "old")
+		require.NoError(t, err)
+		require.Empty(t, pending)
+		require.Zero(t, count(other.ID))
+		require.Equal(t, 2, count(chat.ID))
+	})
+}

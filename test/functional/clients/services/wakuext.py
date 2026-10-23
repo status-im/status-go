@@ -509,6 +509,9 @@ class WakuextService(Service):
     def create_thread(self, chat_id: str, parent_message_id: str):
         return self.rpc_request("createThread", [chat_id, parent_message_id])
 
+    def edit_thread(self, chat_id: str, thread_id: str, name: str):
+        return self.rpc_request("editThread", [{"chatId": chat_id, "threadId": thread_id, "name": name}])
+
     def chat_threads(self, chat_id: str):
         return self.rpc_request("chatThreads", [chat_id])
 
@@ -839,6 +842,11 @@ class WakuextService(Service):
     def communities(self):
         params = []
         response = self.rpc_request("communities", params)
+        return response
+
+    def get_community_members(self, community_id: str):
+        params = [community_id]
+        response = self.rpc_request("getCommunityMembers", params)
         return response
 
     def joined_communities(self):

@@ -301,6 +301,12 @@ func (api *PublicAPI) GetCommunityPublicKeyFromPrivateKey(ctx context.Context, h
 	return publicKey
 }
 
+// GetCommunityMembers returns an atomic snapshot of the community roster:
+// its clock, the members and the channel roles of token-gated channels.
+func (api *PublicAPI) GetCommunityMembers(communityID cryptotypes.HexBytes) (*communities.CommunityMembers, error) {
+	return api.service.messenger.GetCommunityMembers(communityID)
+}
+
 // Get community members contact list for provided wallet addresses
 func (api *PublicAPI) GetCommunityMembersForWalletAddresses(communityID cryptotypes.HexBytes, chainID uint64) (map[string]*contacts.Contact, error) {
 	return api.service.messenger.GetCommunityMembersForWalletAddresses(communityID, chainID)
@@ -564,6 +570,10 @@ func (api *PublicAPI) ChatMessagesWithThreadSummaries(chatID, cursor string, lim
 
 func (api *PublicAPI) CreateThread(chatID string, parentMessageID string) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.CreateThread(chatID, parentMessageID)
+}
+
+func (api *PublicAPI) EditThread(ctx context.Context, request *requests.EditThread) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.EditThread(ctx, request)
 }
 
 func (api *PublicAPI) StartThreadFromNewMessage(ctx context.Context, request *requests.StartThreadFromNewMessage) (*protocol.MessengerResponse, error) {

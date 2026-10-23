@@ -5,7 +5,6 @@ import (
 	"crypto/ecdsa"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"math"
 	"math/big"
 	"os"
@@ -19,8 +18,6 @@ import (
 	errorspkg "github.com/pkg/errors"
 	"go.uber.org/zap"
 
-	accscommon "github.com/status-im/status-go/internal/accounts-management/common"
-	accstypes "github.com/status-im/status-go/internal/accounts-management/types"
 	"github.com/status-im/status-go/internal/crypto"
 	types "github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/images"
@@ -33,35 +30,6 @@ import (
 	"github.com/status-im/status-go/pkg/multiformat"
 	"github.com/status-im/status-go/pkg/services/media"
 )
-
-// enrichedCommunityMember is the JSON-serialization wrapper that combines
-// the protobuf-derived CommunityMember (roles, channel role, last-update
-// clock) with the visual identity derived from the member's public key
-// (alias, colorId, compressedKey, emojiHash)
-type enrichedCommunityMember struct {
-	*protobuf.CommunityMember
-	accstypes.PublicKeyData
-}
-
-// enrichMembersMap wraps every entry of a protobuf members map with the
-// per-pubkey PublicKeyData
-func enrichMembersMap(src map[string]*protobuf.CommunityMember) map[string]*enrichedCommunityMember {
-	if src == nil {
-		return nil
-	}
-	out := make(map[string]*enrichedCommunityMember, len(src))
-	for pubkey, member := range src {
-		if member == nil {
-			continue
-		}
-		entry := &enrichedCommunityMember{CommunityMember: member}
-		if pkd, err := accscommon.GetPublicKeyData(pubkey); err == nil && pkd != nil {
-			entry.PublicKeyData = *pkd
-		}
-		out[pubkey] = entry
-	}
-	return out
-}
 
 const signatureLength = 65
 
@@ -101,6 +69,11 @@ type Community struct {
 	timesource  common.TimeSource
 	encryptor   DescriptionEncryptor
 	mediaServer media.MediaServerInterface
+	// memberProfiles resolves display data for member deltas; may be nil
+	memberProfiles MemberProfileProvider
+	// clockFloor is the newest clock this node emitted for the community
+	// beyond its description and events; see Manager.rosterClockFloors
+	clockFloor uint64
 }
 
 type ReadonlyCommunity interface {
@@ -109,6 +82,7 @@ type ReadonlyCommunity interface {
 	CanView(pk *ecdsa.PublicKey, chatID string) bool
 	CanPost(pk *ecdsa.PublicKey, chatID string, messageType protobuf.ApplicationMetadataMessage_Type) (bool, error)
 	IsBanned(pk *ecdsa.PublicKey) bool
+	MembersSnapshot(profiles MemberProfileProvider) *CommunityMembers
 }
 
 func New(config Config, timesource common.TimeSource, encryptor DescriptionEncryptor, mediaServer media.MediaServerInterface) (*Community, error) {
@@ -146,22 +120,21 @@ type CommunityAdminSettings struct {
 }
 
 type CommunityChat struct {
-	ID                      string                              `json:"id"`
-	Name                    string                              `json:"name"`
-	Color                   string                              `json:"color"`
-	Emoji                   string                              `json:"emoji"`
-	Description             string                              `json:"description"`
-	Members                 map[string]*enrichedCommunityMember `json:"members"`
-	Permissions             *protobuf.CommunityPermissions      `json:"permissions"`
-	CanPost                 bool                                `json:"canPost"`
-	CanView                 bool                                `json:"canView"`
-	CanPostReactions        bool                                `json:"canPostReactions"`
-	ViewersCanPostReactions bool                                `json:"viewersCanPostReactions"`
-	Position                int                                 `json:"position"`
-	CategoryID              string                              `json:"categoryID"`
-	TokenGated              bool                                `json:"tokenGated"`
-	HideIfPermissionsNotMet bool                                `json:"hideIfPermissionsNotMet"`
-	MissingEncryptionKey    bool                                `json:"missingEncryptionKey"`
+	ID                      string                         `json:"id"`
+	Name                    string                         `json:"name"`
+	Color                   string                         `json:"color"`
+	Emoji                   string                         `json:"emoji"`
+	Description             string                         `json:"description"`
+	Permissions             *protobuf.CommunityPermissions `json:"permissions"`
+	CanPost                 bool                           `json:"canPost"`
+	CanView                 bool                           `json:"canView"`
+	CanPostReactions        bool                           `json:"canPostReactions"`
+	ViewersCanPostReactions bool                           `json:"viewersCanPostReactions"`
+	Position                int                            `json:"position"`
+	CategoryID              string                         `json:"categoryID"`
+	TokenGated              bool                           `json:"tokenGated"`
+	HideIfPermissionsNotMet bool                           `json:"hideIfPermissionsNotMet"`
+	MissingEncryptionKey    bool                           `json:"missingEncryptionKey"`
 }
 
 type CommunityCategory struct {
@@ -184,118 +157,6 @@ const (
 	CommunityMemberKickPending
 	CommunityMemberBanWithAllMessagesDelete
 )
-
-func (o *Community) MarshalPublicAPIJSON() ([]byte, error) {
-	if o.config.MemberIdentity == nil {
-		return nil, errors.New("member identity not set")
-	}
-	communityItem := struct {
-		ID                      types.HexBytes                       `json:"id"`
-		Verified                bool                                 `json:"verified"`
-		Chats                   map[string]CommunityChat             `json:"chats"`
-		Categories              map[string]CommunityCategory         `json:"categories"`
-		Name                    string                               `json:"name"`
-		Description             string                               `json:"description"`
-		IntroMessage            string                               `json:"introMessage"`
-		OutroMessage            string                               `json:"outroMessage"`
-		Tags                    []CommunityTag                       `json:"tags"`
-		Images                  map[string]images.IdentityImage      `json:"images"`
-		Color                   string                               `json:"color"`
-		MembersCount            int                                  `json:"membersCount"`
-		EnsName                 string                               `json:"ensName"`
-		Link                    string                               `json:"link"`
-		CommunityAdminSettings  CommunityAdminSettings               `json:"adminSettings"`
-		Encrypted               bool                                 `json:"encrypted"`
-		TokenPermissions        map[string]*CommunityTokenPermission `json:"tokenPermissions"`
-		CommunityTokensMetadata []*protobuf.CommunityTokenMetadata   `json:"communityTokensMetadata"`
-		ActiveMembersCount      uint64                               `json:"activeMembersCount"`
-		PubsubTopic             string                               `json:"pubsubTopic"`
-	}{
-		ID:          o.ID(),
-		Verified:    o.config.Verified,
-		Chats:       make(map[string]CommunityChat),
-		Categories:  make(map[string]CommunityCategory),
-		Tags:        o.Tags(),
-		PubsubTopic: o.PubsubTopic(),
-	}
-
-	if o.config.CommunityDescription != nil {
-		for id, c := range o.config.CommunityDescription.Categories {
-			category := CommunityCategory{
-				ID:       id,
-				Name:     c.Name,
-				Position: int(c.Position),
-			}
-			communityItem.Categories[id] = category
-			communityItem.Encrypted = o.Encrypted()
-		}
-		for id, c := range o.config.CommunityDescription.Chats {
-			// NOTE: Here `CanPost` is only set for ChatMessage and Emoji reactions. But it can be different for pin/etc.
-			// Consider adding more properties to `CommunityChat` to reflect that.
-			canPost, err := o.CanPost(o.MemberIdentity(), id, protobuf.ApplicationMetadataMessage_CHAT_MESSAGE)
-			if err != nil {
-				return nil, err
-			}
-			canPostReactions, err := o.CanPost(o.MemberIdentity(), id, protobuf.ApplicationMetadataMessage_EMOJI_REACTION)
-			if err != nil {
-				return nil, err
-			}
-			canView := o.CanView(o.MemberIdentity(), id)
-
-			chat := CommunityChat{
-				ID:                      id,
-				Name:                    c.Identity.DisplayName,
-				Color:                   c.Identity.Color,
-				Emoji:                   c.Identity.Emoji,
-				Description:             c.Identity.Description,
-				Permissions:             c.Permissions,
-				Members:                 enrichMembersMap(c.Members),
-				CanPost:                 canPost,
-				CanView:                 canView,
-				CanPostReactions:        canPostReactions,
-				ViewersCanPostReactions: c.ViewersCanPostReactions,
-				TokenGated:              o.channelEncrypted(id),
-				CategoryID:              c.CategoryId,
-				HideIfPermissionsNotMet: c.HideIfPermissionsNotMet,
-				Position:                int(c.Position),
-			}
-			communityItem.Chats[id] = chat
-		}
-
-		communityItem.TokenPermissions = o.tokenPermissions()
-		communityItem.MembersCount = len(o.config.CommunityDescription.Members)
-
-		communityItem.Link = fmt.Sprintf("https://join.status.im/c/0x%x", o.ID())
-		communityItem.IntroMessage = o.config.CommunityDescription.IntroMessage
-		communityItem.OutroMessage = o.config.CommunityDescription.OutroMessage
-		communityItem.CommunityTokensMetadata = o.config.CommunityDescription.CommunityTokensMetadata
-		communityItem.ActiveMembersCount = o.config.CommunityDescription.ActiveMembersCount
-
-		if o.config.CommunityDescription.Identity != nil {
-			communityItem.Name = o.Name()
-			communityItem.Color = o.config.CommunityDescription.Identity.Color
-			communityItem.Description = o.config.CommunityDescription.Identity.Description
-			for t, i := range o.config.CommunityDescription.Identity.Images {
-				if communityItem.Images == nil {
-					communityItem.Images = make(map[string]images.IdentityImage)
-				}
-				communityItem.Images[t] = images.IdentityImage{Name: t, Payload: i.Payload}
-
-			}
-		}
-
-		communityItem.CommunityAdminSettings = CommunityAdminSettings{
-			PinMessageAllMembersEnabled:   false,
-			CreateThreadAllMembersEnabled: false,
-		}
-
-		if o.config.CommunityDescription.AdminSettings != nil {
-			communityItem.CommunityAdminSettings.PinMessageAllMembersEnabled = o.config.CommunityDescription.AdminSettings.PinMessageAllMembersEnabled
-			communityItem.CommunityAdminSettings.CreateThreadAllMembersEnabled = o.config.CommunityDescription.AdminSettings.CreateThreadAllMembersEnabled
-		}
-	}
-	return json.Marshal(communityItem)
-}
 
 func (o *Community) MarshalJSON() ([]byte, error) {
 	if o.config.MemberIdentity == nil {
@@ -323,7 +184,7 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 		Categories                  map[string]CommunityCategory         `json:"categories"`
 		Images                      map[string]Image                     `json:"images"`
 		Permissions                 *protobuf.CommunityPermissions       `json:"permissions"`
-		Members                     map[string]*enrichedCommunityMember  `json:"members"`
+		MembersCount                int                                  `json:"membersCount"`
 		CanRequestAccess            bool                                 `json:"canRequestAccess"`
 		CanManageUsers              bool                                 `json:"canManageUsers"`              //TODO: we can remove this
 		CanDeleteMessageForEveryone bool                                 `json:"canDeleteMessageForEveryone"` //TODO: we can remove this
@@ -406,15 +267,11 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 				Position:                int(c.Position),
 				MissingEncryptionKey:    o.HasMissingEncryptionKey(id),
 			}
-
-			if chat.TokenGated {
-				chat.Members = enrichMembersMap(c.Members)
-			}
 			communityItem.Chats[id] = chat
 		}
 		communityItem.TokenPermissions = o.tokenPermissions()
 		communityItem.PendingAndBannedMembers = o.PendingAndBannedMembers()
-		communityItem.Members = enrichMembersMap(o.config.CommunityDescription.Members)
+		communityItem.MembersCount = len(o.config.CommunityDescription.Members)
 		communityItem.Permissions = o.config.CommunityDescription.Permissions
 		communityItem.IntroMessage = o.config.CommunityDescription.IntroMessage
 		communityItem.OutroMessage = o.config.CommunityDescription.OutroMessage
@@ -920,10 +777,9 @@ func (o *Community) RemoveMembersFromOrg(membersToRemove []string) *CommunityCha
 			}
 		}
 
-		changes.ChatsModified[chatID] = &CommunityChatChanges{
-			ChatModified:   chat,
-			MembersRemoved: chatMembersToRemove,
-		}
+		chatChanges := changes.chatChanges(chatID)
+		chatChanges.ChatModified = chat
+		chatChanges.MembersRemoved = chatMembersToRemove
 	}
 
 	return changes
@@ -951,10 +807,9 @@ func (o *Community) RemoveAllUsersFromOrg() *CommunityChanges {
 		chat.Members = make(map[string]*protobuf.CommunityMember)
 		chat.Members[myPublicKey] = member
 
-		changes.ChatsModified[chatID] = &CommunityChatChanges{
-			ChatModified:   chat,
-			MembersRemoved: chatMembersToRemove,
-		}
+		chatChanges := changes.chatChanges(chatID)
+		chatChanges.ChatModified = chat
+		chatChanges.MembersRemoved = chatMembersToRemove
 	}
 
 	return changes
@@ -2182,6 +2037,11 @@ func (o *Community) CanPost(pk *ecdsa.PublicKey, chatID string, messageType prot
 	}
 
 	switch messageType {
+	case protobuf.ApplicationMetadataMessage_THREAD_METADATA:
+		// Thread metadata has stricter creator/admin authorization in the
+		// messenger handler. Access is sufficient at this transport gate.
+		return true, nil
+
 	case protobuf.ApplicationMetadataMessage_PIN_MESSAGE:
 		pinAllowed := o.IsPrivilegedMember(pk) || o.AllowsAllMembersToPinMessage()
 		return pinAllowed, nil
@@ -2294,9 +2154,26 @@ func (o *Community) RequestedToJoinAt() uint64 {
 	return o.config.RequestedToJoinAt
 }
 
+// latestClock is the newest of the description clock, the clocks of the
+// community events applied on top of it and the clock floor.
+func (o *Community) latestClock() uint64 {
+	clock := o.config.CommunityDescription.Clock
+	if o.clockFloor > clock {
+		clock = o.clockFloor
+	}
+	if o.config.EventsData != nil {
+		for _, event := range o.config.EventsData.Events {
+			if event.CommunityEventClock > clock {
+				clock = event.CommunityEventClock
+			}
+		}
+	}
+	return clock
+}
+
 func (o *Community) nextClock() uint64 {
 	// lamport timestamp
-	clock := o.config.CommunityDescription.Clock
+	clock := o.latestClock()
 	timestamp := o.timesource.GetCurrentTime()
 	if clock == 0 || clock < timestamp {
 		clock = timestamp
@@ -2379,12 +2256,9 @@ func (o *Community) AddMemberToChat(chatID string, publicKey *ecdsa.PublicKey,
 		Roles:       roles,
 		ChannelRole: channelRole,
 	}
-	changes.ChatsModified[chatID] = &CommunityChatChanges{
-		ChatModified: chat,
-		MembersAdded: map[string]*protobuf.CommunityMember{
-			memberKey: chat.Members[memberKey],
-		},
-	}
+	chatChanges := changes.chatChanges(chatID)
+	chatChanges.ChatModified = chat
+	chatChanges.MembersAdded[memberKey] = chat.Members[memberKey]
 
 	if o.IsControlNode() {
 		o.increaseClock()
@@ -2440,8 +2314,10 @@ func (o *Community) CreateDeepCopy() *Community {
 			EventsData:                          o.config.EventsData,
 			LastOpenedAt:                        o.config.LastOpenedAt,
 		},
-		timesource:  o.timesource,
-		mediaServer: o.mediaServer,
+		timesource:     o.timesource,
+		mediaServer:    o.mediaServer,
+		memberProfiles: o.memberProfiles,
+		clockFloor:     o.clockFloor,
 	}
 }
 

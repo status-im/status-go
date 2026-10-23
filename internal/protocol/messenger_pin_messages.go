@@ -139,14 +139,10 @@ func (m *Messenger) PinnedMessageByChatID(chatID, cursor string, limit int) ([]*
 		return nil, "", err
 	}
 
-	if m.httpServer != nil {
-		for idx := range pinnedMsgs {
-			msg := pinnedMsgs[idx].Message
-			err = m.prepareMessage(msg, m.httpServer)
-			if err != nil {
-				return nil, "", err
-			}
-			pinnedMsgs[idx].Message = msg
+	for idx := range pinnedMsgs {
+		err = m.prepareMessage(pinnedMsgs[idx].Message, m.httpServer)
+		if err != nil {
+			return nil, "", err
 		}
 	}
 	return pinnedMsgs, cursor, nil

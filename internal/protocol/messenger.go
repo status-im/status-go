@@ -80,6 +80,7 @@ var (
 	ErrChatNotFoundError              = errors.New("Chat not found")
 	ErrThreadFeatureDisabled          = errors.New("threads feature is disabled")
 	ErrThreadsNotSupportedForChatType = errors.New("threads are not supported for this chat type")
+	ErrThreadSenderRequired           = errors.New("thread sender is required")
 )
 
 const communityAdvertiseIntervalSecond int64 = 24 * 60 * 60
@@ -479,6 +480,7 @@ func NewMessenger(
 		messenger.contractMaker = contracts.NewContractMaker(c.rpcClient)
 	}
 
+	communitiesManager.SetMemberProfileProvider(messenger.allContacts)
 	messenger.mentionsManager = NewMentionManager(messenger)
 	messenger.storeNodeRequestsManager = NewStoreNodeRequestManager(messenger)
 
@@ -2197,6 +2199,19 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 		ResendType:           chat.DefaultResendType(),
 	}
 
+	if message.ThreadMetadataCreationAuthorized && message.GetThreadId() != "" {
+		name := m.persistence.threadNameFromParentByID(message.GetThreadId())
+		if err := m.persistence.UpsertThread(message.GetThreadId(), chat.ID, message.GetThreadId(), name); err != nil {
+			return nil, err
+		}
+		if err := m.persistence.SetThreadCreator(message.GetThreadId(), chat.ID, contacts.ContactIDFromPublicKey(&m.identity.PublicKey)); err != nil {
+			return nil, err
+		}
+		if err := m.dispatchThreadCreationMetadata(ctx, chat, message.GetThreadId(), name); err != nil {
+			return nil, err
+		}
+	}
+
 	// We want to save the raw message before dispatching it, to avoid race conditions
 	// since it might get dispatched and confirmed before it's saved.
 	// This is not the best solution, probably it would be better to split
@@ -2238,7 +2253,6 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 	if err != nil {
 		return nil, err
 	}
-
 	msg, err := m.pullMessagesAndResponsesFromDB([]*common.Message{message})
 	if err != nil {
 		return nil, err
@@ -2985,6 +2999,9 @@ type ReceivedMessageState struct {
 	AllBookmarks            map[string]*browsers.Bookmark
 	AllVerificationRequests []*verification.Request
 	AllTrustStatus          map[string]verification.TrustStatus
+	// processedCommunityChanges counts the Response.CommunityChanges already
+	// handled by processCommunityChanges
+	processedCommunityChanges int
 }
 
 // addNewMessageNotification takes a common.Message and generates a new NotificationBody and appends it to the
@@ -3821,11 +3838,9 @@ func (m *Messenger) MessageByID(id string) (*common.Message, error) {
 	if err != nil {
 		return nil, err
 	}
-	if m.httpServer != nil {
-		err = m.prepareMessage(msg, m.httpServer)
-		if err != nil {
-			return nil, err
-		}
+	err = m.prepareMessage(msg, m.httpServer)
+	if err != nil {
+		return nil, err
 	}
 	return msg, nil
 }
@@ -3879,20 +3894,15 @@ func (m *Messenger) MessageByChatID(chatID, threadID, cursor string, limit int) 
 
 	}
 
-	if m.httpServer != nil {
-		err = m.prepareMessagesList(msgs)
-		if err != nil {
-			return nil, "", err
-		}
+	err = m.prepareMessagesList(msgs)
+	if err != nil {
+		return nil, "", err
 	}
 
 	return msgs, nextCursor, nil
 }
 
 func (m *Messenger) prepareMessages(messages map[string]*common.Message) error {
-	if m.httpServer == nil {
-		return nil
-	}
 	for idx := range messages {
 		err := m.prepareMessage(messages[idx], m.httpServer)
 		if err != nil {
@@ -3903,9 +3913,6 @@ func (m *Messenger) prepareMessages(messages map[string]*common.Message) error {
 }
 
 func (m *Messenger) prepareMessagesList(messages []*common.Message) error {
-	if m.httpServer == nil {
-		return nil
-	}
 	for idx := range messages {
 		err := m.prepareMessage(messages[idx], m.httpServer)
 		if err != nil {
@@ -3935,7 +3942,38 @@ func (m *Messenger) prepareTokenData(tokenData *ActivityTokenData, s *media.Serv
 	return nil
 }
 
+// resolveMentionedNames fills MentionedNames from the in-memory contacts map
+// with the client's name priority, falling back to the generated alias for
+// keys without a contact. Mentions that are not public keys are skipped.
+func (m *Messenger) resolveMentionedNames(msg *common.Message) {
+	msg.MentionedNames = nil
+	for _, pubKey := range msg.Mentions {
+		if pubKey == common.EveryoneMentionTag {
+			continue
+		}
+		var name string
+		if contact, ok := m.allContacts.loadIncludingSelf(pubKey); ok && contact != nil {
+			name = contact.PrimaryName()
+		}
+		if name == "" {
+			generated, err := alias.GenerateFromPublicKeyString(pubKey)
+			if err != nil {
+				continue
+			}
+			name = generated
+		}
+		if msg.MentionedNames == nil {
+			msg.MentionedNames = make(map[string]string, len(msg.Mentions))
+		}
+		msg.MentionedNames[pubKey] = name
+	}
+}
+
 func (m *Messenger) prepareMessage(msg *common.Message, s *media.Server) error {
+	m.resolveMentionedNames(msg)
+	if s == nil {
+		return nil
+	}
 	if msg.QuotedMessage != nil && msg.QuotedMessage.ContentType == int64(protobuf.ChatMessage_IMAGE) {
 		msg.QuotedMessage.ImageLocalURL = s.MakeImageURL(msg.QuotedMessage.ID)
 
@@ -4062,7 +4100,14 @@ func (m *Messenger) AllMessagesFromChatsAndCommunitiesWhichMatchTerm(communityId
 		return nil, err
 	}
 
-	return m.filterOutHiddenChatMessages(messages)
+	messages, err = m.filterOutHiddenChatMessages(messages)
+	if err != nil {
+		return nil, err
+	}
+	for _, message := range messages {
+		m.resolveMentionedNames(message)
+	}
+	return messages, nil
 }
 
 func (m *Messenger) filterOutHiddenChatMessages(messages []*common.Message) ([]*common.Message, error) {
