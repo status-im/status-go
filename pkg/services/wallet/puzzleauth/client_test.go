@@ -133,20 +133,19 @@ func TestTransport_RoundTrip_DoesNotMutateCallerRequestHeaders(t *testing.T) {
 }
 
 func TestTransport_Do_AuthRetry(t *testing.T) {
-	var resourceReq, puzzleReq, solveReq int32
-	var tokenProvided bool
+	var resourceReq, puzzleReq, solveReq, requestsWithToken int32
 
 	resourceHandler := func(w http.ResponseWriter, r *http.Request) {
-		atomic.AddInt32(&resourceReq, 1)
-		authHeader := r.Header.Get("Authorization")
-		if authHeader == "" {
+		if r.Header.Get("Authorization") != "" {
+			atomic.AddInt32(&requestsWithToken, 1)
+		}
+		if atomic.AddInt32(&resourceReq, 1) == 1 {
 			w.WriteHeader(http.StatusUnauthorized)
 			_, _ = w.Write([]byte("unauthorized"))
-		} else {
-			tokenProvided = true
-			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte("success"))
+			return
 		}
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("success"))
 	}
 
 	server := newPuzzleAuthServer(t,
@@ -165,9 +164,9 @@ func TestTransport_Do_AuthRetry(t *testing.T) {
 	require.NotNil(t, resp)
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 	require.Equal(t, int32(2), atomic.LoadInt32(&resourceReq))
-	require.Equal(t, int32(1), atomic.LoadInt32(&puzzleReq))
-	require.Equal(t, int32(1), atomic.LoadInt32(&solveReq))
-	require.True(t, tokenProvided)
+	require.Equal(t, int32(2), atomic.LoadInt32(&requestsWithToken), "every attempt carries a bearer")
+	require.Equal(t, int32(2), atomic.LoadInt32(&puzzleReq), "a rejected token is replaced")
+	require.Equal(t, int32(2), atomic.LoadInt32(&solveReq))
 	resp.Body.Close()
 }
 
@@ -185,14 +184,14 @@ func TestTransport_Do_RetryStatusCodes(t *testing.T) {
 			var resourceReq, requestsWithToken int32
 
 			resourceHandler := func(w http.ResponseWriter, r *http.Request) {
-				atomic.AddInt32(&resourceReq, 1)
-				authHeader := r.Header.Get("Authorization")
-				if authHeader != "" {
+				if r.Header.Get("Authorization") != "" {
 					atomic.AddInt32(&requestsWithToken, 1)
-					w.WriteHeader(http.StatusOK)
-				} else {
-					w.WriteHeader(tt.statusCode)
 				}
+				if atomic.AddInt32(&resourceReq, 1) == 1 {
+					w.WriteHeader(tt.statusCode)
+					return
+				}
+				w.WriteHeader(http.StatusOK)
 			}
 
 			server := newPuzzleAuthServer(t, withResourceHandler(resourceHandler))
@@ -207,8 +206,8 @@ func TestTransport_Do_RetryStatusCodes(t *testing.T) {
 			resp, err := client.Do(req)
 			require.NoError(t, err)
 			require.Equal(t, http.StatusOK, resp.StatusCode)
-			require.GreaterOrEqual(t, atomic.LoadInt32(&resourceReq), int32(2))
-			require.Equal(t, int32(1), atomic.LoadInt32(&requestsWithToken))
+			require.Equal(t, int32(2), atomic.LoadInt32(&resourceReq))
+			require.Equal(t, int32(2), atomic.LoadInt32(&requestsWithToken))
 			resp.Body.Close()
 		})
 	}
@@ -263,7 +262,7 @@ func TestTransport_Do_AuthFailure(t *testing.T) {
 	require.Error(t, err)
 	require.Nil(t, resp)
 	require.Contains(t, err.Error(), "failed to get auth token")
-	require.GreaterOrEqual(t, atomic.LoadInt32(&resourceReq), int32(1))
+	require.Zero(t, atomic.LoadInt32(&resourceReq), "nothing is sent without a token")
 }
 
 func TestTransport_Do_NetworkError(t *testing.T) {
