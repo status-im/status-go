@@ -6,6 +6,7 @@ import (
 	"errors"
 	"sort"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/beevik/ntp"
@@ -31,6 +32,9 @@ const (
 	// DefaultRPCTimeout defines write deadline for single ntp server request.
 	DefaultRPCTimeout = 2 * time.Second
 
+	// DefaultQueryDeadline bounds the wait for all servers, name resolution included.
+	DefaultQueryDeadline = 2 * DefaultRPCTimeout
+
 	// TimeChangeThreshold defines the minimum time difference that indicates
 	// system time has been changed. Values smaller than this are considered normal drift.
 	TimeChangeThreshold = 1 * time.Second
@@ -48,7 +52,10 @@ var defaultServers = []string{
 	"amazon.pool.ntp.org",
 	"android.pool.ntp.org",
 }
-var errUpdateOffset = errors.New("failed to compute offset")
+var (
+	errUpdateOffset  = errors.New("failed to compute offset")
+	errQueryDeadline = errors.New("ntp server did not answer before the deadline")
+)
 
 type ntpQuery func(string, ntp.QueryOptions) (*ntp.Response, error)
 
@@ -74,7 +81,7 @@ func (e multiRPCError) Error() string {
 	return b.String()
 }
 
-func computeOffset(timeQuery ntpQuery, servers []string, allowedFailures int) (time.Duration, error) {
+func computeOffset(timeQuery ntpQuery, servers []string, allowedFailures int, deadline time.Duration) (time.Duration, error) {
 	if len(servers) == 0 {
 		return 0, nil
 	}
@@ -98,17 +105,21 @@ func computeOffset(timeQuery ntpQuery, servers []string, allowedFailures int) (t
 	var (
 		rpcErrors multiRPCError
 		offsets   []time.Duration
-		collected int
 	)
-	for response := range responses {
-		if response.Error != nil {
-			rpcErrors = append(rpcErrors, response.Error)
-		} else {
-			offsets = append(offsets, response.Offset)
-		}
-		collected++
-		if collected == len(servers) {
-			break
+	timeout := time.NewTimer(deadline)
+	defer timeout.Stop()
+	for collected := 0; collected < len(servers); collected++ {
+		select {
+		case response := <-responses:
+			if response.Error != nil {
+				rpcErrors = append(rpcErrors, response.Error)
+			} else {
+				offsets = append(offsets, response.Offset)
+			}
+		case <-timeout.C:
+			for ; collected < len(servers); collected++ {
+				rpcErrors = append(rpcErrors, errQueryDeadline)
+			}
 		}
 	}
 	if lth := len(rpcErrors); lth > allowedFailures {
@@ -154,6 +165,8 @@ type ntpTimeSource struct {
 	timeDataMu    sync.RWMutex
 	latestOffset  time.Duration
 	lastMonotonic time.Time
+
+	offsetUpdating atomic.Bool
 }
 
 // Now returns time adjusted by latest known offset
@@ -177,14 +190,12 @@ func (s *ntpTimeSource) Now() time.Time {
 
 	s.timeDataMu.RUnlock()
 
-	// If significant time change detected, update offset synchronously
 	if timeDiff.Abs() > TimeChangeThreshold {
 		logutils.ZapLogger().Warn("system time change detected",
 			zap.Duration("difference", timeDiff),
 			zap.Duration("threshold", TimeChangeThreshold))
 
-		// Ignore error as it's logged in updateOffset
-		_ = s.updateOffset()
+		s.requestOffsetUpdate()
 
 		// Update the reference times only after significant time change
 		s.timeDataMu.Lock()
@@ -195,8 +206,21 @@ func (s *ntpTimeSource) Now() time.Time {
 	return adjustedTime
 }
 
+// requestOffsetUpdate updates the offset in the background, unless an update is already running.
+func (s *ntpTimeSource) requestOffsetUpdate() {
+	if !s.offsetUpdating.CompareAndSwap(false, true) {
+		return
+	}
+	go func() {
+		defer panics.LogOnPanic()
+		defer s.offsetUpdating.Store(false)
+		// Ignore error as it's logged in updateOffset
+		_ = s.updateOffset()
+	}()
+}
+
 func (s *ntpTimeSource) updateOffset() error {
-	offset, err := computeOffset(s.timeQuery, s.servers, s.allowedFailures)
+	offset, err := computeOffset(s.timeQuery, s.servers, s.allowedFailures, DefaultQueryDeadline)
 	if err != nil {
 		logutils.ZapLogger().Error("failed to compute offset", zap.Error(err))
 		return errUpdateOffset
