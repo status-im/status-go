@@ -1924,7 +1924,7 @@ func (m *Messenger) HandleThreadMetadata(ctx context.Context, state *ReceivedMes
 			return err
 		}
 		if !allowed {
-			return errors.New(adminOnlyThreadCreationError)
+			return errors.New(communityMemberOnlyThreadCreationError)
 		}
 		existing, err := m.persistence.ThreadByID(chat.ID, metadata.ThreadId)
 		if err != nil && !errors.Is(err, common.ErrRecordNotFound) {
