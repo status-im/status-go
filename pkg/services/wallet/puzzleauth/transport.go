@@ -36,7 +36,8 @@ func sharedAuthServiceForOrigin(origin string) *Service {
 	return svc
 }
 
-// Transport is an [http.RoundTripper] that adds puzzle JWT (Bearer) auth and retries on 401/403/429.
+// Transport is an [http.RoundTripper] that sends every request with a puzzle JWT (Bearer),
+// solving a puzzle first when the cached one is missing or expiring, and retries on 401/403/429.
 type Transport struct {
 	base        http.RoundTripper
 	authService *Service
@@ -122,11 +123,11 @@ func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 		default:
 			r.ContentLength = 0
 		}
-		var usedBearer string
-		if tok := t.authService.GetToken(); tok != "" {
-			usedBearer = tok
-			r.Header.Set("Authorization", "Bearer "+tok)
+		bearer, err := t.authService.EnsureToken(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get auth token: %w", err)
 		}
+		r.Header.Set("Authorization", "Bearer "+bearer)
 
 		resp, err := t.base.RoundTrip(r)
 		if err != nil {
@@ -140,9 +141,6 @@ func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 		if attempt >= t.maxRetries {
 			return nil, fmt.Errorf("%w: status %d", ErrAuthRotating, resp.StatusCode)
 		}
-		t.authService.InvalidateTokenForRejectedRequest(usedBearer)
-		if _, err = t.authService.EnsureToken(ctx); err != nil {
-			return nil, fmt.Errorf("failed to get auth token: %w", err)
-		}
+		t.authService.InvalidateTokenForRejectedRequest(bearer)
 	}
 }
