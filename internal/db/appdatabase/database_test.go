@@ -625,3 +625,60 @@ func TestPreMigrationStepWithWrongVersionIsRejected(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, uint(1779444743), version, "a rejected step must not advance the database")
 }
+
+// TestFixTwemojiHTMLInAccountEmoji verifies that 1792681635_fix_twemoji_html_in_account_emoji replaces the
+// Twemoji <img> markup that desktop stored as a wallet account emoji with the emoji from its alt attribute,
+// and leaves every other value alone.
+func TestFixTwemojiHTMLInAccountEmoji(t *testing.T) {
+	db, err := sqlite.OpenDB(sqlite.InMemoryPath, "1234567890", dbsetup.ReducedKDFIterationsNumber)
+	require.NoError(t, err)
+	defer db.Close()
+
+	require.NoError(t, migrationsprevnodecfg.Migrate(db))
+	require.NoError(t, nodecfg.MigrateNodeConfig(db))
+	require.NoError(t, migrations.MigrateTo(db, customSteps, 1791529500))
+
+	_, err = db.Exec(`INSERT INTO keypairs (key_uid, name, type) VALUES ('0xkeyuid', 'Keypair', 'seed')`)
+	require.NoError(t, err)
+
+	accounts := []struct {
+		address  string
+		stored   string
+		expected string
+	}{
+		{
+			address:  "0x01",
+			stored:   `<img class="emoji" draggable="false" alt="🐟" src="qrc:/assets/twemoji/svg/1f41f.svg" width="18" height="18" style="vertical-align: top"> `,
+			expected: "🐟",
+		},
+		{
+			address:  "0x02",
+			stored:   `<img class="emoji" draggable="false" alt="✍🏽" src="qrc:/assets/twemoji/svg/270d-1f3fd.svg?72x72" width="18" height="18" style="vertical-align: top">`,
+			expected: "✍🏽",
+		},
+		{
+			address:  "0x03",
+			stored:   `<img src="qrc:/StatusQ/src/assets/twemoji/svg/1f600.svg" alt="😀" class="emoji">`,
+			expected: "😀",
+		},
+		{address: "0x04", stored: "🐟", expected: "🐟"},
+		{address: "0x05", stored: "", expected: ""},
+		{address: "0x06", stored: `<img src="qrc:/assets/twemoji/svg/1f41f.svg">`, expected: `<img src="qrc:/assets/twemoji/svg/1f41f.svg">`},
+	}
+
+	for _, account := range accounts {
+		_, err = db.Exec(`
+			INSERT INTO keypairs_accounts (address, key_uid, name, emoji, wallet, created_at, updated_at)
+			VALUES (?, '0xkeyuid', 'Account', ?, 1, datetime('now'), datetime('now'))`,
+			account.address, account.stored)
+		require.NoError(t, err)
+	}
+
+	require.NoError(t, migrations.MigrateTo(db, customSteps, 1792681635))
+
+	for _, account := range accounts {
+		var emoji string
+		require.NoError(t, db.QueryRow(`SELECT emoji FROM keypairs_accounts WHERE address = ?`, account.address).Scan(&emoji))
+		require.Equal(t, account.expected, emoji, "account %s", account.address)
+	}
+}
