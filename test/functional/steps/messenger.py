@@ -277,6 +277,7 @@ def leave_group(node, group_id, observers=()):
 
 
 def create_community(node, history_archive_support_enabled=False) -> str:
+    node.wait_for_online()
     response = node.wakuext_service.create_community(
         fake.community_name(), fake.community_description(), history_archive_support_enabled=history_archive_support_enabled
     )
