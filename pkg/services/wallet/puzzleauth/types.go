@@ -39,18 +39,25 @@ type TokenResponse struct {
 	RequestLimit int    `json:"request_limit"`
 }
 
+// maxExpiryBuffer caps how early a token is treated as expired.
+const maxExpiryBuffer = time.Minute
+
 // TokenData represents cached token data
 type TokenData struct {
 	Token     string
+	IssuedAt  time.Time
 	ExpiresAt time.Time
 }
 
-// IsValid checks if the token is still valid
+// IsValid reports whether the token can still be sent: it is treated as expired
+// a tenth of its lifetime (at most maxExpiryBuffer) before ExpiresAt.
 func (t *TokenData) IsValid() bool {
 	if t == nil || t.Token == "" {
 		return false
 	}
-	// Consider token expired 5 minutes before actual expiry
-	expiryBuffer := 5 * time.Minute
-	return time.Now().Before(t.ExpiresAt.Add(-expiryBuffer))
+	buffer := maxExpiryBuffer
+	if !t.IssuedAt.IsZero() {
+		buffer = min(buffer, t.ExpiresAt.Sub(t.IssuedAt)/10)
+	}
+	return time.Now().Before(t.ExpiresAt.Add(-buffer))
 }
