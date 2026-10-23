@@ -16,7 +16,7 @@ import (
 	"github.com/status-im/status-go/internal/protocol/requests"
 )
 
-const adminOnlyThreadCreationError = "only admins can create threads in this community"
+const threadCreationPermissionError = "only members who can post in this channel can create threads"
 const threadEditPermissionError = "only the thread creator or an admin can edit this thread"
 
 type MessagePageWithThreadSummaries struct {
@@ -91,12 +91,11 @@ func (m *Messenger) senderCanCreateThread(chat *Chat, sender *ecdsa.PublicKey) (
 		return true, nil
 	}
 
-	community, err := m.communitiesManager.GetByIDString(chat.CommunityID)
-	if err != nil {
-		return false, err
+	if sender == nil {
+		return false, nil
 	}
 
-	return community.AllowsAllMembersToCreateThread() || (sender != nil && community.IsPrivilegedMember(sender)), nil
+	return m.communitiesManager.CanPost(sender, chat.CommunityID, chat.CommunityChatID(), protobuf.ApplicationMetadataMessage_CHAT_MESSAGE)
 }
 
 func (m *Messenger) senderCanEditThread(chat *Chat, thread *Thread, sender *ecdsa.PublicKey) (bool, error) {
@@ -135,8 +134,8 @@ func (m *Messenger) senderCanEditThread(chat *Chat, thread *Thread, sender *ecds
 }
 
 // CreateThread creates thread metadata for an existing parent message in a chat.
-// The parent message must already be stored locally. Permission rules (admin-only
-// vs all-members) are enforced for community chats.
+// The parent message must already be stored locally. Only members who can post
+// in the channel can create threads in community chats.
 func (m *Messenger) CreateThread(chatID string, parentMessageID string) (*MessengerResponse, error) {
 	if !m.featureFlags.Threads {
 		return nil, ErrThreadFeatureDisabled
@@ -178,7 +177,7 @@ func (m *Messenger) CreateThread(chatID string, parentMessageID string) (*Messen
 		return nil, err
 	}
 	if !allowed {
-		return nil, errors.New(adminOnlyThreadCreationError)
+		return nil, errors.New(threadCreationPermissionError)
 	}
 
 	parentMsg, msgErr := m.persistence.MessageByID(parentMessageID)
@@ -412,7 +411,7 @@ func (m *Messenger) StartThreadFromNewMessage(ctx context.Context, request *requ
 		return nil, err
 	}
 	if !allowed {
-		return nil, errors.New(adminOnlyThreadCreationError)
+		return nil, errors.New(threadCreationPermissionError)
 	}
 
 	rootText, _ := common.NormalizeThreadName(request.ThreadName, true)

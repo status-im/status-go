@@ -394,7 +394,7 @@ messages being rendered.
 
 Explicitly create a thread from an existing parent message. The parent message must already be stored locally (i.e. it was previously received or sent).
 
-For community chats, the caller must be a privileged member (admin/owner) unless the community has "create threads for all members" enabled.
+For community chats, the caller must be a community member.
 
 **Params:** `[chatId, parentMessageId]`
 - `chatId`: string — channel/chat identifier.
@@ -419,7 +419,7 @@ For community chats, the caller must be a privileged member (admin/owner) unless
 - `"chatID and parentMessageID are required"` — missing params.
 - `"thread already exists for this message"` — thread already created for this parent.
 - `"parent message not found"` — parent message doesn't exist locally.
-- `"only admins can create threads in this community"` — permission denied.
+- `"only community members can create threads in this community"` — permission denied.
 
 ---
 
@@ -492,8 +492,7 @@ the supplied message as the root's first reply.
   sets both to the generated root message ID.
 - The result contains both sent messages and the created thread metadata.
 
-For community chats, the caller must be a privileged member (admin/owner) unless
-the community has "create threads for all members" enabled.
+For community chats, the caller must be a community member.
 
 The two sends are sequential, not transactional. If sending the first reply
 fails after the root was sent, the root remains in the chat and is already a

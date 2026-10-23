@@ -2164,7 +2164,7 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 				return nil, permissionErr
 			}
 			if !allowed {
-				return nil, errors.New("only admins can create threads in this community")
+				return nil, errors.New(threadCreationPermissionError)
 			}
 		default:
 			return nil, err
