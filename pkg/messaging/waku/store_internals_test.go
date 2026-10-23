@@ -25,7 +25,7 @@ type fakeRequestor struct {
 	respond  func(req *storepb.StoreQueryRequest, callIdx int) ([]*storepb.WakuMessageKeyValue, []byte, error)
 }
 
-func (f *fakeRequestor) query(_ context.Context, _ peer.AddrInfo, req *storepb.StoreQueryRequest) ([]*storepb.WakuMessageKeyValue, []byte, error) {
+func (f *fakeRequestor) Query(_ context.Context, _ peer.AddrInfo, req *storepb.StoreQueryRequest) ([]*storepb.WakuMessageKeyValue, []byte, error) {
 	f.mu.Lock()
 	idx := len(f.requests)
 	f.requests = append(f.requests, req)
@@ -41,13 +41,13 @@ func (f *fakeRequestor) calls() []*storepb.StoreQueryRequest {
 	return out
 }
 
-// recordingProcessor satisfies envelopeProcessor. The tests return empty message
+// recordingProcessor satisfies EnvelopeProcessor. The tests return empty message
 // sets, so OnEnvelope is never invoked; it exists only to construct a pager.
 type recordingProcessor struct{}
 
 func (p *recordingProcessor) OnEnvelope(*protocol.Envelope, bool) error { return nil }
 
-func newPager(r storeRequestor) *storePager {
+func newPager(r StoreRequestor) *storePager {
 	return newStorePager(r, &recordingProcessor{}, zap.NewNop())
 }
 
@@ -175,7 +175,7 @@ func TestStorePagerChunksContentTopics(t *testing.T) {
 
 // --- StoreClient failover ---
 
-func newClient(r storeRequestor, nodes []peer.AddrInfo) *StoreClient {
+func newClient(r StoreRequestor, nodes []peer.AddrInfo) *StoreClient {
 	sel := newStoreSelector()
 	sel.setStorenodes(nodes)
 	resolve := func(s string) string {

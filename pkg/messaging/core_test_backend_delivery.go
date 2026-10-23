@@ -116,7 +116,7 @@ func newTestDeliveryAdapter(cfg delivery.Config, extra map[string]any) (*deliver
 	if err != nil {
 		return nil, err
 	}
-	return delivery.NewAdapter(client, zap.NewNop()), nil
+	return delivery.NewAdapter(client, "", zap.NewNop()), nil
 }
 
 func freeTCPPort() (int, error) {

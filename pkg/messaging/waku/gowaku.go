@@ -1635,19 +1635,23 @@ func FormatPeerConnFailures(wakuNode *node.WakuNode) map[string]int {
 // fleetStorenodes resolves the configured fleet's store nodes into dialable peer
 // addresses. Nodes whose addressing info can't be resolved are skipped.
 func (w *Waku) fleetStorenodes() []peer.AddrInfo {
-	storeNodes := fleets.StoreNodes(w.cfg.Fleet)
+	return fleetStorenodes(w.cfg.Fleet, w.logger)
+}
+
+func fleetStorenodes(fleet string, logger *zap.Logger) []peer.AddrInfo {
+	storeNodes := fleets.StoreNodes(fleet)
 	addrInfos := make([]peer.AddrInfo, 0, len(storeNodes))
 	for _, node := range storeNodes {
 		info, err := node.PeerInfo()
 		if err != nil {
-			w.logger.Warn("skipping storenode with unresolvable peer info",
+			logger.Warn("skipping storenode with unresolvable peer info",
 				zap.String("id", node.ID), zap.String("name", node.Name), zap.Error(err))
 			continue
 		}
 		addrInfos = append(addrInfos, info)
 	}
 	if len(addrInfos) == 0 && len(storeNodes) > 0 {
-		w.logger.Warn("no usable storenodes after resolving peer info; history queries will fail",
+		logger.Warn("no usable storenodes after resolving peer info; history queries will fail",
 			zap.Int("configured", len(storeNodes)))
 	}
 	return addrInfos
