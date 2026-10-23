@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -160,7 +161,7 @@ func newTestCases() []*testCase {
 func TestComputeOffset(t *testing.T) {
 	for _, tc := range newTestCases() {
 		t.Run(tc.description, func(t *testing.T) {
-			offset, err := computeOffset(tc.query, tc.servers, tc.allowedFailures)
+			offset, err := computeOffset(tc.query, tc.servers, tc.allowedFailures, DefaultQueryDeadline)
 			if tc.expectError {
 				assert.Error(t, err)
 			} else {
@@ -345,7 +346,7 @@ func TestSystemTimeChangeDetection(t *testing.T) {
 	const timeJump = 2 * TimeChangeThreshold
 
 	// Track timeQuery calls (which indicates UpdateOffset was called)
-	timeQueryCalled := 0
+	var timeQueryCalled atomic.Int32
 
 	testOffset := 500 * time.Millisecond
 
@@ -365,12 +366,14 @@ func TestSystemTimeChangeDetection(t *testing.T) {
 
 	// Set up the timeQuery function to track calls
 	ts.timeQuery = func(string, ntp.QueryOptions) (*ntp.Response, error) {
-		timeQueryCalled++
+		timeQueryCalled.Add(1)
 		return &ntp.Response{
 			ClockOffset: testOffset,
 			Stratum:     1,
 		}, nil
 	}
+
+	updated := func() bool { return timeQueryCalled.Load() == 1 && !ts.offsetUpdating.Load() }
 
 	// Initialize time tracking fields
 	ts.latestOffset = testOffset
@@ -379,20 +382,20 @@ func TestSystemTimeChangeDetection(t *testing.T) {
 	// Test case 1: No time change
 	// -------------------------------------------------------------------------
 	// Reset the counter before this test case
-	timeQueryCalled = 0
+	timeQueryCalled.Store(0)
 
 	time1 := ts.Now()
 	assert.Equal(t, currentTime.Add(testOffset), time1,
 		"Time should be adjusted by offset with no time change")
 	assert.Equal(t, currentTime, ts.lastMonotonic,
 		"lastMonotonic should be updated after Now() call")
-	assert.Equal(t, 0, timeQueryCalled,
+	assert.Equal(t, int32(0), timeQueryCalled.Load(),
 		"UpdateOffset should not be called when no time change is detected")
 
 	// Test case 2: Small time change (below threshold)
 	// -------------------------------------------------------------------------
 	// Reset the counter before this test case
-	timeQueryCalled = 0
+	timeQueryCalled.Store(0)
 
 	// Advance time by a small amount
 	oldTime := currentTime
@@ -407,13 +410,13 @@ func TestSystemTimeChangeDetection(t *testing.T) {
 		"Time should be adjusted by offset with small time change")
 	assert.Equal(t, oldTime, ts.lastMonotonic,
 		"lastMonotonic should not be updated after small time change")
-	assert.Equal(t, 0, timeQueryCalled,
+	assert.Equal(t, int32(0), timeQueryCalled.Load(),
 		"UpdateOffset should not be called when time change is below threshold")
 
 	// Test case 3: Large backward time change
 	// -------------------------------------------------------------------------
 	// Reset the counter before this test case
-	timeQueryCalled = 0
+	timeQueryCalled.Store(0)
 
 	// Advance time significantly
 	oldTime = currentTime
@@ -428,13 +431,13 @@ func TestSystemTimeChangeDetection(t *testing.T) {
 		"Time should be adjusted by offset after backward time change")
 	assert.Equal(t, currentTime, ts.lastMonotonic,
 		"lastMonotonic should be updated after backward time change")
-	assert.Equal(t, 1, timeQueryCalled,
+	assert.Eventually(t, updated, time.Second, time.Millisecond,
 		"UpdateOffset should be called when backward time change is detected")
 
 	// Test case 4: Large forward time change
 	// -------------------------------------------------------------------------
 	// Reset the counter before this test case
-	timeQueryCalled = 0
+	timeQueryCalled.Store(0)
 
 	// Advance time significantly
 	oldTime = currentTime
@@ -449,7 +452,7 @@ func TestSystemTimeChangeDetection(t *testing.T) {
 		"Time should be adjusted by offset after forward time change")
 	assert.Equal(t, currentTime, ts.lastMonotonic,
 		"lastMonotonic should be updated after forward time change")
-	assert.Equal(t, 1, timeQueryCalled,
+	assert.Eventually(t, updated, time.Second, time.Millisecond,
 		"UpdateOffset should be called when forward time change is detected")
 }
 
