@@ -35,12 +35,39 @@ func TestTokenData_IsValid(t *testing.T) {
 			expected: false,
 		},
 		{
-			name: "token expiring soon (within 5 min) is invalid",
+			name: "token expiring within a minute is invalid",
 			tokenData: &TokenData{
 				Token:     "valid-token",
-				ExpiresAt: time.Now().Add(3 * time.Minute),
+				ExpiresAt: time.Now().Add(30 * time.Second),
 			},
 			expected: false,
+		},
+		{
+			name: "10-minute token is valid for 9 minutes",
+			tokenData: &TokenData{
+				Token:     "valid-token",
+				IssuedAt:  time.Now().Add(-8 * time.Minute),
+				ExpiresAt: time.Now().Add(2 * time.Minute),
+			},
+			expected: true,
+		},
+		{
+			name: "10-minute token is invalid in its last minute",
+			tokenData: &TokenData{
+				Token:     "valid-token",
+				IssuedAt:  time.Now().Add(-9*time.Minute - 10*time.Second),
+				ExpiresAt: time.Now().Add(50 * time.Second),
+			},
+			expected: false,
+		},
+		{
+			name: "short-lived token keeps nine tenths of its lifetime",
+			tokenData: &TokenData{
+				Token:     "valid-token",
+				IssuedAt:  time.Now().Add(-1500 * time.Millisecond),
+				ExpiresAt: time.Now().Add(500 * time.Millisecond),
+			},
+			expected: true,
 		},
 		{
 			name: "valid token with sufficient time is valid",
