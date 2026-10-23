@@ -28,6 +28,7 @@ class MobileBuildTest(unittest.TestCase):
                     result = subprocess.run(
                         ["make", f"statusgo-{platform}-library", "-o", "generate",
                          "-o", "statusgo-c-bindings", "-o", f"build-libsds-{platform}",
+                         "-o", f"build-liblogosdelivery-{platform}",
                          "-o", "install-git-hooks", "ARCH=arm64", "RELEASE_TAG=fixture",
                          "ANDROID_NDK_ROOT=/fixture/ndk", "HOST_OS=linux",
                          "IPHONE_SDK=iphoneos"],
