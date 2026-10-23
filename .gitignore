@@ -129,3 +129,8 @@ libs
 
 # CODEX (ChatGPT plugin)
 .codex
+
+# Nimble
+nimble.develop
+nimble.paths
+nimbledeps
