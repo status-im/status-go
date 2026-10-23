@@ -40,7 +40,10 @@ type RawMessage struct {
 	PubsubTopic           string
 	ResendType            ResendType
 	ResendMethod          ResendMethod
-	Priority              *messagingtypes.MessagePriority
+	// Deprecated: Priority is ignored by the transport. It may come back once
+	// logos-delivery supports message priorities, or once RLN is in place; see
+	// https://github.com/logos-messaging/logos-delivery/issues/3907.
+	Priority *messagingtypes.MessagePriority
 }
 
 // ResendType There are distinct mechanisms for retrying send messages: Datasync supports only direct messages (1-to-1 or private group chats)

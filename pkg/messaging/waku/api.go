@@ -39,7 +39,7 @@ import (
 //
 // ctx is accepted for symmetry with transport.MessagingAPI; the send queue
 // uses the waku instance's own lifecycle context.
-func (w *Waku) Send(ctx context.Context, pubsubTopic, contentTopic string, payload []byte, ephemeral bool, priority *int) ([]byte, error) {
+func (w *Waku) Send(ctx context.Context, pubsubTopic, contentTopic string, payload []byte, ephemeral bool, _ *int) ([]byte, error) {
 	var version uint32 = 0 // wire label only; the payload is RFC26-encoded by the caller
 	msg := &pb.WakuMessage{
 		Payload:      payload,
@@ -49,5 +49,5 @@ func (w *Waku) Send(ctx context.Context, pubsubTopic, contentTopic string, paylo
 		Meta:         []byte{}, // TODO: empty for now. Once we use Waku Archive v2, we should deprecate the timestamp and use an ULID here
 		Ephemeral:    &ephemeral,
 	}
-	return w.sendEnvelope(pubsubTopic, msg, priority)
+	return w.sendEnvelope(pubsubTopic, msg, nil)
 }
