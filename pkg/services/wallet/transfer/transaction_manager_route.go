@@ -331,7 +331,8 @@ func (tm *TransactionManager) ValidateAndAddSignaturesToRouterTransactions(signa
 func addSignatureAndSendTransaction(
 	transactor transactions.TransactorIface,
 	txData *wallettypes.TransactionData,
-	isApproval bool) (*responses.RouterSentTransaction, error) {
+	isApproval bool,
+	processorName string) (*responses.RouterSentTransaction, error) {
 	var txWithSignature *ethTypes.Transaction
 	var err error
 
@@ -351,7 +352,7 @@ func addSignatureAndSendTransaction(
 		txData.TxArgs.To = &toAddr
 	}
 
-	return responses.NewRouterSentTransaction(txData.TxArgs, txData.SentHash, isApproval), nil
+	return responses.NewRouterSentTransaction(txData.TxArgs, txData.SentHash, isApproval, processorName), nil
 }
 
 func (tm *TransactionManager) SendRouterTransactions(ctx context.Context) (transactions []*responses.RouterSentTransaction, fromChainID uint64, toChainID uint64, err error) {
@@ -363,7 +364,7 @@ func (tm *TransactionManager) SendRouterTransactions(ctx context.Context) (trans
 		toChainID = desc.RouterPath.ToChain.ChainID
 		if desc.ApprovalTxData != nil && !desc.IsApprovalPlaced() {
 			var response *responses.RouterSentTransaction
-			response, err = addSignatureAndSendTransaction(tm.transactor, desc.ApprovalTxData, true)
+			response, err = addSignatureAndSendTransaction(tm.transactor, desc.ApprovalTxData, true, desc.RouterPath.ProcessorName)
 			if err != nil {
 				return
 			}
@@ -378,7 +379,7 @@ func (tm *TransactionManager) SendRouterTransactions(ctx context.Context) (trans
 
 		if desc.TxData != nil && !desc.IsTxPlaced() {
 			var response *responses.RouterSentTransaction
-			response, err = addSignatureAndSendTransaction(tm.transactor, desc.TxData, false)
+			response, err = addSignatureAndSendTransaction(tm.transactor, desc.TxData, false, desc.RouterPath.ProcessorName)
 			if err != nil {
 				return
 			}
