@@ -87,6 +87,15 @@ class SendChatMessagePayload(TypedDict):
     image_path: NotRequired[str]
 
 
+class PaymentRequestPayload(TypedDict):
+    receiver: str
+    symbol: str
+    amount: str
+    chain_id: int
+    token_key: str
+    logo_uri: NotRequired[str]
+
+
 class CommunityPermissionsAccess(Enum):
     UNKNOWN = 0
     AUTO_ACCEPT = 1
@@ -133,6 +142,20 @@ class SignParams:
 class Error(Exception):
     def __init__(self, message):
         self.message = message
+
+
+def _payment_request_payload(request: PaymentRequestPayload) -> dict:
+    payload = {
+        "receiver": request["receiver"],
+        "symbol": request["symbol"],
+        "amount": request["amount"],
+        "chainId": request["chain_id"],
+        "tokenKey": request["token_key"],
+    }
+    logo_uri = request.get("logo_uri")
+    if logo_uri:
+        payload["logoUri"] = logo_uri
+    return payload
 
 
 class WakuextService(Service):
@@ -445,6 +468,7 @@ class WakuextService(Service):
         responseTo: str = "",
         image_path: str = "",
         thread_id: str = "",
+        payment_requests: Optional[list[PaymentRequestPayload]] = None,
     ):
         payload = {
             "chatId": chat_id,
@@ -456,6 +480,8 @@ class WakuextService(Service):
             payload["imagePath"] = image_path
         if thread_id:
             payload["threadId"] = thread_id
+        if payment_requests:
+            payload["paymentRequests"] = [_payment_request_payload(request) for request in payment_requests]
         params = [payload]
         response = self.rpc_request("sendChatMessage", params)
         return response

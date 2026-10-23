@@ -1,8 +1,9 @@
+import asyncio
 from time import sleep, time
 from uuid import uuid4
 import pytest
 
-from clients.services.wakuext import SendChatMessagePayload
+from clients.services.wakuext import PaymentRequestPayload, SendChatMessagePayload
 from clients.signals import SignalType
 from resources.enums import MessageContentType
 from steps import async_messenger
@@ -52,6 +53,61 @@ class TestSendingChatMessages:
         assert len(messages) == 1
         actual_text = messages[0].get("text", "")
         assert actual_text == message_text
+
+    async def _assert_payment_request_received(self, sender, receiver, text: str):
+        await async_messenger.make_contacts(sender, receiver)
+        if receiver.waku_light_client:
+            await asyncio.sleep(10)
+
+        payment_request: PaymentRequestPayload = {
+            "receiver": "0x123",
+            "symbol": "ETH",
+            "amount": "1.123",
+            "chain_id": 1,
+            "token_key": "1-0x0000000000000000000000000000000000000000",
+        }
+        expected_payment_request = {
+            "receiver": payment_request["receiver"],
+            "symbol": payment_request["symbol"],
+            "amount": payment_request["amount"],
+            "chainId": payment_request["chain_id"],
+            "tokenKey": payment_request["token_key"],
+        }
+
+        async with receiver.expect_signal(
+            SignalType.MESSAGES_NEW,
+            pattern=expected_payment_request["tokenKey"],
+            timeout=60,
+        ) as exp:
+            response = sender.wakuext_service.send_chat_message(
+                receiver.public_key,
+                text,
+                payment_requests=[payment_request],
+            )
+
+        sent_messages = [message for message in response.get("messages", []) if message.get("paymentRequests")]
+        assert len(sent_messages) == 1
+        sent = sent_messages[0]
+        assert sent.get("text") == text
+        assert sent.get("contentType") == MessageContentType.TEXT_PLAIN.value
+        assert sent.get("paymentRequests") == [expected_payment_request]
+
+        assert exp.result is not None
+        signal_messages = exp.result.event.get("messages", [])
+        received = next((message for message in signal_messages if message.get("id") == sent["id"]), None)
+        assert received is not None, f"Payment request {sent['id']} was not in messages.new"
+        assert received.get("text") == text
+        assert received.get("paymentRequests") == [expected_payment_request]
+
+        saved = receiver.wakuext_service.message_by_message_id(sent["id"])
+        assert saved.get("text") == text
+        assert saved.get("paymentRequests") == [expected_payment_request]
+
+    async def test_receive_payment_request_without_text(self, sender, receiver):
+        await self._assert_payment_request_received(sender, receiver, "")
+
+    async def test_receive_payment_request_with_text(self, sender, receiver):
+        await self._assert_payment_request_received(sender, receiver, f"payment_request_{uuid4()}")
 
     @pytest.mark.light_client_7393
     async def test_send_chat_message_community(self, sender, receiver):
