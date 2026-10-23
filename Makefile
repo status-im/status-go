@@ -158,10 +158,15 @@ endif
 # Built without Nix the same way libsds is.
 NIMBLE_LIB := $(CURDIR)/build/liblogosdelivery.$(LIB_EXT)
 
+# Leopard's CMake would otherwise pick MSVC from vcvars, whose flags MSYS mangles.
+ifeq ($(detected_OS),Windows)
+LEOPARD_CC_ENV := CC=gcc CXX=g++
+endif
+
 .PHONY: liblogosdelivery-nimble statusgo-nim-delivery
 
 $(NIMBLE_LIB): | nimble.paths
-	LIBLOGOSDELIVERY_OUT="$(CURDIR)/build" \
+	$(LEOPARD_CC_ENV) LIBLOGOSDELIVERY_OUT="$(CURDIR)/build" \
 		NIM_PARAMS="--skipParentCfg $$NIM_PARAMS -d:disable_rln $$(tr '\n' ' ' < $(CURDIR)/nimble.paths)" \
 		$(NIMBLE) liblogosdelivery
 	@test -f $@ || (echo "ERROR: $@ was not produced" && exit 1)
