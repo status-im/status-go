@@ -58,6 +58,9 @@ type RouterSentTransaction struct {
 	AmountOut    string        `json:"amountOut"` // amount that will be received
 	Hash         types.Hash    `json:"hash"`
 	ApprovalTx   bool          `json:"approvalTx"`
+	// the path processor that executes the route (e.g. "Relay", "LiFi", "Hop"); the client
+	// names the provider from it instead of guessing from the send type
+	ProcessorName string `json:"processorName"`
 }
 
 type RouterSentTransactions struct {
@@ -65,7 +68,7 @@ type RouterSentTransactions struct {
 	SentTransactions []*RouterSentTransaction `json:"sentTransactions"`
 }
 
-func NewRouterSentTransaction(sendArgs *wallettypes.SendTxArgs, hash types.Hash, approvalTx bool) *RouterSentTransaction {
+func NewRouterSentTransaction(sendArgs *wallettypes.SendTxArgs, hash types.Hash, approvalTx bool, processorName string) *RouterSentTransaction {
 	addr := types.Address{}
 	if sendArgs.To != nil {
 		addr = *sendArgs.To
@@ -88,17 +91,18 @@ func NewRouterSentTransaction(sendArgs *wallettypes.SendTxArgs, hash types.Hash,
 		toTokenKey = sendArgs.ToToken.Key()
 	}
 	return &RouterSentTransaction{
-		FromAddress:  sendArgs.From,
-		ToAddress:    addr,
-		FromChain:    sendArgs.FromChainID,
-		ToChain:      sendArgs.ToChainID,
-		FromTokenKey: fromTokenKey,
-		ToTokenKey:   toTokenKey,
-		Amount:       sendArgs.Value.String(),
-		AmountIn:     sendArgs.ValueIn.String(),
-		AmountOut:    sendArgs.ValueOut.String(),
-		Hash:         hash,
-		ApprovalTx:   approvalTx,
+		FromAddress:   sendArgs.From,
+		ToAddress:     addr,
+		FromChain:     sendArgs.FromChainID,
+		ToChain:       sendArgs.ToChainID,
+		FromTokenKey:  fromTokenKey,
+		ToTokenKey:    toTokenKey,
+		Amount:        sendArgs.Value.String(),
+		AmountIn:      sendArgs.ValueIn.String(),
+		AmountOut:     sendArgs.ValueOut.String(),
+		Hash:          hash,
+		ApprovalTx:    approvalTx,
+		ProcessorName: processorName,
 	}
 }
 
