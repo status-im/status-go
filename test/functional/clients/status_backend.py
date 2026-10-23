@@ -177,7 +177,7 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
         logging.debug("StatusBackend is healthy")
 
     def health(self):
-        return self.api_request("health", data=[], url=self.base_url, quiet=True)
+        return self.api_request("health", data=[], url=self.base_url, quiet=True, timeout=(1, 5))
 
     def init_status_backend(self):
         if Config.logout:
