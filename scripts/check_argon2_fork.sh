@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Checks that internal/crypto/argon2 is exactly the upstream files listed in its UPSTREAM file,
-# at the golang.org/x/crypto version go.mod uses, plus argon2.patch. Any other change fails.
+# at the golang.org/x/crypto version go.mod uses, plus argon2.patch, plus the "own" files UPSTREAM lists.
+# Any other change fails.
 set -euo pipefail
 
 GIT_ROOT=$(cd "${BASH_SOURCE%/*}" && git rev-parse --show-toplevel)
@@ -28,9 +29,16 @@ done < "${FORK}/UPSTREAM"
 chmod -R u+w "${tmp}"
 patch --quiet --no-backup-if-mismatch -p1 -d "${tmp}" < "${FORK}/argon2.patch"
 
-if ! diff -r -x '*_test.go' -x UPSTREAM -x argon2.patch -x .gitattributes "${tmp}" "${FORK}"; then
+own_excludes=()
+while read -r kind name; do
+  [[ "${kind}" == "own" ]] || continue
+  [[ -f "${FORK}/${name}" ]] || { echo "UPSTREAM lists own file ${name}, but it is missing" >&2; exit 1; }
+  own_excludes+=(-x "${name}")
+done < "${FORK}/UPSTREAM"
+
+if ! diff -r -x '*_test.go' -x UPSTREAM -x argon2.patch -x .gitattributes ${own_excludes[@]+"${own_excludes[@]}"} "${tmp}" "${FORK}"; then
   echo "internal/crypto/argon2 differs from ${module}@${version} + argon2.patch (diff above)." >&2
-  echo "Fold intended changes into argon2.patch (diff -u against the upstream file)." >&2
+  echo "Fold intended changes into argon2.patch (diff -u against the upstream file), or list a new file as own in UPSTREAM." >&2
   exit 1
 fi
 echo "internal/crypto/argon2 matches ${module}@${version} + argon2.patch"
