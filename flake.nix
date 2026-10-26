@@ -33,9 +33,11 @@
     };
     # We cannot do follows since the nim-unwrapped-2_0 doesn't exist in this nixpkgs version above
     nim-sds.url = "git+https://github.com/logos-messaging/nim-sds?submodules=1&rev=4b08d508dbfa69c0e2e3883db67adf1fe5a0c994";
+    # nimble 0.20.1 in the nixpkgs above cannot resolve nim-sds through the bindings.
+    nixpkgs-nimble.url = "github:NixOS/nixpkgs/34ab99075ac4f7e40cf037eef32cb1c360bb85e9";
   };
 
-  outputs = { self, nixpkgs, logos-storage-nim, nim-sds, nim-token-lists }:
+  outputs = { self, nixpkgs, logos-storage-nim, nim-sds, nim-token-lists, nixpkgs-nimble }:
   let
     stableSystems = [
       "x86_64-linux" "aarch64-linux"
@@ -62,6 +64,16 @@
             libtkl = final.callPackage ./nix/pkgs/libtkl { src = nim-token-lists; };
             libsds     = useTmpdirForNimCache nim-sds.packages.${system}.libsds;
             libstorage = useTmpdirForNimCache logos-storage-nim.packages.${system}.libstorage;
+            nimble = nixpkgs-nimble.legacyPackages.${system}.nimble.overrideAttrs (_: {
+              version = "0.26.1";
+              src = final.fetchFromGitHub {
+                owner = "nim-lang";
+                repo = "nimble";
+                tag = "v0.26.1";
+                hash = "sha256-tTlUZBJY380sV6c6ijYtjDafdgPhI8pda1392WgI9e0=";
+                fetchSubmodules = true;
+              };
+            });
           })
         ];
       }
