@@ -66,6 +66,10 @@ type Thread struct {
 	ParticipantsCount        uint               `json:"participantsCount"`
 	ParticipantsPreviewIDs   []string           `json:"participantsPreviewIds"`
 	LastMessage              *ThreadLastMessage `json:"lastMessage,omitempty"`
+	// LastActivityAt is the latest new message time (ms), initially the thread creation time.
+	LastActivityAt uint64 `json:"lastActivityAt"`
+	// Archived is derived from LastActivityAt and the thread inactivity TTL.
+	Archived bool `json:"archived"`
 }
 
 const defaultThreadParticipantPreviewLimit = 6
@@ -965,17 +969,19 @@ func (db sqlitePersistence) threadNameFromParentByID(parentMessageID string) str
 	return name
 }
 
-func (db sqlitePersistence) upsertThread(tx *sql.Tx, threadID, chatID, parentMessageID, name string) error {
-	return db.upsertThreadWithCreatorPending(tx, threadID, chatID, parentMessageID, name, false)
+// upsertThread creates a thread if needed. activityAt is the initial activity
+// time, reconciled with stored replies; existing threads keep theirs.
+func (db sqlitePersistence) upsertThread(tx *sql.Tx, threadID, chatID, parentMessageID, name string, activityAt uint64) error {
+	return db.upsertThreadWithCreatorPending(tx, threadID, chatID, parentMessageID, name, false, activityAt)
 }
 
 // upsertPendingCreatorThread creates a thread whose creation metadata is still
 // expected, so the first valid creation metadata may claim it.
-func (db sqlitePersistence) upsertPendingCreatorThread(tx *sql.Tx, threadID, chatID, parentMessageID, name string) error {
-	return db.upsertThreadWithCreatorPending(tx, threadID, chatID, parentMessageID, name, true)
+func (db sqlitePersistence) upsertPendingCreatorThread(tx *sql.Tx, threadID, chatID, parentMessageID, name string, activityAt uint64) error {
+	return db.upsertThreadWithCreatorPending(tx, threadID, chatID, parentMessageID, name, true, activityAt)
 }
 
-func (db sqlitePersistence) upsertThreadWithCreatorPending(tx *sql.Tx, threadID, chatID, parentMessageID, name string, creatorPending bool) error {
+func (db sqlitePersistence) upsertThreadWithCreatorPending(tx *sql.Tx, threadID, chatID, parentMessageID, name string, creatorPending bool, activityAt uint64) error {
 	if threadID == "" || chatID == "" {
 		return nil
 	}
@@ -988,7 +994,12 @@ func (db sqlitePersistence) upsertThreadWithCreatorPending(tx *sql.Tx, threadID,
 	err := tx.QueryRow(`SELECT name FROM threads WHERE thread_id = ? AND chat_id = ?`, threadID, chatID).Scan(&existingName)
 	switch {
 	case errors.Is(err, sql.ErrNoRows), errors.Is(err, common.ErrRecordNotFound):
-		_, err = tx.Exec(`INSERT INTO threads(thread_id, chat_id, parent_message_id, name, creator_pending) VALUES (?, ?, ?, ?, ?)`, threadID, chatID, parentMessageID, name, creatorPending)
+		replyActivity, err := db.storedThreadActivity(tx, chatID, threadID, "")
+		if err != nil {
+			return err
+		}
+		activityAt = max(db.threadActivityAt(activityAt), replyActivity)
+		_, err = tx.Exec(`INSERT INTO threads(thread_id, chat_id, parent_message_id, name, creator_pending, last_activity_at) VALUES (?, ?, ?, ?, ?, ?)`, threadID, chatID, parentMessageID, name, creatorPending, activityAt)
 		return err
 	case err != nil:
 		return err
@@ -1000,6 +1011,24 @@ func (db sqlitePersistence) upsertThreadWithCreatorPending(tx *sql.Tx, threadID,
 	}
 
 	return nil
+}
+
+// storedThreadActivity returns bounded activity from visible replies and,
+// when supplied, the parent message. Zero means no known message time.
+func (db sqlitePersistence) storedThreadActivity(tx *sql.Tx, chatID, threadID, parentMessageID string) (uint64, error) {
+	var activity sql.NullInt64
+	err := tx.QueryRow(`SELECT MAX(COALESCE(NULLIF(timestamp, 0), whisper_timestamp))
+		FROM user_messages
+		WHERE local_chat_id = ? AND (thread_id = ? OR (? <> '' AND id = ?))
+			AND NOT deleted AND NOT deleted_for_me`,
+		chatID, threadID, parentMessageID, parentMessageID).Scan(&activity)
+	if err != nil {
+		return 0, err
+	}
+	if !activity.Valid || activity.Int64 <= 0 {
+		return 0, nil
+	}
+	return db.threadActivityAt(uint64(activity.Int64)), nil
 }
 
 func (db sqlitePersistence) setThreadCreator(tx *sql.Tx, threadID, chatID, creatorID string) error {
@@ -1037,7 +1066,13 @@ func (db sqlitePersistence) ClaimPendingThreadCreator(chatID, threadID, creatorI
 
 // UpsertPendingCreatorThread creates a thread whose creator is not known yet
 // but whose creation metadata is expected to arrive later.
-func (db sqlitePersistence) UpsertPendingCreatorThread(threadID, chatID, parentMessageID, name string) (err error) {
+func (db sqlitePersistence) UpsertPendingCreatorThread(threadID, chatID, parentMessageID, name string) error {
+	return db.UpsertPendingCreatorThreadAt(threadID, chatID, parentMessageID, name, 0)
+}
+
+// UpsertPendingCreatorThreadAt is UpsertPendingCreatorThread with the initial
+// activity time of a new thread (see threadActivityAt).
+func (db sqlitePersistence) UpsertPendingCreatorThreadAt(threadID, chatID, parentMessageID, name string, activityAt uint64) (err error) {
 	tx, err := db.db.BeginTx(context.Background(), &sql.TxOptions{})
 	if err != nil {
 		return err
@@ -1049,7 +1084,7 @@ func (db sqlitePersistence) UpsertPendingCreatorThread(threadID, chatID, parentM
 			_ = tx.Rollback()
 		}
 	}()
-	return db.upsertPendingCreatorThread(tx, threadID, chatID, parentMessageID, name)
+	return db.upsertPendingCreatorThread(tx, threadID, chatID, parentMessageID, name, activityAt)
 }
 
 func (db sqlitePersistence) SetThreadCreator(threadID, chatID, creatorID string) (err error) {
@@ -1225,7 +1260,13 @@ func (db sqlitePersistence) updateThreadNameFromParentIfNeeded(tx *sql.Tx, threa
 	return err
 }
 
-func (db sqlitePersistence) UpsertThread(threadID string, chatID string, parentMessageID string, name string) (err error) {
+func (db sqlitePersistence) UpsertThread(threadID string, chatID string, parentMessageID string, name string) error {
+	return db.UpsertThreadAt(threadID, chatID, parentMessageID, name, 0)
+}
+
+// UpsertThreadAt is UpsertThread with the initial activity time of a new
+// thread (see threadActivityAt).
+func (db sqlitePersistence) UpsertThreadAt(threadID, chatID, parentMessageID, name string, activityAt uint64) (err error) {
 	tx, err := db.db.BeginTx(context.Background(), &sql.TxOptions{})
 	if err != nil {
 		return err
@@ -1240,11 +1281,44 @@ func (db sqlitePersistence) UpsertThread(threadID string, chatID string, parentM
 		_ = tx.Rollback()
 	}()
 
-	return db.upsertThread(tx, threadID, chatID, parentMessageID, name)
+	return db.upsertThread(tx, threadID, chatID, parentMessageID, name, activityAt)
+}
+
+// TouchThreadActivity records activity in a thread. Activity never moves
+// backwards and is capped at the current time.
+func (db sqlitePersistence) TouchThreadActivity(chatID, threadID string, at uint64) error {
+	at = db.threadActivityAt(at)
+	_, err := db.db.Exec(
+		`UPDATE threads SET last_activity_at = ? WHERE chat_id = ? AND thread_id = ? AND last_activity_at < ?`,
+		at, chatID, threadID, at,
+	)
+	return err
+}
+
+// ThreadsInactiveBetween returns threads whose last activity is in [from, to).
+func (db sqlitePersistence) ThreadsInactiveBetween(from, to uint64) ([]threadIdentity, error) {
+	rows, err := db.db.Query(
+		`SELECT chat_id, thread_id FROM threads WHERE last_activity_at >= ? AND last_activity_at < ? ORDER BY chat_id, thread_id`,
+		from, to,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var identities []threadIdentity
+	for rows.Next() {
+		var identity threadIdentity
+		if err := rows.Scan(&identity.chatID, &identity.threadID); err != nil {
+			return nil, err
+		}
+		identities = append(identities, identity)
+	}
+	return identities, rows.Err()
 }
 
 func (db sqlitePersistence) AllThreadsForBackup() ([]*protobuf.BackedUpThread, error) {
-	rows, err := db.db.Query(`SELECT thread_id, chat_id, parent_message_id, name, read_messages_at_clock_value, creator_id, metadata_clock, creator_pending
+	rows, err := db.db.Query(`SELECT thread_id, chat_id, parent_message_id, name, read_messages_at_clock_value, creator_id, metadata_clock, creator_pending, last_activity_at
 		FROM threads ORDER BY chat_id, thread_id`)
 	if err != nil {
 		return nil, err
@@ -1254,7 +1328,7 @@ func (db sqlitePersistence) AllThreadsForBackup() ([]*protobuf.BackedUpThread, e
 	threads := make([]*protobuf.BackedUpThread, 0)
 	for rows.Next() {
 		thread := &protobuf.BackedUpThread{}
-		if err := rows.Scan(&thread.ThreadId, &thread.ChatId, &thread.ParentMessageId, &thread.Name, &thread.ReadMessagesAtClockValue, &thread.CreatorId, &thread.MetadataClock, &thread.CreatorPending); err != nil {
+		if err := rows.Scan(&thread.ThreadId, &thread.ChatId, &thread.ParentMessageId, &thread.Name, &thread.ReadMessagesAtClockValue, &thread.CreatorId, &thread.MetadataClock, &thread.CreatorPending, &thread.LastActivityAt); err != nil {
 			return nil, err
 		}
 		threads = append(threads, thread)
@@ -1292,9 +1366,10 @@ func (db sqlitePersistence) SaveBackedUpThreads(threads []*protobuf.BackedUpThre
 		if err == nil && chatID != thread.ChatId {
 			return fmt.Errorf("backed up thread %s belongs to a different chat", thread.ThreadId)
 		}
+		isNewThread := errors.Is(err, sql.ErrNoRows)
 
 		creatorPending := thread.CreatorPending && thread.CreatorId == ""
-		err = db.upsertThreadWithCreatorPending(tx, thread.ThreadId, thread.ChatId, thread.ParentMessageId, thread.Name, creatorPending)
+		err = db.upsertThreadWithCreatorPending(tx, thread.ThreadId, thread.ChatId, thread.ParentMessageId, thread.Name, creatorPending, thread.LastActivityAt)
 		if err != nil {
 			return err
 		}
@@ -1312,6 +1387,29 @@ func (db sqlitePersistence) SaveBackedUpThreads(threads []*protobuf.BackedUpThre
 			thread.MetadataClock, thread.MetadataClock, thread.Name, thread.Name, thread.MetadataClock, thread.ThreadId, thread.ChatId)
 		if err != nil {
 			return err
+		}
+		activityAt := thread.LastActivityAt
+		if activityAt == 0 {
+			// Legacy backups lack activity metadata. Only these backups derive
+			// activity from messages, including replies restored into existing threads.
+			var parentMessageID string
+			err = tx.QueryRow(`SELECT parent_message_id FROM threads WHERE thread_id = ? AND chat_id = ?`,
+				thread.ThreadId, thread.ChatId).Scan(&parentMessageID)
+			if err != nil {
+				return err
+			}
+			activityAt, err = db.storedThreadActivity(tx, thread.ChatId, thread.ThreadId, parentMessageID)
+			if err != nil {
+				return err
+			}
+		}
+		if activityAt > 0 {
+			activityAt = db.threadActivityAt(activityAt)
+			_, err = tx.Exec(`UPDATE threads SET last_activity_at = MAX(CASE WHEN ? THEN 0 ELSE last_activity_at END, ?)
+				WHERE thread_id = ? AND chat_id = ?`, isNewThread, activityAt, thread.ThreadId, thread.ChatId)
+			if err != nil {
+				return err
+			}
 		}
 	}
 	return nil
@@ -1331,6 +1429,7 @@ const threadMetadataSelect = `
 			threads.creator_id,
 			threads.creator_pending,
 			threads.read_messages_at_clock_value,
+			threads.last_activity_at,
 			(SELECT COUNT(1) FROM user_messages WHERE local_chat_id = threads.chat_id AND thread_id = threads.thread_id AND seen = 0 AND NOT(hide) AND NOT(deleted) AND NOT(deleted_for_me)),
 			(SELECT COUNT(1) FROM user_messages WHERE local_chat_id = threads.chat_id AND thread_id = threads.thread_id AND seen = 0 AND NOT(hide) AND NOT(deleted) AND NOT(deleted_for_me) AND (mentioned OR replied OR chats.type = ?))
 		FROM threads
@@ -1347,6 +1446,7 @@ func threadMetadataScanTargets(thread *Thread) []interface{} {
 		&thread.CreatorID,
 		&thread.CreatorPending,
 		&thread.ReadMessagesAtClockValue,
+		&thread.LastActivityAt,
 		&thread.UnviewedMessagesCount,
 		&thread.UnviewedMentionsCount,
 	}
@@ -1405,6 +1505,7 @@ func (db sqlitePersistence) threadsByIDs(queryer threadSummaryQuerier, identitie
 		}
 		threads = append(threads, thread)
 	}
+	db.applyThreadArchiveState(threads...)
 	return threads, nil
 }
 
@@ -1422,6 +1523,7 @@ func (db sqlitePersistence) threadByID(queryer threadSummaryQuerier, chatID, thr
 	if err != nil {
 		return nil, err
 	}
+	db.applyThreadArchiveState(&thread)
 	return &thread, nil
 }
 
@@ -1450,6 +1552,7 @@ func (db sqlitePersistence) ThreadsByChatID(chatID string) ([]*Thread, error) {
 			t.name,
 			t.creator_id,
 			t.read_messages_at_clock_value,
+			t.last_activity_at,
 			COUNT(CASE WHEN um.seen = 0 AND NOT(um.hide) AND NOT(um.deleted) AND NOT(um.deleted_for_me) THEN 1 END),
 			COUNT(CASE WHEN um.seen = 0 AND NOT(um.hide) AND NOT(um.deleted) AND NOT(um.deleted_for_me) AND (um.mentioned OR um.replied OR chats.type = ?) THEN 1 END)
 		FROM threads t
@@ -1461,7 +1564,7 @@ func (db sqlitePersistence) ThreadsByChatID(chatID string) ([]*Thread, error) {
 			ON um.local_chat_id = t.chat_id
 			AND um.thread_id = t.thread_id
 		WHERE t.chat_id = ?
-		GROUP BY t.thread_id, t.chat_id, t.parent_message_id, t.name, t.creator_id, t.read_messages_at_clock_value, chats.type
+		GROUP BY t.thread_id, t.chat_id, t.parent_message_id, t.name, t.creator_id, t.read_messages_at_clock_value, t.last_activity_at, chats.type
 		ORDER BY COALESCE(parent.clock_value, 0) DESC, t.thread_id DESC`, ChatTypeOneToOne, chatID)
 	if err != nil {
 		return nil, err
@@ -1471,7 +1574,7 @@ func (db sqlitePersistence) ThreadsByChatID(chatID string) ([]*Thread, error) {
 	threads := make([]*Thread, 0)
 	for rows.Next() {
 		thread := &Thread{}
-		err = rows.Scan(&thread.ThreadID, &thread.ChatID, &thread.ParentMessageID, &thread.Name, &thread.CreatorID, &thread.ReadMessagesAtClockValue, &thread.UnviewedMessagesCount, &thread.UnviewedMentionsCount)
+		err = rows.Scan(&thread.ThreadID, &thread.ChatID, &thread.ParentMessageID, &thread.Name, &thread.CreatorID, &thread.ReadMessagesAtClockValue, &thread.LastActivityAt, &thread.UnviewedMessagesCount, &thread.UnviewedMentionsCount)
 		if err != nil {
 			return nil, err
 		}
@@ -1481,6 +1584,7 @@ func (db sqlitePersistence) ThreadsByChatID(chatID string) ([]*Thread, error) {
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
+	db.applyThreadArchiveState(threads...)
 
 	return threads, nil
 }
@@ -1554,6 +1658,7 @@ func (db sqlitePersistence) ThreadsByChatIDs(chatIDs []string) ([]*Thread, error
 		}
 		return threads[i].ThreadID < threads[j].ThreadID
 	})
+	db.applyThreadArchiveState(threads...)
 
 	return threads, nil
 }
@@ -1589,6 +1694,7 @@ func (db sqlitePersistence) threadsByParentMessageIDs(queryer threadSummaryQueri
 			threads.parent_message_id,
 			threads.name,
 			threads.creator_id,
+			threads.last_activity_at,
 			(SELECT COUNT(1) FROM user_messages WHERE local_chat_id = threads.chat_id AND thread_id = threads.thread_id AND seen = 0 AND NOT(hide) AND NOT(deleted) AND NOT(deleted_for_me)),
 			(SELECT COUNT(1) FROM user_messages WHERE local_chat_id = threads.chat_id AND thread_id = threads.thread_id AND seen = 0 AND NOT(hide) AND NOT(deleted) AND NOT(deleted_for_me) AND (mentioned OR replied OR chats.type = ?))
 		FROM threads
@@ -1601,7 +1707,7 @@ func (db sqlitePersistence) threadsByParentMessageIDs(queryer threadSummaryQueri
 	}
 	for rows.Next() {
 		thread := &Thread{}
-		if err := rows.Scan(&thread.ThreadID, &thread.ChatID, &thread.ParentMessageID, &thread.Name, &thread.CreatorID, &thread.UnviewedMessagesCount, &thread.UnviewedMentionsCount); err != nil {
+		if err := rows.Scan(&thread.ThreadID, &thread.ChatID, &thread.ParentMessageID, &thread.Name, &thread.CreatorID, &thread.LastActivityAt, &thread.UnviewedMessagesCount, &thread.UnviewedMentionsCount); err != nil {
 			_ = rows.Close()
 			return nil, err
 		}
@@ -1614,6 +1720,7 @@ func (db sqlitePersistence) threadsByParentMessageIDs(queryer threadSummaryQueri
 	if err := rows.Close(); err != nil {
 		return nil, err
 	}
+	db.applyThreadArchiveState(threads...)
 	return threads, nil
 }
 func (db sqlitePersistence) MessageByChatID(chatID string, threadID string, currCursor string, limit int, threadsEnabled bool) ([]*common.Message, string, error) {
@@ -3043,7 +3150,7 @@ func (db sqlitePersistence) saveMessages(messages []*common.Message, updateThrea
 
 		if msg.ThreadMetadataCreationAuthorized && msg.GetThreadId() != "" {
 			threadName := db.threadNameFromParent(tx, msg.GetThreadId())
-			err = db.upsertPendingCreatorThread(tx, msg.GetThreadId(), msg.LocalChatID, msg.GetThreadId(), threadName)
+			err = db.upsertPendingCreatorThread(tx, msg.GetThreadId(), msg.LocalChatID, msg.GetThreadId(), threadName, messageActivityTime(msg))
 			if err != nil {
 				return
 			}
