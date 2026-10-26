@@ -15,20 +15,27 @@ import (
 )
 
 // bearerServer issues distinct tokens that live for lifetime and answers 401
-// to resource requests without a live bearer.
+// to resource requests without a live bearer. With a quota, a token is also
+// rejected past its quota-th request.
 type bearerServer struct {
 	*httptest.Server
 	lifetime     time.Duration
+	quota        int
 	solves       atomic.Int32
 	unauthorized atomic.Int32
 	served       atomic.Int32
 
 	mu     sync.Mutex
 	tokens map[string]time.Time
+	usage  map[string]int
 }
 
 func newBearerServer(t *testing.T, lifetime time.Duration) *bearerServer {
-	s := &bearerServer{lifetime: lifetime, tokens: map[string]time.Time{}}
+	return newQuotaServer(t, lifetime, 0)
+}
+
+func newQuotaServer(t *testing.T, lifetime time.Duration, quota int) *bearerServer {
+	s := &bearerServer{lifetime: lifetime, quota: quota, tokens: map[string]time.Time{}, usage: map[string]int{}}
 	s.Server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/auth/puzzle":
@@ -40,7 +47,7 @@ func newBearerServer(t *testing.T, lifetime time.Duration) *bearerServer {
 			s.mu.Lock()
 			s.tokens[token] = expiresAt
 			s.mu.Unlock()
-			_ = json.NewEncoder(w).Encode(TokenResponse{Token: token, ExpiresAt: expiresAt.Format(time.RFC3339Nano)})
+			_ = json.NewEncoder(w).Encode(TokenResponse{Token: token, ExpiresAt: expiresAt.Format(time.RFC3339Nano), RequestLimit: s.quota})
 		case "/resource":
 			if !s.authorized(r) {
 				s.unauthorized.Add(1)
@@ -63,10 +70,15 @@ func (s *bearerServer) authorized(r *http.Request) bool {
 	if len(h) <= len(prefix) {
 		return false
 	}
+	token := h[len(prefix):]
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	expiresAt, ok := s.tokens[h[len(prefix):]]
-	return ok && time.Now().Before(expiresAt)
+	expiresAt, ok := s.tokens[token]
+	if !ok {
+		return false
+	}
+	s.usage[token]++
+	return time.Now().Before(expiresAt) && (s.quota == 0 || s.usage[token] <= s.quota)
 }
 
 func (s *bearerServer) do(client *http.Client) error {
@@ -143,4 +155,16 @@ func TestTransport_TokenReusedForMostOfItsLifetime(t *testing.T) {
 
 	require.Zero(t, server.unauthorized.Load())
 	require.Equal(t, int32(1), server.solves.Load(), "a token is not refreshed while it has most of its lifetime left")
+}
+
+func TestTransport_TokenRenewedBeforeQuotaRunsOut(t *testing.T) {
+	const quota, n = 10, 45
+	server := newQuotaServer(t, time.Hour, quota)
+	client := &http.Client{Transport: &Transport{base: http.DefaultTransport, authService: NewService(server.URL, nil), maxRetries: 2}}
+
+	server.burst(t, client, n)
+
+	require.Zero(t, server.unauthorized.Load(), "no request is sent with a token past its quota")
+	require.Equal(t, int32((n+quota-1)/quota), server.solves.Load(), "one solve per quota of requests")
+	require.Equal(t, int32(n), server.served.Load())
 }

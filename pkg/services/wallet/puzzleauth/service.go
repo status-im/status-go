@@ -82,9 +82,23 @@ func (s *Service) InvalidateTokenForRejectedRequest(rejectedBearer string) {
 		zap.String("origin", s.origin))
 }
 
-// EnsureToken returns a valid token, refreshing if necessary
+// takeToken returns the cached token and counts one request sent with it,
+// or "" if the token is expired or has no requests left.
+func (s *Service) takeToken() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if !s.tokenCache.IsValid() {
+		return ""
+	}
+	s.tokenCache.Used++
+	return s.tokenCache.Token
+}
+
+// EnsureToken returns a valid token for one request, refreshing if necessary.
+// Each call counts against the token's request limit.
 func (s *Service) EnsureToken(ctx context.Context) (string, error) {
-	if token := s.GetToken(); token != "" {
+	if token := s.takeToken(); token != "" {
 		return token, nil
 	}
 
@@ -93,14 +107,14 @@ func (s *Service) EnsureToken(ctx context.Context) (string, error) {
 	defer s.refreshLock.Unlock()
 
 	// Double-check after acquiring lock (another goroutine might have refreshed)
-	if token := s.GetToken(); token != "" {
+	if token := s.takeToken(); token != "" {
 		return token, nil
 	}
 
 	return s.refreshToken(ctx)
 }
 
-// refreshToken fetches a new token by solving a puzzle
+// refreshToken fetches a new token by solving a puzzle and counts one request sent with it
 func (s *Service) refreshToken(ctx context.Context) (string, error) {
 	logutils.ZapLogger().Debug("Refreshing puzzle auth token",
 		zap.String("origin", s.origin))
@@ -141,9 +155,11 @@ func (s *Service) refreshToken(ctx context.Context) (string, error) {
 
 	s.mu.Lock()
 	s.tokenCache = &TokenData{
-		Token:     tokenResp.Token,
-		IssuedAt:  issuedAt,
-		ExpiresAt: expiresAt,
+		Token:        tokenResp.Token,
+		IssuedAt:     issuedAt,
+		ExpiresAt:    expiresAt,
+		RequestLimit: tokenResp.RequestLimit,
+		Used:         1,
 	}
 	s.mu.Unlock()
 
