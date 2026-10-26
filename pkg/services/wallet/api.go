@@ -192,7 +192,7 @@ func (api *API) GetTokensByKeys(keys []string) ([]*tokentypes.Token, error) {
 }
 
 // GetTokensByGroupKeys returns the tokens of the given token groups (cross-chain
-// ids, or token keys of tokens without one).
+// ids, or token keys of tokens without one). Keys match exactly (case-sensitive).
 func (api *API) GetTokensByGroupKeys(groupKeys []string) ([]*tokentypes.Token, error) {
 	return api.s.tokenManager.GetTokensByGroupKeys(groupKeys)
 }
