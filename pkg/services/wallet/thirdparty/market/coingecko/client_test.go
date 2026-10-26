@@ -154,11 +154,11 @@ func TestGetTokensSuccess(t *testing.T) {
 		baseURL:    srv.URL,
 	}
 
-	coinIDs, err := geckoClient.getCoinIDsByTokenKey()
+	coingeckoIDs, err := geckoClient.getCoingeckoIDsByTokenKey()
 	require.NoError(t, err)
 
-	for tokenKey, coinID := range expectedMap {
-		require.Equal(t, coinID, coinIDs[strings.ToLower(tokenKey)])
+	for tokenKey, coingeckoID := range expectedMap {
+		require.Equal(t, coingeckoID, coingeckoIDs[strings.ToLower(tokenKey)])
 	}
 }
 
@@ -172,9 +172,9 @@ func TestGetTokensFailure(t *testing.T) {
 		baseURL:    srv.URL,
 	}
 
-	coinIDs, err := geckoClient.getCoinIDsByTokenKey()
+	coingeckoIDs, err := geckoClient.getCoingeckoIDsByTokenKey()
 	require.Error(t, err)
-	require.Nil(t, coinIDs)
+	require.Nil(t, coingeckoIDs)
 }
 
 func TestFetchPrices(t *testing.T) {

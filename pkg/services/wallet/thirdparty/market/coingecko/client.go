@@ -91,35 +91,35 @@ func (c *Client) ID() string {
 	return "coingecko"
 }
 
-// buildCoinIDsByTokenKey returns a map of token keys to coingecko coin ids
-func buildCoinIDsByTokenKey(tokens []GeckoToken) map[string]string {
-	coinIDsByTokenKey := make(map[string]string)
+// buildCoingeckoIDsByTokenKey returns a map of token keys to coingecko ids
+func buildCoingeckoIDsByTokenKey(tokens []GeckoToken) map[string]string {
+	coingeckoIDsByTokenKey := make(map[string]string)
 
 	// for native tokens, platform is empty (zero address), but the id is ethereum, that's why we need to add it manually
 	for _, chainID := range walletcommon.AllChainIDsAsUint64() {
 		token := tokentypes.Token{Token: &types.Token{ChainID: chainID}}
 
 		if chainID == walletcommon.BSCMainnet || chainID == walletcommon.BSCTestnet {
-			coinIDsByTokenKey[token.Key()] = nativeBNBTokenID
+			coingeckoIDsByTokenKey[token.Key()] = nativeBNBTokenID
 			continue
 		}
 
-		coinIDsByTokenKey[token.Key()] = nativeEthTokenID
+		coingeckoIDsByTokenKey[token.Key()] = nativeEthTokenID
 	}
 
 	for _, token := range tokens {
 		for _, key := range token.keys() {
-			coinIDsByTokenKey[key] = token.ID
+			coingeckoIDsByTokenKey[key] = token.ID
 		}
 	}
 
-	return coinIDsByTokenKey
+	return coingeckoIDsByTokenKey
 }
 
 // mapTokensToIds maps wallet sdk tokens to coingecko tokens
 // returns a map of coingecko ids to token keys as first and a list of unmapped token keys as second return value
 func (c *Client) mapTokensToIds(tokens []*tokentypes.Token) (map[string][]string, []string, error) {
-	coinIDsByTokenKey, err := c.getCoinIDsByTokenKey()
+	coingeckoIDsByTokenKey, err := c.getCoingeckoIDsByTokenKey()
 	if err != nil {
 		return nil, nil, err
 	}
@@ -143,7 +143,7 @@ func (c *Client) mapTokensToIds(tokens []*tokentypes.Token) (map[string][]string
 	}
 
 	for _, token := range tokens {
-		coinID, ok := coinIDsByTokenKey[token.Key()]
+		coingeckoID, ok := coingeckoIDsByTokenKey[token.Key()]
 		if !ok {
 			// Check by cross chain id if any of the mainnet siblings have a coingecko token.
 			// This covers testnet tokens as well as mainnet tokens coingecko doesn't list on that some other chain (e.g. SNT is not listed on Base/Optimism).
@@ -154,7 +154,7 @@ func (c *Client) mapTokensToIds(tokens []*tokentypes.Token) (map[string][]string
 			}
 
 			for _, tokenKey := range tokenKeysByCrossChainID[crossChainID] {
-				coinID, ok = coinIDsByTokenKey[tokenKey]
+				coingeckoID, ok = coingeckoIDsByTokenKey[tokenKey]
 				if ok {
 					break
 				}
@@ -165,7 +165,7 @@ func (c *Client) mapTokensToIds(tokens []*tokentypes.Token) (map[string][]string
 				continue
 			}
 		}
-		mappedTokens[coinID] = append(mappedTokens[coinID], token.Key())
+		mappedTokens[coingeckoID] = append(mappedTokens[coingeckoID], token.Key())
 	}
 
 	return mappedTokens, unmappedTokens, nil
@@ -308,12 +308,12 @@ func (c *Client) FetchHistoricalHourlyPrices(token *tokentypes.Token, currency s
 // FetchHistoricalDailyPrices fetches the daily prices for the given token and currency
 // returns a list of HistoricalPrice
 func (c *Client) FetchHistoricalDailyPrices(token *tokentypes.Token, currency string, limit int, allData bool, aggregate int) ([]thirdparty.HistoricalPrice, error) {
-	coinIDsByTokenKey, err := c.getCoinIDsByTokenKey()
+	coingeckoIDsByTokenKey, err := c.getCoingeckoIDsByTokenKey()
 	if err != nil {
 		return nil, err
 	}
 
-	coinID, ok := coinIDsByTokenKey[token.Key()]
+	coingeckoID, ok := coingeckoIDsByTokenKey[token.Key()]
 	if !ok {
 		return nil, fmt.Errorf("%w: coingecko id not found for token %s", thirdparty.ErrTokenNotMapped, token.Key())
 	}
@@ -325,7 +325,7 @@ func (c *Client) FetchHistoricalDailyPrices(token *tokentypes.Token, currency st
 		days = fmt.Sprintf("%d", limit)
 	}
 
-	container, err := c.FetchHistoryMarketData(traffic.WithSource(context.Background(), traffic.MarketPrices), coinID, currency, days)
+	container, err := c.FetchHistoryMarketData(traffic.WithSource(context.Background(), traffic.MarketPrices), coingeckoID, currency, days)
 	if err != nil {
 		return nil, err
 	}
