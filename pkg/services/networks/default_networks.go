@@ -6,6 +6,7 @@ import (
 
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/security"
+	"github.com/status-im/status-go/pkg/services/wallet/common"
 )
 
 const (
@@ -145,8 +146,12 @@ func defaultNetworks(proxyHost string, thirdpartyServicesEnabled bool, usePuzzle
 
 func setRPCs(networks []params.Network, walletConfig *params.WalletConfig) []params.Network {
 	authTokens := map[string]security.SensitiveString{
-		"infura.io":  walletConfig.InfuraAPIKey,
-		"grove.city": walletConfig.PoktAPIKey,
+		"infura.io":   walletConfig.InfuraAPIKey,
+		"grove.city":  walletConfig.PoktAPIKey,
+		"alchemy.com": walletConfig.AlchemyAPIKey,
+	}
+	if walletConfig.AlchemyAPIKey.Empty() {
+		networks = removeProvider(networks, common.DirectAlchemy)
 	}
 	networks = overrideDirectProvidersAuth(networks, authTokens)
 
