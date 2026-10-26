@@ -66,13 +66,11 @@ proc runDeliveryBindingsTask(taskName: string) =
   ## LIBLOGOSDELIVERY_OUT and NIM_PARAMS come from the caller.
   var params = getEnv("NIM_PARAMS") & " -d:disable_rln"
   when defined(windows):
-    # Leopard's CMake would otherwise pick MSVC from vcvars, whose flags MSYS mangles.
+    # Leopard's CMake would otherwise pick MSVC from vcvars: logos-storage/nim-leopard#29.
     putEnv("CC", "gcc")
     putEnv("CXX", "g++")
-    putEnv("CMAKE_GENERATOR", "MSYS Makefiles")
-    # winlibs' only libgomp is static and needs dlopen.
-    params.add " -d:LeopardCmakeFlags=-DENABLE_OPENMP=off" &
-      " -d:LeopardExtraCompilerFlags=-fno-openmp -d:LeopardExtraLinkerFlags=-fno-openmp"
+    # Static libgomp needs dlfcn-win32's -ldl after it, which gcc adds only with -static.
+    params.add " -d:LeopardExtraLinkerFlags=-Wl,--push-state,-Bstatic,-lgomp,-ldl,--pop-state"
   putEnv("NIM_PARAMS", params)
   withDir nimblePkgDir("logos_delivery_go_bindings"):
     exec nimbleExe() & " " & taskName
