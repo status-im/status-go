@@ -17,13 +17,13 @@ const (
 	coinsListRetryDelay = time.Minute
 )
 
-// coinsListCache keeps the token key to coin mapping built from /coins/list.
+// coinsListCache keeps the token key to coin id mapping built from /coins/list.
 // The zero value is an empty cache.
 type coinsListCache struct {
 	group singleflight.Group
 
 	mu        sync.RWMutex
-	byKey     map[string]GeckoToken
+	byKey     map[string]string
 	etag      string
 	expiresAt time.Time
 
@@ -37,15 +37,15 @@ func (cc *coinsListCache) clock() time.Time {
 	return time.Now()
 }
 
-func (cc *coinsListCache) fresh() (map[string]GeckoToken, bool) {
+func (cc *coinsListCache) fresh() (map[string]string, bool) {
 	cc.mu.RLock()
 	defer cc.mu.RUnlock()
 	return cc.byKey, cc.byKey != nil && cc.clock().Before(cc.expiresAt)
 }
 
-// getCoingeckoTokensByTokenKey returns a map of token keys to coingecko tokens.
+// getCoinIDsByTokenKey returns a map of token keys to coingecko coin ids.
 // The map is shared between callers and must not be modified.
-func (c *Client) getCoingeckoTokensByTokenKey() (map[string]GeckoToken, error) {
+func (c *Client) getCoinIDsByTokenKey() (map[string]string, error) {
 	if byKey, ok := c.coinsList.fresh(); ok {
 		return byKey, nil
 	}
@@ -59,10 +59,10 @@ func (c *Client) getCoingeckoTokensByTokenKey() (map[string]GeckoToken, error) {
 	if err != nil {
 		return nil, err
 	}
-	return byKey.(map[string]GeckoToken), nil
+	return byKey.(map[string]string), nil
 }
 
-func (c *Client) refreshCoinsList() (map[string]GeckoToken, error) {
+func (c *Client) refreshCoinsList() (map[string]string, error) {
 	cc := &c.coinsList
 
 	cc.mu.RLock()
@@ -87,7 +87,7 @@ func (c *Client) refreshCoinsList() (map[string]GeckoToken, error) {
 	case notModified:
 		cc.expiresAt = now.Add(coinsListTTL)
 	default:
-		cc.byKey = buildCoingeckoTokensByTokenKey(tokens)
+		cc.byKey = buildCoinIDsByTokenKey(tokens)
 		cc.etag = newEtag
 		cc.expiresAt = now.Add(coinsListTTL)
 	}

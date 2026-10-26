@@ -126,30 +126,22 @@ func TestGetTokensSuccess(t *testing.T) {
 		},
 	}
 
-	expectedMap := map[string]GeckoToken{
-		"1-0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48":     expected[0],
-		"10-0x0b2c639c533813f4aa9d7837caf62653d097ff85":    expected[0],
-		"42161-0xaf88d065e77c8cc2239327c5edb3a432268e5831": expected[0],
-		"1-0x744d70fdbe2ba4cf95131626614a1763df805b9e":     expected[1],
+	expectedMap := map[string]string{
+		"1-0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48":     "usdc-coin",
+		"10-0x0b2c639c533813f4aa9d7837caf62653d097ff85":    "usdc-coin",
+		"42161-0xaf88d065e77c8cc2239327c5edb3a432268e5831": "usdc-coin",
+		"1-0x744d70fdbe2ba4cf95131626614a1763df805b9e":     "status",
 	}
 
 	for _, chainID := range walletcommon.AllChainIDsAsUint64() {
 		token := tokentypes.Token{Token: &types.Token{ChainID: chainID}}
 
 		if chainID == common.BSCMainnet || chainID == common.BSCTestnet {
-			expectedMap[token.Key()] = GeckoToken{
-				ID:     nativeBNBTokenID,
-				Name:   "BNB",
-				Symbol: "BNB",
-			}
+			expectedMap[token.Key()] = nativeBNBTokenID
 			continue
 		}
 
-		expectedMap[token.Key()] = GeckoToken{
-			ID:     nativeEthTokenID,
-			Name:   "Ethereum",
-			Symbol: "ETH",
-		}
+		expectedMap[token.Key()] = nativeEthTokenID
 	}
 
 	response, _ := json.Marshal(expected)
@@ -162,11 +154,11 @@ func TestGetTokensSuccess(t *testing.T) {
 		baseURL:    srv.URL,
 	}
 
-	tokenMap, err := geckoClient.getCoingeckoTokensByTokenKey()
+	coinIDs, err := geckoClient.getCoinIDsByTokenKey()
 	require.NoError(t, err)
 
-	for tokenKey, token := range expectedMap {
-		require.Equal(t, token, tokenMap[strings.ToLower(tokenKey)])
+	for tokenKey, coinID := range expectedMap {
+		require.Equal(t, coinID, coinIDs[strings.ToLower(tokenKey)])
 	}
 }
 
@@ -180,9 +172,9 @@ func TestGetTokensFailure(t *testing.T) {
 		baseURL:    srv.URL,
 	}
 
-	tokenMap, err := geckoClient.getCoingeckoTokensByTokenKey()
+	coinIDs, err := geckoClient.getCoinIDsByTokenKey()
 	require.Error(t, err)
-	require.Nil(t, tokenMap)
+	require.Nil(t, coinIDs)
 }
 
 func TestFetchPrices(t *testing.T) {
