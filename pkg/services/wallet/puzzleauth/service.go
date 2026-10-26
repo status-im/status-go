@@ -65,7 +65,7 @@ func (s *Service) InvalidateToken() {
 }
 
 // InvalidateTokenForRejectedRequest drops the cache only if it still holds the
-// token that was used on a failed request. This avoids a thundering herd on 401/403/429
+// token that was used on a failed request. This avoids a thundering herd on 401/403
 // clobbering a token another goroutine just refreshed.
 // If no Bearer was sent (rejected is empty), this is a no-op; callers use EnsureToken only.
 func (s *Service) InvalidateTokenForRejectedRequest(rejectedBearer string) {
