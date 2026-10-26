@@ -67,7 +67,7 @@ RUN set -eu && \
     /opt/nim-tkl/bin/nim --version
 ENV TKL_NIM=/opt/nim-tkl/bin/nim
 # nim-sds builds through Nimble; the one bundled with Nim is too old for it.
-ARG NIMBLE_VERSION=0.26.0
+ARG NIMBLE_VERSION=0.26.1
 RUN set -eu && \
     case "$(dpkg --print-architecture)" in \
     amd64) NIMBLE_ARCH="linux_x64" ;; \
