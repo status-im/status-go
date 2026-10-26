@@ -118,12 +118,30 @@ func TestDecodeQuote(t *testing.T) {
 	require.Equal(t, uint64(8453), quote.Fees.App.Currency.ChainID)
 
 	require.Equal(t, "swap", quote.Details.Operation)
-	require.Equal(t, 15, quote.Details.TimeEstimate)
+	require.EqualValues(t, 15, quote.Details.TimeEstimate)
 	require.Equal(t, "1000000", quote.Details.CurrencyIn.Amount.String())
 	require.Equal(t, "300000000000000", quote.Details.CurrencyOut.Amount.String())
 	require.Equal(t, "298500000000000", quote.Details.CurrencyOut.MinimumAmount.String())
 	require.Equal(t, "0x", quote.Details.Route.Origin.Router)
 	require.Equal(t, "kyberswap", quote.Details.Route.Destination.Router)
+}
+
+func TestDecodeQuoteTimeEstimateFormats(t *testing.T) {
+	tests := []struct {
+		name string
+		json string
+		want float64
+	}{
+		{name: "integer seconds as in swap quotes", json: `{"details":{"timeEstimate":15}}`, want: 15},
+		{name: "fractional seconds as in bridge quotes", json: `{"details":{"timeEstimate":2.5}}`, want: 2.5},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var quote relay.Quote
+			require.NoError(t, json.Unmarshal([]byte(tt.json), &quote))
+			require.Equal(t, tt.want, quote.Details.TimeEstimate)
+		})
+	}
 }
 
 func baseQuoteParams() relay.QuoteParams {

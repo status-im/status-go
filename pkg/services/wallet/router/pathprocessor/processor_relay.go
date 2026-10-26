@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"math/big"
 	"strings"
 	"sync"
@@ -285,7 +286,7 @@ func (s *RelayProcessor) GetRouteExecutionDuration(params ProcessorInputParams) 
 	if err != nil || quote == nil || quote.Details.TimeEstimate <= 0 {
 		return 0
 	}
-	return uint(quote.Details.TimeEstimate)
+	return uint(math.Round(quote.Details.TimeEstimate))
 }
 
 func (s *RelayProcessor) CalculateAmountOut(params ProcessorInputParams) (*big.Int, error) {
