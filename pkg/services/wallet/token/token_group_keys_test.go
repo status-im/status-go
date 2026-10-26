@@ -55,9 +55,9 @@ func groupTokens(tokens []*tokentypes.Token) map[string][]tokentypes.Token {
 	return result
 }
 
-func (s *TokensByGroupKeysSuite) addCustom(chainID uint64, address string, crossChainID string) *tokentypes.Token {
+func (s *TokensByGroupKeysSuite) addCustom(chainID uint64, address string) *tokentypes.Token {
 	token := &tokentypes.Token{
-		Token:         &types.Token{ChainID: chainID, Address: common.HexToAddress(address), Symbol: "COMM", Name: "Community", Decimals: 18, CrossChainID: crossChainID},
+		Token:         &types.Token{ChainID: chainID, Address: common.HexToAddress(address), Symbol: "COMM", Name: "Community", Decimals: 18},
 		CommunityData: &tokentypes.CommunityData{ID: "community"},
 	}
 	upsertCommunityToken(s.T(), token, s.tm)
@@ -65,8 +65,7 @@ func (s *TokensByGroupKeysSuite) addCustom(chainID uint64, address string, cross
 }
 
 func (s *TokensByGroupKeysSuite) TestEachGroupKeyMatchesAllTokensGrouping() {
-	s.addCustom(walletcommon.EthereumMainnet, "0xc0ffee", "usd-coin")
-	custom := s.addCustom(walletcommon.EthereumMainnet, "0xbeef", "")
+	custom := s.addCustom(walletcommon.EthereumMainnet, "0xbeef")
 	legacy := s.legacyTokensByGroupKey()
 	s.Require().Greater(len(legacy), 1000)
 	s.Require().Contains(legacy, custom.Key())
@@ -106,4 +105,31 @@ func (s *TokensByGroupKeysSuite) TestUnknownKeysReturnEmpty() {
 		s.Require().NotNil(got, keys)
 		s.Require().Empty(got, keys)
 	}
+}
+
+func (s *TokensByGroupKeysSuite) TestKeysMatchExactly() {
+	got, err := s.tm.GetTokensByGroupKeys([]string{"USD-COIN", " usd-coin"})
+	s.Require().NoError(err)
+	s.Require().Empty(got)
+}
+
+func (s *TokensByGroupKeysSuite) TestDuplicateKeysReturnEachTokenOnce() {
+	custom := s.addCustom(walletcommon.EthereumMainnet, "0xbeef")
+	want, err := s.tm.GetTokensByGroupKeys([]string{"usd-coin", custom.Key()})
+	s.Require().NoError(err)
+
+	got, err := s.tm.GetTokensByGroupKeys([]string{"usd-coin", "", custom.Key(), "usd-coin", custom.Key()})
+	s.Require().NoError(err)
+	s.Require().Equal(want, got)
+}
+
+func (s *TokensByGroupKeysSuite) TestCustomsFailureKeepsCatalogueTokens() {
+	want := s.legacyTokensByGroupKey()["usd-coin"]
+	s.Require().NotEmpty(want)
+	_, err := s.tm.walletDB.Exec("DROP TABLE tokens")
+	s.Require().NoError(err)
+
+	got, err := s.tm.GetTokensByGroupKeys([]string{"usd-coin"})
+	s.Require().NoError(err)
+	s.Require().Equal(map[string][]tokentypes.Token{"usd-coin": want}, groupTokens(got))
 }

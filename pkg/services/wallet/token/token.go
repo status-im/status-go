@@ -400,17 +400,21 @@ func (tm *Manager) GetTokensByKeys(tokenKeys []string) ([]*tokentypes.Token, err
 }
 
 // GetTokensByGroupKeys returns the tokens of the given token groups. A token's
-// group key is its cross-chain id, or its token key when it has none. Catalogue
-// tokens come first, in GetAllTokens order, then the custom tokens.
+// group key is its cross-chain id, or its token key when it has none; keys match
+// exactly (case-sensitive). Catalogue tokens come first, in GetAllTokens order,
+// then the custom tokens.
 func (tm *Manager) GetTokensByGroupKeys(groupKeys []string) ([]*tokentypes.Token, error) {
 	tokens := make([]*tokentypes.Token, 0)
 	keys := make(map[string]struct{}, len(groupKeys))
+	uniqueKeys := make([]string, 0, len(groupKeys))
 	for _, key := range groupKeys {
-		if key != "" {
-			keys[key] = struct{}{}
+		if _, ok := keys[key]; ok || key == "" {
+			continue
 		}
+		keys[key] = struct{}{}
+		uniqueKeys = append(uniqueKeys, key)
 	}
-	if len(keys) == 0 {
+	if len(uniqueKeys) == 0 {
 		return tokens, nil
 	}
 	inGroups := func(token *tokentypes.Token) bool {
@@ -422,13 +426,13 @@ func (tm *Manager) GetTokensByGroupKeys(groupKeys []string) ([]*tokentypes.Token
 		return ok
 	}
 
-	crossChainTokens := tm.tokensManager.GetCrossChainTokens(groupKeys, nil)
-	catalogueKeys := make([]string, 0, len(crossChainTokens)+len(groupKeys))
+	crossChainTokens := tm.tokensManager.GetCrossChainTokens(uniqueKeys, nil)
+	catalogueKeys := make([]string, 0, len(crossChainTokens)+len(uniqueKeys))
 	for _, token := range crossChainTokens {
 		catalogueKeys = append(catalogueKeys, types.TokenKey(token.ChainID, token.Address))
 	}
 	// Keys of tokens without a cross-chain id; other keys are skipped or filtered out.
-	catalogueKeys = append(catalogueKeys, groupKeys...)
+	catalogueKeys = append(catalogueKeys, uniqueKeys...)
 	catalogueTokens, err := tm.tokensManager.GetTokensByKeys(catalogueKeys)
 	if err != nil {
 		return nil, err
@@ -445,7 +449,8 @@ func (tm *Manager) GetTokensByGroupKeys(groupKeys []string) ([]*tokentypes.Token
 
 	communityTokens, err := tm.GetCustoms(true)
 	if err != nil {
-		return nil, err
+		logutils.ZapLogger().Error("failed to get custom tokens", zap.Error(err))
+		return tokens, nil
 	}
 	for _, token := range communityTokens {
 		if inGroups(token) {
