@@ -325,6 +325,12 @@ func NewMessenger(
 	sender := common.NewMessageSender(identity, messaging, logger, c.tracer)
 
 	sqlitePersistence := newSQLitePersistence(database)
+	sqlitePersistence.threadClock = func() uint64 {
+		if messaging == nil {
+			return uint64(time.Now().UnixMilli())
+		}
+		return messaging.GetCurrentTime()
+	}
 	// Overriding until we handle different identities
 	pushNotificationClientConfig.Identity = identity
 	pushNotificationClientConfig.Logger = logger
@@ -669,6 +675,7 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 	m.startHistoryCursorMonitor()
 	m.watchChatsToUnmute()
 	m.watchCommunitiesToUnmute()
+	m.startThreadArchiveLoop()
 	m.watchExpiredMessages()
 	m.watchIdentityImageChanges()
 	m.watchPendingCommunityRequestToJoin()
@@ -2253,6 +2260,7 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 	if err != nil {
 		return nil, err
 	}
+	m.touchThreadActivity([]*common.Message{message}, func(*common.Message) bool { return true })
 	msg, err := m.pullMessagesAndResponsesFromDB([]*common.Message{message})
 	if err != nil {
 		return nil, err
@@ -3719,6 +3727,7 @@ func (m *Messenger) saveDataAndPrepareResponse(messageState *ReceivedMessageStat
 		if err != nil {
 			return nil, err
 		}
+		m.touchThreadActivity(messagesToSave, func(message *common.Message) bool { return message.New })
 	}
 
 	for _, emojiReaction := range messageState.EmojiReactions {

@@ -67,8 +67,8 @@ func TestBackedUpThreadsRoundTripAndMerge(t *testing.T) {
 	p := newSQLitePersistence(db)
 
 	threads := []*protobuf.BackedUpThread{
-		{ThreadId: "empty", ChatId: testPublicChatID, ParentMessageId: "absent-parent", Name: "Empty thread"},
-		{ThreadId: "placeholder", ChatId: testPublicChatID, ParentMessageId: "placeholder", ReadMessagesAtClockValue: 42},
+		{ThreadId: "empty", ChatId: testPublicChatID, ParentMessageId: "absent-parent", Name: "Empty thread", LastActivityAt: 1000},
+		{ThreadId: "placeholder", ChatId: testPublicChatID, ParentMessageId: "placeholder", ReadMessagesAtClockValue: 42, LastActivityAt: 2000},
 	}
 	require.NoError(t, p.SaveBackedUpThreads(threads))
 	exported, err := p.AllThreadsForBackup()
@@ -109,6 +109,130 @@ func TestBackedUpThreadsRoundTripAndMerge(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "filled-parent", thread.ParentMessageID)
 	require.EqualValues(t, 99, thread.ReadMessagesAtClockValue)
+}
+
+func TestThreadCreationReconcilesStoredReplies(t *testing.T) {
+	const now = uint64(60 * 24 * time.Hour / time.Millisecond)
+	for _, tc := range []struct {
+		name      string
+		at        uint64
+		whisper   uint64
+		deleted   bool
+		hidden    bool
+		otherChat bool
+		want      uint64
+	}{
+		{name: "recent reply", at: now - 1000, want: now - 1000},
+		{name: "future reply", at: now + 1000, want: now},
+		{name: "whisper fallback", whisper: now - 1000, want: now - 1000},
+		{name: "unknown time", want: 100},
+		{name: "older reply", at: 50, want: 100},
+		{name: "deleted reply", at: now, deleted: true, want: 100},
+		{name: "deleted for me", at: now, hidden: true, want: 100},
+		{name: "different chat", at: now, otherChat: true, want: 100},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			db, err := openTestDB()
+			require.NoError(t, err)
+			t.Cleanup(func() { require.NoError(t, db.Close()) })
+			p := newSQLitePersistence(db)
+			p.threadClock = func() uint64 { return now }
+			require.NoError(t, p.SaveChats([]*Chat{CreatePublicChat(testPublicChatID, &testTimeSource{})}))
+			chatID := testPublicChatID
+			if tc.otherChat {
+				chatID = "other-chat"
+			}
+			require.NoError(t, p.SaveBackedUpMessages([]*protobuf.BackedUpMessage{{
+				Id: "reply", ChatId: chatID, ThreadId: "parent", Timestamp: tc.at,
+			}}))
+			_, err = db.Exec(`UPDATE user_messages SET whisper_timestamp = ?, deleted = ?, deleted_for_me = ? WHERE id = 'reply'`,
+				tc.whisper, tc.deleted, tc.hidden)
+			require.NoError(t, err)
+			require.NoError(t, p.UpsertThreadAt("parent", testPublicChatID, "parent", "", 100))
+			thread, err := p.ThreadByID(testPublicChatID, "parent")
+			require.NoError(t, err)
+			require.Equal(t, tc.want, thread.LastActivityAt)
+
+			_, err = db.Exec(`UPDATE user_messages SET timestamp = ?, deleted = FALSE, deleted_for_me = FALSE`, now)
+			require.NoError(t, err)
+			require.NoError(t, p.UpsertThreadAt("parent", testPublicChatID, "parent", "Name", now))
+			thread, err = p.ThreadByID(testPublicChatID, "parent")
+			require.NoError(t, err)
+			require.Equal(t, tc.want, thread.LastActivityAt, "metadata must not reset existing activity")
+		})
+	}
+}
+
+func TestBackedUpThreadActivityRestore(t *testing.T) {
+	const day = uint64(24 * time.Hour / time.Millisecond)
+	const now = 60 * day
+	for _, tc := range []struct {
+		name        string
+		local       uint64
+		recorded    uint64
+		message     uint64
+		whisper     uint64
+		want        uint64
+		wantArchive bool
+	}{
+		{name: "new thread on old parent", recorded: now, message: now - 30*day, want: now},
+		{name: "existing archived thread receives recorded activity", local: 1, recorded: now - day, want: now - day},
+		{name: "recorded activity overrides newer messages", recorded: now - 10*day, message: now, want: now - 10*day, wantArchive: true},
+		{name: "recorded activity never moves backwards", local: now, recorded: now - day, want: now},
+		{name: "future recorded activity is bounded", recorded: now + day, want: now},
+		{name: "legacy new thread uses old messages", message: now - 30*day, want: now - 30*day, wantArchive: true},
+		{name: "legacy existing thread uses recent replies", local: 1, message: now - day, want: now - day},
+		{name: "legacy activity never moves backwards", local: now, message: now - day, want: now},
+		{name: "legacy new thread future messages are bounded", message: now + day, want: now},
+		{name: "legacy future messages are bounded", local: 1, message: now + day, want: now},
+		{name: "legacy whisper timestamp fallback", local: 1, whisper: now - day, want: now - day},
+		{name: "legacy new thread future whisper timestamp is bounded", whisper: now + day, want: now},
+		{name: "legacy existing thread future whisper timestamp is bounded", local: 1, whisper: now + day, want: now},
+		{name: "legacy missing timestamps preserve local activity", local: 1, want: 1, wantArchive: true},
+		{name: "legacy new thread without timestamps starts now", want: now},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			db, err := openTestDB()
+			require.NoError(t, err)
+			t.Cleanup(func() { require.NoError(t, db.Close()) })
+			p := newSQLitePersistence(db)
+			currentTime := now
+			p.threadClock = func() uint64 { return currentTime }
+			require.NoError(t, p.SaveChats([]*Chat{CreatePublicChat(testPublicChatID, &testTimeSource{})}))
+			if tc.local > 0 {
+				require.NoError(t, p.UpsertThreadAt("parent", testPublicChatID, "parent", "", tc.local))
+			}
+			require.NoError(t, p.SaveBackedUpMessages([]*protobuf.BackedUpMessage{
+				{Id: "parent", ChatId: testPublicChatID, Timestamp: 1},
+				{Id: "reply", ChatId: testPublicChatID, ThreadId: "parent", Timestamp: tc.message},
+			}))
+			if tc.whisper > 0 {
+				_, err = db.Exec(`UPDATE user_messages SET whisper_timestamp = ? WHERE id = 'reply'`, tc.whisper)
+				require.NoError(t, err)
+			}
+			// A zero-time parent lets the legacy no-timestamp cases exercise
+			// the restore-time fallback rather than a message-derived time.
+			if tc.message == 0 && tc.whisper == 0 {
+				_, err = db.Exec(`UPDATE user_messages SET timestamp = 0, whisper_timestamp = 0`)
+				require.NoError(t, err)
+			}
+			backup := []*protobuf.BackedUpThread{{
+				ThreadId: "parent", ChatId: testPublicChatID, ParentMessageId: "parent", LastActivityAt: tc.recorded,
+			}}
+			for range 2 {
+				require.NoError(t, p.SaveBackedUpThreads(backup))
+				thread, err := p.ThreadByID(testPublicChatID, "parent")
+				require.NoError(t, err)
+				require.Equal(t, tc.want, thread.LastActivityAt)
+				require.Equal(t, tc.wantArchive, thread.Archived)
+			}
+			currentTime = now + uint64(threadInactivityTTL.Milliseconds()) + 1
+			thread, err := p.ThreadByID(testPublicChatID, "parent")
+			require.NoError(t, err)
+			require.Equal(t, tc.want, thread.LastActivityAt)
+			require.True(t, thread.Archived, "restored timestamps must not extend activity beyond restore time plus the TTL")
+		})
+	}
 }
 
 func TestBackedUpThreadsRejectInvalidRecordsAndRollBack(t *testing.T) {
