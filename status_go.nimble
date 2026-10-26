@@ -25,7 +25,7 @@ requires "chronos#0de7b335d0ad5557ad5ba71a4b7662f7b201750e"
 # Pins the logos-delivery revision whose C ABI the bindings match.
 requires "https://github.com/logos-messaging/logos-delivery-go-bindings#e2953049"
 
-# nim-nat-traversal has no tags; the commit logos-delivery locks skips version discovery.
+# Untagged: the commit logos-delivery locks.
 requires "nat_traversal#860e18c37667b5dd005b94c63264560c35d88004"
 
 
@@ -47,33 +47,31 @@ proc nimblePkgDir(name: string): string =
 
 ### Tasks
 
-proc runBindingsTask(taskName: string) =
-  ## Delegates to the bindings' own task; they pin the nim-sds revision their
-  ## C ABI matches. LIBSDS_OUT and NIM_PARAMS come from the caller.
-  withDir nimblePkgDir("sds_go_bindings"):
+proc runBindingsTask(pkgName, taskName: string) =
+  ## Delegates to the bindings' own task; they pin the library revision their
+  ## C ABI matches. The output dir and NIM_PARAMS come from the caller.
+  withDir nimblePkgDir(pkgName):
     exec nimbleExe() & " " & taskName
 
 task libsds, "Build the libsds status-go links against":
-  runBindingsTask("libsds")
+  runBindingsTask("sds_go_bindings", "libsds")
 
 task libsdsAndroid, "Build libsds for Android; ARCH selects the architecture":
-  runBindingsTask("libsdsAndroid")
+  runBindingsTask("sds_go_bindings", "libsdsAndroid")
 
 task libsdsIOS, "Build libsds for iOS":
-  runBindingsTask("libsdsIOS")
+  runBindingsTask("sds_go_bindings", "libsdsIOS")
 
 proc runDeliveryBindingsTask(taskName: string) =
-  ## LIBLOGOSDELIVERY_OUT and NIM_PARAMS come from the caller.
   var params = getEnv("NIM_PARAMS") & " -d:disable_rln"
   when defined(windows):
-    # Leopard's CMake would otherwise pick MSVC from vcvars: logos-storage/nim-leopard#29.
+    # Until logos-storage/nim-leopard#29: CMake picks MSVC from vcvars.
     putEnv("CC", "gcc")
     putEnv("CXX", "g++")
-    # Static libgomp needs dlfcn-win32's -ldl after it, which gcc adds only with -static.
+    # Static libgomp needs dlfcn-win32's -ldl after it.
     params.add " -d:LeopardExtraLinkerFlags=-Wl,--push-state,-Bstatic,-lgomp,-ldl,--pop-state"
   putEnv("NIM_PARAMS", params)
-  withDir nimblePkgDir("logos_delivery_go_bindings"):
-    exec nimbleExe() & " " & taskName
+  runBindingsTask("logos_delivery_go_bindings", taskName)
 
 task liblogosdelivery, "Build the liblogosdelivery status-go links against":
   runDeliveryBindingsTask("liblogosdelivery")
