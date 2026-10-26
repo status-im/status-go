@@ -47,12 +47,20 @@ type TokenData struct {
 	Token     string
 	IssuedAt  time.Time
 	ExpiresAt time.Time
+	// RequestLimit is how many requests the server accepts with the token; 0 means no limit.
+	RequestLimit int
+	// Used counts the requests sent with the token.
+	Used int
 }
 
 // IsValid reports whether the token can still be sent: it is treated as expired
-// a tenth of its lifetime (at most maxExpiryBuffer) before ExpiresAt.
+// a tenth of its lifetime (at most maxExpiryBuffer) before ExpiresAt, or once
+// RequestLimit requests were sent with it.
 func (t *TokenData) IsValid() bool {
 	if t == nil || t.Token == "" {
+		return false
+	}
+	if t.RequestLimit > 0 && t.Used >= t.RequestLimit {
 		return false
 	}
 	buffer := maxExpiryBuffer

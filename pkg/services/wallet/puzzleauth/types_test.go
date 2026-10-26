@@ -27,6 +27,26 @@ func TestTokenData_IsValid(t *testing.T) {
 			expected: false,
 		},
 		{
+			name: "token with requests left is valid",
+			tokenData: &TokenData{
+				Token:        "valid-token",
+				ExpiresAt:    time.Now().Add(1 * time.Hour),
+				RequestLimit: 100,
+				Used:         99,
+			},
+			expected: true,
+		},
+		{
+			name: "token with no requests left is invalid",
+			tokenData: &TokenData{
+				Token:        "valid-token",
+				ExpiresAt:    time.Now().Add(1 * time.Hour),
+				RequestLimit: 100,
+				Used:         100,
+			},
+			expected: false,
+		},
+		{
 			name: "expired token is invalid",
 			tokenData: &TokenData{
 				Token:     "valid-token",
