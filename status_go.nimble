@@ -62,7 +62,20 @@ task libsdsAndroid, "Build libsds for Android; ARCH selects the architecture":
 task libsdsIOS, "Build libsds for iOS":
   runBindingsTask("libsdsIOS")
 
-task liblogosdelivery, "Build the liblogosdelivery status-go links against":
+proc runDeliveryBindingsTask(taskName: string) =
   ## LIBLOGOSDELIVERY_OUT and NIM_PARAMS come from the caller.
+  var params = getEnv("NIM_PARAMS") & " -d:disable_rln"
+  when defined(windows):
+    # Leopard's CMake would otherwise pick MSVC from vcvars, whose flags MSYS mangles.
+    putEnv("CC", "gcc")
+    putEnv("CXX", "g++")
+    putEnv("CMAKE_GENERATOR", "MSYS Makefiles")
+    # winlibs' only libgomp is static and needs dlopen.
+    params.add " -d:LeopardCmakeFlags=-DENABLE_OPENMP=off" &
+      " -d:LeopardExtraCompilerFlags=-fno-openmp -d:LeopardExtraLinkerFlags=-fno-openmp"
+  putEnv("NIM_PARAMS", params)
   withDir nimblePkgDir("logos_delivery_go_bindings"):
-    exec nimbleExe() & " liblogosdelivery"
+    exec nimbleExe() & " " & taskName
+
+task liblogosdelivery, "Build the liblogosdelivery status-go links against":
+  runDeliveryBindingsTask("liblogosdelivery")

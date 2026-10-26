@@ -145,49 +145,24 @@ LIBSDS ?= $(NIM_SDS_LIB_DIR)/libsds.$(LIB_EXT)
 CGO_CFLAGS+=-I$(NIM_SDS_INC_DIR)
 CGO_LDFLAGS+=-L$(NIM_SDS_LIB_DIR) -lsds
 
-# `logos-delivery` variables: LOGOS_DELIVERY_LIB_DIR/INC_DIR come from the Nix shell.
+# `logos-delivery` variables
 ifdef LOGOS_DELIVERY_LIB_DIR
 ifndef LOGOS_DELIVERY_INC_DIR
     $(error LOGOS_DELIVERY_INC_DIR must be provided when LOGOS_DELIVERY_LIB_DIR is set)
 endif
+else
+    LOGOS_DELIVERY_LIB_DIR := $(CURDIR)/build
+    LOGOS_DELIVERY_INC_DIR := $(CURDIR)/build
+    LOGOS_DELIVERY_BUILD_FROM_SOURCE := true
+endif
+
+NIMBLE_DELIVERY_ENV = \
+	LIBLOGOSDELIVERY_OUT="$(LOGOS_DELIVERY_LIB_DIR)" \
+	NIM_PARAMS="--skipParentCfg $$NIM_PARAMS $$(tr '\n' ' ' < $(CURDIR)/nimble.paths)"
+
 LIBLOGOSDELIVERY ?= $(LOGOS_DELIVERY_LIB_DIR)/liblogosdelivery.$(LIB_EXT)
 CGO_CFLAGS+=-I$(LOGOS_DELIVERY_INC_DIR)
-CGO_LDFLAGS+=-L$(LOGOS_DELIVERY_LIB_DIR) -llogosdelivery
-endif
-
-# Built without Nix the same way libsds is.
-NIMBLE_LIB := $(CURDIR)/build/liblogosdelivery.$(LIB_EXT)
-
-# Leopard's CMake would otherwise pick MSVC from vcvars, whose flags MSYS mangles.
-ifeq ($(detected_OS),Windows)
-LEOPARD_CC_ENV := CC=gcc CXX=g++ CMAKE_GENERATOR="MSYS Makefiles"
-# winlibs' only libgomp is static and needs dlopen.
-LEOPARD_NIM_PARAMS := -d:LeopardCmakeFlags=-DENABLE_OPENMP=off -d:LeopardExtraCompilerFlags=-fno-openmp -d:LeopardExtraLinkerFlags=-fno-openmp
-endif
-
-.PHONY: liblogosdelivery-nimble statusgo-nim-delivery
-
-$(NIMBLE_LIB): | nimble.paths
-	$(LEOPARD_CC_ENV) LIBLOGOSDELIVERY_OUT="$(CURDIR)/build" \
-		NIM_PARAMS="--skipParentCfg $$NIM_PARAMS $(LEOPARD_NIM_PARAMS) -d:disable_rln $$(tr '\n' ' ' < $(CURDIR)/nimble.paths)" \
-		$(NIMBLE) liblogosdelivery
-	@test -f $@ || (echo "ERROR: $@ was not produced" && exit 1)
-
-liblogosdelivery-nimble: $(NIMBLE_LIB) ##@build Build liblogosdelivery via the Go bindings' Nimble task
-
-# Temporary: folds into statusgo-library once the delivery backend is wired in.
-statusgo-nim-delivery: STATUS_GO_BINDINGS_PATH ?= build/bin/statusgo-lib
-statusgo-nim-delivery: STATUS_GO_LIBRARY_OUT ?= build/bin
-statusgo-nim-delivery: $(NIMBLE_LIB) generate statusgo-c-bindings $(LIBSDS) ##@build libstatus.a against the Nimble-built liblogosdelivery
-	CGO_CFLAGS="$(CGO_CFLAGS) -I$(CURDIR)/build" \
-	CGO_LDFLAGS="$(CGO_LDFLAGS) -L$(CURDIR)/build -llogosdelivery -Wl,-rpath,$(CURDIR)/build" \
-	go build \
-		-tags '$(BUILD_TAGS)' \
-		$(BUILD_FLAGS) \
-		-buildmode=c-archive \
-		-o $(STATUS_GO_LIBRARY_OUT)/libstatus.a \
-		"$(STATUS_GO_BINDINGS_PATH)/main.go"
-	@echo "Static library built: $(STATUS_GO_LIBRARY_OUT)/libstatus.a"
+CGO_LDFLAGS+=-L$(LOGOS_DELIVERY_LIB_DIR)
 
 # `logos-storage` variables (opt-in)
 USE_LOGOS_STORAGE ?= false
@@ -212,10 +187,7 @@ endif
 
 LIBSTORAGE ?= $(LOGOS_STORAGE_LIB_DIR)/libstorage.$(LIB_EXT)
 
-RUNTIME_LIB_DIRS := $(NIM_SDS_LIB_DIR)
-ifdef LOGOS_DELIVERY_LIB_DIR
-    RUNTIME_LIB_DIRS := $(LOGOS_DELIVERY_LIB_DIR):$(RUNTIME_LIB_DIRS)
-endif
+RUNTIME_LIB_DIRS := $(LOGOS_DELIVERY_LIB_DIR):$(NIM_SDS_LIB_DIR)
 LOGOS_STORAGE_BUILD_DEPS :=
 ifeq ($(USE_LOGOS_STORAGE),true)
 	override BUILD_TAGS += use_logos_storage
@@ -394,6 +366,16 @@ else
 endif
 
 build-libsds: $(LIBSDS)
+
+$(LIBLOGOSDELIVERY): | $(if $(LOGOS_DELIVERY_BUILD_FROM_SOURCE),nimble.paths)
+ifeq ($(LOGOS_DELIVERY_BUILD_FROM_SOURCE),true)
+	$(NIMBLE_DELIVERY_ENV) $(NIMBLE) liblogosdelivery
+	@test -f $@ || (echo "Error: liblogosdelivery not found at $@ after build" && exit 1)
+else
+	@test -f $@ || (echo "Error: liblogosdelivery not found at $@" && exit 1)
+endif
+
+build-liblogosdelivery: $(LIBLOGOSDELIVERY) ##@build Build liblogosdelivery through the Go bindings
 
 
 ## Target-specific architecture mapping for libsds Android build
