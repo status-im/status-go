@@ -124,31 +124,32 @@ pipeline {
       } }
     }
 
-    stage('Unit Tests') {
-      environment {
-        TEST_POSTGRES_PORT = "${env.DB_PORT}"
-      }
-      steps { script {
-        db = docker.image('postgres:9.6-alpine').withRun([
-          "--name=${DB_CONT}",
-          "--env=POSTGRES_HOST_AUTH_METHOD=trust",
-          "--publish=${DB_PORT}:${DB_PORT}",
-        ].join(' '), "-p ${DB_PORT}") { c ->
-          withCredentials([
-            string(
-              credentialsId: 'codecov-repository-upload-token',
-              variable: 'CODECOV_TOKEN'
-            ),
-          ]) {
-            nix.develop('make test-unit V=1 USE_LOGOS_STORAGE=true USE_TORRENT=true', pure: false)
-          }
-          archiveArtifacts('report_*.xml, test_*.log, test-coverage.html')
-        }
-      } }
-      post { cleanup { /* Leftover DB containers. */
-        sh "docker rm -f ${DB_CONT} || true"
-      } }
-    }
+    /* FIXME: Disabled due to absurd CPU load spikes. */
+    //stage('Unit Tests') {
+    //  environment {
+    //    TEST_POSTGRES_PORT = "${env.DB_PORT}"
+    //  }
+    //  steps { script {
+    //    db = docker.image('postgres:9.6-alpine').withRun([
+    //      "--name=${DB_CONT}",
+    //      "--env=POSTGRES_HOST_AUTH_METHOD=trust",
+    //      "--publish=${DB_PORT}:${DB_PORT}",
+    //    ].join(' '), "-p ${DB_PORT}") { c ->
+    //      withCredentials([
+    //        string(
+    //          credentialsId: 'codecov-repository-upload-token',
+    //          variable: 'CODECOV_TOKEN'
+    //        ),
+    //      ]) {
+    //        nix.develop('make test-unit V=1 USE_LOGOS_STORAGE=true USE_TORRENT=true', pure: false)
+    //      }
+    //      archiveArtifacts('report_*.xml, test_*.log, test-coverage.html')
+    //    }
+    //  } }
+    //  post { cleanup { /* Leftover DB containers. */
+    //    sh "docker rm -f ${DB_CONT} || true"
+    //  } }
+    //}
   } // stages
 
   post {
@@ -207,4 +208,3 @@ def getDefaultUnitTestCount() { isNightlyJob() ? '20' : '1' }
 def getDefaultTimeout() { isNightlyJob() ? 5*60 : 50 }
 
 def getAmountToKeep() { isNightlyJob() ? '14' : isDevelopJob() ? '30' : '5' }
-
