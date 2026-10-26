@@ -11,10 +11,11 @@ import (
 	"github.com/status-im/status-go/internal/traffic"
 )
 
+// retryStatusCodes are the answers to a rejected token. A 429 is an upstream rate limit
+// and is returned to the caller as is.
 var retryStatusCodes = map[int]bool{
-	http.StatusUnauthorized:    true, // 401
-	http.StatusForbidden:       true, // 403
-	http.StatusTooManyRequests: true, // 429
+	http.StatusUnauthorized: true, // 401
+	http.StatusForbidden:    true, // 403
 }
 
 // shared auth service per origin: many eth RPC / Alchemy clients call NewTransport with the same
@@ -37,7 +38,7 @@ func sharedAuthServiceForOrigin(origin string) *Service {
 }
 
 // Transport is an [http.RoundTripper] that sends every request with a puzzle JWT (Bearer),
-// solving a puzzle first when the cached one is missing or expiring, and retries on 401/403/429.
+// solving a puzzle first when the cached one is missing or expiring, and retries on 401/403.
 type Transport struct {
 	base        http.RoundTripper
 	authService *Service
