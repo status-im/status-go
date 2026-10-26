@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"math/big"
 	"slices"
+	"strings"
 	"sync"
 	"time"
 
@@ -393,6 +394,63 @@ func (tm *Manager) GetTokensByKeys(tokenKeys []string) ([]*tokentypes.Token, err
 			continue
 		}
 		tokens = append(tokens, token)
+	}
+
+	return tokens, nil
+}
+
+// GetTokensByGroupKeys returns the tokens of the given token groups. A token's
+// group key is its cross-chain id, or its token key when it has none. Catalogue
+// tokens come first, in GetAllTokens order, then the custom tokens.
+func (tm *Manager) GetTokensByGroupKeys(groupKeys []string) ([]*tokentypes.Token, error) {
+	tokens := make([]*tokentypes.Token, 0)
+	keys := make(map[string]struct{}, len(groupKeys))
+	for _, key := range groupKeys {
+		if key != "" {
+			keys[key] = struct{}{}
+		}
+	}
+	if len(keys) == 0 {
+		return tokens, nil
+	}
+	inGroups := func(token *tokentypes.Token) bool {
+		key := token.CrossChainID
+		if strings.TrimSpace(key) == "" {
+			key = token.Key()
+		}
+		_, ok := keys[key]
+		return ok
+	}
+
+	crossChainTokens := tm.tokensManager.GetCrossChainTokens(groupKeys, nil)
+	catalogueKeys := make([]string, 0, len(crossChainTokens)+len(groupKeys))
+	for _, token := range crossChainTokens {
+		catalogueKeys = append(catalogueKeys, types.TokenKey(token.ChainID, token.Address))
+	}
+	// Keys of tokens without a cross-chain id; other keys are skipped or filtered out.
+	catalogueKeys = append(catalogueKeys, groupKeys...)
+	catalogueTokens, err := tm.tokensManager.GetTokensByKeys(catalogueKeys)
+	if err != nil {
+		return nil, err
+	}
+	seen := make(map[string]struct{}, len(catalogueTokens))
+	for _, wsdkToken := range catalogueTokens {
+		token := &tokentypes.Token{Token: wsdkToken}
+		if _, ok := seen[token.Key()]; ok || !inGroups(token) {
+			continue
+		}
+		seen[token.Key()] = struct{}{}
+		tokens = append(tokens, token)
+	}
+
+	communityTokens, err := tm.GetCustoms(true)
+	if err != nil {
+		return nil, err
+	}
+	for _, token := range communityTokens {
+		if inGroups(token) {
+			tokens = append(tokens, token)
+		}
 	}
 
 	return tokens, nil

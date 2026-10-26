@@ -191,6 +191,12 @@ func (api *API) GetTokensByKeys(keys []string) ([]*tokentypes.Token, error) {
 	return api.s.tokenManager.GetTokensByKeys(keys)
 }
 
+// GetTokensByGroupKeys returns the tokens of the given token groups (cross-chain
+// ids, or token keys of tokens without one).
+func (api *API) GetTokensByGroupKeys(groupKeys []string) ([]*tokentypes.Token, error) {
+	return api.s.tokenManager.GetTokensByGroupKeys(groupKeys)
+}
+
 // TokenAvailableForBridgingViaHop returns true if the token with the given chainID and address is available for bridging via Hop
 func (api *API) TokenAvailableForBridgingViaHop(ctx context.Context, chainID uint64, address common.Address) bool {
 	logutils.ZapLogger().Debug("call to get tokens available for bridge on chain")
