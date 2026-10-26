@@ -64,7 +64,16 @@
             libtkl = final.callPackage ./nix/pkgs/libtkl { src = nim-token-lists; };
             libsds     = useTmpdirForNimCache nim-sds.packages.${system}.libsds;
             libstorage = useTmpdirForNimCache logos-storage-nim.packages.${system}.libstorage;
-            nimble = nixpkgs-nimble.legacyPackages.${system}.nimble;
+            nimble = nixpkgs-nimble.legacyPackages.${system}.nimble.overrideAttrs (_: {
+              version = "0.26.1";
+              src = final.fetchFromGitHub {
+                owner = "nim-lang";
+                repo = "nimble";
+                tag = "v0.26.1";
+                hash = "sha256-tTlUZBJY380sV6c6ijYtjDafdgPhI8pda1392WgI9e0=";
+                fetchSubmodules = true;
+              };
+            });
           })
         ];
       }
