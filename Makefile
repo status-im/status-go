@@ -50,7 +50,7 @@ else
     MAKE_SHELL := /bin/bash
 endif
 
-ifeq ($(MAKECMDGOALS),statusgo-android-library)
+ifneq ($(filter statusgo-android-library build-liblogosdelivery-android,$(MAKECMDGOALS)),)
     ARCH ?= arm64
     ANDROID_NDK_ROOT ?= $(shell find /nix/store -path "*android-sdk-ndk-27.2.12479018/libexec/android-sdk/ndk/27.2.12479018" -type d 2>/dev/null | head -1)
     ANDROID_API ?= 28
@@ -67,7 +67,7 @@ ifeq ($(MAKECMDGOALS),statusgo-android-library)
     CGO_LDFLAGS+=-Os -flto
 endif
 
-ifeq ($(MAKECMDGOALS),statusgo-ios-library)
+ifneq ($(filter statusgo-ios-library build-liblogosdelivery-ios,$(MAKECMDGOALS)),)
     ARCH ?= arm64
     IPHONE_SDK ?= iphoneos
     # Apple Silicon simulators require iOS 14; devices and Intel retain iOS 13.
@@ -137,9 +137,8 @@ else
 endif
 
 # nimble.paths has every --path, so parent configs (status-app's) are skipped.
-NIMBLE_SDS_ENV = \
-	LIBSDS_OUT="$(NIM_SDS_LIB_DIR)" \
-	NIM_PARAMS="--skipParentCfg $$NIM_PARAMS $$(tr '\n' ' ' < $(CURDIR)/nimble.paths)"
+NIMBLE_NIM_PARAMS = NIM_PARAMS="--skipParentCfg $$NIM_PARAMS $$(tr '\n' ' ' < $(CURDIR)/nimble.paths)"
+NIMBLE_SDS_ENV = LIBSDS_OUT="$(NIM_SDS_LIB_DIR)" $(NIMBLE_NIM_PARAMS)
 
 LIBSDS ?= $(NIM_SDS_LIB_DIR)/libsds.$(LIB_EXT)
 CGO_CFLAGS+=-I$(NIM_SDS_INC_DIR)
@@ -156,9 +155,7 @@ else
     LOGOS_DELIVERY_BUILD_FROM_SOURCE := true
 endif
 
-NIMBLE_DELIVERY_ENV = \
-	LIBLOGOSDELIVERY_OUT="$(LOGOS_DELIVERY_LIB_DIR)" \
-	NIM_PARAMS="--skipParentCfg $$NIM_PARAMS $$(tr '\n' ' ' < $(CURDIR)/nimble.paths)"
+NIMBLE_DELIVERY_ENV = LIBLOGOSDELIVERY_OUT="$(LOGOS_DELIVERY_LIB_DIR)" $(NIMBLE_NIM_PARAMS)
 
 LIBLOGOSDELIVERY ?= $(LOGOS_DELIVERY_LIB_DIR)/liblogosdelivery.$(LIB_EXT)
 CGO_CFLAGS+=-I$(LOGOS_DELIVERY_INC_DIR)
@@ -367,7 +364,7 @@ endif
 
 build-libsds: $(LIBSDS)
 
-$(LIBLOGOSDELIVERY): | $(if $(LOGOS_DELIVERY_BUILD_FROM_SOURCE),nimble.paths)
+$(LIBLOGOSDELIVERY): | $(if $(LOGOS_DELIVERY_BUILD_FROM_SOURCE),nimble.paths $(LIBSDS))
 ifeq ($(LOGOS_DELIVERY_BUILD_FROM_SOURCE),true)
 	$(NIMBLE_DELIVERY_ENV) $(NIMBLE) liblogosdelivery
 	@test -f $@ || (echo "Error: liblogosdelivery not found at $@ after build" && exit 1)
@@ -377,18 +374,20 @@ endif
 
 build-liblogosdelivery: $(LIBLOGOSDELIVERY) ##@build Build liblogosdelivery through the Go bindings
 
-## Same ARCH values as build-libsds-android; logos-delivery builds only arm64 for Android so far.
+build-liblogosdelivery-android statusgo-android-library: LOGOS_DELIVERY_LIB_DIR := $(CURDIR)/build/android
+build-liblogosdelivery-ios statusgo-ios-library: LOGOS_DELIVERY_LIB_DIR := $(CURDIR)/build/ios
+
 build-liblogosdelivery-android: DELIVERY_ABI = $(strip $(if $(filter arm64,$(ARCH)),arm64 arm64-v8a,\
 	$(if $(filter arm,$(ARCH)),arm armeabi-v7a,\
 	$(if $(filter amd64 x86_64,$(ARCH)),amd64 x86_64,\
 	$(error Unsupported ARCH '$(ARCH)'. Please set ARCH to one of: arm64, arm, amd64, x86_64)))))
-build-liblogosdelivery-android: | nimble.paths
+build-liblogosdelivery-android: | nimble.paths build-libsds-android
 	@echo "Building liblogosdelivery for Android"
 	$(NIMBLE_DELIVERY_ENV) CPU="$(word 1,$(DELIVERY_ABI))" ABIDIR="$(word 2,$(DELIVERY_ABI))" \
 		ANDROID_NDK_ROOT="$(ANDROID_NDK_ROOT)" ANDROID_TARGET="$(ANDROID_API)" \
 		$(NIMBLE) liblogosdeliveryAndroid
 
-build-liblogosdelivery-ios: | nimble.paths
+build-liblogosdelivery-ios: | nimble.paths build-libsds-ios
 	@echo "Building liblogosdelivery for iOS"
 	$(NIMBLE_DELIVERY_ENV) IOS_SDK="$(IPHONE_SDK)" IOS_ARCH="$(ARCH)" \
 		IOS_SDK_PATH="$$(xcrun --sdk $(IPHONE_SDK) --show-sdk-path)" IOS_DEPLOYMENT_TARGET="$(IOS_TARGET)" \
