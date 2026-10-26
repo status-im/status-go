@@ -84,7 +84,7 @@ type Details struct {
 	Operation    string         `json:"operation"`
 	Sender       string         `json:"sender"`
 	Recipient    string         `json:"recipient"`
-	TimeEstimate int            `json:"timeEstimate"` // seconds
+	TimeEstimate float64        `json:"timeEstimate"` // seconds; Relay may return a fractional value
 	CurrencyIn   CurrencyAmount `json:"currencyIn"`
 	CurrencyOut  CurrencyAmount `json:"currencyOut"`
 	Rate         string         `json:"rate"`
