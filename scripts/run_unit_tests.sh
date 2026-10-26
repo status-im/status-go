@@ -113,9 +113,10 @@ echo -e "${GRN}Testing HEAD:${RST} $(git rev-parse HEAD)"
 
 DEFAULT_TIMEOUT_MINUTES=5
 PROTOCOL_TIMEOUT_MINUTES=45
-DEFAULT_PROTOCOL_SHARDS=5
+# WARNING: Increase values if you want to melt your CPU.
+DEFAULT_PROTOCOL_SHARDS=2
 MIN_PROTOCOL_SHARDS=1
-MAX_PROTOCOL_SHARDS=32
+MAX_PROTOCOL_SHARDS=5
 
 resolve_protocol_shards() {
   local shards
