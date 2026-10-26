@@ -81,9 +81,18 @@
             });
             # Postgres is only used by fleet store nodes; without this the
             # library dlopens libpq at startup and a client node fails to start.
-            liblogosdelivery = logos-delivery.packages.${system}.liblogosdelivery.override {
-              enablePostgres = false;
-            };
+            # Leaves out the bundled librln.so, which shadows go-waku's rln on -L.
+            liblogosdelivery = let
+              full = logos-delivery.packages.${system}.liblogosdelivery.override {
+                enablePostgres = false;
+              };
+            in final.runCommand full.name {
+              propagatedBuildInputs = full.propagatedBuildInputs;
+            } ''
+              mkdir -p $out/lib
+              ln -s ${full}/include $out/include
+              ln -s ${full}/lib/liblogosdelivery.* $out/lib/
+            '';
           })
         ];
       }
