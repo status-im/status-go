@@ -35,7 +35,6 @@
     nim-sds.url = "git+https://github.com/logos-messaging/nim-sds?submodules=1&rev=8fec68d9b694e70c8b468a59b6d402d80dd57f3d";
     # nimble 0.20.1 in the nixpkgs above cannot resolve nim-sds through the bindings.
     nixpkgs-nimble.url = "github:NixOS/nixpkgs/34ab99075ac4f7e40cf037eef32cb1c360bb85e9";
-    # logos-delivery pins the same nixpkgs rev as we do, so following is safe.
     logos-delivery = {
       url = "git+https://github.com/logos-messaging/logos-delivery?submodules=1&rev=a0087c1881fdaf80f2ef7ace1cd7272b6021743a";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -79,9 +78,7 @@
                 fetchSubmodules = true;
               };
             });
-            # Postgres is only used by fleet store nodes; without this the
-            # library dlopens libpq at startup and a client node fails to start.
-            # Leaves out the bundled librln.so, which shadows go-waku's rln on -L.
+            # No libpq dlopen, and no bundled librln.so shadowing go-waku's rln.
             liblogosdelivery = let
               full = logos-delivery.packages.${system}.liblogosdelivery.override {
                 enablePostgres = false;
