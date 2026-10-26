@@ -43,3 +43,13 @@ func BenchmarkSolveAttempts(b *testing.B) {
 		_, _ = solve(context.Background(), puzzle, 10)
 	}
 }
+
+// One solve at the production parameters: difficulty 1 takes ~16 attempts on average.
+func BenchmarkSolvePuzzleParams(b *testing.B) {
+	puzzle := unsolvablePuzzle(16 * 1024)
+	puzzle.Argon2Params.Time = 4
+	puzzle.Argon2Params.Threads = 4
+	for b.Loop() {
+		_, _ = solve(context.Background(), puzzle, 16)
+	}
+}
