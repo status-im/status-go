@@ -37,6 +37,8 @@ type Client struct {
 	// isMarketProxy marks a client pointed at the Status market proxy, which
 	// understands convert_currency and normalizes vs_currency to usd.
 	isMarketProxy bool
+
+	coinsList coinsListCache
 }
 
 type Params struct {
@@ -89,48 +91,35 @@ func (c *Client) ID() string {
 	return "coingecko"
 }
 
-// getCoingeckoTokensByTokenKey returns a map of token keys to coingecko tokens
-func (c *Client) getCoingeckoTokensByTokenKey() (map[string]GeckoToken, error) {
-	tokens, err := c.fetchTokens(traffic.WithSource(context.Background(), traffic.MarketTokenList))
-	if err != nil {
-		return nil, err
-	}
-
-	coingeckoTokensByTokenKey := make(map[string]GeckoToken)
+// buildCoingeckoIDsByTokenKey returns a map of token keys to coingecko ids
+func buildCoingeckoIDsByTokenKey(tokens []GeckoToken) map[string]string {
+	coingeckoIDsByTokenKey := make(map[string]string)
 
 	// for native tokens, platform is empty (zero address), but the id is ethereum, that's why we need to add it manually
 	for _, chainID := range walletcommon.AllChainIDsAsUint64() {
 		token := tokentypes.Token{Token: &types.Token{ChainID: chainID}}
 
 		if chainID == walletcommon.BSCMainnet || chainID == walletcommon.BSCTestnet {
-			coingeckoTokensByTokenKey[token.Key()] = GeckoToken{
-				ID:     nativeBNBTokenID,
-				Name:   walletcommon.BNBName,
-				Symbol: walletcommon.BNBSymbol,
-			}
+			coingeckoIDsByTokenKey[token.Key()] = nativeBNBTokenID
 			continue
 		}
 
-		coingeckoTokensByTokenKey[token.Key()] = GeckoToken{
-			ID:     nativeEthTokenID,
-			Name:   walletcommon.EthName,
-			Symbol: walletcommon.EthSymbol,
-		}
+		coingeckoIDsByTokenKey[token.Key()] = nativeEthTokenID
 	}
 
 	for _, token := range tokens {
 		for _, key := range token.keys() {
-			coingeckoTokensByTokenKey[key] = token
+			coingeckoIDsByTokenKey[key] = token.ID
 		}
 	}
 
-	return coingeckoTokensByTokenKey, nil
+	return coingeckoIDsByTokenKey
 }
 
 // mapTokensToIds maps wallet sdk tokens to coingecko tokens
 // returns a map of coingecko ids to token keys as first and a list of unmapped token keys as second return value
 func (c *Client) mapTokensToIds(tokens []*tokentypes.Token) (map[string][]string, []string, error) {
-	coingeckoTokensByTokenKey, err := c.getCoingeckoTokensByTokenKey()
+	coingeckoIDsByTokenKey, err := c.getCoingeckoIDsByTokenKey()
 	if err != nil {
 		return nil, nil, err
 	}
@@ -154,7 +143,7 @@ func (c *Client) mapTokensToIds(tokens []*tokentypes.Token) (map[string][]string
 	}
 
 	for _, token := range tokens {
-		coingeckoToken, ok := coingeckoTokensByTokenKey[token.Key()]
+		coingeckoID, ok := coingeckoIDsByTokenKey[token.Key()]
 		if !ok {
 			// Check by cross chain id if any of the mainnet siblings have a coingecko token.
 			// This covers testnet tokens as well as mainnet tokens coingecko doesn't list on that some other chain (e.g. SNT is not listed on Base/Optimism).
@@ -165,7 +154,7 @@ func (c *Client) mapTokensToIds(tokens []*tokentypes.Token) (map[string][]string
 			}
 
 			for _, tokenKey := range tokenKeysByCrossChainID[crossChainID] {
-				coingeckoToken, ok = coingeckoTokensByTokenKey[tokenKey]
+				coingeckoID, ok = coingeckoIDsByTokenKey[tokenKey]
 				if ok {
 					break
 				}
@@ -176,7 +165,7 @@ func (c *Client) mapTokensToIds(tokens []*tokentypes.Token) (map[string][]string
 				continue
 			}
 		}
-		mappedTokens[coingeckoToken.ID] = append(mappedTokens[coingeckoToken.ID], token.Key())
+		mappedTokens[coingeckoID] = append(mappedTokens[coingeckoID], token.Key())
 	}
 
 	return mappedTokens, unmappedTokens, nil
@@ -319,12 +308,12 @@ func (c *Client) FetchHistoricalHourlyPrices(token *tokentypes.Token, currency s
 // FetchHistoricalDailyPrices fetches the daily prices for the given token and currency
 // returns a list of HistoricalPrice
 func (c *Client) FetchHistoricalDailyPrices(token *tokentypes.Token, currency string, limit int, allData bool, aggregate int) ([]thirdparty.HistoricalPrice, error) {
-	coingeckoTokensByTokenKey, err := c.getCoingeckoTokensByTokenKey()
+	coingeckoIDsByTokenKey, err := c.getCoingeckoIDsByTokenKey()
 	if err != nil {
 		return nil, err
 	}
 
-	coingeckoToken, ok := coingeckoTokensByTokenKey[token.Key()]
+	coingeckoID, ok := coingeckoIDsByTokenKey[token.Key()]
 	if !ok {
 		return nil, fmt.Errorf("%w: coingecko id not found for token %s", thirdparty.ErrTokenNotMapped, token.Key())
 	}
@@ -336,7 +325,7 @@ func (c *Client) FetchHistoricalDailyPrices(token *tokentypes.Token, currency st
 		days = fmt.Sprintf("%d", limit)
 	}
 
-	container, err := c.FetchHistoryMarketData(traffic.WithSource(context.Background(), traffic.MarketPrices), coingeckoToken.ID, currency, days)
+	container, err := c.FetchHistoryMarketData(traffic.WithSource(context.Background(), traffic.MarketPrices), coingeckoID, currency, days)
 	if err != nil {
 		return nil, err
 	}
