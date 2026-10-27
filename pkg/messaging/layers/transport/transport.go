@@ -6,11 +6,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/jellydator/ttlcache/v3"
 	"github.com/pkg/errors"
 	"github.com/waku-org/go-waku/waku/v2/api/history"
 	"go.uber.org/zap"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 
 	"github.com/status-im/status-go/internal/connection"
 	"github.com/status-im/status-go/internal/crypto"
@@ -62,7 +64,14 @@ type Transport struct {
 	// FiltersManager mutation is acquired here, and every removed filter
 	// released.
 	subs *FilterSubscriptions
+
+	// routed holds hashes of envelopes recently decoded for one of our filters,
+	// i.e. handed on for processing. Envelopes dropped for lack of a matching
+	// filter are not recorded, so they can still be recovered from a store.
+	routed *ttlcache.Cache[common.Hash, struct{}]
 }
+
+const routedEnvelopesTTL = 20 * time.Minute
 
 // Pause signals Transport's internal goroutines to idle and cascades to
 // EnvelopesMonitor and the underlying waku transport.
@@ -139,7 +148,12 @@ func NewTransport(
 		received:         make(map[string]map[string]*wakutypes.Message),
 		matchedPublisher: pubsub.NewTypePublisher[struct{}](),
 		subs:             newFilterSubscriptions(api, logger),
+		routed:           ttlcache.New(ttlcache.WithTTL[common.Hash, struct{}](routedEnvelopesTTL)),
 	}
+	go func() {
+		defer panics.LogOnPanic()
+		t.routed.Start()
+	}()
 
 	for _, opt := range opts {
 		if err := opt(t); err != nil {
@@ -253,6 +267,7 @@ func (t *Transport) handleReceivedMessage(msg *wakutypes.ReceivedMessage) {
 		for _, filter := range group.filters {
 			t.bufferMessage(filter.FilterID, toMessage(decoded, filter, msg, group.privKey))
 		}
+		t.markRouted(msg.Hash)
 		matched = true
 		break // only one key can authenticate a given message
 	}
@@ -725,6 +740,9 @@ func (t *Transport) MaxMessageSize() uint32 {
 
 func (t *Transport) Stop() error {
 	close(t.quit)
+	if t.routed != nil {
+		t.routed.Stop()
+	}
 
 	if t.envelopesMonitor != nil {
 		t.envelopesMonitor.Stop()
@@ -875,19 +893,32 @@ func (t *Transport) Query(
 	return t.waku.StoreQuery(ctx, batch, pageLimit, shouldProcessNextPage, processEnvelopes)
 }
 
-// EnvelopesSeen reports which envelope hashes were recently received or
-// published, even if they failed processing. Backends that don't track seen
-// envelopes report none.
-func (t *Transport) EnvelopesSeen(messageHashes []string) map[string]bool {
-	type seenTracker interface {
-		EnvelopesSeen(messageHashes []string) map[string]bool
+func (t *Transport) markRouted(hash []byte) {
+	if t.routed == nil || len(hash) != common.HashLength {
+		return
 	}
+	t.routed.Set(common.BytesToHash(hash), struct{}{}, ttlcache.DefaultTTL)
+}
 
-	tracker, ok := t.waku.(seenTracker)
-	if !ok || len(messageHashes) == 0 {
-		return map[string]bool{}
+// EnvelopesSeen reports which of the hex-encoded envelope hashes were recently
+// decoded for one of our filters and handed on for processing, even if that
+// processing failed. Envelopes received before a matching filter existed are
+// not reported, so they can still be fetched. Invalid hashes are not reported.
+func (t *Transport) EnvelopesSeen(messageHashes []string) map[string]bool {
+	seen := make(map[string]bool)
+	if t.routed == nil {
+		return seen
 	}
-	return tracker.EnvelopesSeen(messageHashes)
+	for _, messageHash := range messageHashes {
+		decoded, err := hexutil.Decode(messageHash)
+		if err != nil || len(decoded) != common.HashLength {
+			continue
+		}
+		if t.routed.Has(common.BytesToHash(decoded)) {
+			seen[messageHash] = true
+		}
+	}
+	return seen
 }
 
 func (t *Transport) FetchMessagesByHashes(ctx context.Context, messageHashes []string) error {
