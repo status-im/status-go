@@ -147,14 +147,14 @@ func TestTransport_TokenReusedForMostOfItsLifetime(t *testing.T) {
 	server := newBearerServer(t, lifetime)
 	client := &http.Client{Transport: &Transport{base: http.DefaultTransport, authService: NewService(server.URL, nil), maxRetries: 2}}
 
-	deadline := time.Now().Add(lifetime * 8 / 10)
+	deadline := time.Now().Add(lifetime * 6 / 10)
 	for time.Now().Before(deadline) {
 		server.get(t, client)
 		time.Sleep(50 * time.Millisecond)
 	}
 
 	require.Zero(t, server.unauthorized.Load())
-	require.Equal(t, int32(1), server.solves.Load(), "a token is not refreshed while it has most of its lifetime left")
+	require.Equal(t, int32(1), server.solves.Load(), "a token is not refreshed in the first 60% of its lifetime")
 }
 
 func TestTransport_TokenRenewedBeforeQuotaRunsOut(t *testing.T) {

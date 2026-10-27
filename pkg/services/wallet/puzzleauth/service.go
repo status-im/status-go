@@ -23,6 +23,8 @@ const (
 	authRequestTimeout = 5 * time.Second
 	// refreshTimeout bounds a whole refresh, solve included.
 	refreshTimeout = 30 * time.Second
+	// backgroundRetryDelay delays the next background refresh after a failed one.
+	backgroundRetryDelay = 30 * time.Second
 )
 
 // refreshCall is a token refresh shared by every request that waits for it.
@@ -40,6 +42,8 @@ type Service struct {
 	mu          sync.RWMutex
 	refreshing  *refreshCall
 	authTimeout time.Duration
+	now         func() time.Time
+	retryAt     time.Time
 }
 
 // NewService creates a new puzzle auth service for the given origin
@@ -55,6 +59,7 @@ func NewService(origin string, httpClient *http.Client) *Service {
 		origin:      origin,
 		httpClient:  httpClient,
 		authTimeout: authRequestTimeout,
+		now:         time.Now,
 	}
 }
 
@@ -64,7 +69,7 @@ func (s *Service) GetToken() string {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	if s.tokenCache != nil && s.tokenCache.IsValid() {
+	if s.tokenCache != nil && s.tokenCache.validAt(s.now()) {
 		return s.tokenCache.Token
 	}
 
@@ -100,13 +105,18 @@ func (s *Service) InvalidateTokenForRejectedRequest(rejectedBearer string) {
 }
 
 // takeToken returns the cached token and counts one request sent with it,
-// or "" if the token is expired or has no requests left.
-func (s *Service) takeToken() string {
+// or "" if the token is expired or has no requests left. A token close to
+// expiry is still returned while a refresh starts in the background.
+func (s *Service) takeToken(ctx context.Context) string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if !s.tokenCache.IsValid() {
+	now := s.now()
+	if !s.tokenCache.validAt(now) {
 		return ""
+	}
+	if s.refreshing == nil && s.tokenCache.refreshDueAt(now) && !now.Before(s.retryAt) {
+		s.startRefreshLocked(ctx)
 	}
 	s.tokenCache.Used++
 	return s.tokenCache.Token
@@ -117,7 +127,7 @@ func (s *Service) takeToken() string {
 // one refresh and share its result; a caller that gives up does not cancel it.
 func (s *Service) EnsureToken(ctx context.Context) (string, error) {
 	for {
-		if token := s.takeToken(); token != "" {
+		if token := s.takeToken(ctx); token != "" {
 			return token, nil
 		}
 		if err := ctx.Err(); err != nil {
@@ -148,12 +158,18 @@ func (s *Service) joinRefresh(ctx context.Context) *refreshCall {
 	if s.refreshing != nil {
 		return s.refreshing
 	}
-	call := &refreshCall{done: make(chan struct{})}
-	if s.tokenCache.IsValid() {
-		call.token = s.tokenCache.Token
+	if s.tokenCache.validAt(s.now()) {
+		call := &refreshCall{done: make(chan struct{}), token: s.tokenCache.Token}
 		close(call.done)
 		return call
 	}
+	return s.startRefreshLocked(ctx)
+}
+
+// startRefreshLocked starts a refresh that outlives the caller's ctx.
+// s.mu must be held.
+func (s *Service) startRefreshLocked(ctx context.Context) *refreshCall {
+	call := &refreshCall{done: make(chan struct{})}
 	s.refreshing = call
 	go func() {
 		defer panics.LogOnPanic()
@@ -165,6 +181,9 @@ func (s *Service) joinRefresh(ctx context.Context) *refreshCall {
 
 		s.mu.Lock()
 		s.refreshing = nil
+		if call.err != nil {
+			s.retryAt = s.now().Add(backgroundRetryDelay)
+		}
 		s.mu.Unlock()
 	}()
 	return call
@@ -222,7 +241,7 @@ func (s *Service) refreshToken(ctx context.Context) (token string, err error) {
 		return "", fmt.Errorf("failed to submit solution: %w", err)
 	}
 
-	issuedAt := time.Now()
+	issuedAt := s.now()
 	expiresAt, err := time.Parse(time.RFC3339, tokenResp.ExpiresAt)
 	if err != nil {
 		logutils.ZapLogger().Warn("Failed to parse token expiry, using 1 hour default",
