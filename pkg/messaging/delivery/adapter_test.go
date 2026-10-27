@@ -23,6 +23,7 @@ type fakeClient struct {
 	subscribed   map[string]int
 	sendID       string
 	beforeReturn func()
+	onSubscribe  func()
 }
 
 func newFakeClient() *fakeClient {
@@ -35,6 +36,9 @@ func (f *fakeClient) Close() error         { close(f.events); return nil }
 func (f *fakeClient) Events() <-chan Event { return f.events }
 
 func (f *fakeClient) Subscribe(contentTopic string) error {
+	if f.onSubscribe != nil {
+		f.onSubscribe()
+	}
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.subscribed[contentTopic]++
@@ -186,6 +190,32 @@ func TestReceivedMessageIsReportedOnce(t *testing.T) {
 		t.Fatalf("unexpected second event: %+v", ev)
 	case <-time.After(100 * time.Millisecond):
 	}
+}
+
+func TestReceivedMessageIsReportedWhileSubscribing(t *testing.T) {
+	a, client := startAdapter(t)
+	subscribed := types.BytesToTopic([]byte{1, 2, 3, 4})
+	pending := types.BytesToTopic([]byte{5, 6, 7, 8})
+	require.NoError(t, a.Subscribe(context.Background(), "/waku/2/rs/16/32", []types.TopicType{subscribed}))
+
+	events := make(chan types.EnvelopeEvent, 4)
+	sub := a.SubscribeEnvelopeEvents(events)
+	defer sub.Unsubscribe()
+
+	release := make(chan struct{})
+	client.onSubscribe = func() {
+		client.events <- ReceivedEvent{MessageHash: testHash, ContentTopic: subscribed.ContentTopic(), Payload: []byte("hi")}
+		nextEvent(t, events)
+		close(release)
+	}
+	require.NoError(t, a.Subscribe(context.Background(), "/waku/2/rs/16/32", []types.TopicType{pending}))
+	<-release
+}
+
+func TestStopIsIdempotent(t *testing.T) {
+	a, _ := startAdapter(t)
+	require.NoError(t, a.Stop())
+	require.NoError(t, a.Stop())
 }
 
 func TestUnsubscribeKeepsTopicWhileAnotherPubsubTopicWantsIt(t *testing.T) {

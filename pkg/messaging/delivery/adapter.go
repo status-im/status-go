@@ -54,6 +54,9 @@ type Adapter struct {
 	// subscriptions maps a content topic to the pubsub topics the transport
 	// subscribed it on. A received message carries no pubsub topic, so it is
 	// reported on the lowest of them.
+	// subscribeMu serialises Subscribe and Unsubscribe; subscriptionsMu only
+	// guards the map, which the event loop reads.
+	subscribeMu     sync.Mutex
 	subscriptionsMu sync.Mutex
 	subscriptions   map[string]map[string]struct{}
 
@@ -69,8 +72,10 @@ type Adapter struct {
 
 	historyReconcileNeeded chan types.HistoryReconcileWindow
 
-	quit chan struct{}
-	wg   sync.WaitGroup
+	quit     chan struct{}
+	stopOnce sync.Once
+	stopErr  error
+	wg       sync.WaitGroup
 }
 
 // NewAdapter returns an Adapter driving client. The client must not be started.
@@ -99,21 +104,25 @@ func (a *Adapter) Start() error {
 	return nil
 }
 
-// Stop stops the node and releases it. The Adapter cannot be restarted.
+// Stop stops the node and releases it. Later calls return the first result.
+// The Adapter cannot be restarted.
 func (a *Adapter) Stop() error {
-	stopErr := a.client.Stop()
-	closeErr := a.client.Close()
-	close(a.quit)
-	a.wg.Wait()
+	a.stopOnce.Do(func() {
+		stopErr := a.client.Stop()
+		closeErr := a.client.Close()
+		close(a.quit)
+		a.wg.Wait()
 
-	a.connMu.Lock()
-	for id, sub := range a.connSubscribers {
-		sub.Unsubscribe()
-		delete(a.connSubscribers, id)
-	}
-	a.connMu.Unlock()
+		a.connMu.Lock()
+		for id, sub := range a.connSubscribers {
+			sub.Unsubscribe()
+			delete(a.connSubscribers, id)
+		}
+		a.connMu.Unlock()
 
-	return errors.Join(stopErr, closeErr)
+		a.stopErr = errors.Join(stopErr, closeErr)
+	})
+	return a.stopErr
 }
 
 func (a *Adapter) eventLoop() {
@@ -260,20 +269,28 @@ func (a *Adapter) Send(ctx context.Context, pubsubTopic, contentTopic string, pa
 // Subscribe subscribes the content topics. A content topic is subscribed with
 // the library once, whatever pubsub topics it is requested on.
 func (a *Adapter) Subscribe(ctx context.Context, pubsubTopic string, contentTopics []types.TopicType) error {
-	a.subscriptionsMu.Lock()
-	defer a.subscriptionsMu.Unlock()
+	a.subscribeMu.Lock()
+	defer a.subscribeMu.Unlock()
 
 	for _, topic := range contentTopics {
 		contentTopic := topic.ContentTopic()
-		pubsubTopics, ok := a.subscriptions[contentTopic]
+		a.subscriptionsMu.Lock()
+		_, ok := a.subscriptions[contentTopic]
+		a.subscriptionsMu.Unlock()
 		if !ok {
 			if err := a.client.Subscribe(contentTopic); err != nil {
 				return fmt.Errorf("delivery: subscribe %s: %w", contentTopic, err)
 			}
+		}
+
+		a.subscriptionsMu.Lock()
+		pubsubTopics, ok := a.subscriptions[contentTopic]
+		if !ok {
 			pubsubTopics = make(map[string]struct{})
 			a.subscriptions[contentTopic] = pubsubTopics
 		}
 		pubsubTopics[pubsubTopic] = struct{}{}
+		a.subscriptionsMu.Unlock()
 	}
 	return nil
 }
@@ -281,20 +298,26 @@ func (a *Adapter) Subscribe(ctx context.Context, pubsubTopic string, contentTopi
 // Unsubscribe drops the content topics from pubsubTopic, and unsubscribes a
 // content topic from the library when no pubsub topic wants it any more.
 func (a *Adapter) Unsubscribe(ctx context.Context, pubsubTopic string, contentTopics []types.TopicType) error {
-	a.subscriptionsMu.Lock()
-	defer a.subscriptionsMu.Unlock()
+	a.subscribeMu.Lock()
+	defer a.subscribeMu.Unlock()
 
 	for _, topic := range contentTopics {
 		contentTopic := topic.ContentTopic()
+		a.subscriptionsMu.Lock()
 		pubsubTopics, ok := a.subscriptions[contentTopic]
 		if !ok {
+			a.subscriptionsMu.Unlock()
 			continue
 		}
 		delete(pubsubTopics, pubsubTopic)
-		if len(pubsubTopics) > 0 {
+		last := len(pubsubTopics) == 0
+		if last {
+			delete(a.subscriptions, contentTopic)
+		}
+		a.subscriptionsMu.Unlock()
+		if !last {
 			continue
 		}
-		delete(a.subscriptions, contentTopic)
 		if err := a.client.Unsubscribe(contentTopic); err != nil {
 			return fmt.Errorf("delivery: unsubscribe %s: %w", contentTopic, err)
 		}
