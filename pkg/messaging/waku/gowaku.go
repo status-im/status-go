@@ -1199,25 +1199,6 @@ func (w *Waku) MessageExists(mh pb.MessageHash) (bool, error) {
 	return w.envelopeCache.Has(gethcommon.Hash(mh)), nil
 }
 
-// EnvelopesSeen reports which of the hex-encoded envelope hashes were received
-// or published within cacheTTL, whatever the outcome of their processing.
-// Invalid hashes are reported as not seen.
-func (w *Waku) EnvelopesSeen(messageHashes []string) map[string]bool {
-	seen := make(map[string]bool)
-	w.poolMu.Lock()
-	defer w.poolMu.Unlock()
-	for _, messageHash := range messageHashes {
-		decodedHash, err := hexutil.Decode(messageHash)
-		if err != nil || len(decodedHash) != gethcommon.HashLength {
-			continue
-		}
-		if w.envelopeCache.Has(gethcommon.BytesToHash(decodedHash)) {
-			seen[messageHash] = true
-		}
-	}
-	return seen
-}
-
 func (w *Waku) setupRelaySubscriptions() error {
 	if w.cfg.IsLightClient() {
 		return nil
