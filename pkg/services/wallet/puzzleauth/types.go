@@ -60,7 +60,7 @@ func (t *TokenData) IsValid() bool {
 	if t == nil || t.Token == "" {
 		return false
 	}
-	if t.RequestLimit > 0 && t.Used >= t.RequestLimit {
+	if t.limitReached() {
 		return false
 	}
 	buffer := maxExpiryBuffer
@@ -68,4 +68,8 @@ func (t *TokenData) IsValid() bool {
 		buffer = min(buffer, t.ExpiresAt.Sub(t.IssuedAt)/10)
 	}
 	return time.Now().Before(t.ExpiresAt.Add(-buffer))
+}
+
+func (t *TokenData) limitReached() bool {
+	return t.RequestLimit > 0 && t.Used >= t.RequestLimit
 }
