@@ -48,6 +48,19 @@ func wrapPayloadForPublicSDS(logger *zap.Logger, wrapper publicSDSWrapper, paylo
 	return sdsWrappedPayload, sdsMessageIDBytes, nil
 }
 
+func wrapPublicParamsForSDS(logger *zap.Logger, wrapper publicSDSWrapper, params messagingtypes.SendPublicParams) ([]byte, []byte, error) {
+	if !sdsForCommunitiesEnabled || params.SkipSDS {
+		return params.Payload, nil, nil
+	}
+
+	communityID := params.CommunityID
+	if len(communityID) == 0 && params.CommunityPublicKey != nil {
+		communityID = cryptotypes.EncodeHex(crypto.CompressPubkey(params.CommunityPublicKey))
+	}
+
+	return wrapPayloadForPublicSDS(logger, wrapper, params.Payload, communityID)
+}
+
 func (s *Sender) SendPublic(ctx context.Context, params messagingtypes.SendPublicParams) error {
 	messageID := messagingtypes.MessageID(params.Sender, params.Payload)
 	var sdsMessageIDBytes []byte
@@ -69,20 +82,12 @@ func (s *Sender) SendPublic(ctx context.Context, params messagingtypes.SendPubli
 		zap.Any("hashRatchet", params.HashRatchet),
 	)
 
-	if sdsForCommunitiesEnabled {
-		var wrapErr error
-		communityID := params.CommunityID
-		if len(communityID) == 0 && params.CommunityPublicKey != nil {
-			communityID = cryptotypes.EncodeHex(crypto.CompressPubkey(params.CommunityPublicKey))
-		}
-
-		params.Payload, sdsMessageIDBytes, wrapErr = wrapPayloadForPublicSDS(logger, s.stack.Reliability, params.Payload, communityID)
-		if wrapErr != nil {
-			return wrapErr
-		}
+	var err error
+	params.Payload, sdsMessageIDBytes, err = wrapPublicParamsForSDS(logger, s.stack.Reliability, params)
+	if err != nil {
+		return err
 	}
 
-	var err error
 	var spec *encryption.ProtocolMessageSpec
 	if params.HashRatchet != nil {
 		if params.HashRatchet.Encrypt {
