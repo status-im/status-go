@@ -13,6 +13,9 @@ type SendPublicParams struct {
 	HashRatchet         *SendPublicHashRatchetParams
 	CommunityPublicKey  *ecdsa.PublicKey
 	CommunityID         string
+	// SkipSDS sends the payload without the SDS wrapper, so it is neither added
+	// to the channel's causal history nor carries one.
+	SkipSDS bool
 }
 
 type SendPublicHashRatchetParams struct {
