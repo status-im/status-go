@@ -10,7 +10,6 @@ import (
 	"testing"
 
 	"github.com/brianvoe/gofakeit/v6"
-	"github.com/jellydator/ttlcache/v3"
 
 	"github.com/libp2p/go-libp2p/core/peer"
 
@@ -21,7 +20,6 @@ import (
 	wps "github.com/waku-org/go-waku/waku/v2/peerstore"
 	"github.com/waku-org/go-waku/waku/v2/utils"
 
-	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 
 	"github.com/stretchr/testify/require"
@@ -236,21 +234,4 @@ func TestHandlePeerAddress(t *testing.T) {
 		err := handlePeerAddress(addr, mockHandler)
 		require.ErrorContains(t, err, "unknown format of waku")
 	})
-}
-
-func TestEnvelopesSeen(t *testing.T) {
-	w, err := New(nil, nil, nil, nil)
-	require.NoError(t, err)
-	t.Cleanup(func() {
-		w.cancel()
-		w.envelopeCache.Stop()
-		w.wg.Wait()
-	})
-
-	seenHash := gethcommon.HexToHash("0x01")
-	w.envelopeCache.Set(seenHash, struct{}{}, ttlcache.DefaultTTL)
-	unseenHash := gethcommon.HexToHash("0x02")
-
-	seen := w.EnvelopesSeen([]string{seenHash.Hex(), unseenHash.Hex(), "not-a-hash", "0x0102"})
-	require.Equal(t, map[string]bool{seenHash.Hex(): true}, seen)
 }

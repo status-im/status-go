@@ -38,8 +38,9 @@ var missingDepsTimeoutRetryDelays = []time.Duration{30 * time.Second, 2 * time.M
 
 type missingDependencyFetcher interface {
 	AlreadyProcessed(messageHashes []string) (map[string]bool, error)
-	// EnvelopesSeen reports hashes recently received, even if they failed
-	// processing. Fetching them again would only redeliver the same envelope.
+	// EnvelopesSeen reports hashes recently handed on for processing, even if
+	// processing failed. Fetching them again would only redeliver the same
+	// envelope.
 	EnvelopesSeen(messageHashes []string) map[string]bool
 	FetchMessagesByHashes(ctx context.Context, messageHashes []string) error
 }

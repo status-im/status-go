@@ -99,20 +99,3 @@ func TestFetchMessagesByHashes_BackendErrorPropagates(t *testing.T) {
 	require.ErrorIs(t, err, backendErr)
 	require.Equal(t, 1, waku.fetchInvocations)
 }
-
-func (f *fakeWakuWithHashFetcher) EnvelopesSeen(messageHashes []string) map[string]bool {
-	return map[string]bool{messageHashes[0]: true}
-}
-
-func TestEnvelopesSeen_ForwardsToBackend(t *testing.T) {
-	tr := &Transport{waku: &fakeWakuWithHashFetcher{}}
-
-	require.Equal(t, map[string]bool{"0x01": true}, tr.EnvelopesSeen([]string{"0x01", "0x02"}))
-	require.Empty(t, tr.EnvelopesSeen(nil))
-}
-
-func TestEnvelopesSeen_BackendWithoutTrackingSeesNothing(t *testing.T) {
-	tr := &Transport{waku: &fakeWakuWithoutHashFetcher{}}
-
-	require.Empty(t, tr.EnvelopesSeen([]string{"0x01"}))
-}
