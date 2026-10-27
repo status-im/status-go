@@ -867,6 +867,21 @@ func (t *Transport) Query(
 	return t.waku.StoreQuery(ctx, batch, pageLimit, shouldProcessNextPage, processEnvelopes)
 }
 
+// EnvelopesSeen reports which envelope hashes were recently received or
+// published, even if they failed processing. Backends that don't track seen
+// envelopes report none.
+func (t *Transport) EnvelopesSeen(messageHashes []string) map[string]bool {
+	type seenTracker interface {
+		EnvelopesSeen(messageHashes []string) map[string]bool
+	}
+
+	tracker, ok := t.waku.(seenTracker)
+	if !ok || len(messageHashes) == 0 {
+		return map[string]bool{}
+	}
+	return tracker.EnvelopesSeen(messageHashes)
+}
+
 func (t *Transport) FetchMessagesByHashes(ctx context.Context, messageHashes []string) error {
 	if len(messageHashes) == 0 {
 		return nil

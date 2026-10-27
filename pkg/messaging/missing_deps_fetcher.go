@@ -38,6 +38,9 @@ var missingDepsTimeoutRetryDelays = []time.Duration{30 * time.Second, 2 * time.M
 
 type missingDependencyFetcher interface {
 	AlreadyProcessed(messageHashes []string) (map[string]bool, error)
+	// EnvelopesSeen reports hashes recently received, even if they failed
+	// processing. Fetching them again would only redeliver the same envelope.
+	EnvelopesSeen(messageHashes []string) map[string]bool
 	FetchMessagesByHashes(ctx context.Context, messageHashes []string) error
 }
 
@@ -89,11 +92,11 @@ func newMissingDepsFetcher(logger *zap.Logger, fetcher missingDependencyFetcher,
 	}
 }
 
-// enqueue schedules hashes for fetching. It does not block: hashes requested
-// recently or already queued are skipped, and hashes beyond the queue
-// capacity are dropped.
+// enqueue schedules hashes for fetching. It does not block: hashes already
+// received, requested recently or already queued are skipped, and hashes
+// beyond the queue capacity are dropped.
 func (f *missingDepsFetcher) enqueue(hashes []string) (queued, dropped int) {
-	claimed := f.requested.claim(hashes)
+	claimed := f.requested.claim(withoutHashes(hashes, f.fetcher.EnvelopesSeen(hashes)))
 	if len(claimed) == 0 {
 		return 0, 0
 	}
@@ -172,22 +175,28 @@ func (f *missingDepsFetcher) takeBatch(now time.Time) (batch []string, nextDue t
 // fetchBatch makes a single by-hash store query for the hashes of batch that
 // were not received in the meantime, and reschedules them if it fails.
 func (f *missingDepsFetcher) fetchBatch(ctx context.Context, batch []string) {
-	toFetch := batch
 	alreadyProcessed, err := f.fetcher.AlreadyProcessed(batch)
 	if err != nil {
 		f.logger.Debug("failed to check missing dependencies cache", zap.Error(err))
-	} else {
-		toFetch = make([]string, 0, len(batch))
-		f.mu.Lock()
-		for _, h := range batch {
-			if alreadyProcessed[h] {
-				delete(f.pending, h)
-			} else {
-				toFetch = append(toFetch, h)
-			}
-		}
-		f.mu.Unlock()
 	}
+	received := make(map[string]bool, len(alreadyProcessed))
+	for h, ok := range alreadyProcessed {
+		received[h] = ok
+	}
+	for h, ok := range f.fetcher.EnvelopesSeen(batch) {
+		received[h] = received[h] || ok
+	}
+
+	toFetch := make([]string, 0, len(batch))
+	f.mu.Lock()
+	for _, h := range batch {
+		if received[h] {
+			delete(f.pending, h)
+		} else {
+			toFetch = append(toFetch, h)
+		}
+	}
+	f.mu.Unlock()
 	if len(toFetch) == 0 {
 		return
 	}
@@ -198,6 +207,7 @@ func (f *missingDepsFetcher) fetchBatch(ctx context.Context, batch []string) {
 	cancel()
 	f.logger.Debug("fetched missing dependencies from storenode",
 		zap.Int("batch", len(batch)),
+		zap.Int("skippedReceived", len(batch)-len(toFetch)),
 		zap.Strings("hashes", toFetch),
 		zap.Duration("duration", time.Since(fetchStart)),
 		zap.Error(err),
@@ -280,6 +290,20 @@ func (f *missingDepsFetcher) pendingCount() int {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return len(f.pending)
+}
+
+// withoutHashes returns the hashes not in exclude, keeping their order.
+func withoutHashes(hashes []string, exclude map[string]bool) []string {
+	if len(exclude) == 0 {
+		return hashes
+	}
+	kept := make([]string, 0, len(hashes))
+	for _, h := range hashes {
+		if !exclude[h] {
+			kept = append(kept, h)
+		}
+	}
+	return kept
 }
 
 func sleepCtx(ctx context.Context, d time.Duration) bool {

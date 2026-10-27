@@ -18,6 +18,7 @@ import (
 type fakeMissingDependencyFetcher struct {
 	mu        sync.Mutex
 	processed map[string]bool
+	seen      map[string]bool
 	fetches   [][]string
 	// fetchErrs[i] is returned by the i-th fetch; fetches beyond it succeed.
 	fetchErrs []error
@@ -35,6 +36,27 @@ func (f *fakeMissingDependencyFetcher) AlreadyProcessed(hashes []string) (map[st
 		}
 	}
 	return hits, nil
+}
+
+func (f *fakeMissingDependencyFetcher) EnvelopesSeen(hashes []string) map[string]bool {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	hits := make(map[string]bool)
+	for _, h := range hashes {
+		if f.seen[h] {
+			hits[h] = true
+		}
+	}
+	return hits
+}
+
+func (f *fakeMissingDependencyFetcher) markSeen(h string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.seen == nil {
+		f.seen = make(map[string]bool)
+	}
+	f.seen[h] = true
 }
 
 func (f *fakeMissingDependencyFetcher) FetchMessagesByHashes(_ context.Context, hashes []string) error {
@@ -164,6 +186,50 @@ func TestMissingDepsFetcher_SkipsAlreadyProcessed(t *testing.T) {
 	m, clock := newTestMissingDepsFetcher(f)
 
 	m.enqueue([]string{"0x01"})
+	clock.advance(missingDepsBatchDelay)
+	step(t, m)
+
+	require.Empty(t, f.fetches)
+	require.Zero(t, m.pendingCount())
+}
+
+func TestMissingDepsFetcher_SkipsSeenOnEnqueue(t *testing.T) {
+	f := &fakeMissingDependencyFetcher{}
+	f.markSeen("0x01")
+	m, clock := newTestMissingDepsFetcher(f)
+
+	queued, _ := m.enqueue([]string{"0x01", "0x02"})
+	require.Equal(t, 1, queued)
+	clock.advance(missingDepsBatchDelay)
+	step(t, m)
+
+	require.Equal(t, [][]string{{"0x02"}}, f.fetches)
+	// Seen hashes were never requested from the store, so they are not blocked.
+	require.Equal(t, []string{"0x01"}, m.requested.claim([]string{"0x01"}))
+}
+
+func TestMissingDepsFetcher_DropsHashesSeenWhileQueued(t *testing.T) {
+	f := &fakeMissingDependencyFetcher{}
+	m, clock := newTestMissingDepsFetcher(f)
+
+	m.enqueue([]string{"0x01", "0x02"})
+	// 0x01 arrives (e.g. through history sync) while waiting for the batch,
+	// then fails processing so it is never marked as processed.
+	f.markSeen("0x01")
+	clock.advance(missingDepsBatchDelay)
+	step(t, m)
+
+	require.Equal(t, [][]string{{"0x02"}}, f.fetches)
+	require.Zero(t, m.pendingCount())
+}
+
+func TestMissingDepsFetcher_NoQueryWhenAllSeen(t *testing.T) {
+	f := &fakeMissingDependencyFetcher{}
+	m, clock := newTestMissingDepsFetcher(f)
+
+	m.enqueue([]string{"0x01", "0x02"})
+	f.markSeen("0x01")
+	f.markSeen("0x02")
 	clock.advance(missingDepsBatchDelay)
 	step(t, m)
 
