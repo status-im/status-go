@@ -1704,8 +1704,8 @@ func (w *Waku) FetchMessagesByHashes(ctx context.Context, messageHashes []string
 		return ErrNoStorenodesReachable
 	}
 
-	return storeClient.FetchByHashes(ctx, func(storenode peer.AddrInfo) error {
-		return w.fetchMessagesByHashesFrom(ctx, storenode, parsedHashes)
+	return storeClient.FetchByHashes(ctx, func(nodeCtx context.Context, storenode peer.AddrInfo) error {
+		return w.fetchMessagesByHashesFrom(nodeCtx, storenode, parsedHashes)
 	})
 }
 

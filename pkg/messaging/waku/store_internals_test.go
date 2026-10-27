@@ -231,7 +231,7 @@ func TestStoreClientFetchByHashesFailsOverToNextNode(t *testing.T) {
 	sc := newClient(&fakeRequestor{respond: emptyResponse}, []peer.AddrInfo{{ID: "n1"}, {ID: "n2"}})
 
 	var tried []peer.ID
-	err := sc.FetchByHashes(context.Background(), func(node peer.AddrInfo) error {
+	err := sc.FetchByHashes(context.Background(), func(_ context.Context, node peer.AddrInfo) error {
 		tried = append(tried, node.ID)
 		if len(tried) == 1 {
 			return errors.New("EOF")
@@ -251,7 +251,7 @@ func TestStoreClientFetchByHashesBoundedAttempts(t *testing.T) {
 
 	attempts := 0
 	fetchErr := errors.New("down")
-	err := sc.FetchByHashes(context.Background(), func(peer.AddrInfo) error {
+	err := sc.FetchByHashes(context.Background(), func(context.Context, peer.AddrInfo) error {
 		attempts++
 		return fetchErr
 	})
@@ -264,7 +264,7 @@ func TestStoreClientFetchByHashesStopsOnCancelledContext(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	attempts := 0
-	err := sc.FetchByHashes(ctx, func(peer.AddrInfo) error {
+	err := sc.FetchByHashes(ctx, func(context.Context, peer.AddrInfo) error {
 		attempts++
 		cancel()
 		return context.Canceled
@@ -276,9 +276,45 @@ func TestStoreClientFetchByHashesStopsOnCancelledContext(t *testing.T) {
 func TestStoreClientFetchByHashesNoStorenodes(t *testing.T) {
 	sc := newClient(&fakeRequestor{respond: emptyResponse}, nil)
 
-	err := sc.FetchByHashes(context.Background(), func(peer.AddrInfo) error {
+	err := sc.FetchByHashes(context.Background(), func(context.Context, peer.AddrInfo) error {
 		t.Fatal("fetch must not be called without storenodes")
 		return nil
 	})
 	require.ErrorIs(t, err, ErrNoStorenodesReachable)
+}
+
+func TestStoreClientFetchByHashesTimeoutDoesNotFailOver(t *testing.T) {
+	sc := newClient(&fakeRequestor{respond: emptyResponse}, []peer.AddrInfo{{ID: "n1"}, {ID: "n2"}})
+	sc.fetchByHashNodeTimeout = 10 * time.Millisecond
+
+	var tried []peer.ID
+	err := sc.FetchByHashes(context.Background(), func(ctx context.Context, node peer.AddrInfo) error {
+		tried = append(tried, node.ID)
+		<-ctx.Done()
+		return ctx.Err()
+	})
+	require.ErrorIs(t, err, ErrStorenodeTimeout)
+	require.ErrorIs(t, err, context.DeadlineExceeded)
+	require.Len(t, tried, 1) // the timed-out node is not failed over within this request
+
+	// The timed-out node is backed off, so the next fetch prefers another one.
+	require.NotEqual(t, tried[0], sc.selector.candidates()[0].ID)
+}
+
+func TestStoreClientFetchByHashesParentDeadlineDoesNotBackOff(t *testing.T) {
+	sc := newClient(&fakeRequestor{respond: emptyResponse}, []peer.AddrInfo{{ID: "n1"}, {ID: "n2"}})
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
+	defer cancel()
+
+	var tried []peer.ID
+	err := sc.FetchByHashes(ctx, func(nodeCtx context.Context, node peer.AddrInfo) error {
+		tried = append(tried, node.ID)
+		<-nodeCtx.Done()
+		return nodeCtx.Err()
+	})
+	require.Error(t, err)
+	require.NotErrorIs(t, err, ErrStorenodeTimeout)
+	require.Len(t, tried, 1)
+	// The caller's own deadline is not the node's fault.
+	require.Equal(t, tried[0], sc.selector.candidates()[0].ID)
 }
