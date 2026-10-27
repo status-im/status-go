@@ -7,7 +7,10 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
+	"github.com/status-im/status-go/internal/crypto"
+	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/pkg/messaging/layers/reliability"
+	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
 )
 
 type sdsWrapperStub struct {
@@ -90,4 +93,49 @@ func TestWrapPayloadForPublicSDS_Success(t *testing.T) {
 	require.Equal(t, wantedWrapped, wrapped)
 	require.Equal(t, wantedMessageID, messageID)
 	require.True(t, stub.called)
+}
+
+func TestWrapPublicParamsForSDS_SkipSDS(t *testing.T) {
+	payload := []byte("payload")
+	stub := &sdsWrapperStub{wrappedPayload: []byte("wrapped-payload")}
+
+	wrapped, messageID, err := wrapPublicParamsForSDS(zap.NewNop(), stub, messagingtypes.SendPublicParams{
+		Payload:     payload,
+		CommunityID: "community-id",
+		SkipSDS:     true,
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, payload, wrapped)
+	require.Nil(t, messageID)
+	require.False(t, stub.called)
+}
+
+func TestWrapPublicParamsForSDS_WrapsCommunityPayload(t *testing.T) {
+	stub := &sdsWrapperStub{wrappedPayload: []byte("wrapped-payload"), messageID: []byte{0x01}}
+
+	wrapped, messageID, err := wrapPublicParamsForSDS(zap.NewNop(), stub, messagingtypes.SendPublicParams{
+		Payload:     []byte("payload"),
+		CommunityID: "community-id",
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, stub.wrappedPayload, wrapped)
+	require.Equal(t, stub.messageID, messageID)
+	require.Equal(t, reliability.BuildChannelID("community-id"), stub.wantChannelID)
+}
+
+func TestWrapPublicParamsForSDS_DerivesCommunityIDFromPublicKey(t *testing.T) {
+	key, err := crypto.GenerateKey()
+	require.NoError(t, err)
+	stub := &sdsWrapperStub{wrappedPayload: []byte("wrapped-payload")}
+
+	_, _, err = wrapPublicParamsForSDS(zap.NewNop(), stub, messagingtypes.SendPublicParams{
+		Payload:            []byte("payload"),
+		CommunityPublicKey: &key.PublicKey,
+	})
+
+	require.NoError(t, err)
+	communityID := cryptotypes.EncodeHex(crypto.CompressPubkey(&key.PublicKey))
+	require.Equal(t, reliability.BuildChannelID(communityID), stub.wantChannelID)
 }
