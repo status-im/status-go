@@ -68,6 +68,10 @@ proc runDeliveryBindingsTask(taskName: string) =
     # Until logos-storage/nim-leopard#29: CMake picks MSVC from vcvars.
     putEnv("CC", "gcc")
     putEnv("CXX", "g++")
+    putEnv("CMAKE_GENERATOR", "MSYS Makefiles")
+    # Portable like logos-delivery's config.nims: no -march=native, SSSE3 baseline.
+    params.add " -d:\"LeopardCmakeFlags=-DCMAKE_BUILD_TYPE=Release" &
+      " -DCOMPILER_SUPPORTS_MARCH_NATIVE=FALSE -DCMAKE_CXX_FLAGS=-mssse3\""
     # Static libgomp needs dlfcn-win32's -ldl after it.
     params.add " -d:LeopardExtraLinkerFlags=-Wl,--push-state,-Bstatic,-lgomp,-ldl,--pop-state"
   putEnv("NIM_PARAMS", params)
