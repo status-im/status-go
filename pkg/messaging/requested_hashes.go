@@ -26,8 +26,9 @@ type requestedHashes struct {
 	now     func() time.Time
 	entries map[string]time.Time
 	// order holds entries in insertion order. Since the TTL is uniform this is
-	// also expiry order. It may contain stale items for re-claimed hashes;
-	// those are detected by comparing against entries.
+	// also expiry order. It may contain stale items for re-claimed or released
+	// hashes; those are detected by comparing against entries and compacted
+	// away once they outnumber live entries.
 	order []requestedHashEntry
 }
 
@@ -85,6 +86,32 @@ func (r *requestedHashes) prune(now time.Time) {
 	if i > 0 {
 		r.order = append(r.order[:0:0], r.order[i:]...)
 	}
+
+	// Stale records behind a live head are not reached by the loop above, e.g.
+	// when overflowing callbacks repeatedly claim and release hashes. Compact
+	// once they dominate so order stays bounded by about twice maxSize.
+	if len(r.order) > r.maxSize && len(r.order) > 2*len(r.entries) {
+		r.compact()
+	}
+}
+
+// compact drops stale records from order, keeping one record per live entry.
+// Caller must hold r.mu.
+func (r *requestedHashes) compact() {
+	kept := make([]requestedHashEntry, 0, len(r.entries))
+	seen := make(map[string]struct{}, len(r.entries))
+	for _, e := range r.order {
+		current, ok := r.entries[e.hash]
+		if !ok || !current.Equal(e.requestedAt) {
+			continue
+		}
+		if _, dup := seen[e.hash]; dup {
+			continue
+		}
+		seen[e.hash] = struct{}{}
+		kept = append(kept, e)
+	}
+	r.order = kept
 }
 
 // release forgets hashes so they can be claimed again right away.
