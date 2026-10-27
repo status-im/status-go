@@ -39,7 +39,8 @@ func TestStoreResponseConversion(t *testing.T) {
 	var resp kcommon.StoreQueryResponse
 	require.NoError(t, json.Unmarshal([]byte(`{
 		"messages": [{"messageHash": "0x01", "pubsubTopic": "/waku/2/rs/16/32",
-			"message": {"payload": "aGk=", "contentTopic": "/a/1/b/proto", "timestamp": 7}}],
+			"message": {"payload": "aGk=", "contentTopic": "/a/1/b/proto", "timestamp": 7}},
+			{"messageHash": "0x03", "pubsubTopic": "/waku/2/rs/16/32"}],
 		"paginationCursor": "0x02"
 	}`), &resp))
 

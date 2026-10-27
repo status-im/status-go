@@ -180,13 +180,17 @@ func fromKernelStoreResponse(r *kcommon.StoreQueryResponse) ([]*storepb.WakuMess
 	if r.Messages != nil {
 		messages = make([]*storepb.WakuMessageKeyValue, 0, len(*r.Messages))
 		for _, m := range *r.Messages {
+			if m.WakuMessage == nil {
+				continue
+			}
 			hash, err := hexutil.Decode(string(m.MessageHash))
 			if err != nil {
 				return nil, nil, fmt.Errorf("delivery: store query: message hash: %w", err)
 			}
-			kv := &storepb.WakuMessageKeyValue{MessageHash: hash, PubsubTopic: proto.String(m.PubsubTopic)}
-			if m.WakuMessage != nil {
-				kv.Message = &wakupb.WakuMessage{
+			messages = append(messages, &storepb.WakuMessageKeyValue{
+				MessageHash: hash,
+				PubsubTopic: proto.String(m.PubsubTopic),
+				Message: &wakupb.WakuMessage{
 					Payload:        m.WakuMessage.Payload,
 					ContentTopic:   m.WakuMessage.ContentTopic,
 					Version:        m.WakuMessage.Version,
@@ -194,9 +198,8 @@ func fromKernelStoreResponse(r *kcommon.StoreQueryResponse) ([]*storepb.WakuMess
 					Meta:           m.WakuMessage.Meta,
 					Ephemeral:      m.WakuMessage.Ephemeral,
 					RateLimitProof: m.WakuMessage.RateLimitProof,
-				}
-			}
-			messages = append(messages, kv)
+				},
+			})
 		}
 	}
 	var cursor []byte
