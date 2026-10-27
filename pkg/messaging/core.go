@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"sync"
-	"time"
 
 	"github.com/golang/protobuf/proto"
 	"github.com/pkg/errors"
@@ -48,6 +47,8 @@ type Core struct {
 	connectionState connection.State
 
 	wakumetrics *wakumetrics.Client
+
+	missingDeps *missingDepsFetcher
 }
 
 type sdsEnvelopeHashesTracker interface {
@@ -166,6 +167,11 @@ func newCore(waku wakutypes.Waku, params CoreParams, config *config) (*Core, err
 		cancel:     cancel,
 		quit:       make(chan struct{}),
 	}
+	core.missingDeps = newMissingDepsFetcher(
+		config.logger,
+		stack.Transport,
+		newRequestedHashes(requestedHashesTTL, requestedHashesMaxSize),
+	)
 
 	stack.Reliability.SetRetrievalHintProvider(core.resolveSDSRetrievalHint)
 	stack.Reliability.SetMessageSentHandler(core.handleSDSMessageSent)
@@ -287,6 +293,13 @@ func (c *Core) start() error {
 		return err
 	}
 
+	c.wg.Add(1)
+	go func() {
+		defer panics.LogOnPanic()
+		defer c.wg.Done()
+		c.missingDeps.run(c.ctx)
+	}()
+
 	return nil
 }
 
@@ -320,96 +333,15 @@ func (c *Core) fetchMissingDependenciesAsync(messageID string, missingDeps []str
 		return nil
 	}
 
-	select {
-	case <-c.ctx.Done():
-		return nil
-	default:
-	}
-
-	c.wg.Add(1)
-	go func() {
-		defer panics.LogOnPanic()
-		defer c.wg.Done()
-
-		logger := c.logger.With(
+	_, dropped := c.missingDeps.enqueue(missingDeps)
+	if dropped > 0 {
+		c.logger.Warn("missing dependencies fetch queue full, dropping hashes",
 			zap.String("messageID", messageID),
 			zap.String("channelID", channelID),
+			zap.Int("dropped", dropped),
 		)
-		fetchMissingDependencies(c.ctx, logger, c.stack.Transport, missingDeps, missingDependencyFetchRetryDelays)
-	}()
-
-	return nil
-}
-
-const missingDependencyFetchTimeout = 30 * time.Second
-
-// missingDependencyFetchRetryDelays are the waits before each retry of a failed
-// by-hash fetch. Each attempt already fails over across storenodes, so these
-// cover the case where every storenode failed (e.g. dropped connections, EOF).
-// SDS only re-detects a missing dependency when a later message references it
-// again, so a fetch that is not retried is usually lost for good.
-var missingDependencyFetchRetryDelays = []time.Duration{5 * time.Second, 15 * time.Second, 45 * time.Second}
-
-type missingDependencyFetcher interface {
-	AlreadyProcessed(messageHashes []string) (map[string]bool, error)
-	FetchMessagesByHashes(ctx context.Context, messageHashes []string) error
-}
-
-// fetchMissingDependencies fetches the missing dependencies from the store,
-// retrying after each of retryDelays if the fetch fails. Before every attempt
-// it drops the hashes that have been received in the meantime.
-func fetchMissingDependencies(ctx context.Context, logger *zap.Logger, fetcher missingDependencyFetcher, missingDeps []string, retryDelays []time.Duration) {
-	for attempt := 0; ; attempt++ {
-		alreadyProcessed, err := fetcher.AlreadyProcessed(missingDeps)
-		if err != nil {
-			logger.Debug("failed to check missing dependencies cache",
-				zap.Strings("missingDeps", missingDeps),
-				zap.Error(err),
-			)
-			return
-		}
-
-		missingDepsToFetch := make([]string, 0, len(missingDeps))
-		for _, missingDep := range missingDeps {
-			if !alreadyProcessed[missingDep] {
-				missingDepsToFetch = append(missingDepsToFetch, missingDep)
-			}
-		}
-		if len(missingDepsToFetch) == 0 {
-			return
-		}
-
-		fetchCtx, cancel := context.WithTimeout(ctx, missingDependencyFetchTimeout)
-		err = fetcher.FetchMessagesByHashes(fetchCtx, missingDepsToFetch)
-		cancel()
-		if err == nil {
-			return
-		}
-
-		if ctx.Err() != nil || attempt >= len(retryDelays) {
-			logger.Warn("failed to fetch missing dependencies from storenode",
-				zap.Strings("missingDeps", missingDepsToFetch),
-				zap.Int("attempts", attempt+1),
-				zap.Error(err),
-			)
-			return
-		}
-
-		logger.Debug("failed to fetch missing dependencies from storenode, will retry",
-			zap.Strings("missingDeps", missingDepsToFetch),
-			zap.Int("attempt", attempt+1),
-			zap.Duration("retryIn", retryDelays[attempt]),
-			zap.Error(err),
-		)
-
-		timer := time.NewTimer(retryDelays[attempt])
-		select {
-		case <-ctx.Done():
-			timer.Stop()
-			return
-		case <-timer.C:
-		}
 	}
+	return nil
 }
 
 type wakuParams struct {
