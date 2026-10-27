@@ -346,6 +346,27 @@ func TestMissingDepsFetcher_DropsOverCapacity(t *testing.T) {
 	require.Equal(t, 1, queued)
 }
 
+func TestMissingDepsFetcher_RepeatedOverflowKeepsRequestedCacheBounded(t *testing.T) {
+	f := &fakeMissingDependencyFetcher{}
+	m, _ := newTestMissingDepsFetcher(f)
+	m.maxQueue = 2
+	maxSize := m.requested.maxSize
+
+	queued, _ := m.enqueue([]string{"0xaa", "0xbb"})
+	require.Equal(t, 2, queued)
+
+	// The queue is full, so every callback claims hashes and releases them on
+	// drop, leaving stale records behind the live queued ones.
+	for i := 0; i < 50*maxSize; i++ {
+		_, dropped := m.enqueue([]string{fmt.Sprintf("0xdrop%x", i)})
+		require.Equal(t, 1, dropped)
+		require.LessOrEqual(t, len(m.requested.order), 2*maxSize)
+	}
+
+	require.Equal(t, 2, m.requested.len())
+	require.Empty(t, m.requested.claim([]string{"0xaa", "0xbb"}))
+}
+
 func TestMissingDepsFetcher_CancelledFetchKeepsPending(t *testing.T) {
 	f := &fakeMissingDependencyFetcher{fetchErrs: []error{context.Canceled}}
 	m, clock := newTestMissingDepsFetcher(f)
@@ -464,4 +485,22 @@ func TestRequestedHashes_ReleaseAndExpireIn(t *testing.T) {
 	require.Empty(t, r.claim([]string{"0x02"}))
 	now = now.Add(time.Minute)
 	require.Equal(t, []string{"0x02"}, r.claim([]string{"0x02"}))
+}
+
+func TestRequestedHashes_CompactsStaleRecordsBehindLiveHead(t *testing.T) {
+	now := time.Unix(0, 0)
+	r := newRequestedHashes(time.Hour, 10)
+	r.now = func() time.Time { return now }
+
+	r.claim([]string{"0xlive"})
+	for i := 0; i < 1000; i++ {
+		h := fmt.Sprintf("0xdrop%x", i)
+		require.Equal(t, []string{h}, r.claim([]string{h}))
+		r.release([]string{h})
+		r.expireIn([]string{"0xlive"}, time.Hour)
+		require.LessOrEqual(t, len(r.order), 2*r.maxSize)
+	}
+
+	require.Equal(t, 1, r.len())
+	require.Empty(t, r.claim([]string{"0xlive"}))
 }
