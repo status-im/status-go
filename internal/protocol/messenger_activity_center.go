@@ -41,6 +41,8 @@ func (m *Messenger) ActivityCenterNotifications(request ActivityCenterNotificati
 		return nil, err
 	}
 
+	m.populateActivityCenterThreadNames(notifications)
+
 	if m.httpServer != nil {
 		for _, notification := range notifications {
 			if notification.Message != nil {
@@ -153,6 +155,7 @@ func (m *Messenger) MarkActivityCenterNotificationsRead(ctx context.Context, ids
 	if err != nil {
 		return nil, err
 	}
+	m.populateActivityCenterThreadNames(notifications)
 
 	response := &MessengerResponse{}
 	repliesAndMentions := make(map[string][]string)
@@ -210,6 +213,7 @@ func (m *Messenger) MarkActivityCenterNotificationsUnread(ctx context.Context, i
 	if err != nil {
 		return nil, err
 	}
+	m.populateActivityCenterThreadNames(notifications)
 
 	response := &MessengerResponse{}
 	response.AddActivityCenterNotifications(notifications)
@@ -296,6 +300,7 @@ func (m *Messenger) addActivityCenterNotification(response *MessengerResponse, n
 		m.logger.Error("failed to obtain activity center state", zap.Error(err))
 		return err
 	}
+	m.populateActivityCenterThreadNames([]*ActivityCenterNotification{notification})
 	response.AddActivityCenterNotification(notification)
 	response.SetActivityCenterState(state)
 
@@ -633,6 +638,7 @@ func (m *Messenger) ActivityCenterNotification(id types.HexBytes) (*ActivityCent
 	if err != nil {
 		return nil, err
 	}
+	m.populateActivityCenterThreadNames([]*ActivityCenterNotification{notification})
 
 	if notification.Message != nil {
 		image := notification.Message.GetImage()

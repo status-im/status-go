@@ -117,6 +117,9 @@ type ActivityCenterNotification struct {
 	//The value should represent the time when the update occurred.
 	UpdatedAt     uint64            `json:"updatedAt"`
 	AlbumMessages []*common.Message `json:"albumMessages"`
+
+	// ThreadName is resolved from thread metadata when building notification responses.
+	ThreadName string `json:"threadName,omitempty"`
 }
 
 func (n *ActivityCenterNotification) IncrementUpdatedAt(timesource common.TimeSource) {
