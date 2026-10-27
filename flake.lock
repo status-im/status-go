@@ -67,17 +67,17 @@
     "nim-token-lists": {
       "flake": false,
       "locked": {
-        "lastModified": 1792501627,
-        "narHash": "sha256-b+2ypfQ81Ut4be8L/Ft2/v7mj9nJ5LFHHPha1yqyQUk=",
+        "lastModified": 1793092735,
+        "narHash": "sha256-xCIOZXZEav0ue482SwyYkc/MORPLt5cNU3O5hOBDzGA=",
         "ref": "refs/heads/main",
-        "rev": "5d72b476563f38a504af297102e5d193af79734a",
-        "revCount": 34,
+        "rev": "9be9a427df5b0e53a1396a025f8bc9e4c2ab8ded",
+        "revCount": 36,
         "submodules": true,
         "type": "git",
         "url": "https://github.com/status-im/nim-token-lists"
       },
       "original": {
-        "rev": "5d72b476563f38a504af297102e5d193af79734a",
+        "rev": "9be9a427df5b0e53a1396a025f8bc9e4c2ab8ded",
         "submodules": true,
         "type": "git",
         "url": "https://github.com/status-im/nim-token-lists"
