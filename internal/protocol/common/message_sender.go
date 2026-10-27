@@ -31,6 +31,13 @@ func encodeCommunityID(communityID []byte) string {
 	return cryptotypes.EncodeHex(communityID)
 }
 
+// skipSDS reports whether a message type must stay out of the SDS causal
+// history. Community descriptions are superseded by clock, so recovering old
+// ones is useless and makes receivers walk the whole chain via store queries.
+func skipSDS(messageType protobuf.ApplicationMetadataMessage_Type) bool {
+	return messageType == protobuf.ApplicationMetadataMessage_COMMUNITY_DESCRIPTION
+}
+
 type MessageSender struct {
 	identity  *ecdsa.PrivateKey
 	messaging *messaging.API
@@ -199,6 +206,7 @@ func (s *MessageSender) SendPublic(
 		Ephemeral:           rawMessage.Ephemeral,
 		Priority:            rawMessage.Priority,
 		HashRatchet:         hashRatchetParams,
+		SkipSDS:             skipSDS(rawMessage.MessageType),
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to send public message")
@@ -399,6 +407,7 @@ func (s *MessageSender) SendCommunity(
 			ContentTopic: rawMessage.ContentTopic,
 			CommunityID:  encodeCommunityID(rawMessage.CommunityID),
 			HashRatchet:  hashRatchetParams,
+			SkipSDS:      skipSDS(rawMessage.MessageType),
 		})
 
 	} else {
@@ -416,6 +425,7 @@ func (s *MessageSender) SendCommunity(
 			CommunityID:        encodeCommunityID(rawMessage.CommunityID),
 			HashRatchet:        hashRatchetParams,
 			CommunityPublicKey: pubkey,
+			SkipSDS:            skipSDS(rawMessage.MessageType),
 		})
 	}
 
