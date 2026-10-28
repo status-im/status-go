@@ -25,7 +25,7 @@ func (p *countingTokenListProvider) GetTokenContractAddresses(chainID uint64) ([
 
 func TestBuildChainFetchesReadsTokenListOncePerChain(t *testing.T) {
 	provider := &countingTokenListProvider{calls: make(map[uint64]int)}
-	c := NewController(DefaultControllerConfig(), NewStorageMemory(), nil, nil, nil, nil, provider, nil, nil, nil, nil, zap.NewNop())
+	c := NewController(DefaultControllerConfig(), NewStorageMemory(), nil, nil, nil, nil, provider, nil, nil, nil, nil, nil, zap.NewNop())
 
 	plan := newReadPlan()
 	for _, chainID := range []uint64{1, 10} {
@@ -70,7 +70,7 @@ func BenchmarkBuildChainFetches(b *testing.B) {
 	for i := range provider.list {
 		provider.list[i] = common.Address{0x70, 18: byte(i >> 8), 19: byte(i)}
 	}
-	c := NewController(DefaultControllerConfig(), NewStorageMemory(), nil, nil, nil, nil, provider, nil, nil, nil, nil, zap.NewNop())
+	c := NewController(DefaultControllerConfig(), NewStorageMemory(), nil, nil, nil, nil, provider, nil, nil, nil, nil, nil, zap.NewNop())
 	plan := func() *readPlan {
 		plan := newReadPlan()
 		for i := 0; i < 2; i++ {
@@ -115,7 +115,7 @@ func TestHandleERC20Result_ZeroAndFailedAcrossFetches(t *testing.T) {
 	fails := common.Address{0x70, 19: 2}
 	ctx := context.Background()
 	config := erc20Config(account, dropsToZero, fails)
-	c := NewController(DefaultControllerConfig(), NewStorageMemory(), nil, nil, nil, nil, nil, nil, nil, noopLastBlockManager{}, nil, zap.NewNop())
+	c := NewController(DefaultControllerConfig(), NewStorageMemory(), nil, nil, nil, nil, nil, nil, nil, nil, noopLastBlockManager{}, nil, zap.NewNop())
 
 	c.handleFetchResult(ctx, 1, erc20FetchResult(1, account, map[common.Address]*big.Int{dropsToZero: big.NewInt(5), fails: big.NewInt(7)}), &chainFetch{config: config})
 	require.Equal(t, int64(5), storedERC20Balances(t, c, account).Balances[dropsToZero].Int64())
@@ -130,7 +130,7 @@ func TestHandleERC20Result_ZeroAndFailedAcrossFetches(t *testing.T) {
 func TestHandleERC20Result_FailedWithoutKnownBalanceIsUnknown(t *testing.T) {
 	account := common.Address{19: 1}
 	fails := common.Address{0x70, 19: 2}
-	c := NewController(DefaultControllerConfig(), NewStorageMemory(), nil, nil, nil, nil, nil, nil, nil, noopLastBlockManager{}, nil, zap.NewNop())
+	c := NewController(DefaultControllerConfig(), NewStorageMemory(), nil, nil, nil, nil, nil, nil, nil, nil, noopLastBlockManager{}, nil, zap.NewNop())
 
 	c.handleFetchResult(context.Background(), 1, erc20FetchResult(1, account, map[common.Address]*big.Int{}, fails), &chainFetch{config: erc20Config(account, fails)})
 	stored := storedERC20Balances(t, c, account)
@@ -162,7 +162,7 @@ func TestHandleERC20Result_OverlappingFetchesKeepEachOthersAnswers(t *testing.T)
 	newerToken := common.Address{0x70, 19: 2}
 	ctx := context.Background()
 	storage := &interleavingStorage{Storage: NewStorageMemory()}
-	c := NewController(DefaultControllerConfig(), storage, nil, nil, nil, nil, nil, nil, nil, noopLastBlockManager{}, nil, zap.NewNop())
+	c := NewController(DefaultControllerConfig(), storage, nil, nil, nil, nil, nil, nil, nil, nil, noopLastBlockManager{}, nil, zap.NewNop())
 	finishedCh, unsub := pubsub.Subscribe[EventBalanceFetchFinished](c.GetPublisher(), 10)
 	defer unsub()
 

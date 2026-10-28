@@ -40,6 +40,7 @@ func (c *Controller) handleERC20Result(ctx context.Context, chainID uint64, aske
 		c.sendEventBalanceFetchError(key, resultType, err)
 		return false
 	}
+	c.forgetDetected(key, asked, result.Results, result.Failed)
 	c.logger.Debug("finished updating ERC20 balance", zap.String("address", logutils.TruncateWithDot(key.Account.String())), zap.Uint64("chainID", key.ChainID), zap.Bool("balanceChanged", balanceChanged))
 	c.sendEventBalanceFetchFinished(key, resultType, balanceChanged, oldState, state)
 	return true

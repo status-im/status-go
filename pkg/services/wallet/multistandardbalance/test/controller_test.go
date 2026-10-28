@@ -34,7 +34,7 @@ import (
 	"go.uber.org/zap"
 )
 
-func TestController_DebounceTiming(t *testing.T) {
+func TestController_RequestedRefreshSkipsTheDebounce(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
@@ -126,6 +126,7 @@ func TestController_DebounceTiming(t *testing.T) {
 			tokenListProvider,
 			collectibleListProvider,
 			heldTokensProvider,
+			&fakeChangeSource{},
 			lastBlockManager,
 			nil, // walletFeed
 			logger,
@@ -142,22 +143,16 @@ func TestController_DebounceTiming(t *testing.T) {
 		}, 2*debounceTime, 10*time.Millisecond, "Expected 1 fetch call after Start")
 		resetFetchCalls()
 
-		// Test debounce behavior - multiple rapid calls should only result in one fetch
+		// A requested refresh reads at once, without the debounce
 		controller.TriggerFullFetch()
 		controller.TriggerFullFetch()
 		controller.TriggerFullFetch()
-
-		// Wait for debounce time
-		time.Sleep(2 * debounceTime)
-		require.Equal(t, 1, getFetchCalls(), "Expected 1 fetch call after multiple consecutive TriggerFullFetch calls")
+		synctest.Wait()
+		require.Equal(t, 3, getFetchCalls(), "Expected a fetch call for each TriggerFullFetch call")
 		resetFetchCalls()
 
-		// Test that another call after debounce time works
-		controller.TriggerFullFetch()
-		// Wait for debounce time
 		time.Sleep(2 * debounceTime)
-		require.Equal(t, 1, getFetchCalls(), "Expected 1 fetch call after multiple consecutive TriggerFullFetch calls")
-		resetFetchCalls()
+		require.Zero(t, getFetchCalls(), "Expected no fetch call left for the debounce")
 	})
 }
 
@@ -254,6 +249,7 @@ func TestController_FetchPeriod(t *testing.T) {
 			tokenListProvider,
 			collectibleListProvider,
 			heldTokensProvider,
+			&fakeChangeSource{},
 			lastBlockManager,
 			nil, // walletFeed
 			logger,
@@ -285,9 +281,10 @@ func TestController_FetchPeriod(t *testing.T) {
 		}, 100*time.Millisecond, 10*time.Millisecond, "Expected 1 fetch call after TriggerFullFetch()")
 		resetFetchCalls()
 
-		// The periodic ticker continues independently, so after ~100ms more (to complete the period from last periodic fetch),
-		// another periodic fetch should happen
+		// The next periodic fetch counts from the requested one
 		time.Sleep(200 * time.Millisecond)
+		require.Zero(t, getFetchCalls(), "Expected no periodic fetch right after the requested one")
+		time.Sleep(config.FetchPeriod - 200*time.Millisecond)
 		require.Eventually(t, func() bool {
 			return getFetchCalls() >= 1
 		}, 100*time.Millisecond, 10*time.Millisecond, "Expected at least 1 fetch call from periodic ticker")
@@ -560,6 +557,7 @@ func TestController_BasicFlow(t *testing.T) {
 			tokenListProvider,
 			collectibleListProvider,
 			heldTokensProvider,
+			&fakeChangeSource{},
 			lastBlockManager,
 			nil, // walletFeed
 			logger,
@@ -891,7 +889,7 @@ func newTestController(
 
 	controller = multistandardbalance.NewController(
 		cfg, storage, balanceFetcher, accountsProvider, accountsPublisher,
-		networksProvider, tokenListProvider, collectibleListProvider, heldTokensProvider,
+		networksProvider, tokenListProvider, collectibleListProvider, heldTokensProvider, &fakeChangeSource{},
 		lastBlockManager, walletFeed, zap.NewNop(),
 	)
 
@@ -1125,6 +1123,7 @@ func TestController_CancelsInFlightFetchWhenStartingNewFetchForSameChain(t *test
 			tokenListProvider,
 			collectibleListProvider,
 			heldTokensProvider,
+			&fakeChangeSource{},
 			lastBlockManager,
 			nil,
 			logger,

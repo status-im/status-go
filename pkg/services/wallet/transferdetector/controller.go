@@ -36,7 +36,9 @@ type NetworksProvider interface {
 }
 
 type LastBlockProvider interface {
-	GetEstimatedLatestBlockNumber(ctx context.Context, chainID uint64) (uint64, error)
+	// GetReadBlocks are the first and the last block balances of chainID were
+	// read at.
+	GetReadBlocks(chainID uint64) (first uint64, last uint64, ok bool)
 }
 
 type FilterProvider interface {
@@ -45,13 +47,11 @@ type FilterProvider interface {
 
 type ControllerConfig struct {
 	FetchDebounceTime time.Duration
-	FetchPeriod       time.Duration
 }
 
 func DefaultControllerConfig() ControllerConfig {
 	return ControllerConfig{
 		FetchDebounceTime: 10 * time.Second,
-		FetchPeriod:       10 * time.Minute,
 	}
 }
 
@@ -94,7 +94,7 @@ func NewController(
 		lastBlockProvider:      lastBlockProvider,
 		publisher:              pubsub.NewPublisher(),
 		fetchDebounceFn:        debounce.New(config.FetchDebounceTime),
-		triggerFetchCh:         make(chan struct{}),
+		triggerFetchCh:         make(chan struct{}, 1),
 		logger:                 logger,
 		lastFetchedBlockNumber: make(map[uint64]uint64),
 	}
@@ -176,19 +176,16 @@ func (c *Controller) startNetworksWatcher(stopCh <-chan struct{}) {
 	}()
 }
 
+// startFetcher runs detection on TriggerFetch; the balance refresh triggers it
+// with every periodic read, so it runs as often as balances are read.
 func (c *Controller) startFetcher(stopCh <-chan struct{}) {
-	ticker := time.NewTicker(c.config.FetchPeriod)
 	go func() {
 		defer panics.LogOnPanic()
-		defer ticker.Stop()
 		for {
 			select {
 			case <-stopCh:
 				return
-			case <-ticker.C:
-				c.run(stopCh)
 			case <-c.triggerFetchCh:
-				ticker.Reset(c.config.FetchPeriod)
 				c.run(stopCh)
 			}
 		}
@@ -276,27 +273,33 @@ func (c *Controller) runNow(stopCh <-chan struct{}) {
 	wg.Wait()
 }
 
+// fetchTransfers looks for transfers in the blocks after the last one it
+// looked at, up to the last block balances were read at: an estimate of the
+// latest block can run ahead of the node and skip blocks for good. With no
+// block looked at yet, it starts at the first block balances were read at,
+// which a full refresh covered. A range it fails to look at is a detection
+// gap, closed by a full refresh of the chain, so it is never looked at again.
 func (c *Controller) fetchTransfers(ctx context.Context, chainID uint64, accounts []common.Address) {
-	latestBlockNumber, err := c.lastBlockProvider.GetEstimatedLatestBlockNumber(ctx, chainID)
-	if err != nil {
-		c.logger.Error("failed to get estimated latest block number", zap.Uint64("chainID", chainID), zap.Error(err))
+	firstReadBlock, lastReadBlock, ok := c.lastBlockProvider.GetReadBlocks(chainID)
+	if !ok {
+		c.logger.Debug("no balances read yet", zap.Uint64("chainID", chainID))
 		return
 	}
 
 	lastFetchedBlockNumber := c.getLastFetchedBlockNumber(chainID)
 	if lastFetchedBlockNumber == 0 {
-		c.logger.Debug("setting initial block for the chain", zap.Uint64("chainID", chainID), zap.Uint64("latestBlockNumber", latestBlockNumber))
-		c.updateLastFetchedBlockNumber(chainID, latestBlockNumber)
-		return
+		c.logger.Debug("setting initial block for the chain", zap.Uint64("chainID", chainID), zap.Uint64("firstReadBlock", firstReadBlock))
+		lastFetchedBlockNumber = firstReadBlock
+		c.updateLastFetchedBlockNumber(chainID, lastFetchedBlockNumber)
 	}
 
-	if lastFetchedBlockNumber >= latestBlockNumber {
-		c.logger.Debug("latest block number is already fetched", zap.Uint64("chainID", chainID), zap.Uint64("latestBlockNumber", latestBlockNumber), zap.Uint64("lastFetchedBlockNumber", lastFetchedBlockNumber))
+	if lastFetchedBlockNumber >= lastReadBlock {
+		c.logger.Debug("latest block number is already fetched", zap.Uint64("chainID", chainID), zap.Uint64("lastReadBlock", lastReadBlock), zap.Uint64("lastFetchedBlockNumber", lastFetchedBlockNumber))
 		return
 	}
 
 	fromBlock := lastFetchedBlockNumber + 1
-	toBlock := latestBlockNumber
+	toBlock := lastReadBlock
 
 	c.sendEventTransferDetectionStarted(chainID, accounts, fromBlock, toBlock)
 	events, err := c.fetcher.FilterTransfers(ctx, chainID, eventfilter.TransferQueryConfig{
@@ -310,6 +313,10 @@ func (c *Controller) fetchTransfers(ctx context.Context, chainID uint64, account
 		},
 		Direction: eventfilter.Both,
 	})
+	if ctx.Err() != nil {
+		return
+	}
+	c.updateLastFetchedBlockNumber(chainID, toBlock)
 	if err != nil {
 		c.logger.Error("failed to filter transfers", zap.Uint64("chainID", chainID), zap.Error(err))
 		c.sendEventTransferDetectionError(chainID, accounts, fromBlock, toBlock, err)
@@ -318,7 +325,6 @@ func (c *Controller) fetchTransfers(ctx context.Context, chainID uint64, account
 
 	c.logger.Debug("filtered transfers", zap.Uint64("chainID", chainID), zap.Int64("fromBlock", int64(fromBlock)), zap.Int64("toBlock", int64(toBlock)), zap.Int("events", len(events)))
 	c.sendEventTransferDetectionFinished(chainID, accounts, fromBlock, toBlock, events)
-	c.updateLastFetchedBlockNumber(chainID, toBlock)
 }
 
 func (c *Controller) getLastFetchedBlockNumber(chainID uint64) uint64 {

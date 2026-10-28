@@ -21,6 +21,7 @@ import (
 	"go.uber.org/zap/zaptest/observer"
 
 	"github.com/status-im/go-wallet-sdk/pkg/balance/multistandardfetcher"
+	"github.com/status-im/go-wallet-sdk/pkg/balance/refresh"
 	tokentypes "github.com/status-im/go-wallet-sdk/pkg/tokens/types"
 
 	"github.com/status-im/status-go/internal/crypto/types"
@@ -68,6 +69,52 @@ type balanceOf struct {
 	token common.Address
 }
 
+// fakeChangeSource records when it is scanned and tells what the test emits
+// while it is watched.
+type fakeChangeSource struct {
+	start time.Time
+
+	mu    sync.Mutex
+	emit  func(refresh.Event)
+	scans []time.Duration
+}
+
+func (s *fakeChangeSource) Watch(emit func(refresh.Event)) (stop func()) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.emit = emit
+	return func() {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		s.emit = nil
+	}
+}
+
+func (s *fakeChangeSource) Scan() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.scans = append(s.scans, time.Since(s.start))
+}
+
+// tell emits ev as the source would, if it is watched.
+func (s *fakeChangeSource) tell(ev refresh.Event) {
+	s.mu.Lock()
+	emit := s.emit
+	s.mu.Unlock()
+	if emit != nil {
+		emit(ev)
+	}
+}
+
+func (s *fakeChangeSource) takeScans() []time.Duration {
+	synctest.Wait()
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	scans := s.scans
+	s.scans = nil
+	return scans
+}
+
 // refreshHarness is a controller over a fake chain: its fetches answer with
 // the balances the test sets, zero for the others, each at a new block. It
 // records every fetch that reads anything.
@@ -76,6 +123,7 @@ type refreshHarness struct {
 	walletFeed *event.Feed
 	accounts   *pubsub.Publisher
 	networks   *pubsub.Publisher
+	source     *fakeChangeSource
 	logs       *observer.ObservedLogs
 	start      time.Time
 
@@ -110,6 +158,7 @@ func newRefreshHarness(t *testing.T) *refreshHarness {
 		networks:   pubsub.NewPublisher(),
 		logs:       logs,
 		start:      time.Now(),
+		source:     &fakeChangeSource{start: time.Now()},
 		wallet:     []types.Address{alice, bob, carol},
 		chains:     []uint64{1, 10, 56},
 		tokens:     []common.Address{usdc, dai},
@@ -152,7 +201,7 @@ func newRefreshHarness(t *testing.T) *refreshHarness {
 	h.controller = multistandardbalance.NewController(
 		multistandardbalance.DefaultControllerConfig(),
 		multistandardbalance.NewStorageMemory(), fetcher, accountsProvider, h.accounts, networksProvider,
-		tokenListProvider, collectibleListProvider, heldTokensProvider, lastBlockManager, h.walletFeed, zap.New(core))
+		tokenListProvider, collectibleListProvider, heldTokensProvider, h.source, lastBlockManager, h.walletFeed, zap.New(core))
 	return h
 }
 
@@ -181,7 +230,9 @@ func (h *refreshHarness) fetch(_ context.Context, chain uint64, config multistan
 		answered := make(map[multistandardbalance.ContractAddress]*big.Int, len(tokens))
 		for _, token := range tokens {
 			balances[account.Hex()] = append(balances[account.Hex()], token)
-			answered[token] = h.balance(account, chain, token)
+			if balance := h.balance(account, chain, token); balance.Sign() != 0 || !config.OmitZeroERC20Balances {
+				answered[token] = balance
+			}
 		}
 		results <- multistandardfetcher.FetchResult{ResultType: multistandardfetcher.ResultTypeERC20, Result: multistandardfetcher.ERC20Result{
 			Account: account, Results: answered, Err: err, AtBlockNumber: block,
@@ -503,7 +554,7 @@ func tokenReads(at time.Duration, token common.Address) []read {
 	return reads
 }
 
-func TestRefresh_RequestedRefreshReadsTheHeldSetSoonAfterAFullRefresh(t *testing.T) {
+func TestRefresh_RequestedRefreshReadsTheHeldSetAtOnceSoonAfterAFullRefresh(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		h := newRefreshHarness(t)
 		h.controller.Start()
@@ -512,9 +563,9 @@ func TestRefresh_RequestedRefreshReadsTheHeldSetSoonAfterAFullRefresh(t *testing
 
 		time.Sleep(30 * time.Second)
 		h.controller.TriggerFullFetch()
-		time.Sleep(15 * time.Second)
+		synctest.Wait()
 
-		requireReads(t, h.heldSet(40*time.Second, nil), h.takeReads())
+		requireReads(t, h.heldSet(30*time.Second, nil), h.takeReads())
 	})
 }
 
@@ -527,9 +578,9 @@ func TestRefresh_RequestedRefreshReadsEverythingLongAfterAFullRefresh(t *testing
 		time.Sleep(11 * time.Minute)
 		h.takeReads()
 		h.controller.TriggerFullFetch()
-		time.Sleep(15 * time.Second)
+		synctest.Wait()
 
-		requireReads(t, h.everything(11*time.Minute+10*time.Second), h.takeReads())
+		requireReads(t, h.everything(11*time.Minute), h.takeReads())
 	})
 }
 
@@ -641,19 +692,26 @@ func TestRefresh_PartialReadsDoNotWarnAboutMissingBalances(t *testing.T) {
 	})
 }
 
-func TestRefresh_StoppedControllerReadsNothing(t *testing.T) {
+func TestRefresh_ResumeReadsWhatWaitedWhenItStopped(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		h := newRefreshHarness(t)
 		h.controller.Start()
 		h.takeReads()
 
 		time.Sleep(30 * time.Second)
-		h.controller.TriggerFullFetch()
+		h.source.tell(refresh.DetectionGap{Chain: 10})
 		time.Sleep(5 * time.Second)
 		h.controller.Stop()
 		time.Sleep(5 * time.Minute)
-
 		require.Empty(t, h.takeReads())
+
+		h.controller.Start()
+		defer h.controller.Stop()
+
+		resumed := 5*time.Minute + 35*time.Second
+		expected := h.heldSet(resumed, nil)
+		expected[1] = h.everything(resumed)[1]
+		requireReads(t, expected, h.takeReads())
 	})
 }
 
@@ -701,5 +759,117 @@ func TestRefresh_BalancesBackOnScreenSoonAfterAReadAreNotReadAgain(t *testing.T)
 		time.Sleep(time.Minute)
 
 		require.Equal(t, []time.Duration{0}, readTimes(h.takeReads()))
+	})
+}
+
+func TestRefresh_DetectedTransferReadsWhatMovedAfterDebounce(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		h := newRefreshHarness(t)
+		h.controller.Start()
+		defer h.controller.Stop()
+		h.takeReads()
+
+		time.Sleep(30 * time.Second)
+		h.source.tell(refresh.TransferDetected{Pair: refresh.Pair{Account: common.Address(alice), Chain: 1}, Contracts: []common.Address{dai}, Native: true})
+		time.Sleep(15 * time.Second)
+
+		requireReads(t, []read{{at: 40 * time.Second, chain: 1, balances: map[string][]common.Address{alice.Hex(): {native, dai}}}}, h.takeReads())
+	})
+}
+
+func TestRefresh_DetectedTokenStaysHeldUntilReadAsZero(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		h := newRefreshHarness(t)
+		h.controller.Start()
+		defer h.controller.Stop()
+		h.takeReads()
+
+		h.setErring(1, true)
+		time.Sleep(30 * time.Second)
+		h.source.tell(refresh.TransferDetected{Pair: refresh.Pair{Account: common.Address(alice), Chain: 1}, Contracts: []common.Address{weth}})
+		time.Sleep(15 * time.Second)
+		h.setErring(1, false)
+		time.Sleep(3*time.Minute + 30*time.Second)
+
+		requireReads(t, slices.Concat(
+			[]read{{at: 40 * time.Second, chain: 1, balances: map[string][]common.Address{alice.Hex(): {weth}}}},
+			h.heldSet(2*time.Minute, map[pair][]common.Address{{alice, 1}: {weth}}),
+			h.heldSet(4*time.Minute, nil),
+		), h.takeReads())
+	})
+}
+
+func TestRefresh_DetectionGapReadsItsChainInFullAfterDebounce(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		h := newRefreshHarness(t)
+		h.controller.Start()
+		defer h.controller.Stop()
+		h.takeReads()
+
+		time.Sleep(30 * time.Second)
+		h.source.tell(refresh.DetectionGap{Chain: 10})
+		time.Sleep(15 * time.Second)
+
+		requireReads(t, []read{h.everything(40 * time.Second)[1]}, h.takeReads())
+	})
+}
+
+func TestRefresh_ScansForChangesWithEveryPeriodicRefresh(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		h := newRefreshHarness(t)
+		h.controller.Start()
+		defer h.controller.Stop()
+
+		time.Sleep(30 * time.Second)
+		h.source.tell(refresh.TransferDetected{Pair: refresh.Pair{Account: common.Address(alice), Chain: 1}, Native: true})
+		time.Sleep(4*time.Minute - 30*time.Second + time.Second)
+
+		require.Equal(t, []time.Duration{0, 2 * time.Minute, 4 * time.Minute}, h.source.takeScans())
+	})
+}
+
+func TestRefresh_RequestedRefreshScansForChangesAtOnce(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		h := newRefreshHarness(t)
+		h.controller.Start()
+		defer h.controller.Stop()
+		h.source.takeScans()
+
+		time.Sleep(30 * time.Second)
+		h.controller.TriggerFullFetch()
+
+		require.Equal(t, []time.Duration{30 * time.Second}, h.source.takeScans())
+	})
+}
+
+func TestRefresh_ReconnectReadsTheHeldSetAndScansForChangesAtOnce(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		h := newRefreshHarness(t)
+		h.controller.Start()
+		defer h.controller.Stop()
+
+		time.Sleep(20 * time.Minute)
+		h.takeReads()
+		h.source.takeScans()
+		time.Sleep(30 * time.Second)
+		h.controller.Reconnected()
+		synctest.Wait()
+
+		requireReads(t, h.heldSet(20*time.Minute+30*time.Second, nil), h.takeReads())
+		require.Equal(t, []time.Duration{20*time.Minute + 30*time.Second}, h.source.takeScans())
+	})
+}
+
+func TestRefresh_StoppedControllerHearsNoChanges(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		h := newRefreshHarness(t)
+		h.controller.Start()
+		h.controller.Stop()
+		h.takeReads()
+
+		h.source.tell(refresh.DetectionGap{Chain: 10})
+		time.Sleep(time.Minute)
+
+		require.Empty(t, h.takeReads())
 	})
 }

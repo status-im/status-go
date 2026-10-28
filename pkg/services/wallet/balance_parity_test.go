@@ -20,6 +20,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/go-wallet-sdk/pkg/balance/multistandardfetcher"
+	"github.com/status-im/go-wallet-sdk/pkg/balance/refresh"
 	"github.com/status-im/go-wallet-sdk/pkg/contracts/multicall3"
 
 	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
@@ -196,6 +197,12 @@ func (h parityHeld) GetHeldTokens(chainID uint64, _ common.Address) ([]common.Ad
 	return h.list.GetTokenContractAddresses(chainID)
 }
 
+// parityNoChanges finds no transfers.
+type parityNoChanges struct{}
+
+func (parityNoChanges) Watch(func(refresh.Event)) func() { return func() {} }
+func (parityNoChanges) Scan()                            {}
+
 type parityLastBlock struct{}
 
 func (parityLastBlock) SetLatestBlockNumber(uint64, uint64) {}
@@ -276,7 +283,7 @@ func newParityHarness(t *testing.T) *parityHarness {
 	config.FetchDebounceTime = time.Millisecond
 	controller := multistandardbalance.NewController(config, storage, fetcher,
 		parityAccounts{accounts: []cryptotypes.Address{cryptotypes.BytesToAddress(account.Bytes())}}, nil, parityNetworks{},
-		tokenList, parityCollectibles{}, parityHeld{tokenList}, parityLastBlock{}, nil, zap.NewNop())
+		tokenList, parityCollectibles{}, parityHeld{tokenList}, parityNoChanges{}, parityLastBlock{}, nil, zap.NewNop())
 	finished, unsubscribe := pubsub.Subscribe[multistandardbalance.EventBalanceFetchFinished](controller.GetPublisher(), 10)
 	t.Cleanup(unsubscribe)
 

@@ -243,6 +243,16 @@ func NewService(
 	marketManager := market.NewManager(marketProviders, tokenManager, feed)
 	currency := currency.NewService(db, feed, tokenManager, marketManager)
 
+	transferDetectorController := transferdetector.NewController(
+		transferdetector.DefaultControllerConfig(),
+		transferdetector.NewFetcher(rpcClient),
+		accountsDB,
+		accountsPublisher,
+		rpcClient.GetNetworkManager(),
+		blockChainState,
+		logutils.ZapLogger().Named("TransferDetectorController"),
+	)
+
 	multistandardBalanceFetcher := multistandardbalance.NewFetcher(rpcClient, multistandardbalance.DefaultBatchSize, config.WalletConfig.MulticallOverrides)
 	multistandardBalanceStorage := multistandardbalance.NewStorageMemory()
 	multistandardBalanceController := multistandardbalance.NewController(
@@ -255,6 +265,11 @@ func NewService(
 		NewMultistandardBalanceTokenListProvider(tokenManager),
 		NewMultistandardBalanceCollectiblesListProvider(ownership.NewOwnershipDB(db), collectibles.NewContractTypeDB(db)),
 		NewMultistandardBalanceHeldTokensProvider(tokenManager, pendingTxManager),
+		transferdetector.NewChangeSource(
+			transferDetectorController,
+			NewTransferDetectionKnownTokensProvider(tokenManager),
+			logutils.ZapLogger().Named("TransferDetectorChangeSource"),
+		),
 		blockChainState,
 		feed,
 		logutils.ZapLogger().Named("MultistandardBalanceController"),
@@ -262,16 +277,6 @@ func NewService(
 
 	tokenBalancesFetcher := tokenbalances.NewFetcher(multistandardBalanceFetcher)
 	tokenBalancesStorage := tokenbalances.NewStorageMultistandardBalance(multistandardBalanceStorage)
-
-	transferDetectorController := transferdetector.NewController(
-		transferdetector.DefaultControllerConfig(),
-		transferdetector.NewFetcher(rpcClient),
-		accountsDB,
-		accountsPublisher,
-		rpcClient.GetNetworkManager(),
-		blockChainState,
-		logutils.ZapLogger().Named("TransferDetectorController"),
-	)
 
 	reader := NewReader(
 		tokenManager,
