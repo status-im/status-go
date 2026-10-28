@@ -95,6 +95,10 @@ type CreateAccount struct {
 	KeycardPairingKey      string  `json:"keycardPairingKey"`
 	KeycardPairingDataFile *string `json:"keycardPairingDataFile"`
 
+	// KeycardSecureChannelV2 is set when the keycard (applet 4.x) uses SecureChannelV2 and so has no
+	// pairing: neither a pairings file entry nor a pairing key is expected.
+	KeycardSecureChannelV2 bool `json:"keycardSecureChannelV2"`
+
 	ThirdpartyServicesEnabled bool `json:"thirdpartyServicesEnabled"`
 }
 type WalletConfig struct {

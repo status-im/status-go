@@ -647,7 +647,13 @@ func removeKeypairKeystoreFiles(t *testing.T, keystoreDir string, kp *accsmanage
 
 func convertProfileToKeycard(t *testing.T, b *backend.StatusBackend, account multiaccounts.Account, keycardPairing, oldPassword, keycardPassword string) {
 	account.KeycardPairing = keycardPairing
-	require.NoError(t, b.ConvertToKeycardAccount(account, settings.Settings{}, testKeycardUID, oldPassword, keycardPassword))
+	require.NoError(t, b.ConvertToKeycardAccount(&requests.ConvertToKeycardAccount{
+		Account:     account,
+		Settings:    settings.Settings{},
+		KeycardUID:  testKeycardUID,
+		OldPassword: oldPassword,
+		NewPassword: keycardPassword,
+	}))
 }
 
 // startKeystoreFilesSenderServer stands in for StartUpKeystoreFilesSenderServer,

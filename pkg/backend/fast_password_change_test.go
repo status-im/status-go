@@ -565,7 +565,13 @@ func TestConvertAccountLegacyProfile(t *testing.T) {
 	keycardAccount := multiAcc
 	keycardAccount.KeycardPairing = "pairing"
 	const keycardPassword = "222222"
-	require.NoError(t, b.ConvertToKeycardAccount(keycardAccount, settings.Settings{}, keyUID, testPassword, keycardPassword))
+	require.NoError(t, b.ConvertToKeycardAccount(&requests.ConvertToKeycardAccount{
+		Account:     keycardAccount,
+		Settings:    settings.Settings{},
+		KeycardUID:  keyUID,
+		OldPassword: testPassword,
+		NewPassword: keycardPassword,
+	}))
 
 	// The conversion migrated the profile to the DEK scheme, wrapped with the keycard key.
 	require.True(t, b.ProfileEncryptionInfo(keyUID))

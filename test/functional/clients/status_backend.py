@@ -491,13 +491,23 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
         data = self._set_wallet_secrets(data)
         return self.api_request_json("LoginAccount", data)
 
-    def convert_to_keycard_account_v2(self, key_uid, keycard_pairing: str, keycard_uid: str, old_password: str, new_password: str, **kwargs):
+    def convert_to_keycard_account_v2(
+        self,
+        key_uid,
+        keycard_pairing: str,
+        keycard_uid: str,
+        old_password: str,
+        new_password: str,
+        keycard_secure_channel_v2: bool = False,
+        **kwargs,
+    ):
         data = {
             "account": {"key-uid": key_uid, "keycard-pairing": keycard_pairing, "kdfIterations": 0},
             "settings": {},
             "keycardUID": keycard_uid,
             "oldPassword": old_password,
             "newPassword": new_password,
+            "keycardSecureChannelV2": keycard_secure_channel_v2,
         }
         response = self.api_request_json("ConvertToKeycardAccountV2", data, **kwargs)
         self.password = new_password

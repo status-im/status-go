@@ -1309,7 +1309,13 @@ func convertToKeycardAccount(accountData, settingsJSON, keycardUID, password, ne
 		return makeJSONResponse(err)
 	}
 
-	err = statusBackend.ConvertToKeycardAccount(account, settings, keycardUID, password, newPassword)
+	err = statusBackend.ConvertToKeycardAccount(&requests.ConvertToKeycardAccount{
+		Account:     account,
+		Settings:    settings,
+		KeycardUID:  keycardUID,
+		OldPassword: password,
+		NewPassword: newPassword,
+	})
 	return makeJSONResponse(err)
 }
 
@@ -1323,7 +1329,7 @@ func convertToKeycardAccountV2(requestJSON string) string {
 	if err != nil {
 		return makeJSONResponse(err)
 	}
-	err = statusBackend.ConvertToKeycardAccount(request.Account, request.Settings, request.KeycardUID, request.OldPassword, request.NewPassword)
+	err = statusBackend.ConvertToKeycardAccount(&request)
 	return makeJSONResponse(err)
 }
 

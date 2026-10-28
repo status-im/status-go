@@ -110,6 +110,33 @@ class TestConvertProfileKeypairToKeycard:
         added = [a for a in kp3["accounts"] if a["path"] == next_path]
         assert len(added) == 1, "Expected the empty-password add_account to succeed because the keycard migration retains the stored xpub"
 
+    def test_convert_keycard_without_pairing(self, backend):
+        """Applet 4.x keycards (SecureChannelV2) have no pairing: the conversion stores a marker instead."""
+        key_uid = backend.key_uid
+        kp0 = self._profile_precondition(backend)
+        keycard_password = derive_keycard_password(backend, backend.mnemonic)
+        old_password = backend.password
+
+        backend.convert_to_keycard_account_v2(key_uid, "", KEYCARD_UID, old_password, keycard_password, keycard_secure_channel_v2=True)
+
+        self._assert_on_keycard(backend, kp0, old_password, keycard_password)
+        assert (
+            keycard_pairing_of(backend.reinit_and_get_accounts(), key_uid) == "secure-channel-v2"
+        ), "Expected the marker stored because a non-empty keycard-pairing is what marks a keycard account"
+
+    def test_convert_without_pairing_or_secure_channel_v2_is_rejected(self, backend):
+        key_uid = backend.key_uid
+        kp0 = self._profile_precondition(backend)
+        keycard_password = derive_keycard_password(backend, backend.mnemonic)
+
+        with pytest.raises(ApiResponseError, match="keycard pairing missing"):
+            backend.convert_to_keycard_account_v2(key_uid, "", KEYCARD_UID, backend.password, keycard_password)
+
+        kp1 = backend.accounts_service.get_keypair_by_key_uid(key_uid)
+        assert kp1.get("cold-wallet", "") == "", "Expected the keypair to stay off the keycard after a rejected conversion"
+        assert_keystore_state(backend, keypair_addresses(kp1), backend.password, present=True)
+        assert kp1["xpub"] == kp0["xpub"]
+
     def test_convert_already_on_keycard_is_idempotent(self, backend):
         key_uid = backend.key_uid
         kp0 = self._profile_precondition(backend)

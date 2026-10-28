@@ -42,6 +42,8 @@ var sensitiveKeys = []string{
 	"verifyENSURL",
 	"verifyTransactionURL",
 	"gifs/api-key",
+	"keycard-pairing",
+	"keycardPairingKey",
 }
 
 var sensitiveRegexString = fmt.Sprintf(`(?i)(\\?"(?:\w*?%s\w*?)\\?"\s*:\s*\\?").*?(\\?")`, strings.Join(sensitiveKeys, "|"))

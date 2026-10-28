@@ -45,6 +45,11 @@ func TestRemoveSensitiveInfo(t *testing.T) {
 			expected: fmt.Sprintf(`{"password":"%s","data":{"nested_password":"%s"}}`, redactionPlaceholder, redactionPlaceholder),
 		},
 		{
+			name:     "keycard pairing keys",
+			input:    `{"account":{"keycard-pairing":"785d5295"},"keycardPairingKey":"785d5295"}`,
+			expected: fmt.Sprintf(`{"account":{"keycard-pairing":"%s"},"keycardPairingKey":"%s"}`, redactionPlaceholder, redactionPlaceholder),
+		},
+		{
 			name:     "no password field",
 			input:    `{"username":"user1","email":"user1@example.com"}`,
 			expected: `{"username":"user1","email":"user1@example.com"}`,
