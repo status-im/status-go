@@ -14,7 +14,7 @@ repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 export TKL_BASE_CGO_CFLAGS="${TKL_BASE_CGO_CFLAGS-${CGO_CFLAGS:-}}"
 export TKL_BASE_CGO_LDFLAGS="${TKL_BASE_CGO_LDFLAGS-${CGO_LDFLAGS:-}}"
 tkl_library_dir="$(bash "$repo/scripts/tkl_native.sh")"
-export NIM_TKL_INC_DIR="${NIM_TKL_INC_DIR:-$repo/build/deps/nim-token-lists/abi}"
+export NIM_TKL_INC_DIR="${NIM_TKL_INC_DIR:-${STATUS_GO_BUILD_DIR:-$repo/build}/deps/nim-token-lists/abi}"
 export NIM_TKL_LIB_DIR="$tkl_library_dir"
 # Go's cache does not inspect external archives. Change a cgo input whenever
 # either native artifact changes, including when supplied by a Nix derivation.

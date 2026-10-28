@@ -106,6 +106,10 @@ GIT_ROOT_IS_CHECKOUT := $(wildcard $(GIT_ROOT).git)
 GIT_COMMIT ?= $(if $(GIT_ROOT_IS_CHECKOUT),$(shell git -C "$(GIT_ROOT)" rev-parse --short HEAD 2>/dev/null))
 GIT_AUTHOR ?= $(shell git config user.email || echo $$USER)
 
+# Every library-build output goes here; point it outside a read-only tree.
+STATUS_GO_BUILD_DIR ?= $(GIT_ROOT)build
+STATUS_GO_BIN_DIR ?= $(STATUS_GO_BUILD_DIR)/bin
+
 BUILD_TAGS ?= gowaku_no_rln
 
 # Every wallet build uses the pinned native token catalogue.
@@ -114,7 +118,7 @@ MOBILE_BUILD_TAGS := gowaku_no_rln nowatchdog disable_torrent
 # The dev shell's prebuilt token library targets the host, not a mobile SDK.
 ANDROID_TOKEN_ENV = env -u NIM_TKL_INC_DIR -u NIM_TKL_LIB_DIR ANDROID_NDK_ROOT="$(ANDROID_NDK_ROOT)" ANDROID_API="$(ANDROID_API)" TKL_HIDE_EXPORTS=1 bash scripts/tkl_env.sh
 IOS_TOKEN_ENV = env -u NIM_TKL_INC_DIR -u NIM_TKL_LIB_DIR IPHONE_SDK="$(IPHONE_SDK)" IOS_TARGET="$(IOS_TARGET)" bash scripts/tkl_env.sh
-IOS_TOKEN_ARCHIVE = bash scripts/tkl_bundle_archive.sh build/bin/libstatus.a
+IOS_TOKEN_ARCHIVE = bash scripts/tkl_bundle_archive.sh $(STATUS_GO_BIN_DIR)/libstatus.a
 
 # `nim-sds` variables
 #
@@ -145,8 +149,9 @@ NIMBLE_SDS_ENV = \
 	NIM_PARAMS="--skipParentCfg $$NIM_PARAMS $$(tr '\n' ' ' < $(CURDIR)/nimble.paths)"
 
 LIBSDS ?= $(NIM_SDS_LIB_DIR)/libsds.$(LIB_EXT)
-CGO_CFLAGS+=-I$(NIM_SDS_INC_DIR)
-CGO_LDFLAGS+=-L$(NIM_SDS_LIB_DIR) -lsds
+# override: these must survive CGO_* passed as make command-line args (else -lsds is silently dropped).
+override CGO_CFLAGS += -I$(NIM_SDS_INC_DIR)
+override CGO_LDFLAGS += -L$(NIM_SDS_LIB_DIR) -lsds
 
 # `logos-storage` variables (opt-in)
 USE_LOGOS_STORAGE ?= false
@@ -175,8 +180,8 @@ RUNTIME_LIB_DIRS := $(NIM_SDS_LIB_DIR)
 LOGOS_STORAGE_BUILD_DEPS :=
 ifeq ($(USE_LOGOS_STORAGE),true)
 	override BUILD_TAGS += use_logos_storage
-	CGO_CFLAGS += -I$(LOGOS_STORAGE_INC_DIR)
-	CGO_LDFLAGS += -L$(LOGOS_STORAGE_LIB_DIR) -lstorage -Wl,-rpath,$(LOGOS_STORAGE_LIB_DIR)
+	override CGO_CFLAGS += -I$(LOGOS_STORAGE_INC_DIR)
+	override CGO_LDFLAGS += -L$(LOGOS_STORAGE_LIB_DIR) -lstorage -Wl,-rpath,$(LOGOS_STORAGE_LIB_DIR)
 	RUNTIME_LIB_DIRS := $(LOGOS_STORAGE_LIB_DIR):$(RUNTIME_LIB_DIRS)
 	LOGOS_STORAGE_BUILD_DEPS += $(LIBSTORAGE)
 endif
@@ -242,7 +247,7 @@ history-archive-help: ##@build Show history archive build/test toggles and env v
 # mbedtls configuration for go-sqlcipher
 ifeq ($(detected_OS),Windows)
  # On Windows, use portable C implementations and add -Werror=implicit-function-declaration workaround
- CGO_CFLAGS+=-Wno-implicit-function-declaration
+ override CGO_CFLAGS += -Wno-implicit-function-declaration
 endif
 
 # Common flags
@@ -272,6 +277,12 @@ BUILD_VARS_LDFLAGS := \
 GO_EXTRA_LDFLAGS ?=
 BUILD_FLAGS ?= -ldflags="$(BUILD_VARS_LDFLAGS) $(GO_EXTRA_LDFLAGS)"
 BUILD_FLAGS_MOBILE ?=
+
+# Library targets generate under STATUS_GO_BUILD_DIR and pass the result to
+# `go build -overlay`, so they never write into the tree. `make generate` still
+# generates in place, for tests, linters and editors.
+GO_OVERLAY_DIR := $(STATUS_GO_BUILD_DIR)/generated
+GO_OVERLAY_FLAG := -overlay="$(GO_OVERLAY_DIR)/overlay.json"
 
 networkid ?= StatusChain
 
@@ -425,14 +436,17 @@ status-go-deps:
 # GOOS and GOARCH are essential to generate cbindings when cross compiling on macos
 GO_HOST_ENV = GOOS=$(shell go env GOHOSTOS) GOARCH=$(shell go env GOHOSTARCH)
 
-statusgo-c-bindings: STATUS_GO_BINDINGS_PATH ?= build/bin/statusgo-lib
+# Library targets build this generated file (not a package path), so it can
+# live outside the module.
+STATUS_GO_BINDINGS_PATH ?= $(STATUS_GO_BIN_DIR)/statusgo-lib
+
 statusgo-c-bindings:
 	@## tools/generate-cbindings/README.md explains the magic incantation behind this
 	mkdir -p $(STATUS_GO_BINDINGS_PATH)
 	$(GO_HOST_ENV) go run ./tools/generate-cbindings > $(STATUS_GO_BINDINGS_PATH)/main.go
 
-statusgo-stub-bindings: STATUS_GO_STUB_BINDINGS_OUT ?= build/bin
-statusgo-stub-bindings: STATUS_GO_STUB_BINDINGS_HEADER ?= build/bin/libstatus.h
+statusgo-stub-bindings: STATUS_GO_STUB_BINDINGS_OUT ?= $(STATUS_GO_BIN_DIR)
+statusgo-stub-bindings: STATUS_GO_STUB_BINDINGS_HEADER ?= $(STATUS_GO_BIN_DIR)/libstatus.h
 statusgo-stub-bindings:
 	@## Generate stub bindings based on libstatus.h
 	mkdir -p $(STATUS_GO_STUB_BINDINGS_OUT)
@@ -440,16 +454,15 @@ statusgo-stub-bindings:
 		--header $(STATUS_GO_STUB_BINDINGS_HEADER) \
 		--out-dir $(STATUS_GO_STUB_BINDINGS_OUT)
 
-statusgo-library: STATUS_GO_BINDINGS_PATH ?= build/bin/statusgo-lib
-statusgo-library: STATUS_GO_LIBRARY_OUT ?= build/bin
+statusgo-library: STATUS_GO_LIBRARY_OUT ?= $(STATUS_GO_BIN_DIR)
 statusgo-library: TOKEN_STATIC_BUILD = $(TOKEN_ENV) bash scripts/tkl_bundle_archive.sh "$(STATUS_GO_LIBRARY_OUT)/libstatus.a"
-statusgo-library: generate
+statusgo-library: generate-overlay
 statusgo-library: statusgo-c-bindings $(LIBSDS)  ##@cross-compile Build status-go as static library for current platform
 	@echo "Building static library..."
 	CGO_LDFLAGS='$(CGO_LDFLAGS)' CGO_CFLAGS='$(CGO_CFLAGS)' \
 	$(TOKEN_STATIC_BUILD) go build \
 		-tags '$(BUILD_TAGS)' \
-		$(BUILD_FLAGS) \
+		$(BUILD_FLAGS) $(GO_OVERLAY_FLAG) \
 		-buildmode=c-archive \
 		-o $(STATUS_GO_LIBRARY_OUT)/libstatus.a \
 		"$(STATUS_GO_BINDINGS_PATH)/main.go"
@@ -465,59 +478,59 @@ statusgo-shared-library: $(if $(filter true,$(NIM_SDS_BUILD_FROM_SOURCE)),$(LIBS
 	@test -n "$(TKL_LIBSDS)" || { echo "libsds not found in $(NIM_SDS_LIB_DIR); run 'make build-libsds' first" >&2; exit 1; }
 	$(GOBIN_SHARED_LIB_CFLAGS) TKL_HIDE_EXPORTS=1 \
 		CGO_CFLAGS='$(CGO_CFLAGS)' CGO_LDFLAGS='$(CGO_LDFLAGS) -Wl,-rpath,$(NIM_SDS_LIB_DIR)' \
-		bash scripts/tkl_env.sh bash scripts/tkl_backend.sh build/bin/libstatus.$(GOBIN_SHARED_LIB_EXT) \
+		bash scripts/tkl_env.sh bash scripts/tkl_backend.sh $(STATUS_GO_BIN_DIR)/libstatus.$(GOBIN_SHARED_LIB_EXT) \
 		$(MAKE) statusgo-shared-library-build \
 		BUILD_TAGS='$(BUILD_TAGS)' \
 		NIM_SDS_LIB_DIR='$(NIM_SDS_LIB_DIR)' NIM_SDS_INC_DIR='$(NIM_SDS_INC_DIR)' \
 		LIBSDS='$(TKL_LIBSDS)'
-	bash scripts/check_tkl_exports.sh build/bin/libstatus.$(GOBIN_SHARED_LIB_EXT)
+	bash scripts/check_tkl_exports.sh $(STATUS_GO_BIN_DIR)/libstatus.$(GOBIN_SHARED_LIB_EXT)
 
 .PHONY: test-tkl-backend
 test-libtkl: test-tkl-backend
 test-tkl-backend:
 	python3 scripts/test_tkl_backend.py
 
-statusgo-shared-library-build: generate
+statusgo-shared-library-build: generate-overlay
 statusgo-shared-library-build: statusgo-c-bindings $(LIBSDS) ##@cross-compile Build status-go as shared library for current platform
 	@echo "Building shared library..."
 	@echo "Tags: $(BUILD_TAGS)"
 	CGO_LDFLAGS='$(CGO_LDFLAGS)' CGO_CFLAGS='$(CGO_CFLAGS)' \
  	go build \
 		-tags '$(BUILD_TAGS)' \
-		$(BUILD_FLAGS) \
+		$(BUILD_FLAGS) $(GO_OVERLAY_FLAG) \
 		-buildmode=c-shared \
-		-o build/bin/libstatus.$(GOBIN_SHARED_LIB_EXT)$(if $(filter Linux,$(detected_OS)),.0) \
-		./build/bin/statusgo-lib
+		-o $(STATUS_GO_BIN_DIR)/libstatus.$(GOBIN_SHARED_LIB_EXT)$(if $(filter Linux,$(detected_OS)),.0) \
+		"$(STATUS_GO_BINDINGS_PATH)/main.go"
 ifeq ($(detected_OS),Linux)
 	# Build the versioned file directly, including when the public symlink exists.
 	# Go replaces the final extension with .h; retain the public header name.
-	mv build/bin/libstatus.$(GOBIN_SHARED_LIB_EXT).h build/bin/libstatus.h
-	ln -sfn libstatus.$(GOBIN_SHARED_LIB_EXT).0 build/bin/libstatus.$(GOBIN_SHARED_LIB_EXT)
+	mv $(STATUS_GO_BIN_DIR)/libstatus.$(GOBIN_SHARED_LIB_EXT).h $(STATUS_GO_BIN_DIR)/libstatus.h
+	ln -sfn libstatus.$(GOBIN_SHARED_LIB_EXT).0 $(STATUS_GO_BIN_DIR)/libstatus.$(GOBIN_SHARED_LIB_EXT)
 endif
 	@echo "Shared library built:"
-	@ls -la build/bin/libstatus.*
+	@ls -la $(STATUS_GO_BIN_DIR)/libstatus.*
 
-statusgo-android-library: generate statusgo-c-bindings build-libsds-android ##@cross-compile Build status-go as Android mobile library
+statusgo-android-library: generate-overlay statusgo-c-bindings build-libsds-android ##@cross-compile Build status-go as Android mobile library
 	@echo "Building Android mobile library..."
 	$(ANDROID_BUILD_FLAGS) CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
-	$(ANDROID_TOKEN_ENV) go build -buildmode=c-shared -tags '$(MOBILE_BUILD_TAGS)' \
+	$(ANDROID_TOKEN_ENV) go build $(GO_OVERLAY_FLAG) -buildmode=c-shared -tags '$(MOBILE_BUILD_TAGS)' \
 		-ldflags="-s -w -buildid= -checklinkname=0 -X github.com/status-im/status-go/vendor/github.com/ethereum/go-ethereum/metrics.EnabledStr=true $(BUILD_VARS_LDFLAGS)" \
-		-o "build/bin/libstatus.so" ./build/bin/statusgo-lib
+		-o "$(STATUS_GO_BIN_DIR)/libstatus.so" "$(STATUS_GO_BINDINGS_PATH)/main.go"
 	@echo "Android library built"
-	@file build/bin/libstatus.so
+	@file $(STATUS_GO_BIN_DIR)/libstatus.so
 	TKL_TARGET_OS=android NM="$(ANDROID_NDK_ROOT)/toolchains/llvm/prebuilt/$(HOST_OS)-x86_64/bin/llvm-nm" \
-		bash scripts/check_tkl_exports.sh build/bin/libstatus.so
+		bash scripts/check_tkl_exports.sh $(STATUS_GO_BIN_DIR)/libstatus.so
 
-statusgo-ios-library: generate statusgo-c-bindings build-libsds-ios ##@cross-compile Build status-go as iOS mobile library
+statusgo-ios-library: generate-overlay statusgo-c-bindings build-libsds-ios ##@cross-compile Build status-go as iOS mobile library
 	@echo "Building iOS mobile library..."
 	DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" \
 	CC="$$(xcrun --sdk $(IPHONE_SDK) --find clang)" \
 	$(IOS_BUILD_FLAGS) CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
-	$(IOS_TOKEN_ENV) $(IOS_TOKEN_ARCHIVE) go build -buildmode=c-archive -tags '$(MOBILE_BUILD_TAGS)' \
+	$(IOS_TOKEN_ENV) $(IOS_TOKEN_ARCHIVE) go build $(GO_OVERLAY_FLAG) -buildmode=c-archive -tags '$(MOBILE_BUILD_TAGS)' \
 		-ldflags="-checklinkname=0 -X github.com/status-im/status-go/vendor/github.com/ethereum/go-ethereum/metrics.EnabledStr=true $(BUILD_VARS_LDFLAGS)" \
-		-o "build/bin/libstatus.a" ./build/bin/statusgo-lib
+		-o "$(STATUS_GO_BIN_DIR)/libstatus.a" "$(STATUS_GO_BINDINGS_PATH)/main.go"
 	@echo "iOS library built"
-	@file build/bin/libstatus.a
+	@file $(STATUS_GO_BIN_DIR)/libstatus.a
 
 docker-image: SHELL := /bin/sh
 docker-image: BUILD_TARGET ?= cmd
@@ -560,6 +573,15 @@ generate: clean-generated
 generate: ##@ Run generate for all given packages using go-generate-fast, fallback to `go generate` (e.g. for docker)
 	@GOROOT=$$(go env GOROOT) $(GO_HOST_ENV) $(GO_GENERATE_CMD) $(PACKAGES)
 	@$(GO_HOST_ENV) go generate -tags "use_logos_storage $(BUILD_TAGS)" ./pkg/services/logosstorage
+
+# Inputs of the directives scripts/generate-overlay.sh runs.
+GO_OVERLAY_INPUTS := scripts/generate-overlay.sh mobile/status.go \
+	$(shell find cmd/status-backend/server/parse-api tools/generate-handlers internal pkg \
+		-name '*.proto' -o -name '*.sql' -o -name '*_template.txt' -o -name 'template.txt' -o -name 'doc.go' -o -name 'main.go' 2>/dev/null)
+$(GO_OVERLAY_DIR)/overlay.json: $(GO_OVERLAY_INPUTS)
+	bash ./scripts/generate-overlay.sh "$(GO_OVERLAY_DIR)"
+
+generate-overlay: $(GO_OVERLAY_DIR)/overlay.json ##@generate Generate the library's sources outside the tree, for -overlay
 
 generate-contracts:
 	go generate ./contracts
@@ -726,8 +748,8 @@ migration-wallet:
 
 install-git-hooks: SHELL := /bin/sh
 install-git-hooks:
-	@ln -sf $(if $(filter $(detected_OS), Linux),-r,) \
-		$(GIT_ROOT)/githooks/* $(GIT_ROOT)/.git/hooks
+	@if [ -d $(GIT_ROOT)/.git/hooks ]; then ln -sf $(if $(filter $(detected_OS), Linux),-r,) \
+		$(GIT_ROOT)/githooks/* $(GIT_ROOT)/.git/hooks; fi
 
 -include install-git-hooks
 .PHONY: install-git-hooks

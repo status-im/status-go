@@ -26,7 +26,7 @@ class MobileBuildTest(unittest.TestCase):
             for platform in ("android", "ios"):
                 with self.subTest(platform=platform):
                     result = subprocess.run(
-                        ["make", f"statusgo-{platform}-library", "-o", "generate",
+                        ["make", f"statusgo-{platform}-library", "-o", "generate", "-o", "generate-overlay",
                          "-o", "statusgo-c-bindings", "-o", f"build-libsds-{platform}",
                          "-o", "install-git-hooks", "ARCH=arm64", "RELEASE_TAG=fixture",
                          "ANDROID_NDK_ROOT=/fixture/ndk", "HOST_OS=linux",
@@ -57,7 +57,7 @@ class MobileBuildTest(unittest.TestCase):
         for target in ("test-storage", "test-torrent"):
             with self.subTest(target=target):
                 result = subprocess.run(
-                    ["make", "-n", target, "-o", "generate", "-o", "build-storage",
+                    ["make", "-n", target, "-o", "generate", "-o", "generate-overlay", "-o", "build-storage",
                      "LIBSDS=/fixture/libsds.a", "-o", "/fixture/libsds.a"],
                     cwd=repo, text=True, capture_output=True)
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
@@ -76,7 +76,7 @@ class MobileBuildTest(unittest.TestCase):
             for override in (None, "17.0"):
                 with self.subTest(sdk=sdk, arch=arch, override=override):
                     command = [
-                        "make", "-n", "statusgo-ios-library", "-o", "generate",
+                        "make", "-n", "statusgo-ios-library", "-o", "generate", "-o", "generate-overlay",
                         "-o", "statusgo-c-bindings", "-o", "build-libsds-ios",
                         "USE_NIM_TOKEN_LISTS=true", f"ARCH={arch}", f"IPHONE_SDK={sdk}"]
                     if override:
@@ -92,7 +92,7 @@ class MobileBuildTest(unittest.TestCase):
         for tags in ("gowaku_no_rln", "gowaku_no_rln tkl", "gowaku_no_rln,tkl"):
             with self.subTest(tags=tags):
                 result = subprocess.run(
-                    ["make", "-n", "statusgo-library", "-o", "generate",
+                    ["make", "-n", "statusgo-library", "-o", "generate", "-o", "generate-overlay",
                      "-o", "statusgo-c-bindings", "LIBSDS=/fixture/libsds.a",
                      "-o", "/fixture/libsds.a", f"BUILD_TAGS={tags}"],
                     cwd=repo, text=True, capture_output=True, check=True)
@@ -106,7 +106,7 @@ class MobileBuildTest(unittest.TestCase):
                 with self.subTest(platform=platform, enabled=enabled):
                     result = subprocess.run(
                         ["make", "-n", f"statusgo-{platform}-library",
-                         "-o", "generate", "-o", "statusgo-c-bindings",
+                         "-o", "generate", "-o", "generate-overlay", "-o", "statusgo-c-bindings",
                          "-o", f"build-libsds-{platform}",
                          f"USE_NIM_TOKEN_LISTS={enabled}", "ARCH=arm64",
                          "ANDROID_NDK_ROOT=/fixture/ndk", "HOST_OS=linux",

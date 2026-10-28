@@ -15,6 +15,7 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"text/template"
@@ -121,6 +122,11 @@ func main() {
 	}
 
 	// Create the output file
+	// scripts/generate-overlay.sh generates outside the source tree.
+	outputFilePath := outputFilePath
+	if root := os.Getenv("STATUSGO_GENERATE_ROOT"); root != "" {
+		outputFilePath = filepath.Join(root, "cmd/status-backend/server/endpoints.go")
+	}
 	outputFile, err := os.Create(outputFilePath)
 	if err != nil {
 		fmt.Printf("Failed to create output file: %s\n", err)

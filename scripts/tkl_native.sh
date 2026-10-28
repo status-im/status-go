@@ -2,7 +2,9 @@
 # One disposable checkout owned by status-go; no developer source override.
 set -euo pipefail
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-source_dir="$repo/build/deps/nim-token-lists"
+# STATUS_GO_BUILD_DIR moves it out of a read-only tree.
+deps_dir="${STATUS_GO_BUILD_DIR:-$repo/build}/deps"
+source_dir="$deps_dir/nim-token-lists"
 action="${1:-prepare}"
 fail() { echo "libtkl: $*" >&2; exit 1; }
 lock_native() {
@@ -10,8 +12,8 @@ lock_native() {
   local owners
   [[ "$timeout" =~ ^[0-9]+$ ]] || fail "TKL_LOCK_TIMEOUT must be seconds (a non-negative integer)"
   deadline=$((SECONDS + 10#$timeout))
-  mkdir -p "$repo/build/deps"
-  lock="$repo/build/deps/.nim-token-lists-lock"
+  mkdir -p "$deps_dir"
+  lock="$deps_dir/.nim-token-lists-lock"
   while true; do
     if mkdir "$lock" 2>/dev/null; then
       # Use an owner-specific directory so stale waiters cannot delete a new
