@@ -1,6 +1,14 @@
 package multistandardbalance
 
-import "github.com/status-im/go-wallet-sdk/pkg/balance/multistandardfetcher"
+import (
+	"github.com/status-im/go-wallet-sdk/pkg/balance/multistandardfetcher"
+
+	"github.com/status-im/status-go/pkg/services/wallet/walletevent"
+)
+
+// EventRequestedBalanceRefreshFinished is sent on the wallet feed once every
+// fetch of a refresh the user asked for has ended, whether it succeeded or not.
+const EventRequestedBalanceRefreshFinished walletevent.EventType = "wallet-requested-balance-refresh-finished"
 
 type EventBalanceFetchStarted struct {
 	ChainID uint64

@@ -101,6 +101,7 @@ publisher := controller.GetPublisher()
 - `EventBalanceFetchFinished`: Successful fetch completion
 - `EventBalanceFetchError`: Fetch errors
 - `EventBalanceFetchFailedToStart`: Failed to initiate fetch
+- `EventRequestedBalanceRefreshFinished` (wallet feed): every fetch of a `TriggerFullFetch` has ended
 
 ## Configuration
 
