@@ -7,7 +7,7 @@ pipeline {
   agent {
     docker {
       label 'linuxcontainer'
-      image 'harbor.status.im/infra/ci-build-containers:linux-base-1.0.0'
+      image 'harbor.status.im/infra/ci-build-containers:linux-base-1.1.2'
       args '--volume=/nix:/nix ' +
            '--volume=/etc/nix:/etc/nix ' +
            '--volume=/var/run/docker.sock:/var/run/docker.sock ' +
