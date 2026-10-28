@@ -11,14 +11,16 @@ import (
 	"github.com/status-im/status-go/internal/logutils"
 )
 
-func (c *Controller) handleERC20Result(ctx context.Context, chainID uint64, asked []ContractAddress, result multistandardfetcher.ERC20Result) {
+// handleERC20Result stores result of a fetch that asked for asked and reports
+// whether it succeeded.
+func (c *Controller) handleERC20Result(ctx context.Context, chainID uint64, asked []ContractAddress, result multistandardfetcher.ERC20Result) bool {
 	key := BalancesKey{Account: result.Account, ChainID: chainID}
 	resultType := multistandardfetcher.ResultTypeERC20
 
 	if result.Err != nil {
 		c.logger.Error("failed to get ERC20 balance", zap.String("address", logutils.TruncateWithDot(key.Account.String())), zap.Uint64("chainID", key.ChainID), zap.Error(result.Err))
 		c.sendEventBalanceFetchError(key, resultType, result.Err)
-		return
+		return false
 	}
 
 	c.lastBlockManager.SetLatestBlockNumber(chainID, result.AtBlockNumber.Uint64())
@@ -36,8 +38,9 @@ func (c *Controller) handleERC20Result(ctx context.Context, chainID uint64, aske
 	if err != nil {
 		c.logger.Error("failed to update ERC20 balance", zap.String("address", logutils.TruncateWithDot(key.Account.String())), zap.Uint64("chainID", key.ChainID), zap.Error(err))
 		c.sendEventBalanceFetchError(key, resultType, err)
-		return
+		return false
 	}
 	c.logger.Debug("finished updating ERC20 balance", zap.String("address", logutils.TruncateWithDot(key.Account.String())), zap.Uint64("chainID", key.ChainID), zap.Bool("balanceChanged", balanceChanged))
 	c.sendEventBalanceFetchFinished(key, resultType, balanceChanged, oldState, state)
+	return true
 }

@@ -16,7 +16,9 @@ This package provides a unified interface for:
 ### Controller
 The main orchestrator that manages balance fetching operations:
 - Monitors account and network changes, token list updates and pending transactions
-- Leaves when and what to fetch to `refresh.Policy` from go-wallet-sdk (`pkg/balance/refresh`): every balance every 2 min on screen and every 15 min hidden, other reads after a 10s debounce, a confirmed transaction at once
+- Leaves when and what to fetch to `refresh.Policy` from go-wallet-sdk (`pkg/balance/refresh`) with the `HeldEveryTick` schedule: the held set every 2 min on screen and every 15 min hidden, every balance on start and hourly on screen, other reads after a 10s debounce, a confirmed transaction at once
+- The held set of an account on a chain is its native coin, its tokens with a balance, the tokens of `HeldTokensProvider` (custom tokens, pending ERC20 transfers) and its known collectibles
+- A full refresh of a chain that fails is retried at the next period
 - Coordinates between storage, fetcher, and providers
 
 ### Fetcher
@@ -53,6 +55,7 @@ controller := multistandardbalance.NewController(
     networksProvider,
     tokenListProvider,
     collectibleListProvider,
+    heldTokensProvider,
     lastBlockManager,
     walletFeed,
     logger,

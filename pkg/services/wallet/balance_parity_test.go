@@ -188,6 +188,14 @@ func (parityCollectibles) GetCollectiblesList(uint64, common.Address) ([]multist
 	return nil, nil, nil
 }
 
+// parityHeld holds every listed token, so a held refresh asks for the whole
+// list like the fetches these tests compare.
+type parityHeld struct{ list *parityTokenList }
+
+func (h parityHeld) GetHeldTokens(chainID uint64, _ common.Address) ([]common.Address, error) {
+	return h.list.GetTokenContractAddresses(chainID)
+}
+
 type parityLastBlock struct{}
 
 func (parityLastBlock) SetLatestBlockNumber(uint64, uint64) {}
@@ -268,7 +276,7 @@ func newParityHarness(t *testing.T) *parityHarness {
 	config.FetchDebounceTime = time.Millisecond
 	controller := multistandardbalance.NewController(config, storage, fetcher,
 		parityAccounts{accounts: []cryptotypes.Address{cryptotypes.BytesToAddress(account.Bytes())}}, nil, parityNetworks{},
-		tokenList, parityCollectibles{}, parityLastBlock{}, nil, zap.NewNop())
+		tokenList, parityCollectibles{}, parityHeld{tokenList}, parityLastBlock{}, nil, zap.NewNop())
 	finished, unsubscribe := pubsub.Subscribe[multistandardbalance.EventBalanceFetchFinished](controller.GetPublisher(), 10)
 	t.Cleanup(unsubscribe)
 
