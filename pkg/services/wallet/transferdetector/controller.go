@@ -105,9 +105,9 @@ func (c *Controller) Start() {
 	}
 	c.stopCh = make(chan struct{})
 
-	c.startAccountsWatcher()
-	c.startNetworksWatcher()
-	c.startFetcher()
+	c.startAccountsWatcher(c.stopCh)
+	c.startNetworksWatcher(c.stopCh)
+	c.startFetcher(c.stopCh)
 }
 
 func (c *Controller) Stop() {
@@ -121,7 +121,7 @@ func (c *Controller) GetPublisher() *pubsub.Publisher {
 	return c.publisher
 }
 
-func (c *Controller) startAccountsWatcher() {
+func (c *Controller) startAccountsWatcher(stopCh <-chan struct{}) {
 	if c.accountsPublisher == nil {
 		return
 	}
@@ -134,24 +134,24 @@ func (c *Controller) startAccountsWatcher() {
 		defer addedUnsubFn()
 		for {
 			select {
-			case <-c.stopCh:
+			case <-stopCh:
 				return
 			case _, ok := <-removedCh:
 				if !ok {
 					return
 				}
-				c.run()
+				c.run(stopCh)
 			case _, ok := <-addedCh:
 				if !ok {
 					return
 				}
-				c.run()
+				c.run(stopCh)
 			}
 		}
 	}()
 }
 
-func (c *Controller) startNetworksWatcher() {
+func (c *Controller) startNetworksWatcher(stopCh <-chan struct{}) {
 	if c.networksProvider == nil {
 		return
 	}
@@ -163,37 +163,37 @@ func (c *Controller) startNetworksWatcher() {
 		defer unsubFn()
 		for {
 			select {
-			case <-c.stopCh:
+			case <-stopCh:
 				return
 			case _, ok := <-ch:
 				if !ok {
 					return
 				}
-				c.run()
+				c.run(stopCh)
 			}
 		}
 	}()
 }
 
-func (c *Controller) startFetcher() {
+func (c *Controller) startFetcher(stopCh <-chan struct{}) {
 	ticker := time.NewTicker(c.config.FetchPeriod)
 	go func() {
 		defer panics.LogOnPanic()
 		defer ticker.Stop()
 		for {
 			select {
-			case <-c.stopCh:
+			case <-stopCh:
 				return
 			case <-ticker.C:
-				c.run()
+				c.run(stopCh)
 			case <-c.triggerFetchCh:
 				ticker.Reset(c.config.FetchPeriod)
-				c.run()
+				c.run(stopCh)
 			}
 		}
 	}()
 	// Trigger initial fetch
-	c.run()
+	c.run(stopCh)
 }
 
 func (c *Controller) TriggerFetch() {
@@ -203,11 +203,11 @@ func (c *Controller) TriggerFetch() {
 	}
 }
 
-func (c *Controller) run() {
+func (c *Controller) run(stopCh <-chan struct{}) {
 	c.fetchDebounceFn(func() {
 		go func() {
 			defer panics.LogOnPanic()
-			c.runNow()
+			c.runNow(stopCh)
 		}()
 	})
 }
@@ -236,7 +236,7 @@ func (c *Controller) getAllNetworks() ([]uint64, error) {
 	return chains, nil
 }
 
-func (c *Controller) runNow() {
+func (c *Controller) runNow(stopCh <-chan struct{}) {
 	accounts, err := c.getAllAccounts()
 	if err != nil {
 		c.logger.Error("failed to get all accounts", zap.Error(err))
@@ -265,7 +265,7 @@ func (c *Controller) runNow() {
 	go func() {
 		defer panics.LogOnPanic()
 		select {
-		case <-c.stopCh:
+		case <-stopCh:
 			cancel()
 			return
 		case <-ctx.Done():
