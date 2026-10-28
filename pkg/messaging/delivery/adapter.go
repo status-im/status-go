@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -18,10 +19,6 @@ import (
 	"github.com/status-im/status-go/internal/panics"
 	"github.com/status-im/status-go/pkg/messaging/waku/types"
 )
-
-// MaxMessageSize is the status.prod preset's message size limit. The
-// Messaging API does not report the limit of the network it joined.
-const MaxMessageSize = 1024 * 1024
 
 // sendHashTimeout bounds how long Send waits for the wire hash of a message
 // the library accepted, when the caller's context has no deadline.
@@ -62,6 +59,8 @@ type Adapter struct {
 
 	historyReconcileNeeded chan types.HistoryReconcileWindow
 
+	maxMessageSize atomic.Uint32
+
 	quit     chan struct{}
 	stopOnce sync.Once
 	stopErr  error
@@ -90,6 +89,11 @@ func (a *Adapter) Start() error {
 	if err := a.client.Start(); err != nil {
 		return fmt.Errorf("delivery: start: %w", err)
 	}
+	size, err := a.client.MaxMessageSize()
+	if err != nil {
+		return fmt.Errorf("delivery: max message size: %w", err)
+	}
+	a.maxMessageSize.Store(uint32(size))
 	return nil
 }
 
@@ -308,9 +312,9 @@ func (a *Adapter) OnHistoryReconcileNeeded() <-chan types.HistoryReconcileWindow
 	return a.historyReconcileNeeded
 }
 
-// MaxMessageSize returns the status.prod message size limit.
+// MaxMessageSize returns the node's message size limit, read when it started.
 func (a *Adapter) MaxMessageSize() uint32 {
-	return MaxMessageSize
+	return a.maxMessageSize.Load()
 }
 
 // Pause is a no-op: the Messaging API cannot idle the node.

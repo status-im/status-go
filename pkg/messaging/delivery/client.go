@@ -28,6 +28,8 @@ type Client interface {
 	PeerID() (peer.ID, error)
 	// Metrics returns the node's metrics in the Prometheus text format.
 	Metrics() (string, error)
+	// MaxMessageSize returns the largest message, in bytes, the node accepts.
+	MaxMessageSize() (uint64, error)
 }
 
 // Event is one Messaging API event: ReceivedEvent, SentEvent, PropagatedEvent,
