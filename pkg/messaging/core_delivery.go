@@ -1,9 +1,13 @@
 package messaging
 
 import (
+	"encoding/hex"
 	"fmt"
 
+	"github.com/ethereum/go-ethereum/crypto"
 	"go.uber.org/zap"
+
+	bindings "github.com/logos-messaging/logos-delivery-go-bindings/pkg/messaging"
 
 	"github.com/status-im/status-go/pkg/messaging/delivery"
 	"github.com/status-im/status-go/pkg/messaging/waku"
@@ -16,23 +20,32 @@ var deliveryPresets = map[string]string{
 	fleets.StatusStaging: "status.staging",
 }
 
-func deliveryConfig(params CoreParams) (delivery.Config, error) {
+func deliveryConfig(params CoreParams) (bindings.Config, error) {
 	preset, ok := deliveryPresets[params.Fleet]
 	if !ok {
-		return delivery.Config{}, fmt.Errorf("fleet %q has no logos-delivery preset", params.Fleet)
+		return bindings.Config{}, fmt.Errorf("fleet %q has no logos-delivery preset", params.Fleet)
 	}
-	mode := delivery.ModeCore
+	mode := bindings.ModeCore
 	if params.Mode == waku.ModeEdge {
-		mode = delivery.ModeEdge
+		mode = bindings.ModeEdge
 	}
-	return delivery.Config{
-		Preset:  preset,
-		Mode:    mode,
-		NodeKey: params.NodeKey,
-		DataDir: params.DataDir,
-		TCPPort: params.WakuConfig.Port,
-		UDPPort: params.WakuConfig.UDPPort,
-	}, nil
+	overrides := bindings.Overrides{}
+	if params.NodeKey != nil {
+		overrides["nodekey"] = hex.EncodeToString(crypto.FromECDSA(params.NodeKey))
+	}
+	if params.WakuConfig.Port != 0 {
+		overrides["tcp-port"] = params.WakuConfig.Port
+	}
+	if params.WakuConfig.UDPPort != 0 {
+		overrides["discv5-udp-port"] = params.WakuConfig.UDPPort
+	}
+	if params.DataDir != "" {
+		overrides["local-storage-path"] = params.DataDir
+	}
+	if len(overrides) == 0 {
+		overrides = nil
+	}
+	return bindings.Config{Mode: mode, Preset: preset, MessagingOverrides: overrides}, nil
 }
 
 func newDeliveryBackend(params CoreParams, logger *zap.Logger) (*delivery.Adapter, error) {
@@ -40,9 +53,5 @@ func newDeliveryBackend(params CoreParams, logger *zap.Logger) (*delivery.Adapte
 	if err != nil {
 		return nil, err
 	}
-	client, err := delivery.NewClient(cfg)
-	if err != nil {
-		return nil, err
-	}
-	return delivery.NewAdapter(client, logger), nil
+	return delivery.NewAdapter(cfg, logger)
 }

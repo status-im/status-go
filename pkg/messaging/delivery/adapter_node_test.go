@@ -2,6 +2,7 @@ package delivery
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"net"
 	"testing"
@@ -13,6 +14,8 @@ import (
 	"go.uber.org/zap"
 
 	libp2pcrypto "github.com/libp2p/go-libp2p/core/crypto"
+
+	"github.com/logos-messaging/logos-delivery-go-bindings/pkg/messaging"
 
 	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/pkg/messaging/waku/types"
@@ -27,8 +30,8 @@ func freePort(t *testing.T) int {
 
 // privateCluster is a two-node network with no preset: one auto-sharded shard,
 // no discovery, and no store confirmation.
-func privateCluster(extra map[string]any) map[string]any {
-	overrides := map[string]any{
+func privateCluster(extra messaging.Overrides) messaging.Overrides {
+	overrides := messaging.Overrides{
 		"cluster-id":            16,
 		"num-shards-in-network": 1,
 		"listen-address":        "127.0.0.1",
@@ -42,10 +45,10 @@ func privateCluster(extra map[string]any) map[string]any {
 	return overrides
 }
 
-func newTestAdapter(t *testing.T, cfg Config) *Adapter {
-	client, err := NewClient(cfg)
+func newTestAdapter(t *testing.T, overrides messaging.Overrides) *Adapter {
+	overrides["local-storage-path"] = t.TempDir()
+	a, err := NewAdapter(messaging.Config{Mode: messaging.ModeCore, MessagingOverrides: privateCluster(overrides)}, zap.NewNop())
 	require.NoError(t, err)
-	a := NewAdapter(client, zap.NewNop())
 	require.NoError(t, a.Start())
 	t.Cleanup(func() { require.NoError(t, a.Stop()) })
 	return a
@@ -74,20 +77,13 @@ func TestAdapterExchangesMessagesOverLiblogosdelivery(t *testing.T) {
 	require.NoError(t, err)
 	portA := freePort(t)
 
-	a := newTestAdapter(t, Config{
-		Mode:      ModeCore,
-		DataDir:   t.TempDir(),
-		NodeKey:   keyA,
-		TCPPort:   portA,
-		Overrides: privateCluster(nil),
+	a := newTestAdapter(t, messaging.Overrides{
+		"nodekey":  hex.EncodeToString(crypto.FromECDSA(keyA)),
+		"tcp-port": portA,
 	})
-	b := newTestAdapter(t, Config{
-		Mode:    ModeCore,
-		DataDir: t.TempDir(),
-		Overrides: privateCluster(map[string]any{
-			"tcp-port":   freePort(t),
-			"entry-node": []string{fmt.Sprintf("/ip4/127.0.0.1/tcp/%d/p2p/%s", portA, idA)},
-		}),
+	b := newTestAdapter(t, messaging.Overrides{
+		"tcp-port":   freePort(t),
+		"entry-node": []string{fmt.Sprintf("/ip4/127.0.0.1/tcp/%d/p2p/%s", portA, idA)},
 	})
 
 	topic := types.BytesToTopic([]byte{0xde, 0xad, 0xbe, 0xef})
@@ -137,4 +133,16 @@ func TestAdapterExchangesMessagesOverLiblogosdelivery(t *testing.T) {
 			break
 		}
 	}
+
+	require.Equal(t, idA, a.PeerID())
+	require.Contains(t, a.Peers(), b.PeerID())
+	require.NotEmpty(t, a.Metrics())
+	require.Positive(t, a.MaxMessageSize())
+	require.NoError(t, a.Unsubscribe(context.Background(), pubsubTopic, []types.TopicType{topic}))
+}
+
+func TestStopIsIdempotent(t *testing.T) {
+	a := newTestAdapter(t, messaging.Overrides{"tcp-port": freePort(t)})
+	require.NoError(t, a.Stop())
+	require.NoError(t, a.Stop())
 }

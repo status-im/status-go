@@ -14,6 +14,8 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"go.uber.org/zap"
 
+	"github.com/logos-messaging/logos-delivery-go-bindings/pkg/messaging"
+
 	"github.com/status-im/status-go/internal/connection"
 	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/panics"
@@ -27,7 +29,7 @@ var ErrStoreQueryUnsupported = errors.New("delivery: store queries are not expos
 // Adapter is the messaging backend over the logos-delivery Messaging API.
 // It satisfies types.Waku and transport.MessagingAPI.
 type Adapter struct {
-	client Client
+	mc     *messaging.MessagingClient
 	logger *zap.Logger
 
 	envelopeFeed event.Feed
@@ -46,10 +48,19 @@ type Adapter struct {
 	wg       sync.WaitGroup
 }
 
-// NewAdapter returns an Adapter driving client. The client must not be started.
-func NewAdapter(client Client, logger *zap.Logger) *Adapter {
+// NewAdapter creates a logos-delivery node from cfg and returns an Adapter
+// driving it. The node is not started.
+func NewAdapter(cfg messaging.Config, logger *zap.Logger) (*Adapter, error) {
+	mc, err := messaging.New(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("delivery: create node: %w", err)
+	}
+	return newAdapter(mc, logger), nil
+}
+
+func newAdapter(mc *messaging.MessagingClient, logger *zap.Logger) *Adapter {
 	return &Adapter{
-		client:                 client,
+		mc:                     mc,
 		logger:                 logger.Named("delivery"),
 		connSubscribers:        make(map[string]*types.ConnStatusSubscription),
 		historyReconcileNeeded: make(chan types.HistoryReconcileWindow),
@@ -63,10 +74,10 @@ var _ types.Waku = (*Adapter)(nil)
 func (a *Adapter) Start() error {
 	a.wg.Add(1)
 	go a.eventLoop()
-	if err := a.client.Start(); err != nil {
+	if err := a.mc.Start(); err != nil {
 		return fmt.Errorf("delivery: start: %w", err)
 	}
-	size, err := a.client.MaxMessageSize()
+	size, err := a.mc.Node().Debug().MaxMessageSize()
 	if err != nil {
 		return fmt.Errorf("delivery: max message size: %w", err)
 	}
@@ -78,8 +89,8 @@ func (a *Adapter) Start() error {
 // The Adapter cannot be restarted.
 func (a *Adapter) Stop() error {
 	a.stopOnce.Do(func() {
-		stopErr := a.client.Stop()
-		closeErr := a.client.Close()
+		stopErr := a.mc.Stop()
+		closeErr := a.mc.Close()
 		close(a.quit)
 		a.wg.Wait()
 
@@ -99,7 +110,7 @@ func (a *Adapter) eventLoop() {
 	defer panics.LogOnPanic()
 	defer a.wg.Done()
 
-	events := a.client.Events()
+	events := a.mc.Events()
 	for {
 		select {
 		case <-a.quit:
@@ -113,42 +124,42 @@ func (a *Adapter) eventLoop() {
 	}
 }
 
-func (a *Adapter) handleEvent(ev Event) {
+func (a *Adapter) handleEvent(ev messaging.Event) {
 	switch e := ev.(type) {
-	case ReceivedEvent:
+	case messaging.MessageReceivedEvent:
 		a.handleReceived(e)
-	case PropagatedEvent:
+	case messaging.MessagePropagatedEvent:
 		a.envelopeFeed.Send(types.EnvelopeEvent{
 			Event: types.EventEnvelopeSent,
-			Hash:  cryptotypes.BytesToHash(requestKey(e.RequestID)),
+			Hash:  cryptotypes.BytesToHash(requestKey(string(e.RequestID))),
 			Data:  cryptotypes.BytesToHash(decodeHash(e.MessageHash)),
 		})
-	case ErrorEvent:
-		a.logger.Debug("send failed", zap.String("requestID", e.RequestID), zap.String("error", e.Err))
+	case messaging.MessageErrorEvent:
+		a.logger.Debug("send failed", zap.String("requestID", string(e.RequestID)), zap.String("error", e.Err))
 		a.envelopeFeed.Send(types.EnvelopeEvent{
 			Event: types.EventEnvelopeExpired,
-			Hash:  cryptotypes.BytesToHash(requestKey(e.RequestID)),
+			Hash:  cryptotypes.BytesToHash(requestKey(string(e.RequestID))),
 		})
-	case ConnectionEvent:
+	case messaging.ConnectionStatusEvent:
 		a.setConnectionState(toConnectionState(e.Status))
 	}
 }
 
 // handleReceived reports a received message. It carries no pubsub topic: the
 // Messaging API delivers by content topic.
-func (a *Adapter) handleReceived(e ReceivedEvent) {
+func (a *Adapter) handleReceived(e messaging.MessageReceivedEvent) {
 	hash := decodeHash(e.MessageHash)
 	a.envelopeFeed.Send(types.EnvelopeEvent{
 		Event: types.EventEnvelopeAvailable,
 		Hash:  cryptotypes.BytesToHash(hash),
 		Data: &types.ReceivedMessage{
 			Hash:         hash,
-			ContentTopic: e.ContentTopic,
-			Payload:      e.Payload,
-			Ephemeral:    e.Ephemeral,
-			Meta:         e.Meta,
-			Version:      e.Version,
-			Timestamp:    e.Timestamp,
+			ContentTopic: e.Message.ContentTopic,
+			Payload:      e.Message.Payload,
+			Ephemeral:    e.Message.Ephemeral,
+			Meta:         e.Message.Meta,
+			Version:      e.Message.Version,
+			Timestamp:    e.Message.Timestamp,
 		},
 	})
 }
@@ -161,11 +172,11 @@ func (a *Adapter) handleReceived(e ReceivedEvent) {
 // pubsubTopic and priority are not honoured: the Messaging API derives the
 // shard from the content topic and has no send priority.
 func (a *Adapter) Send(ctx context.Context, pubsubTopic, contentTopic string, payload []byte, ephemeral bool, priority *int) ([]byte, error) {
-	requestID, err := a.client.Send(ctx, contentTopic, payload, ephemeral)
+	requestID, err := a.mc.Send(ctx, contentTopic, payload, ephemeral)
 	if err != nil {
 		return nil, fmt.Errorf("delivery: send: %w", err)
 	}
-	key := requestKey(requestID)
+	key := requestKey(string(requestID))
 	if key == nil {
 		return nil, fmt.Errorf("delivery: send: unexpected request ID %q", requestID)
 	}
@@ -186,7 +197,7 @@ func requestKey(requestID string) []byte {
 // transport counts subscriptions per content topic (see ContentTopicOnly).
 func (a *Adapter) Subscribe(ctx context.Context, pubsubTopic string, contentTopics []types.TopicType) error {
 	for _, topic := range contentTopics {
-		if err := a.client.Subscribe(topic.ContentTopic()); err != nil {
+		if err := a.mc.Subscribe(topic.ContentTopic()); err != nil {
 			return fmt.Errorf("delivery: subscribe %s: %w", topic.ContentTopic(), err)
 		}
 	}
@@ -196,7 +207,7 @@ func (a *Adapter) Subscribe(ctx context.Context, pubsubTopic string, contentTopi
 // Unsubscribe unsubscribes the content topics. The pubsub topic is ignored.
 func (a *Adapter) Unsubscribe(ctx context.Context, pubsubTopic string, contentTopics []types.TopicType) error {
 	for _, topic := range contentTopics {
-		if err := a.client.Unsubscribe(topic.ContentTopic()); err != nil {
+		if err := a.mc.Unsubscribe(topic.ContentTopic()); err != nil {
 			return fmt.Errorf("delivery: unsubscribe %s: %w", topic.ContentTopic(), err)
 		}
 	}
@@ -266,17 +277,21 @@ func (a *Adapter) ConfirmMessageDelivered([]common.Hash) {}
 
 // Peers returns the node's connected peers, or none when it cannot tell.
 func (a *Adapter) Peers() types.PeerStats {
-	peers, err := a.client.ConnectedPeers()
+	peers, err := a.mc.Node().Peers().ConnectedInfo()
 	if err != nil {
 		a.logger.Debug("failed to list connected peers", zap.Error(err))
 		return types.PeerStats{}
 	}
-	return peers
+	stats := make(types.PeerStats, len(peers))
+	for id, info := range peers {
+		stats[id] = types.WakuV2Peer{Protocols: info.Protocols, Addresses: info.Addresses}
+	}
+	return stats
 }
 
 // PeerID returns the node's peer ID, or an empty one when it cannot tell.
 func (a *Adapter) PeerID() peer.ID {
-	id, err := a.client.PeerID()
+	id, err := a.mc.Node().Debug().PeerID()
 	if err != nil {
 		a.logger.Debug("failed to read the peer ID", zap.Error(err))
 		return ""
@@ -286,7 +301,7 @@ func (a *Adapter) PeerID() peer.ID {
 
 // Metrics returns the node's metrics in the Prometheus text format.
 func (a *Adapter) Metrics() string {
-	metrics, err := a.client.Metrics()
+	metrics, err := a.mc.Node().Debug().Metrics()
 	if err != nil {
 		a.logger.Debug("failed to read metrics", zap.Error(err))
 		return ""
@@ -313,11 +328,11 @@ func decodeHash(s string) []byte {
 	return b
 }
 
-func toConnectionState(s ConnectionStatus) types.ConnectionState {
+func toConnectionState(s messaging.ConnectionStatus) types.ConnectionState {
 	switch s {
-	case Connected:
+	case messaging.Connected:
 		return types.ConnectionStateConnected
-	case PartiallyConnected:
+	case messaging.PartiallyConnected:
 		return types.ConnectionStatePartiallyConnected
 	default:
 		return types.ConnectionStateDisconnected
