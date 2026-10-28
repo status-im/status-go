@@ -130,6 +130,7 @@ func newCore(waku wakutypes.Waku, params CoreParams, config *config) (*Core, err
 		params.Identity,
 		missingDepsHandler,
 		config.logger,
+		config.persistence.SDSPersistenceStorage(),
 	)
 	if err != nil {
 		return nil, err

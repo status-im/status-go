@@ -120,7 +120,8 @@ func TestNewReliabilityFailsWhenSDSManagerInitFails(t *testing.T) {
 		key,
 		func(string, []string, string) error { return nil },
 		zap.NewNop(),
-		func(*zap.Logger) (*sds.ReliabilityManager, error) {
+		sds.PersistenceCallbacks{},
+		func(*zap.Logger, sds.PersistenceCallbacks) (*sds.ReliabilityManager, error) {
 			return nil, errors.New("boom")
 		},
 	)
@@ -135,7 +136,7 @@ func TestReliabilityStartFailsWhenSDSRebuildFails(t *testing.T) {
 	r.Close()
 	require.Nil(t, r.sdsManager)
 
-	r.sdsManagerFactory = func(*zap.Logger) (*sds.ReliabilityManager, error) {
+	r.sdsManagerFactory = func(*zap.Logger, sds.PersistenceCallbacks) (*sds.ReliabilityManager, error) {
 		return nil, errors.New("boom")
 	}
 

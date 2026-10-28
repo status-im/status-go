@@ -1,0 +1,195 @@
+--- a/library/libsds.nim
++++ b/library/libsds.nim
+@@ -13,6 +13,9 @@
+ import std/[base64, json]
+ import ffi
+ import sds
++import sds/types/persistence
++import sds/protobuf as wire
++import sds/snapshot_codec
+ import
+   ./events/[
+     json_message_ready_event, json_message_sent_event, json_missing_dependencies_event,
+@@ -35,18 +38,31 @@
+   messageId: cstring, hint: ptr cstring, hintLen: ptr csize_t, userData: pointer
+ ) {.cdecl, gcsafe, raises: [].}
+ 
++type SdsPersistenceCallback* = proc(
++  operation: cint,
++  channelId: cstring,
++  payload: ptr byte,
++  payloadLen: csize_t,
++  response: ptr cstring,
++  responseLen: ptr csize_t,
++  userData: pointer,
++) : cint {.cdecl, gcsafe, raises: [].}
++
+ # The active retrieval-hint provider, stored per worker thread (one thread per
+ # context). Set by sds_set_retrieval_hint_provider via a dispatched request so
+ # the write lands on the worker thread, where the manager's hint closure reads
+ # it during message processing.
+ var sdsRetrievalHintCb {.threadvar.}: pointer
+ var sdsRetrievalHintUserData {.threadvar.}: pointer
++var sdsPersistenceCb {.threadvar.}: pointer
++var sdsPersistenceUserData {.threadvar.}: pointer
+ 
+ ################################################################################
+ ### JSON-marshalled request/response types
+ 
+ type SdsConfig* {.ffi.} = object
+   participantId: string ## empty disables SDS-R (see newReliabilityManager)
++  persistenceEnabled: bool
+ 
+ type SdsWrapRequest* {.ffi.} = object
+   message: seq[byte]
+@@ -63,6 +79,101 @@
+   messageIds: seq[string]
+   channelId: string
+ 
++proc bytesToSeq(value: string): seq[byte] =
++  result = newSeq[byte](value.len)
++  for i, ch in value:
++    result[i] = byte(ch)
++
++proc invokePersistence(
++    operation: cint, channelId: string, payload: openArray[byte]
++): Result[string, string] =
++  if sdsPersistenceCb.isNil():
++    return err("SDS persistence callback is not registered")
++
++  var response: cstring
++  var responseLen: csize_t
++  var payloadPtr: ptr byte
++  if payload.len > 0:
++    payloadPtr = unsafeAddr payload[0]
++
++  let ret = cast[SdsPersistenceCallback](sdsPersistenceCb)(
++    operation,
++    channelId.cstring,
++    payloadPtr,
++    csize_t(payload.len),
++    addr response,
++    addr responseLen,
++    sdsPersistenceUserData,
++  )
++  var responseText = ""
++  if not response.isNil() and responseLen > 0:
++    responseText = newString(int(responseLen))
++    copyMem(addr responseText[0], response, int(responseLen))
++  if not response.isNil():
++    c_free(response)
++  if ret != RET_OK:
++    return err(if responseText.len == 0: "SDS persistence callback failed" else: responseText)
++  ok(responseText)
++
++proc goPersistence(): Persistence =
++  result.saveChannelMeta = proc(
++      channelId: SdsChannelID, meta: ChannelMeta
++  ): Future[Result[void, string]] {.async: (raises: []), gcsafe.} =
++    let saved = invokePersistence(1, $channelId, encode(meta).buffer)
++    if saved.isErr():
++      return err(saved.error)
++    return ok()
++
++  result.updateHistory = proc(
++      channelId: SdsChannelID, update: HistoryUpdate
++  ): Future[Result[void, string]] {.async: (raises: []), gcsafe.} =
++    var request = newJObject()
++    var appended = newJArray()
++    for message in update.append:
++      let encoded = wire.serializeMessage(message).valueOr:
++        return err("failed to serialize SDS history message: " & $error)
++      var entry = newJObject()
++      entry["messageId"] = %* message.messageId
++      entry["lamportTimestamp"] = %* message.lamportTimestamp
++      entry["data"] = % encode(encoded)
++      appended.add(entry)
++    request["append"] = appended
++    request["evict"] = %* update.evict
++    let saved = invokePersistence(2, $channelId, bytesToSeq($request))
++    if saved.isErr():
++      return err(saved.error)
++    return ok()
++
++  result.loadChannel = proc(
++      channelId: SdsChannelID
++  ): Future[Result[ChannelData, string]] {.async: (raises: []), gcsafe.} =
++    let loaded = invokePersistence(3, $channelId, [])
++    if loaded.isErr():
++      return err(loaded.error)
++    try:
++      let data = parseJson(loaded.value)
++      var channel = ChannelData.init()
++      if data.hasKey("meta") and data["meta"].kind == JString and data["meta"].getStr().len > 0:
++        let decoded = ChannelMeta.decode(bytesToSeq(decode(data["meta"].getStr()))).valueOr:
++          return err("failed to decode persisted SDS channel metadata")
++        channel.meta = decoded
++      if data.hasKey("messageHistory") and data["messageHistory"].kind == JArray:
++        for entry in data["messageHistory"]:
++          let message = wire.deserializeMessage(bytesToSeq(decode(entry.getStr()))).valueOr:
++            return err("failed to decode persisted SDS history message")
++          channel.messageHistory.add(message)
++      return ok(channel)
++    except CatchableError as exc:
++      return err("failed to load persisted SDS channel: " & exc.msg)
++
++  result.dropChannel = proc(
++      channelId: SdsChannelID
++  ): Future[Result[void, string]] {.async: (raises: []), gcsafe.} =
++    let dropped = invokePersistence(4, $channelId, [])
++    if dropped.isErr():
++      return err(dropped.error)
++    return ok()
++
+ ################################################################################
+ ### Constructor — creates the FFI context and the ReliabilityManager.
+ ###
+@@ -78,8 +189,11 @@
+   # stale C function pointer is never invoked.
+   sdsRetrievalHintCb = nil
+   sdsRetrievalHintUserData = nil
++  sdsPersistenceCb = nil
++  sdsPersistenceUserData = nil
+ 
+-  let rm = newReliabilityManager(participantId = config.participantId.SdsParticipantID).valueOr:
++  let persistence = if config.persistenceEnabled: goPersistence() else: noOpPersistence()
++  let rm = newReliabilityManager(participantId = config.participantId.SdsParticipantID, persistence = persistence).valueOr:
+     error "Failed creating reliability manager", error = error
+     return err("Failed creating reliability manager: " & $error)
+ 
+@@ -232,6 +346,35 @@
+           sdsNoopCallback, nil, cast[uint64](callback), cast[uint64](userData)
+         ),
+         ctxToken.tokenGeneration(),
++      )
++    except Exception as exc:
++      Result[void, string].err("sendRequestToFFIThread exception: " & exc.msg)
++  if sendRes.isErr():
++    return RET_ERR
++  return RET_OK
++
++registerReqFFI(SdsSetPersistenceReq, ctx: ptr FFIContext[ReliabilityManager]):
++  proc(cbAddr: uint64, udAddr: uint64): Future[Result[string, string]] {.async.} =
++    sdsPersistenceCb = cast[pointer](cbAddr)
++    sdsPersistenceUserData = cast[pointer](udAddr)
++    return ok("")
++
++proc sds_set_persistence_callback(
++    ctxToken: FFICtxToken, callback: SdsPersistenceCallback, userData: pointer
++): cint {.dynlib, exportc, cdecl, raises: [].} =
++  initializeLibrary()
++  let ctx = ReliabilityManagerFFIPool.resolveCtx(ctxToken)
++  if ctx.isNil():
++    return RET_ERR
++
++  let sendRes =
++    try:
++      ffi_context.sendRequestToFFIThread(
++        ctx,
++        SdsSetPersistenceReq.ffiNewReq(
++          sdsNoopCallback, nil, cast[uint64](callback), cast[uint64](userData)
++        ),
++        ctxToken.tokenGeneration(),
+       )
+     except Exception as exc:
+       Result[void, string].err("sendRequestToFFIThread exception: " & exc.msg)

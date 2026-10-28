@@ -49,6 +49,7 @@ type MessageSentHandler func(messageID string)
 type Reliability struct {
 	identity              *ecdsa.PrivateKey
 	mvdsPersistence       mvdsnode.Persistence
+	sdsPersistence        sds.PersistenceCallbacks
 	mvdsStatusChangeEvent chan mvdsnode.PeerStatusChangeEvent
 	sdsManager            *sds.ReliabilityManager
 	logger                *zap.Logger
@@ -79,8 +80,24 @@ type Reliability struct {
 	sdsOpsMu sync.RWMutex
 }
 
-func NewReliability(datasyncPersistence mvdsnode.Persistence, identity *ecdsa.PrivateKey, missingDepsHandler MissingDependenciesHandler, logger *zap.Logger) (*Reliability, error) {
-	return newReliabilityWithSDSFactory(datasyncPersistence, identity, missingDepsHandler, logger, sds.NewReliabilityManager)
+func NewReliability(datasyncPersistence mvdsnode.Persistence, identity *ecdsa.PrivateKey, missingDepsHandler MissingDependenciesHandler, logger *zap.Logger, persistence ...sds.PersistenceCallbacks) (*Reliability, error) {
+	if len(persistence) > 1 {
+		return nil, errors.New("at most one SDS persistence callback set is allowed")
+	}
+	var sdsPersistence sds.PersistenceCallbacks
+	if len(persistence) == 1 {
+		sdsPersistence = persistence[0]
+	}
+	return newReliabilityWithSDSFactory(
+		datasyncPersistence,
+		identity,
+		missingDepsHandler,
+		logger,
+		sdsPersistence,
+		func(logger *zap.Logger, persistence sds.PersistenceCallbacks) (*sds.ReliabilityManager, error) {
+			return sds.NewReliabilityManager(logger, persistence)
+		},
+	)
 }
 
 func newReliabilityWithSDSFactory(
@@ -88,6 +105,7 @@ func newReliabilityWithSDSFactory(
 	identity *ecdsa.PrivateKey,
 	missingDepsHandler MissingDependenciesHandler,
 	logger *zap.Logger,
+	sdsPersistence sds.PersistenceCallbacks,
 	sdsManagerFactory sdsManagerFactoryFunc,
 ) (*Reliability, error) {
 	if missingDepsHandler == nil {
@@ -100,6 +118,7 @@ func newReliabilityWithSDSFactory(
 	r := &Reliability{
 		identity:              identity,
 		mvdsPersistence:       datasyncPersistence,
+		sdsPersistence:        sdsPersistence,
 		mvdsStatusChangeEvent: make(chan mvdsnode.PeerStatusChangeEvent, 5),
 		logger:                logger,
 		missingDepsHandler:    missingDepsHandler,
@@ -119,6 +138,7 @@ func (r *Reliability) buildSdsManager() error {
 	manager, err := newSdsReliabilityManager(
 		r.sdsManagerFactory,
 		r.logger.Named("sds"),
+		r.sdsPersistence,
 		r.handleSDSMessageSent,
 		r.handleMissingDependencies,
 		r.provideRetrievalHint,

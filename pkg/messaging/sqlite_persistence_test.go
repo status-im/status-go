@@ -40,3 +40,20 @@ func TestResetHistoryCursorsMigration(t *testing.T) {
 	require.Equal(t, 2, total, "topics must be kept")
 	require.Zero(t, nonZero, "every history cursor must be reset")
 }
+
+func TestSQLiteMigrateCreatesSDSChannelStateTables(t *testing.T) {
+	db, cleanup, err := testutils.SetupTestSQLDB(appdatabase.DbInitializer{}, "sds-channel-state-")
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, cleanup()) })
+
+	require.NoError(t, SQLiteMigrate(db, 0))
+	for _, table := range []string{"sds_channel_metadata", "sds_channel_history"} {
+		var found string
+		err := db.QueryRow(
+			`SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?`,
+			table,
+		).Scan(&found)
+		require.NoError(t, err)
+		require.Equal(t, table, found)
+	}
+}

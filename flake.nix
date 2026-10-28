@@ -62,7 +62,13 @@
           pkgsOverlay
           (final: prev: {
             libtkl = final.callPackage ./nix/pkgs/libtkl { src = nim-token-lists; };
-            libsds     = useTmpdirForNimCache nim-sds.packages.${system}.libsds;
+            libsds     = useTmpdirForNimCache (nim-sds.packages.${system}.libsds.overrideAttrs (old: {
+              postPatch = (old.postPatch or "") + ''
+                if ! grep -q sds_set_persistence_callback library/libsds.nim; then
+                  git apply ${./third_party/sds-go-bindings/patches/nim-sds-persistence-ffi.patch}
+                fi
+              '';
+            }));
             libstorage = useTmpdirForNimCache logos-storage-nim.packages.${system}.libstorage;
             nimble = nixpkgs-nimble.legacyPackages.${system}.nimble.overrideAttrs (_: {
               version = "0.26.1";

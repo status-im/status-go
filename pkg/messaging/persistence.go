@@ -2,6 +2,7 @@ package messaging
 
 import (
 	mvdsnode "github.com/status-im/mvds/node"
+	"github.com/waku-org/sds-go-bindings/sds"
 
 	"github.com/status-im/status-go/pkg/messaging/common"
 	"github.com/status-im/status-go/pkg/messaging/layers/encryption"
@@ -14,6 +15,7 @@ type Persistence interface {
 	SegmentationStorage() segmentation.Persistence
 	MVDSStorage() mvdsnode.Persistence
 	EncryptionStorage() encryption.Persistence
+	SDSPersistenceStorage() sds.PersistenceCallbacks
 
 	MessageConfirmationStorage() common.MessageConfirmationPersistence
 	HashRatchetStorage() common.HashRatchetPersistence

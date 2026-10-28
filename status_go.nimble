@@ -44,6 +44,21 @@ proc nimblePkgDir(name: string): string =
 proc runBindingsTask(taskName: string) =
   ## Delegates to the bindings' own task; they pin the nim-sds revision their
   ## C ABI matches. LIBSDS_OUT and NIM_PARAMS come from the caller.
+  let repoRoot = getCurrentDir()
+  let sdsDir = nimblePkgDir("sds")
+  let sdsFfi = sdsDir / "library" / "libsds.nim"
+  if not fileExists(sdsFfi):
+    raise newException(CatchableError, "nim-sds FFI source not found: " & sdsFfi)
+  if not readFile(sdsFfi).contains("sds_set_persistence_callback"):
+    let patch = repoRoot / "third_party" / "sds-go-bindings" / "patches" / "nim-sds-persistence-ffi.patch"
+    let command = "git -C " & sdsDir.quoteShell & " apply "
+    let (checkOutput, checkCode) = gorgeEx(command & "--check " & patch.quoteShell)
+    if checkCode != 0:
+      raise newException(CatchableError, "nim-sds persistence patch no longer applies: " & checkOutput)
+    let (applyOutput, applyCode) = gorgeEx(command & patch.quoteShell)
+    if applyCode != 0:
+      raise newException(CatchableError, "failed to apply nim-sds persistence patch: " & applyOutput)
+
   withDir nimblePkgDir("sds_go_bindings"):
     exec nimbleExe() & " " & taskName
 
@@ -55,4 +70,3 @@ task libsdsAndroid, "Build libsds for Android; ARCH selects the architecture":
 
 task libsdsIOS, "Build libsds for iOS":
   runBindingsTask("libsdsIOS")
-
