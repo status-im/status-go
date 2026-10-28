@@ -3,5 +3,4 @@ blake2b.go linguist-vendored
 blamka_amd64.go linguist-vendored
 blamka_amd64.s linguist-vendored
 blamka_generic.go linguist-vendored
-blamka_ref.go linguist-vendored
 LICENSE linguist-vendored

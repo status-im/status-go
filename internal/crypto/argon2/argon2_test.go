@@ -53,3 +53,11 @@ func BenchmarkHasherIDKey(b *testing.B) {
 		h.IDKey([]byte("p"), []byte("saltsalt"), 1, 8*1024, 1, 32)
 	}
 }
+
+// Puzzle-auth parameters: 16 MiB, 4 passes, 4 lanes.
+func BenchmarkHasherIDKeyPuzzle(b *testing.B) {
+	var h Hasher
+	for b.Loop() {
+		h.IDKey([]byte("p"), []byte("saltsalt"), 4, 16*1024, 4, 32)
+	}
+}

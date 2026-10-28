@@ -176,7 +176,6 @@ func TestTransport_Do_RetryStatusCodes(t *testing.T) {
 		statusCode int
 	}{
 		{"403 retry", http.StatusForbidden},
-		{"429 retry", http.StatusTooManyRequests},
 	}
 
 	for _, tt := range tests {
@@ -211,6 +210,28 @@ func TestTransport_Do_RetryStatusCodes(t *testing.T) {
 			resp.Body.Close()
 		})
 	}
+}
+
+func TestTransport_Do_RateLimitPassedThrough(t *testing.T) {
+	var resourceReq, solveReq int32
+
+	resourceHandler := func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt32(&resourceReq, 1)
+		w.WriteHeader(http.StatusTooManyRequests)
+	}
+
+	server := newPuzzleAuthServer(t, withResourceHandler(resourceHandler), withCounters(new(int32), &solveReq))
+	defer server.Close()
+
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, server.URL+"/resource", nil)
+	require.NoError(t, err)
+
+	resp, err := NewHTTPClient(server.URL, nil).Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	require.Equal(t, http.StatusTooManyRequests, resp.StatusCode, "an upstream rate limit reaches the caller")
+	require.Equal(t, int32(1), atomic.LoadInt32(&resourceReq), "a rate limit is not retried")
+	require.Equal(t, int32(1), atomic.LoadInt32(&solveReq), "a rate limit does not cost a new puzzle")
 }
 
 func TestTransport_Do_MaxRetriesExceeded(t *testing.T) {

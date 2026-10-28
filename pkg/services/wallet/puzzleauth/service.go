@@ -14,8 +14,25 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/internal/logutils"
+	"github.com/status-im/status-go/internal/panics"
 	"github.com/status-im/status-go/internal/traffic"
 )
+
+const (
+	// authRequestTimeout bounds each /auth/puzzle and /auth/solve request.
+	authRequestTimeout = 5 * time.Second
+	// refreshTimeout bounds a whole refresh, solve included.
+	refreshTimeout = 30 * time.Second
+	// backgroundRetryDelay delays the next background refresh after a failed one.
+	backgroundRetryDelay = 30 * time.Second
+)
+
+// refreshCall is a token refresh shared by every request that waits for it.
+type refreshCall struct {
+	done  chan struct{}
+	token string
+	err   error
+}
 
 // Service manages puzzle authentication tokens
 type Service struct {
@@ -23,7 +40,10 @@ type Service struct {
 	httpClient  *http.Client
 	tokenCache  *TokenData
 	mu          sync.RWMutex
-	refreshLock sync.Mutex
+	refreshing  *refreshCall
+	authTimeout time.Duration
+	now         func() time.Time
+	retryAt     time.Time
 }
 
 // NewService creates a new puzzle auth service for the given origin
@@ -36,8 +56,10 @@ func NewService(origin string, httpClient *http.Client) *Service {
 		}
 	}
 	return &Service{
-		origin:     origin,
-		httpClient: httpClient,
+		origin:      origin,
+		httpClient:  httpClient,
+		authTimeout: authRequestTimeout,
+		now:         time.Now,
 	}
 }
 
@@ -47,7 +69,7 @@ func (s *Service) GetToken() string {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	if s.tokenCache != nil && s.tokenCache.IsValid() {
+	if s.tokenCache != nil && s.tokenCache.validAt(s.now()) {
 		return s.tokenCache.Token
 	}
 
@@ -65,7 +87,7 @@ func (s *Service) InvalidateToken() {
 }
 
 // InvalidateTokenForRejectedRequest drops the cache only if it still holds the
-// token that was used on a failed request. This avoids a thundering herd on 401/403/429
+// token that was used on a failed request. This avoids a thundering herd on 401/403
 // clobbering a token another goroutine just refreshed.
 // If no Bearer was sent (rejected is empty), this is a no-op; callers use EnsureToken only.
 func (s *Service) InvalidateTokenForRejectedRequest(rejectedBearer string) {
@@ -82,30 +104,118 @@ func (s *Service) InvalidateTokenForRejectedRequest(rejectedBearer string) {
 		zap.String("origin", s.origin))
 }
 
-// EnsureToken returns a valid token, refreshing if necessary
+// takeToken returns the cached token and counts one request sent with it,
+// or "" if the token is expired or has no requests left. A token close to
+// expiry is still returned while a refresh starts in the background.
+func (s *Service) takeToken(ctx context.Context) string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	now := s.now()
+	if !s.tokenCache.validAt(now) {
+		return ""
+	}
+	if s.refreshing == nil && s.tokenCache.refreshDueAt(now) && !now.Before(s.retryAt) {
+		s.startRefreshLocked(ctx)
+	}
+	s.tokenCache.Used++
+	return s.tokenCache.Token
+}
+
+// EnsureToken returns a valid token for one request, refreshing if necessary.
+// Each call counts against the token's request limit. Concurrent callers wait for
+// one refresh and share its result; a caller that gives up does not cancel it.
 func (s *Service) EnsureToken(ctx context.Context) (string, error) {
-	if token := s.GetToken(); token != "" {
-		return token, nil
+	for {
+		if token := s.takeToken(ctx); token != "" {
+			return token, nil
+		}
+		if err := ctx.Err(); err != nil {
+			return "", err
+		}
+
+		call := s.joinRefresh(ctx)
+		select {
+		case <-call.done:
+		case <-ctx.Done():
+			return "", ctx.Err()
+		}
+		if call.err != nil {
+			return "", call.err
+		}
+		if s.takeRefreshed(call.token) {
+			return call.token, nil
+		}
 	}
+}
 
-	// Need to refresh - use lock to prevent concurrent refreshes
-	s.refreshLock.Lock()
-	defer s.refreshLock.Unlock()
+// joinRefresh returns the refresh in flight, or starts one if the cached token
+// cannot be sent.
+func (s *Service) joinRefresh(ctx context.Context) *refreshCall {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
-	// Double-check after acquiring lock (another goroutine might have refreshed)
-	if token := s.GetToken(); token != "" {
-		return token, nil
+	if s.refreshing != nil {
+		return s.refreshing
 	}
+	if s.tokenCache.validAt(s.now()) {
+		call := &refreshCall{done: make(chan struct{}), token: s.tokenCache.Token}
+		close(call.done)
+		return call
+	}
+	return s.startRefreshLocked(ctx)
+}
 
-	return s.refreshToken(ctx)
+// startRefreshLocked starts a refresh that outlives the caller's ctx.
+// s.mu must be held.
+func (s *Service) startRefreshLocked(ctx context.Context) *refreshCall {
+	call := &refreshCall{done: make(chan struct{})}
+	s.refreshing = call
+	go func() {
+		defer panics.LogOnPanic()
+		defer close(call.done)
+
+		refreshCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), refreshTimeout)
+		defer cancel()
+		call.token, call.err = s.refreshToken(refreshCtx)
+
+		s.mu.Lock()
+		s.refreshing = nil
+		if call.err != nil {
+			s.retryAt = s.now().Add(backgroundRetryDelay)
+		}
+		s.mu.Unlock()
+	}()
+	return call
+}
+
+// takeRefreshed counts one request sent with a token that a refresh just
+// returned. It fails if the token was replaced or its request limit is used up.
+func (s *Service) takeRefreshed(token string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.tokenCache == nil || s.tokenCache.Token != token || s.tokenCache.limitReached() {
+		return false
+	}
+	s.tokenCache.Used++
+	return true
 }
 
 // refreshToken fetches a new token by solving a puzzle
-func (s *Service) refreshToken(ctx context.Context) (string, error) {
+func (s *Service) refreshToken(ctx context.Context) (token string, err error) {
 	logutils.ZapLogger().Debug("Refreshing puzzle auth token",
 		zap.String("origin", s.origin))
 
 	startTime := time.Now()
+	defer func() {
+		if err != nil {
+			logutils.ZapLogger().Warn("Puzzle auth token refresh failed",
+				zap.String("origin", s.origin),
+				zap.Error(err),
+				zap.Duration("totalTime", time.Since(startTime)))
+		}
+	}()
 
 	// Step 1: Get puzzle
 	puzzle, err := s.getPuzzle(ctx)
@@ -131,7 +241,7 @@ func (s *Service) refreshToken(ctx context.Context) (string, error) {
 		return "", fmt.Errorf("failed to submit solution: %w", err)
 	}
 
-	issuedAt := time.Now()
+	issuedAt := s.now()
 	expiresAt, err := time.Parse(time.RFC3339, tokenResp.ExpiresAt)
 	if err != nil {
 		logutils.ZapLogger().Warn("Failed to parse token expiry, using 1 hour default",
@@ -141,9 +251,10 @@ func (s *Service) refreshToken(ctx context.Context) (string, error) {
 
 	s.mu.Lock()
 	s.tokenCache = &TokenData{
-		Token:     tokenResp.Token,
-		IssuedAt:  issuedAt,
-		ExpiresAt: expiresAt,
+		Token:        tokenResp.Token,
+		IssuedAt:     issuedAt,
+		ExpiresAt:    expiresAt,
+		RequestLimit: tokenResp.RequestLimit,
 	}
 	s.mu.Unlock()
 
@@ -162,6 +273,8 @@ func (s *Service) getPuzzle(ctx context.Context) (*Puzzle, error) {
 		return nil, fmt.Errorf("failed to construct puzzle URL: %w", err)
 	}
 
+	ctx, cancel := context.WithTimeout(ctx, s.authTimeout)
+	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
@@ -198,6 +311,8 @@ func (s *Service) submitSolution(ctx context.Context, solution *Solution) (*Toke
 		return nil, err
 	}
 
+	ctx, cancel := context.WithTimeout(ctx, s.authTimeout)
+	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return nil, err

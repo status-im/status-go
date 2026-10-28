@@ -7,6 +7,7 @@
 //
 // Modified by Status: the first pass writes blocks instead of XOR-ing into zeroed memory, which is
 // equivalent for fresh memory and makes stale blocks from a previous derivation irrelevant.
+// blamka_arm64.s adds a NEON block compression; upstream has assembly for amd64 only.
 package argon2
 
 import (
