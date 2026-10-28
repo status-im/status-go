@@ -266,7 +266,7 @@ else
  STATUS_GO_GIT_COMMIT := $(GIT_COMMIT)
 endif
 SENTRY_CONTEXT_VERSION ?= $(STATUS_GO_VERSION)
-BUILD_VARS_LDFLAGS := \
+BUILD_VARS_LDFLAGS = \
 	-X $(VERSION_PKG).version=$(STATUS_GO_VERSION) \
 	-X $(VERSION_PKG).gitCommit=$(STATUS_GO_GIT_COMMIT) \
 	-X $(SENTRY_PKG).defaultContextName=$(SENTRY_CONTEXT_NAME) \
@@ -533,6 +533,11 @@ statusgo-ios-library: generate-overlay statusgo-c-bindings build-libsds-ios ##@c
 	@file $(STATUS_GO_BIN_DIR)/libstatus.a
 
 docker-image: SHELL := /bin/sh
+# Docker images were never stamped for Sentry (go:generate ran inside the image
+# without these variables); keep it so. Changing that is a separate decision.
+docker-image: SENTRY_CONTEXT_NAME =
+docker-image: SENTRY_CONTEXT_VERSION =
+docker-image: SENTRY_PRODUCTION =
 docker-image: BUILD_TARGET ?= cmd
 docker-image: ##@docker Build docker image (use DOCKER_IMAGE_NAME to set the image name)
 	@echo "Building docker image..."
