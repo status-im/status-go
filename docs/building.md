@@ -26,6 +26,26 @@ Checkout [`status-backend docs`](../cmd/status-backend/README.md) for more detai
 - `make status-go-deps` - install required tools
 - `make generate` - compile protobuf files, build SQL migrations, generate mocks
 
+## Build values come from `-ldflags`
+
+`pkg/version` and `pkg/sentry` take their build-time values as plain package
+variables set at link time (`BUILD_VARS_LDFLAGS` in the Makefile), not from
+generated files:
+
+| linker variable | source |
+|---|---|
+| `pkg/version.version` | `STATUS_GO_VERSION`; defaults to `git describe --tags`, else `0.0.0-dev` |
+| `pkg/version.gitCommit` | `GIT_COMMIT`; defaults to `git rev-parse --short HEAD`, else `unknown` |
+| `pkg/sentry.defaultContextName` | `SENTRY_CONTEXT_NAME` |
+| `pkg/sentry.defaultContextVersion` | `SENTRY_CONTEXT_VERSION`; defaults to `STATUS_GO_VERSION` |
+| `pkg/sentry.production` | `SENTRY_PRODUCTION` |
+
+A copy that is not its own git checkout falls back to the placeholders above;
+an embedder that knows the real version passes `STATUS_GO_VERSION` in.
+
+Extra link flags belong in `GO_EXTRA_LDFLAGS`. Overriding `BUILD_FLAGS`
+replaces `BUILD_VARS_LDFLAGS` and leaves the build unstamped.
+
 ## Building with Docker
 
 ```shell
