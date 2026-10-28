@@ -5,6 +5,9 @@
 // responses (RFC 7694). Transport sends plain bodies to a host until a
 // response from it carries that header, and plain again once one does not.
 // A host that turns a gzip body down all the same gets plain bodies from then on.
+// Until a host first answers, one large request goes to it at a time, so that
+// requests sent together, such as on start, do not all go plain. A request
+// waits for that answer no longer than FirstAnswerWait.
 package requestgzip
 
 import (
@@ -15,24 +18,43 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 )
 
 // MinSize is the smallest body worth compressing: below it the gzip header
 // and the CPU outweigh what is saved.
 const MinSize = 1 << 10
 
+// FirstAnswerWait is the longest a large request waits for a host's first
+// answer before it goes plain.
+const FirstAnswerWait = 3 * time.Second
+
 type Transport struct {
-	base    http.RoundTripper
-	accepts sync.Map // host -> struct{}
-	refuses sync.Map // host -> struct{}
+	base     http.RoundTripper
+	accepts  sync.Map // host -> struct{}
+	refuses  sync.Map // host -> struct{}
+	answered sync.Map // host -> struct{}
+
+	firstMu sync.Mutex
+	// first are the hosts that have not answered yet with a large request on
+	// its way; the channel closes when it ends.
+	first map[string]chan struct{}
 }
 
 func New(base http.RoundTripper) *Transport {
-	return &Transport{base: base}
+	return &Transport{base: base, first: make(map[string]chan struct{})}
 }
 
 func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 	host := req.URL.Host
+	if large(req) {
+		ended, err := t.awaitFirstAnswer(req)
+		if err != nil {
+			_ = req.Body.Close()
+			return nil, err
+		}
+		defer ended()
+	}
 	if !t.worthCompressing(req) {
 		resp, err := t.base.RoundTrip(req)
 		t.learn(host, resp)
@@ -68,13 +90,52 @@ func mayRefuseEncoding(status int) bool {
 	return status == http.StatusUnsupportedMediaType || status == http.StatusBadRequest
 }
 
+func large(req *http.Request) bool {
+	return req.Body != nil && req.Body != http.NoBody && req.ContentLength >= MinSize &&
+		req.Header.Get("Content-Encoding") == ""
+}
+
 func (t *Transport) worthCompressing(req *http.Request) bool {
-	if req.Body == nil || req.Body == http.NoBody || req.ContentLength < MinSize ||
-		req.Header.Get("Content-Encoding") != "" {
+	if !large(req) {
 		return false
 	}
 	_, ok := t.accepts.Load(req.URL.Host)
 	return ok
+}
+
+// awaitFirstAnswer holds req while another large request goes to a host that
+// has not answered yet. When req goes first instead, ended is to be called
+// once it ends.
+func (t *Transport) awaitFirstAnswer(req *http.Request) (ended func(), err error) {
+	host := req.URL.Host
+	timeout := time.NewTimer(FirstAnswerWait)
+	defer timeout.Stop()
+	for {
+		if _, ok := t.answered.Load(host); ok {
+			return func() {}, nil
+		}
+		t.firstMu.Lock()
+		first, ok := t.first[host]
+		if !ok {
+			first = make(chan struct{})
+			t.first[host] = first
+			t.firstMu.Unlock()
+			return func() {
+				t.firstMu.Lock()
+				delete(t.first, host)
+				t.firstMu.Unlock()
+				close(first)
+			}, nil
+		}
+		t.firstMu.Unlock()
+		select {
+		case <-first:
+		case <-timeout.C:
+			return func() {}, nil
+		case <-req.Context().Done():
+			return nil, req.Context().Err()
+		}
+	}
 }
 
 // learn takes what the latest response from host says about gzip bodies.
@@ -82,6 +143,7 @@ func (t *Transport) learn(host string, resp *http.Response) {
 	if resp == nil {
 		return
 	}
+	t.answered.Store(host, struct{}{})
 	if _, refused := t.refuses.Load(host); refused {
 		return
 	}

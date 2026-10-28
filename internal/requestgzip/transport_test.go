@@ -5,12 +5,17 @@ import (
 	"cmp"
 	"compress/gzip"
 	"context"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
+	"testing/synctest"
+	"time"
 
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/stretchr/testify/require"
@@ -310,6 +315,177 @@ func TestTransport_CompressesGoEthereumRPCCalls(t *testing.T) {
 	require.Equal(t, "gzip", got.encoding)
 	require.Contains(t, got.body, `"method":"eth_call"`)
 	require.Contains(t, got.body, data)
+}
+
+// heldHost is a host whose answers wait for release; it records the encoding
+// of every request it gets.
+type heldHost struct {
+	mu        sync.Mutex
+	encodings []string
+	release   chan struct{}
+	advertise string
+	err       error
+}
+
+func (h *heldHost) RoundTrip(r *http.Request) (*http.Response, error) {
+	h.mu.Lock()
+	h.encodings = append(h.encodings, r.Header.Get("Content-Encoding"))
+	h.mu.Unlock()
+	<-h.release
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if err := h.err; err != nil {
+		h.err = nil
+		return nil, err
+	}
+	header := http.Header{}
+	if h.advertise != "" {
+		header.Set("Accept-Encoding", h.advertise)
+	}
+	return &http.Response{StatusCode: http.StatusOK, Header: header, Body: http.NoBody}, nil
+}
+
+func (h *heldHost) got() []string {
+	synctest.Wait()
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return slices.Clone(h.encodings)
+}
+
+// roundTripAll sends n large requests at once and returns what waits for
+// their errors.
+func roundTripAll(ctx context.Context, t *testing.T, tr *Transport, n int) func() []error {
+	errs := make([]error, n)
+	var wg sync.WaitGroup
+	for i := range n {
+		wg.Go(func() {
+			req, err := http.NewRequestWithContext(ctx, http.MethodPost, "http://node.test/rpc", strings.NewReader(largeBody))
+			require.NoError(t, err)
+			resp, err := tr.RoundTrip(req)
+			if err == nil {
+				_ = resp.Body.Close()
+			}
+			errs[i] = err
+		})
+	}
+	t.Cleanup(wg.Wait)
+	return func() []error {
+		wg.Wait()
+		return errs
+	}
+}
+
+func TestTransport_SendsOneLargeRequestToAHostUntilItFirstAnswers(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		host := &heldHost{release: make(chan struct{}), advertise: "gzip"}
+		tr := New(host)
+
+		roundTripAll(context.Background(), t, tr, 3)
+		require.Equal(t, []string{""}, host.got(), "the others wait for the first answer")
+
+		close(host.release)
+		require.Equal(t, []string{"", "gzip", "gzip"}, host.got())
+	})
+}
+
+func TestTransport_SendsLargeRequestsTogetherToAHostThatAnsweredWithoutGzip(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		release := make(chan struct{})
+		close(release)
+		host := &heldHost{release: release}
+		tr := New(host)
+		roundTripAll(context.Background(), t, tr, 1)
+		host.got()
+
+		host.release = make(chan struct{})
+		roundTripAll(context.Background(), t, tr, 2)
+		require.Equal(t, []string{"", "", ""}, host.got(), "a host that answered holds nothing back")
+		close(host.release)
+	})
+}
+
+func TestTransport_SendsTheNextLargeRequestWhenTheFirstGetsNoAnswer(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		host := &heldHost{release: make(chan struct{}), advertise: "gzip", err: errors.New("connection reset")}
+		tr := New(host)
+
+		wait := roundTripAll(context.Background(), t, tr, 2)
+		require.Equal(t, []string{""}, host.got())
+
+		close(host.release)
+		require.Equal(t, []string{"", ""}, host.got(), "no answer teaches nothing, so the next goes plain too")
+		failed := slices.DeleteFunc(wait(), func(err error) bool { return err == nil })
+		require.Len(t, failed, 1)
+	})
+}
+
+func TestTransport_GivesUpWaitingWhenTheRequestIsCanceled(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		host := &heldHost{release: make(chan struct{}), advertise: "gzip"}
+		tr := New(host)
+		roundTripAll(context.Background(), t, tr, 1)
+		host.got()
+
+		ctx, cancel := context.WithCancel(context.Background())
+		wait := roundTripAll(ctx, t, tr, 1)
+		synctest.Wait()
+		cancel()
+
+		require.ErrorIs(t, wait()[0], context.Canceled)
+		require.Equal(t, []string{""}, host.got(), "the canceled request is never sent")
+		close(host.release)
+	})
+}
+
+func TestTransport_SendsAnywayWhenTheFirstAnswerTakesTooLong(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		host := &heldHost{release: make(chan struct{}), advertise: "gzip"}
+		defer close(host.release)
+		tr := New(host)
+
+		roundTripAll(context.Background(), t, tr, 2)
+		require.Equal(t, []string{""}, host.got())
+
+		time.Sleep(FirstAnswerWait)
+		require.Equal(t, []string{"", ""}, host.got(), "the held request goes plain")
+	})
+}
+
+// closeRecorder is a request body that records whether it was closed.
+type closeRecorder struct {
+	io.Reader
+	closed atomic.Bool
+}
+
+func (c *closeRecorder) Close() error {
+	c.closed.Store(true)
+	return nil
+}
+
+func TestTransport_ClosesTheBodyOfARequestCanceledWhileHeld(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		host := &heldHost{release: make(chan struct{}), advertise: "gzip"}
+		defer close(host.release)
+		tr := New(host)
+		roundTripAll(context.Background(), t, tr, 1)
+		host.got()
+
+		ctx, cancel := context.WithCancel(context.Background())
+		body := &closeRecorder{Reader: strings.NewReader(largeBody)}
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, "http://node.test/rpc", body)
+		require.NoError(t, err)
+		req.ContentLength = int64(len(largeBody))
+		errs := make(chan error, 1)
+		go func() {
+			_, err := tr.RoundTrip(req)
+			errs <- err
+		}()
+		synctest.Wait()
+		cancel()
+
+		require.ErrorIs(t, <-errs, context.Canceled)
+		require.True(t, body.closed.Load())
+	})
 }
 
 type roundTripFunc func(*http.Request) (*http.Response, error)
