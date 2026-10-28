@@ -52,6 +52,20 @@ func NewStoreClient(selector *storeSelector, pager *storePager, resolvePubsubTop
 	}
 }
 
+// NewStoreClientOver returns a StoreClient that sends each store request
+// through requestor and hands fetched envelopes to processor. It has no
+// storenodes until SetStorenodes.
+func NewStoreClientOver(requestor StoreRequestor, processor EnvelopeProcessor, logger *zap.Logger) *StoreClient {
+	return NewStoreClient(newStoreSelector(), newStorePager(requestor, processor, logger), defaultShardIfEmpty, logger)
+}
+
+func defaultShardIfEmpty(pubsubTopic string) string {
+	if pubsubTopic == "" {
+		return DefaultShardPubsubTopic()
+	}
+	return pubsubTopic
+}
+
 // SetStorenodes sets the storenodes Query may use. Called once at startup.
 func (sc *StoreClient) SetStorenodes(nodes []peer.AddrInfo) {
 	sc.selector.setStorenodes(nodes)
