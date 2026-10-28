@@ -34,9 +34,10 @@ type Account struct {
 	HasAcceptedTerms bool `json:"hasAcceptedTerms"`
 }
 
-func (a *Account) RefersToKeycard() bool {
-	return a.KeycardPairing != ""
-}
+// KeycardPairingSecureChannelV2 is stored as KeycardPairing for keycards that have no pairing
+// (applet 4.x, SecureChannelV2). A non-empty KeycardPairing is what marks an account as a keycard
+// account, so these cards need a value even though there is no pairing key.
+const KeycardPairingSecureChannelV2 = "secure-channel-v2"
 
 func (a *Account) ToProtobuf() *protobuf.MultiAccount {
 	var colorHashes []*protobuf.MultiAccount_ColorHash

@@ -855,7 +855,13 @@ func TestConvertAccount(t *testing.T) {
 
 	// Converting to a keycard account
 	const keycardPassword = "222222" // represents password for a keycard user
-	err = testContext.backend.ConvertToKeycardAccount(keycardAccount, keycardSettings, testContext.profileKeypair.KeyUID, testPassword, keycardPassword)
+	err = testContext.backend.ConvertToKeycardAccount(&requests.ConvertToKeycardAccount{
+		Account:     keycardAccount,
+		Settings:    keycardSettings,
+		KeycardUID:  testContext.profileKeypair.KeyUID,
+		OldPassword: testPassword,
+		NewPassword: keycardPassword,
+	})
 	require.NoError(t, err)
 
 	require.NotNil(t, testContext.backend.appDB)
@@ -1688,6 +1694,69 @@ func TestRestoreKeycardAccountAndLogin(t *testing.T) {
 		"Expected the restored profile keypair marked as status-keycard cold wallet because the restore request carried KeycardInstanceUID")
 }
 
+func TestConvertToKeycardAccountRequiresPairingOrSecureChannelV2(t *testing.T) {
+	backend := NewStatusBackend(testutils.MustCreateTestLogger())
+	err := backend.ConvertToKeycardAccount(&requests.ConvertToKeycardAccount{
+		Account:     multiaccounts.Account{KeyUID: "0x01"},
+		KeycardUID:  "a84599394887b742eed9a99d3834a797",
+		OldPassword: testPassword,
+		NewPassword: testKeycardPassword,
+	})
+	require.ErrorContains(t, err, "keycard pairing missing",
+		"Expected a refusal because the converted account would not be marked as a keycard account")
+}
+
+func TestPrepareForKeycardSecureChannelV2NeedsNoPairing(t *testing.T) {
+	backend := NewStatusBackend(testutils.MustCreateTestLogger())
+	nodeConfig := &params.NodeConfig{KeycardPairingDataFile: path.Join(t.TempDir(), "keycard-pairings.json")}
+
+	account := &multiaccounts.Account{}
+	err := backend.prepareForKeycard(&requests.CreateAccount{
+		KeycardInstanceUID:     "a84599394887b742eed9a99d3834a797",
+		KeycardSecureChannelV2: true,
+	}, account, nodeConfig)
+	require.NoError(t, err, "Expected no pairings file lookup because applet 4.x cards have no pairing")
+	require.Equal(t, multiaccounts.KeycardPairingSecureChannelV2, account.KeycardPairing,
+		"Expected the marker so the account is still recognised as a keycard account")
+
+	err = backend.prepareForKeycard(&requests.CreateAccount{
+		KeycardInstanceUID: "a84599394887b742eed9a99d3834a797",
+	}, &multiaccounts.Account{}, nodeConfig)
+	require.Error(t, err, "Expected a card with pairing (applet 3.x) to still require its pairings file entry")
+}
+
+func TestConvertToKeycardAccountSecureChannelV2StoresMarker(t *testing.T) {
+	testContext := setupTestContext(t, testPassword, false, false, true)
+
+	request := &requests.CreateAccount{
+		RootDataDir:   testContext.config.RootDataDir,
+		Password:      testPassword,
+		KdfIterations: 1,
+	}
+	_, err := testContext.backend.StartNodeWithChatKeyOrMnemonic(request, testContext.mnemonic, nil, false)
+	require.NoError(t, err)
+	defer func() {
+		assert.NoError(t, testContext.backend.Logout())
+		assert.NoError(t, testContext.backend.StopNode())
+	}()
+
+	keycardAccount := *testContext.multiAcc
+	keycardAccount.KeycardPairing = ""
+	require.NoError(t, testContext.backend.ConvertToKeycardAccount(&requests.ConvertToKeycardAccount{
+		Account:                keycardAccount,
+		KeycardUID:             testContext.profileKeypair.KeyUID,
+		OldPassword:            testPassword,
+		NewPassword:            testKeycardPassword,
+		KeycardSecureChannelV2: true,
+	}))
+
+	// read back from the database: the next login decides keycard-ness from the stored value
+	storedAcc, err := testContext.backend.multiaccountsDB.GetAccount(testContext.profileKeypair.KeyUID)
+	require.NoError(t, err)
+	require.Equal(t, multiaccounts.KeycardPairingSecureChannelV2, storedAcc.KeycardPairing,
+		"Expected the marker persisted because an applet 4.x card has no pairing key to store")
+}
+
 func countKeystoreFilesForKeyUID(t *testing.T, rootDataDir string, keyUID string) int {
 	_, absolutePath := DefaultKeystorePath(rootDataDir, keyUID)
 	entries, err := os.ReadDir(absolutePath)
@@ -1877,8 +1946,13 @@ func setupLoggedOutKeycardProfileWithoutXPub(t *testing.T) *setupContext {
 
 	keycardAccount := *testContext.multiAcc
 	keycardAccount.KeycardPairing = "pairing"
-	require.NoError(t, testContext.backend.ConvertToKeycardAccount(keycardAccount, settings.Settings{},
-		testContext.profileKeypair.KeyUID, testPassword, testKeycardPassword))
+	require.NoError(t, testContext.backend.ConvertToKeycardAccount(&requests.ConvertToKeycardAccount{
+		Account:     keycardAccount,
+		Settings:    settings.Settings{},
+		KeycardUID:  testContext.profileKeypair.KeyUID,
+		OldPassword: testPassword,
+		NewPassword: testKeycardPassword,
+	}))
 
 	_, err = testContext.backend.appDB.Exec("UPDATE keypairs SET xpub = '' WHERE key_uid = ?", testContext.profileKeypair.KeyUID)
 	require.NoError(t, err)
@@ -1988,7 +2062,13 @@ func TestKeycardReLoginViaLoginAccountAfterConversion(t *testing.T) {
 
 	keycardAccount := *testContext.multiAcc
 	keycardAccount.KeycardPairing = "pairing"
-	err = testContext.backend.ConvertToKeycardAccount(keycardAccount, settings.Settings{}, testContext.profileKeypair.KeyUID, testPassword, testKeycardPassword)
+	err = testContext.backend.ConvertToKeycardAccount(&requests.ConvertToKeycardAccount{
+		Account:     keycardAccount,
+		Settings:    settings.Settings{},
+		KeycardUID:  testContext.profileKeypair.KeyUID,
+		OldPassword: testPassword,
+		NewPassword: testKeycardPassword,
+	})
 	require.NoError(t, err)
 
 	require.NoError(t, testContext.backend.Logout())
@@ -2044,7 +2124,13 @@ func TestLostKeycardLoginWithMnemonicRecoversKeycardAccount(t *testing.T) {
 
 	keycardAccount := *testContext.multiAcc
 	keycardAccount.KeycardPairing = "pairing"
-	err = testContext.backend.ConvertToKeycardAccount(keycardAccount, settings.Settings{}, testContext.profileKeypair.KeyUID, testPassword, encryptionPublicKey)
+	err = testContext.backend.ConvertToKeycardAccount(&requests.ConvertToKeycardAccount{
+		Account:     keycardAccount,
+		Settings:    settings.Settings{},
+		KeycardUID:  testContext.profileKeypair.KeyUID,
+		OldPassword: testPassword,
+		NewPassword: encryptionPublicKey,
+	})
 	require.NoError(t, err)
 
 	require.NoError(t, testContext.backend.Logout())
@@ -2135,7 +2221,13 @@ func setupKeycardConvertedContext(t *testing.T) *setupContext {
 
 	keycardAccount := *testContext.multiAcc
 	keycardAccount.KeycardPairing = "pairing"
-	err = testContext.backend.ConvertToKeycardAccount(keycardAccount, settings.Settings{}, testContext.profileKeypair.KeyUID, testPassword, testKeycardPassword)
+	err = testContext.backend.ConvertToKeycardAccount(&requests.ConvertToKeycardAccount{
+		Account:     keycardAccount,
+		Settings:    settings.Settings{},
+		KeycardUID:  testContext.profileKeypair.KeyUID,
+		OldPassword: testPassword,
+		NewPassword: testKeycardPassword,
+	})
 	require.NoError(t, err)
 
 	require.NoError(t, testContext.backend.Logout())
@@ -2156,7 +2248,13 @@ func TestConvertToKeycardAccountRequiresMessenger(t *testing.T) {
 	testContext := setupTestContext(t, testPassword, false, false, true)
 
 	keycardAccount := *testContext.multiAcc
-	err := testContext.backend.ConvertToKeycardAccount(keycardAccount, settings.Settings{}, testContext.profileKeypair.KeyUID, testPassword, testKeycardPassword)
+	err := testContext.backend.ConvertToKeycardAccount(&requests.ConvertToKeycardAccount{
+		Account:     keycardAccount,
+		Settings:    settings.Settings{},
+		KeycardUID:  testContext.profileKeypair.KeyUID,
+		OldPassword: testPassword,
+		NewPassword: testKeycardPassword,
+	})
 	require.ErrorContains(t, err, "cannot resolve messenger instance",
 		"Expected the conversion to be rejected because without a logged-in messenger no keypair migration can run")
 }
@@ -2186,7 +2284,13 @@ func TestConvertToKeycardAccountRejectsWrongOldPassword(t *testing.T) {
 
 	keycardAccount := *testContext.multiAcc
 	keycardAccount.KeycardPairing = "wrong-password-pairing"
-	err = testContext.backend.ConvertToKeycardAccount(keycardAccount, settings.Settings{}, keyUID, "wrong-password", testKeycardPassword)
+	err = testContext.backend.ConvertToKeycardAccount(&requests.ConvertToKeycardAccount{
+		Account:     keycardAccount,
+		Settings:    settings.Settings{},
+		KeycardUID:  keyUID,
+		OldPassword: "wrong-password",
+		NewPassword: testKeycardPassword,
+	})
 	require.ErrorIs(t, err, envelope.ErrInvalidKEK,
 		"Expected the conversion to fail on the key-encryption envelope because the old password is wrong")
 
@@ -2365,7 +2469,13 @@ func TestConvertToKeycardAccountOnLegacyProfileWipesMnemonicOnWrongPassword(t *t
 
 	keycardAccount := multiAcc
 	keycardAccount.KeycardPairing = "legacy-wrong-password-pairing"
-	err = b.ConvertToKeycardAccount(keycardAccount, settings.Settings{}, keyUID, "wrong-password", testKeycardPassword)
+	err = b.ConvertToKeycardAccount(&requests.ConvertToKeycardAccount{
+		Account:     keycardAccount,
+		Settings:    settings.Settings{},
+		KeycardUID:  keyUID,
+		OldPassword: "wrong-password",
+		NewPassword: testKeycardPassword,
+	})
 	require.ErrorContains(t, err, "incorrect password provided",
 		"a legacy profile only rejects the password at the keypair migration, two steps after the settings writes")
 

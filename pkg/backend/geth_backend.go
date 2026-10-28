@@ -1640,7 +1640,19 @@ func replaceDBFile(dbPath string, newDBPath string) (cleanup func(), err error) 
 	return
 }
 
-func (b *StatusBackend) ConvertToKeycardAccount(account multiaccounts.Account, s settings.Settings, keycardUID string, oldPassword string, newPassword string) error {
+// ConvertToKeycardAccount converts the profile to a keycard profile as described by the request.
+func (b *StatusBackend) ConvertToKeycardAccount(request *requests.ConvertToKeycardAccount) error {
+	account := request.Account
+	oldPassword := request.OldPassword
+	newPassword := request.NewPassword
+	if request.KeycardSecureChannelV2 {
+		account.KeycardPairing = multiaccounts.KeycardPairingSecureChannelV2
+	}
+	// An empty KeycardPairing would leave the converted account looking like a regular one
+	if account.KeycardPairing == "" {
+		return errors.New("keycard pairing missing: set the account's keycard pairing, or KeycardSecureChannelV2 for keycards without pairing")
+	}
+
 	messenger := b.Messenger()
 	if messenger == nil {
 		return errors.New("cannot resolve messenger instance")
@@ -1936,6 +1948,11 @@ func (b *StatusBackend) prepareKeypair(request *requests.CreateAccount, keyUID s
 func (b *StatusBackend) prepareForKeycard(request *requests.CreateAccount, multiAccount *multiaccounts.Account,
 	nodeConfig *params.NodeConfig) error {
 	if request.KeycardInstanceUID == "" {
+		return nil
+	}
+
+	if request.KeycardSecureChannelV2 {
+		multiAccount.KeycardPairing = multiaccounts.KeycardPairingSecureChannelV2
 		return nil
 	}
 

@@ -11,4 +11,8 @@ type ConvertToKeycardAccount struct {
 	KeycardUID  string                `json:"keycardUID"`
 	OldPassword string                `json:"oldPassword"`
 	NewPassword string                `json:"newPassword"`
+
+	// KeycardSecureChannelV2 is set when the keycard (applet 4.x) uses SecureChannelV2 and so has no
+	// pairing; Account.KeycardPairing is then ignored.
+	KeycardSecureChannelV2 bool `json:"keycardSecureChannelV2"`
 }
