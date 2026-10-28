@@ -296,6 +296,8 @@ func newParityHarness(t *testing.T) *parityHarness {
 		tokenbalances.NewStorageMultistandardBalance(storage), pubsub.NewPublisher())
 	require.NoError(t, reader.Start())
 	t.Cleanup(reader.Stop)
+	controller.Start()
+	t.Cleanup(controller.Stop)
 
 	return &parityHarness{t: t, node: node, tokenList: tokenList, cache: cache, controller: controller,
 		reader: reader, account: account, finished: finished}
@@ -307,13 +309,14 @@ func (h *parityHarness) fetch(answers map[common.Address]tokenAnswer) bool {
 	for drained := false; !drained; {
 		select {
 		case <-h.cache.saved:
+		case <-h.finished:
 		case <-time.After(300 * time.Millisecond):
 			drained = true
 		}
 	}
 	h.node.set(answers)
 	key := multistandardbalance.BalancesKey{Account: h.account, ChainID: parityChainID}
-	h.controller.TriggerFetchWithConfig(multistandardbalance.FetchConfig{key: {multistandardfetcher.ResultTypeERC20}})
+	h.controller.TriggerFullFetch()
 	timeout := time.After(10 * time.Second)
 	for done := false; !done; {
 		select {
