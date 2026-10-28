@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
+	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/pkg/messaging/layers/transport"
 	"github.com/status-im/status-go/pkg/messaging/waku/types"
 )
@@ -22,16 +23,15 @@ var (
 const testHash = "0x0102030405060708091011121314151617181920212223242526272829303132"
 
 type fakeClient struct {
-	mu           sync.Mutex
-	events       chan Event
-	subscribed   map[string]int
-	sendID       string
-	beforeReturn func()
-	peers        types.PeerStats
+	mu         sync.Mutex
+	events     chan Event
+	subscribed map[string]int
+	sendID     string
+	peers      types.PeerStats
 }
 
 func newFakeClient() *fakeClient {
-	return &fakeClient{events: make(chan Event, 16), subscribed: make(map[string]int), sendID: "req-1"}
+	return &fakeClient{events: make(chan Event, 16), subscribed: make(map[string]int), sendID: "0a1b2c3d4e5f60718293"}
 }
 
 func (f *fakeClient) Start() error         { return nil }
@@ -54,9 +54,6 @@ func (f *fakeClient) Unsubscribe(contentTopic string) error {
 }
 
 func (f *fakeClient) Send(ctx context.Context, contentTopic string, payload []byte, ephemeral bool) (string, error) {
-	if f.beforeReturn != nil {
-		f.beforeReturn()
-	}
 	return f.sendID, nil
 }
 
@@ -89,69 +86,17 @@ func nextEvent(t *testing.T, ch <-chan types.EnvelopeEvent) types.EnvelopeEvent 
 	}
 }
 
-func TestSendReturnsHashFromSentEvent(t *testing.T) {
-	a, client := startAdapter(t)
-
-	go func() {
-		time.Sleep(20 * time.Millisecond)
-		client.events <- SentEvent{RequestID: "req-1", MessageHash: testHash}
-	}()
-
-	hash, err := a.Send(context.Background(), "", "/waku/1/0x01020304/rfc26", []byte("hi"), false, nil)
-	require.NoError(t, err)
-	require.Equal(t, decodeHash(testHash), hash)
-}
-
-func TestSendReturnsHashFromPropagatedEvent(t *testing.T) {
-	a, client := startAdapter(t)
-
-	go func() {
-		time.Sleep(20 * time.Millisecond)
-		client.events <- PropagatedEvent{RequestID: "req-1", MessageHash: testHash}
-	}()
-
-	hash, err := a.Send(context.Background(), "", "/waku/1/0x01020304/rfc26", []byte("hi"), false, nil)
-	require.NoError(t, err)
-	require.Equal(t, decodeHash(testHash), hash)
-}
-
-func TestSendReturnsHashWhenEventBeatsRequestID(t *testing.T) {
-	a, client := startAdapter(t)
-
-	client.beforeReturn = func() {
-		client.events <- SentEvent{RequestID: "req-1", MessageHash: testHash}
-		require.Eventually(t, func() bool {
-			a.sendMu.Lock()
-			defer a.sendMu.Unlock()
-			_, ok := a.early["req-1"]
-			return ok
-		}, time.Second, time.Millisecond)
-	}
-
-	hash, err := a.Send(context.Background(), "", "/waku/1/0x01020304/rfc26", []byte("hi"), false, nil)
-	require.NoError(t, err)
-	require.Equal(t, decodeHash(testHash), hash)
-}
-
-func TestSendFailsOnErrorEvent(t *testing.T) {
-	a, client := startAdapter(t)
-
-	go func() {
-		time.Sleep(20 * time.Millisecond)
-		client.events <- ErrorEvent{RequestID: "req-1", MessageHash: testHash, Err: "send queue full"}
-	}()
-
-	_, err := a.Send(context.Background(), "", "/waku/1/0x01020304/rfc26", []byte("hi"), false, nil)
-	require.ErrorContains(t, err, "send queue full")
-}
-
-func TestSendTimesOutWithoutEvent(t *testing.T) {
+func TestSendReturnsWithoutWaitingForAnOutcome(t *testing.T) {
 	a, _ := startAdapter(t)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
-	defer cancel()
-	_, err := a.Send(ctx, "", "/waku/1/0x01020304/rfc26", []byte("hi"), false, nil)
-	require.ErrorIs(t, err, context.DeadlineExceeded)
+	hash, err := a.Send(context.Background(), "", "/waku/1/0x01020304/rfc26", []byte("hi"), false, nil)
+	require.NoError(t, err)
+	require.Equal(t, requestKey("0a1b2c3d4e5f60718293"), hash)
+}
+
+func TestRequestKeyIsThePaddedRequestID(t *testing.T) {
+	require.Equal(t, append(make([]byte, 22), 0x0a, 0x1b, 0x2c, 0x3d, 0x4e, 0x5f, 0x60, 0x71, 0x82, 0x93), requestKey("0a1b2c3d4e5f60718293"))
+	require.Nil(t, requestKey("not-hex"))
 }
 
 func TestSendOutcomesBecomeEnvelopeEvents(t *testing.T) {
@@ -160,14 +105,17 @@ func TestSendOutcomesBecomeEnvelopeEvents(t *testing.T) {
 	sub := a.SubscribeEnvelopeEvents(events)
 	defer sub.Unsubscribe()
 
-	client.events <- PropagatedEvent{RequestID: "req-1", MessageHash: testHash}
+	client.events <- SentEvent{RequestID: "0a1b2c3d4e5f60718293", MessageHash: testHash}
+	client.events <- PropagatedEvent{RequestID: "0a1b2c3d4e5f60718293", MessageHash: testHash}
 	ev := nextEvent(t, events)
 	require.Equal(t, types.EventEnvelopeSent, ev.Event)
-	require.Equal(t, decodeHash(testHash), ev.Hash.Bytes())
+	require.Equal(t, requestKey("0a1b2c3d4e5f60718293"), ev.Hash.Bytes())
+	require.Equal(t, cryptotypes.BytesToHash(decodeHash(testHash)), ev.Data)
 
-	client.events <- ErrorEvent{RequestID: "req-2", MessageHash: testHash, Err: "retry window elapsed"}
+	client.events <- ErrorEvent{RequestID: "93827160f5e4d3c2b1a0", MessageHash: testHash, Err: "retry window elapsed"}
 	ev = nextEvent(t, events)
 	require.Equal(t, types.EventEnvelopeExpired, ev.Event)
+	require.Equal(t, requestKey("93827160f5e4d3c2b1a0"), ev.Hash.Bytes())
 }
 
 func TestReceivedMessageIsReportedWithoutPubsubTopic(t *testing.T) {

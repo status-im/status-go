@@ -2,11 +2,11 @@ package delivery
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"sync"
 	"sync/atomic"
-	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -20,24 +20,9 @@ import (
 	"github.com/status-im/status-go/pkg/messaging/waku/types"
 )
 
-// sendHashTimeout bounds how long Send waits for the wire hash of a message
-// the library accepted, when the caller's context has no deadline.
-const sendHashTimeout = 30 * time.Second
-
-// earlyResultTTL is how long an outcome that no Send is waiting for is kept.
-// Most are for sends that already returned, so they are dropped unclaimed.
-const earlyResultTTL = time.Minute
-
 // ErrStoreQueryUnsupported is returned by StoreQuery: the Messaging API
 // recovers history itself and exposes no store query.
 var ErrStoreQueryUnsupported = errors.New("delivery: store queries are not exposed by the Messaging API")
-
-// sendResult is the outcome of a send, keyed by its request ID.
-type sendResult struct {
-	hash []byte
-	err  error
-	at   time.Time
-}
 
 // Adapter is the messaging backend over the logos-delivery Messaging API.
 // It satisfies types.Waku and transport.MessagingAPI.
@@ -46,12 +31,6 @@ type Adapter struct {
 	logger *zap.Logger
 
 	envelopeFeed event.Feed
-
-	// pending and early pair a request ID returned by Send with the event that
-	// settles it, whichever arrives first.
-	sendMu  sync.Mutex
-	pending map[string]chan sendResult
-	early   map[string]sendResult
 
 	connMu          sync.Mutex
 	connState       types.ConnectionState
@@ -72,8 +51,6 @@ func NewAdapter(client Client, logger *zap.Logger) *Adapter {
 	return &Adapter{
 		client:                 client,
 		logger:                 logger.Named("delivery"),
-		pending:                make(map[string]chan sendResult),
-		early:                  make(map[string]sendResult),
 		connSubscribers:        make(map[string]*types.ConnStatusSubscription),
 		historyReconcileNeeded: make(chan types.HistoryReconcileWindow),
 		quit:                   make(chan struct{}),
@@ -140,23 +117,17 @@ func (a *Adapter) handleEvent(ev Event) {
 	switch e := ev.(type) {
 	case ReceivedEvent:
 		a.handleReceived(e)
-	case SentEvent:
-		a.settleSend(e.RequestID, sendResult{hash: decodeHash(e.MessageHash)})
 	case PropagatedEvent:
-		hash := decodeHash(e.MessageHash)
-		a.settleSend(e.RequestID, sendResult{hash: hash})
 		a.envelopeFeed.Send(types.EnvelopeEvent{
 			Event: types.EventEnvelopeSent,
-			Hash:  cryptotypes.BytesToHash(hash),
+			Hash:  cryptotypes.BytesToHash(requestKey(e.RequestID)),
+			Data:  cryptotypes.BytesToHash(decodeHash(e.MessageHash)),
 		})
 	case ErrorEvent:
-		hash := decodeHash(e.MessageHash)
-		if a.settleSend(e.RequestID, sendResult{hash: hash, err: errors.New(e.Err)}) {
-			return
-		}
+		a.logger.Debug("send failed", zap.String("requestID", e.RequestID), zap.String("error", e.Err))
 		a.envelopeFeed.Send(types.EnvelopeEvent{
 			Event: types.EventEnvelopeExpired,
-			Hash:  cryptotypes.BytesToHash(hash),
+			Hash:  cryptotypes.BytesToHash(requestKey(e.RequestID)),
 		})
 	case ConnectionEvent:
 		a.setConnectionState(toConnectionState(e.Status))
@@ -182,33 +153,10 @@ func (a *Adapter) handleReceived(e ReceivedEvent) {
 	})
 }
 
-// settleSend hands result to the Send waiting on requestID, or keeps it for
-// the Send that has not registered yet. The first outcome of a request wins.
-// It reports whether a Send was waiting.
-func (a *Adapter) settleSend(requestID string, result sendResult) bool {
-	a.sendMu.Lock()
-	defer a.sendMu.Unlock()
-	if ch, ok := a.pending[requestID]; ok {
-		delete(a.pending, requestID)
-		ch <- result
-		return true
-	}
-	now := time.Now()
-	for id, r := range a.early {
-		if now.Sub(r.at) > earlyResultTTL {
-			delete(a.early, id)
-		}
-	}
-	if _, ok := a.early[requestID]; !ok {
-		result.at = now
-		a.early[requestID] = result
-	}
-	return false
-}
-
-// Send publishes a pre-encoded payload on contentTopic and returns its wire
-// hash. The library reports the hash only with the first outcome of the send,
-// usually its propagation, so Send waits for that.
+// Send queues a pre-encoded payload on contentTopic and returns a key derived
+// from the library's request ID, without waiting for the message to go out.
+// The envelope events of the send carry the same key; the sent event also
+// carries the wire hash in Data.
 //
 // pubsubTopic and priority are not honoured: the Messaging API derives the
 // shard from the content topic and has no send priority.
@@ -217,35 +165,21 @@ func (a *Adapter) Send(ctx context.Context, pubsubTopic, contentTopic string, pa
 	if err != nil {
 		return nil, fmt.Errorf("delivery: send: %w", err)
 	}
-
-	ch := make(chan sendResult, 1)
-	a.sendMu.Lock()
-	if result, ok := a.early[requestID]; ok {
-		delete(a.early, requestID)
-		ch <- result
-	} else {
-		a.pending[requestID] = ch
+	key := requestKey(requestID)
+	if key == nil {
+		return nil, fmt.Errorf("delivery: send: unexpected request ID %q", requestID)
 	}
-	a.sendMu.Unlock()
+	return key, nil
+}
 
-	if _, ok := ctx.Deadline(); !ok {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, sendHashTimeout)
-		defer cancel()
+// requestKey is the envelope key of a send: its hex request ID, left-padded
+// to 32 bytes, so it matches the library's logs.
+func requestKey(requestID string) []byte {
+	id, err := hex.DecodeString(requestID)
+	if err != nil || len(id) > cryptotypes.HashLength {
+		return nil
 	}
-
-	select {
-	case result := <-ch:
-		if result.err != nil {
-			return nil, fmt.Errorf("delivery: send %s: %w", requestID, result.err)
-		}
-		return result.hash, nil
-	case <-ctx.Done():
-		a.sendMu.Lock()
-		delete(a.pending, requestID)
-		a.sendMu.Unlock()
-		return nil, fmt.Errorf("delivery: send %s: waiting for the message hash: %w", requestID, ctx.Err())
-	}
+	return cryptotypes.BytesToHash(id).Bytes()
 }
 
 // Subscribe subscribes the content topics. The pubsub topic is ignored: the

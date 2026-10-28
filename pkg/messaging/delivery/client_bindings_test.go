@@ -14,6 +14,7 @@ import (
 
 	libp2pcrypto "github.com/libp2p/go-libp2p/core/crypto"
 
+	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/pkg/messaging/waku/types"
 )
 
@@ -107,13 +108,14 @@ func TestAdapterExchangesMessagesOverLiblogosdelivery(t *testing.T) {
 	}, 60*time.Second, 200*time.Millisecond, "nodes did not connect")
 
 	// A fresh relay mesh needs a heartbeat or two before it carries messages.
-	var hash []byte
+	keys := map[cryptotypes.Hash]bool{}
 	var received types.EnvelopeEvent
 	require.Eventually(t, func() bool {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
-		hash, err = b.Send(ctx, pubsubTopic, topic.ContentTopic(), []byte("hello from b"), false, nil)
+		key, err := b.Send(ctx, pubsubTopic, topic.ContentTopic(), []byte("hello from b"), false, nil)
 		require.NoError(t, err)
+		keys[cryptotypes.BytesToHash(key)] = true
 		select {
 		case received = <-eventsA:
 			return received.Event == types.EventEnvelopeAvailable
@@ -126,9 +128,13 @@ func TestAdapterExchangesMessagesOverLiblogosdelivery(t *testing.T) {
 	require.Equal(t, []byte("hello from b"), msg.Payload)
 	require.Equal(t, topic.ContentTopic(), msg.ContentTopic)
 	require.Empty(t, msg.PubsubTopic)
-	require.Equal(t, hash, msg.Hash, "the hash Send returned must be the wire hash the receiver sees")
 
-	sent := waitFor(t, eventsB, types.EventEnvelopeSent)
-	require.Len(t, sent.Hash.Bytes(), 32)
-	t.Logf("received %x; b reported %s for %s", msg.Hash, sent.Event, sent.Hash)
+	wireHash := cryptotypes.BytesToHash(msg.Hash)
+	for {
+		sent := waitFor(t, eventsB, types.EventEnvelopeSent)
+		if sent.Data == wireHash {
+			require.True(t, keys[sent.Hash], "the sent event must carry a key Send returned")
+			break
+		}
+	}
 }
