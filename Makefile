@@ -1,6 +1,6 @@
 .PHONY: statusgo all test clean help
 .PHONY: statusgo-ios-library statusgo-android-library
-.PHONY: build-libsds clean-libsds rebuild-libsds
+.PHONY: nim-libs nim-libs-android nim-libs-ios build-libsds clean-nim-libs
 .PHONY: clone-storage build-storage clean-storage test-storage test-torrent
 .PHONY: history-archive-help
 
@@ -50,7 +50,7 @@ else
     MAKE_SHELL := /bin/bash
 endif
 
-ifneq ($(filter statusgo-android-library build-liblogosdelivery-android,$(MAKECMDGOALS)),)
+ifneq ($(filter statusgo-android-library nim-libs-android,$(MAKECMDGOALS)),)
     ARCH ?= arm64
     ANDROID_NDK_ROOT ?= $(shell find /nix/store -path "*android-sdk-ndk-27.2.12479018/libexec/android-sdk/ndk/27.2.12479018" -type d 2>/dev/null | head -1)
     ANDROID_API ?= 28
@@ -67,7 +67,7 @@ ifneq ($(filter statusgo-android-library build-liblogosdelivery-android,$(MAKECM
     CGO_LDFLAGS+=-Os -flto
 endif
 
-ifneq ($(filter statusgo-ios-library build-liblogosdelivery-ios,$(MAKECMDGOALS)),)
+ifneq ($(filter statusgo-ios-library nim-libs-ios,$(MAKECMDGOALS)),)
     ARCH ?= arm64
     IPHONE_SDK ?= iphoneos
     # Apple Silicon simulators require iOS 14; devices and Intel retain iOS 13.
@@ -113,38 +113,24 @@ ANDROID_TOKEN_ENV = env -u NIM_TKL_INC_DIR -u NIM_TKL_LIB_DIR ANDROID_NDK_ROOT="
 IOS_TOKEN_ENV = env -u NIM_TKL_INC_DIR -u NIM_TKL_LIB_DIR IPHONE_SDK="$(IPHONE_SDK)" IOS_TARGET="$(IOS_TARGET)" bash scripts/tkl_env.sh
 IOS_TOKEN_ARCHIVE = bash scripts/tkl_bundle_archive.sh build/bin/libstatus.a
 
-# `nim-sds` variables
+# Nim libraries: libsds and liblogosdelivery
 #
-# Option 1 (default): Nimble builds libsds into build/. sds-go-bindings pins the revision.
-# Option 2: Provide NIM_SDS_LIB_DIR and NIM_SDS_INC_DIR (used by Nix).
+# Option 1 (default): Nimble builds them into build/. The Go bindings pin the revisions.
+# Option 2: Provide NIM_SDS_LIB_DIR/NIM_SDS_INC_DIR and
+# LOGOS_DELIVERY_LIB_DIR/LOGOS_DELIVERY_INC_DIR (used by Nix).
 
 NIMBLE ?= nimble
 
 ifdef NIM_SDS_LIB_DIR
-ifdef NIM_SDS_INC_DIR
-    # External lib/include approach (e.g. used in Nix)
-    NIM_SDS_BUILD_FROM_SOURCE := false
-else
+ifndef NIM_SDS_INC_DIR
     $(error NIM_SDS_INC_DIR must be provided when NIM_SDS_LIB_DIR is set)
 endif
 else
-    # Nimble approach
     NIM_SDS_LIB_DIR := $(CURDIR)/build
     NIM_SDS_INC_DIR := $(CURDIR)/build
-    NIM_SDS_BUILD_FROM_SOURCE := true
-    # Nix builds have no Nimble on PATH.
-    NIMBLE_SETUP := nimble.paths
+    LIBSDS_OUT := $(NIM_SDS_LIB_DIR)
 endif
 
-# nimble.paths has every --path, so parent configs (status-app's) are skipped.
-NIMBLE_NIM_PARAMS = NIM_PARAMS="--skipParentCfg $$NIM_PARAMS $$(tr '\n' ' ' < $(CURDIR)/nimble.paths)"
-NIMBLE_SDS_ENV = LIBSDS_OUT="$(NIM_SDS_LIB_DIR)" $(NIMBLE_NIM_PARAMS)
-
-LIBSDS ?= $(NIM_SDS_LIB_DIR)/libsds.$(LIB_EXT)
-CGO_CFLAGS+=-I$(NIM_SDS_INC_DIR)
-CGO_LDFLAGS+=-L$(NIM_SDS_LIB_DIR) -lsds
-
-# `logos-delivery` variables
 ifdef LOGOS_DELIVERY_LIB_DIR
 ifndef LOGOS_DELIVERY_INC_DIR
     $(error LOGOS_DELIVERY_INC_DIR must be provided when LOGOS_DELIVERY_LIB_DIR is set)
@@ -152,14 +138,17 @@ endif
 else
     LOGOS_DELIVERY_LIB_DIR := $(CURDIR)/build
     LOGOS_DELIVERY_INC_DIR := $(CURDIR)/build
-    LOGOS_DELIVERY_BUILD_FROM_SOURCE := true
+    LIBLOGOSDELIVERY_OUT := $(LOGOS_DELIVERY_LIB_DIR)
 endif
 
-NIMBLE_DELIVERY_ENV = LIBLOGOSDELIVERY_OUT="$(LOGOS_DELIVERY_LIB_DIR)" $(NIMBLE_NIM_PARAMS)
+# nimble.paths has every --path, so parent configs (status-app's) are skipped.
+NIMBLE_NIM_PARAMS = NIM_PARAMS="--skipParentCfg $$NIM_PARAMS $$(tr '\n' ' ' < $(CURDIR)/nimble.paths)"
+NIMBLE_ENV = LIBSDS_OUT="$(LIBSDS_OUT)" LIBLOGOSDELIVERY_OUT="$(LIBLOGOSDELIVERY_OUT)" $(NIMBLE_NIM_PARAMS)
+NIMBLE_MOBILE_ENV = LIBSDS_OUT="$(CURDIR)/build" LIBLOGOSDELIVERY_OUT="$(CURDIR)/build" $(NIMBLE_NIM_PARAMS)
 
-LIBLOGOSDELIVERY ?= $(LOGOS_DELIVERY_LIB_DIR)/liblogosdelivery.$(LIB_EXT)
-CGO_CFLAGS+=-I$(LOGOS_DELIVERY_INC_DIR)
-CGO_LDFLAGS+=-L$(LOGOS_DELIVERY_LIB_DIR)
+LIBSDS ?= $(NIM_SDS_LIB_DIR)/libsds.$(LIB_EXT)
+CGO_CFLAGS+=-I$(NIM_SDS_INC_DIR) -I$(LOGOS_DELIVERY_INC_DIR)
+CGO_LDFLAGS+=-L$(NIM_SDS_LIB_DIR) -lsds -L$(LOGOS_DELIVERY_LIB_DIR)
 
 # `logos-storage` variables (opt-in)
 USE_LOGOS_STORAGE ?= false
@@ -233,7 +222,7 @@ STORAGE_TEST_ENV := LD_LIBRARY_PATH="$(LOGOS_STORAGE_LIB_DIR):$(RUNTIME_LIB_DIRS
 	CGO_CFLAGS="$(CGO_CFLAGS) -I$(LOGOS_STORAGE_INC_DIR)"
 STORAGE_TEST_TAGS := use_logos_storage $(BUILD_TAGS) gowaku_skip_migrations
 
-test-storage: build-storage $(LIBSDS) $(LIBLOGOSDELIVERY) generate ##@tests Run logosstorage package tests via gotestsum
+test-storage: build-storage nim-libs generate ##@tests Run logosstorage package tests via gotestsum
 	$(STORAGE_TEST_ENV) bash scripts/tkl_env.sh gotestsum --packages="./pkg/services/logosstorage" -f testname -- -count 1 -tags "$(STORAGE_TEST_TAGS)"
 	$(STORAGE_TEST_ENV) bash scripts/tkl_env.sh gotestsum --packages="./internal/protocol/communities/archive/logosstorage" -f testname -- -count 1 -tags "$(STORAGE_TEST_TAGS)"
 	$(STORAGE_TEST_ENV) bash scripts/tkl_env.sh gotestsum --packages="./internal/protocol" -f testname -- -count 1 -tags "$(STORAGE_TEST_TAGS)" \
@@ -244,7 +233,7 @@ TORRENT_TEST_ENV := LD_LIBRARY_PATH="$(RUNTIME_LIB_DIRS)" \
 	CGO_CFLAGS="$(CGO_CFLAGS)"
 TORRENT_TEST_TAGS := $(BUILD_TAGS) use_torrent gowaku_skip_migrations
 
-test-torrent: $(LIBSDS) $(LIBLOGOSDELIVERY) generate ##@tests Run torrent archive package tests via gotestsum
+test-torrent: nim-libs generate ##@tests Run torrent archive package tests via gotestsum
 	$(TORRENT_TEST_ENV) bash scripts/tkl_env.sh gotestsum --packages="./internal/protocol/communities/archive/torrent" -f testname -- -count 1 -tags "$(TORRENT_TEST_TAGS)"
 	$(TORRENT_TEST_ENV) bash scripts/tkl_env.sh gotestsum --packages="./internal/protocol" -f testname -- -count 1 -tags "$(TORRENT_TEST_TAGS)" \
 	-run TestMessengerCommunitiesTokenPermissionsSuite/TestImportDecryptedArchiveMessages
@@ -330,7 +319,7 @@ nix-purge: ##@nix Completely remove Nix setup, including /nix directory
 all: $(GO_CMD_NAMES)
 
 .PHONY: $(GO_CMD_NAMES) $(GO_CMD_PATHS) $(GO_CMD_BUILDS)
-$(GO_CMD_BUILDS): generate $(LOGOS_STORAGE_BUILD_DEPS) $(LIBSDS) $(LIBLOGOSDELIVERY)
+$(GO_CMD_BUILDS): generate $(LOGOS_STORAGE_BUILD_DEPS) nim-libs
 $(GO_CMD_BUILDS): ##@build Build any Go project from cmd folder
 	CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
 	$(TOKEN_ENV) go build -v \
@@ -344,7 +333,7 @@ $(GO_CMD_BUILDS): ##@build Build any Go project from cmd folder
 # enforces to use system-installed Nim.
 USE_SYSTEM_NIM ?= 1
 
-# libsds targets
+# Nim library targets
 
 .PHONY: nimble-deps
 
@@ -353,68 +342,24 @@ nimble.paths: status_go.nimble
 
 nimble-deps: nimble.paths ##@build Resolve the Nim dependencies
 
-$(LIBSDS): | $(NIMBLE_SETUP)
-ifeq ($(NIM_SDS_BUILD_FROM_SOURCE),true)
-	@echo "Building nim-sds: $(LIBSDS)"
-	$(NIMBLE_SDS_ENV) $(NIMBLE) libsds
-	@test -f $(LIBSDS) || (echo "Error: libsds not found at $(LIBSDS) after build" && exit 1)
-else
-	@test -f $(LIBSDS) || (echo "Error: libsds not found at $(LIBSDS)" && exit 1)
-endif
+nim-libs: $(if $(LIBSDS_OUT)$(LIBLOGOSDELIVERY_OUT),build/.nim-libs) ##@build Build libsds and liblogosdelivery
 
-build-libsds: $(LIBSDS)
+build/.nim-libs: nimble.paths
+	$(NIMBLE_ENV) $(NIMBLE) libs
+	touch $@
 
-$(LIBLOGOSDELIVERY): | $(if $(LOGOS_DELIVERY_BUILD_FROM_SOURCE),nimble.paths $(LIBSDS))
-ifeq ($(LOGOS_DELIVERY_BUILD_FROM_SOURCE),true)
-	$(NIMBLE_DELIVERY_ENV) $(NIMBLE) liblogosdelivery
-	@test -f $@ || (echo "Error: liblogosdelivery not found at $@ after build" && exit 1)
-else
-	@test -f $@ || (echo "Error: liblogosdelivery not found at $@" && exit 1)
-endif
+nim-libs-android: | nimble.paths
+	$(NIMBLE_MOBILE_ENV) ARCH="$(ARCH)" ANDROID_NDK_ROOT="$(ANDROID_NDK_ROOT)" ANDROID_API="$(ANDROID_API)" \
+		$(NIMBLE) libsAndroid
 
-build-liblogosdelivery: $(LIBLOGOSDELIVERY) ##@build Build liblogosdelivery through the Go bindings
+nim-libs-ios: | nimble.paths
+	$(NIMBLE_MOBILE_ENV) ARCH="$(ARCH)" IPHONE_SDK="$(IPHONE_SDK)" IOS_TARGET="$(IOS_TARGET)" \
+		env -u SDKROOT -u CPATH -u LIBRARY_PATH $(NIMBLE) libsIOS
 
-build-liblogosdelivery-android statusgo-android-library: LOGOS_DELIVERY_LIB_DIR := $(CURDIR)/build/android
-build-liblogosdelivery-ios statusgo-ios-library: LOGOS_DELIVERY_LIB_DIR := $(CURDIR)/build/ios
+build-libsds: nim-libs
 
-build-liblogosdelivery-android: DELIVERY_ABI = $(strip $(if $(filter arm64,$(ARCH)),arm64 arm64-v8a,\
-	$(if $(filter arm,$(ARCH)),arm armeabi-v7a,\
-	$(if $(filter amd64 x86_64,$(ARCH)),amd64 x86_64,\
-	$(error Unsupported ARCH '$(ARCH)'. Please set ARCH to one of: arm64, arm, amd64, x86_64)))))
-build-liblogosdelivery-android: | nimble.paths build-libsds-android
-	@echo "Building liblogosdelivery for Android"
-	$(NIMBLE_DELIVERY_ENV) CPU="$(word 1,$(DELIVERY_ABI))" ABIDIR="$(word 2,$(DELIVERY_ABI))" \
-		ANDROID_NDK_ROOT="$(ANDROID_NDK_ROOT)" ANDROID_TARGET="$(ANDROID_API)" \
-		$(NIMBLE) liblogosdeliveryAndroid
-
-build-liblogosdelivery-ios: | nimble.paths build-libsds-ios
-	@echo "Building liblogosdelivery for iOS"
-	$(NIMBLE_DELIVERY_ENV) IOS_SDK="$(IPHONE_SDK)" IOS_ARCH="$(ARCH)" \
-		IOS_SDK_PATH="$$(xcrun --sdk $(IPHONE_SDK) --show-sdk-path)" IOS_DEPLOYMENT_TARGET="$(IOS_TARGET)" \
-		env -u SDKROOT -u CPATH -u LIBRARY_PATH $(NIMBLE) liblogosdeliveryIOS
-
-
-## Target-specific architecture mapping for libsds Android build
-# Note: nim-sds uses 'amd64' for both x86 and x86_64
-build-libsds-android: SDSARCH = $(strip $(if $(filter arm64,$(ARCH)),arm64,\
-	$(if $(filter arm,$(ARCH)),arm,\
-	$(if $(filter amd64,$(ARCH)),amd64,\
-	$(if $(filter x86 x86_64,$(ARCH)),amd64,\
-	$(error Unsupported ARCH '$(ARCH)'. Please set ARCH to one of: arm64, arm, amd64, x86, x86_64))))))
-build-libsds-android: | nimble.paths
-	@echo "Building nim-sds for Android" $(LIBSDS)
-	$(NIMBLE_SDS_ENV) ARCH="$(SDSARCH)" ANDROID_NDK_ROOT="$(ANDROID_NDK_ROOT)" \
-		$(NIMBLE) libsdsAndroid
-
-build-libsds-ios: | nimble.paths
-	@echo "Building nim-sds for iOS" $(LIBSDS)
-	$(NIMBLE_SDS_ENV) env -u SDKROOT -u CPATH -u LIBRARY_PATH $(NIMBLE) libsdsIOS
-
-clean-libsds:
-	@echo "Removing libsds"
-	rm $(LIBSDS)
-
-rebuild-libsds: | clean-libsds $(LIBSDS)
+clean-nim-libs:
+	rm -f build/.nim-libs build/libsds.* build/liblogosdelivery.*
 
 # Status-go targets
 
@@ -425,7 +370,7 @@ status-backend: ##@build Build status-backend to run status-go as HTTP server
 status-backend: build/bin/status-backend
 
 run-status-backend: PORT ?= 0
-run-status-backend: $(LIBSDS) $(LIBLOGOSDELIVERY)
+run-status-backend: nim-libs
 run-status-backend: generate
 run-status-backend: ##@run Start status-backend server listening to localhost:PORT
 	LD_LIBRARY_PATH="$(RUNTIME_LIB_DIRS)" CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
@@ -463,7 +408,7 @@ statusgo-library: STATUS_GO_BINDINGS_PATH ?= build/bin/statusgo-lib
 statusgo-library: STATUS_GO_LIBRARY_OUT ?= build/bin
 statusgo-library: TOKEN_STATIC_BUILD = $(TOKEN_ENV) bash scripts/tkl_bundle_archive.sh "$(STATUS_GO_LIBRARY_OUT)/libstatus.a"
 statusgo-library: generate
-statusgo-library: statusgo-c-bindings $(LIBSDS) $(LIBLOGOSDELIVERY)  ##@cross-compile Build status-go as static library for current platform
+statusgo-library: statusgo-c-bindings nim-libs  ##@cross-compile Build status-go as static library for current platform
 	@echo "Building static library..."
 	CGO_LDFLAGS='$(CGO_LDFLAGS)' CGO_CFLAGS='$(CGO_CFLAGS)' \
 	$(TOKEN_STATIC_BUILD) go build \
@@ -475,14 +420,12 @@ statusgo-library: statusgo-c-bindings $(LIBSDS) $(LIBLOGOSDELIVERY)  ##@cross-co
 	@echo "Static library built: $(STATUS_GO_LIBRARY_OUT)/libstatus.a"
 
 .PHONY: statusgo-shared-library statusgo-shared-library-tkl statusgo-shared-library-build
-# Reuse matching native and backend artifacts. Preserve the normal SDS
-# prerequisite, including support for supplied prebuilt SDS inputs.
+# Reuse matching native and backend artifacts.
 statusgo-shared-library-tkl: statusgo-shared-library
 
 statusgo-shared-library: TKL_LIBSDS = $(firstword $(wildcard $(LIBSDS) $(NIM_SDS_LIB_DIR)/libsds.a))
-statusgo-shared-library: $(if $(filter true,$(NIM_SDS_BUILD_FROM_SOURCE)),$(LIBSDS))
-statusgo-shared-library: $(if $(filter true,$(LOGOS_DELIVERY_BUILD_FROM_SOURCE)),$(LIBLOGOSDELIVERY))
-	@test -n "$(TKL_LIBSDS)" || { echo "libsds not found in $(NIM_SDS_LIB_DIR); run 'make build-libsds' first" >&2; exit 1; }
+statusgo-shared-library: nim-libs
+	@test -n "$(TKL_LIBSDS)" || { echo "libsds not found in $(NIM_SDS_LIB_DIR); run 'make nim-libs' first" >&2; exit 1; }
 	$(GOBIN_SHARED_LIB_CFLAGS) TKL_HIDE_EXPORTS=1 \
 		CGO_CFLAGS='$(CGO_CFLAGS)' CGO_LDFLAGS='$(CGO_LDFLAGS) -Wl,-rpath,$(NIM_SDS_LIB_DIR) -Wl,-rpath,$(LOGOS_DELIVERY_LIB_DIR)' \
 		bash scripts/tkl_env.sh bash scripts/tkl_backend.sh build/bin/libstatus.$(GOBIN_SHARED_LIB_EXT) \
@@ -499,7 +442,7 @@ test-tkl-backend:
 	python3 scripts/test_tkl_backend.py
 
 statusgo-shared-library-build: generate
-statusgo-shared-library-build: statusgo-c-bindings $(LIBSDS) $(LIBLOGOSDELIVERY) ##@cross-compile Build status-go as shared library for current platform
+statusgo-shared-library-build: statusgo-c-bindings nim-libs ##@cross-compile Build status-go as shared library for current platform
 	@echo "Building shared library..."
 	@echo "Tags: $(BUILD_TAGS)"
 	CGO_LDFLAGS='$(CGO_LDFLAGS)' CGO_CFLAGS='$(CGO_CFLAGS)' \
@@ -518,7 +461,7 @@ endif
 	@echo "Shared library built:"
 	@ls -la build/bin/libstatus.*
 
-statusgo-android-library: generate statusgo-c-bindings build-libsds-android build-liblogosdelivery-android ##@cross-compile Build status-go as Android mobile library
+statusgo-android-library: generate statusgo-c-bindings nim-libs-android ##@cross-compile Build status-go as Android mobile library
 	@echo "Building Android mobile library..."
 	$(ANDROID_BUILD_FLAGS) CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
 	$(ANDROID_TOKEN_ENV) go build -buildmode=c-shared -tags '$(MOBILE_BUILD_TAGS)' \
@@ -529,7 +472,7 @@ statusgo-android-library: generate statusgo-c-bindings build-libsds-android buil
 	TKL_TARGET_OS=android NM="$(ANDROID_NDK_ROOT)/toolchains/llvm/prebuilt/$(HOST_OS)-x86_64/bin/llvm-nm" \
 		bash scripts/check_tkl_exports.sh build/bin/libstatus.so
 
-statusgo-ios-library: generate statusgo-c-bindings build-libsds-ios build-liblogosdelivery-ios ##@cross-compile Build status-go as iOS mobile library
+statusgo-ios-library: generate statusgo-c-bindings nim-libs-ios ##@cross-compile Build status-go as iOS mobile library
 	@echo "Building iOS mobile library..."
 	DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" \
 	CC="$$(xcrun --sdk $(IPHONE_SDK) --find clang)" \
@@ -606,7 +549,7 @@ docker-test: ##@tests Run tests in a docker container with golang.
 
 test: test-unit ##@tests Run basic, short tests during development
 
-test-unit-prep: $(LOGOS_STORAGE_BUILD_DEPS) $(LIBSDS) $(LIBLOGOSDELIVERY)
+test-unit-prep: $(LOGOS_STORAGE_BUILD_DEPS) nim-libs
 test-unit-prep: generate
 test-unit-prep: export BUILD_TAGS ?=
 test-unit-prep: export UNIT_TEST_DRY_RUN ?= false
@@ -693,7 +636,7 @@ test-libtkl: ##@test Check native dependency reuse and public ABI
 	python3 scripts/test_tkl_mobile_make.py
 	bash scripts/tkl_env.sh go test -tags tkl ./internal/tklbuild
 
-test-libtkl-coexistence: $(LIBSDS) ##@test Check token-library and SDS runtimes in one process
+test-libtkl-coexistence: nim-libs ##@test Check token-library and SDS runtimes in one process
 	LD_LIBRARY_PATH="$(NIM_SDS_LIB_DIR)" CGO_CFLAGS='$(CGO_CFLAGS)' CGO_LDFLAGS='$(CGO_LDFLAGS)' \
 		bash scripts/tkl_env.sh go test -v -count=1 -tags tkl_coexistence ./internal/tklbuild
 

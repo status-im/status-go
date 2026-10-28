@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check the real mobile recipes without generating code or rebuilding SDS."""
+"""Check the real mobile recipes without generating code or rebuilding the Nim libraries."""
 from pathlib import Path
 import os
 import shutil
@@ -27,8 +27,7 @@ class MobileBuildTest(unittest.TestCase):
                 with self.subTest(platform=platform):
                     result = subprocess.run(
                         ["make", f"statusgo-{platform}-library", "-o", "generate",
-                         "-o", "statusgo-c-bindings", "-o", f"build-libsds-{platform}",
-                         "-o", f"build-liblogosdelivery-{platform}",
+                         "-o", "statusgo-c-bindings", "-o", f"nim-libs-{platform}",
                          "-o", "install-git-hooks", "ARCH=arm64", "RELEASE_TAG=fixture",
                          "ANDROID_NDK_ROOT=/fixture/ndk", "HOST_OS=linux",
                          "IPHONE_SDK=iphoneos"],
@@ -36,11 +35,10 @@ class MobileBuildTest(unittest.TestCase):
                     self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
                     self.assertEqual((root / "selected-target").read_text(), f"{platform}/arm64")
 
-    def test_shared_build_keeps_sds_prerequisite(self):
+    def test_shared_build_keeps_nim_libs_prerequisite(self):
         repo = Path(__file__).resolve().parent.parent
         result = subprocess.run(
-            ["make", "-qp", "statusgo-shared-library", "LIBSDS=/fixture/libsds.a",
-             "NIM_SDS_BUILD_FROM_SOURCE=true"],
+            ["make", "-qp", "statusgo-shared-library"],
             cwd=repo, text=True, capture_output=True)
         self.assertIn(result.returncode, (0, 1), result.stderr)
         # Newer Make versions also print target-specific variable assignments
@@ -51,7 +49,7 @@ class MobileBuildTest(unittest.TestCase):
             if line.startswith("statusgo-shared-library:") and "=" not in line
             for dependency in line.split()[1:]
         ]
-        self.assertIn("/fixture/libsds.a", prerequisites)
+        self.assertIn("nim-libs", prerequisites)
 
     def test_archive_tests_prepare_token_library_and_keep_storage_flags(self):
         repo = Path(__file__).resolve().parent.parent
@@ -59,7 +57,7 @@ class MobileBuildTest(unittest.TestCase):
             with self.subTest(target=target):
                 result = subprocess.run(
                     ["make", "-n", target, "-o", "generate", "-o", "build-storage",
-                     "LIBSDS=/fixture/libsds.a", "-o", "/fixture/libsds.a"],
+                     "-o", "nim-libs"],
                     cwd=repo, text=True, capture_output=True)
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
                 commands = [line for line in result.stdout.splitlines() if "gotestsum" in line]
@@ -78,7 +76,7 @@ class MobileBuildTest(unittest.TestCase):
                 with self.subTest(sdk=sdk, arch=arch, override=override):
                     command = [
                         "make", "-n", "statusgo-ios-library", "-o", "generate",
-                        "-o", "statusgo-c-bindings", "-o", "build-libsds-ios",
+                        "-o", "statusgo-c-bindings", "-o", "nim-libs-ios",
                         "USE_NIM_TOKEN_LISTS=true", f"ARCH={arch}", f"IPHONE_SDK={sdk}"]
                     if override:
                         command.append(f"IOS_TARGET={override}")
@@ -94,8 +92,8 @@ class MobileBuildTest(unittest.TestCase):
             with self.subTest(tags=tags):
                 result = subprocess.run(
                     ["make", "-n", "statusgo-library", "-o", "generate",
-                     "-o", "statusgo-c-bindings", "LIBSDS=/fixture/libsds.a",
-                     "-o", "/fixture/libsds.a", f"BUILD_TAGS={tags}"],
+                     "-o", "statusgo-c-bindings", "-o", "nim-libs",
+                     f"BUILD_TAGS={tags}"],
                     cwd=repo, text=True, capture_output=True, check=True)
                 self.assertIn("scripts/tkl_env.sh", result.stdout)
                 self.assertIn("scripts/tkl_bundle_archive.sh", result.stdout)
@@ -108,7 +106,7 @@ class MobileBuildTest(unittest.TestCase):
                     result = subprocess.run(
                         ["make", "-n", f"statusgo-{platform}-library",
                          "-o", "generate", "-o", "statusgo-c-bindings",
-                         "-o", f"build-libsds-{platform}",
+                         "-o", f"nim-libs-{platform}",
                          f"USE_NIM_TOKEN_LISTS={enabled}", "ARCH=arm64",
                          "ANDROID_NDK_ROOT=/fixture/ndk", "HOST_OS=linux",
                          "IPHONE_SDK=iphonesimulator", "IOS_TARGET=14.0"],

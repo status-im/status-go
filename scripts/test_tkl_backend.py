@@ -144,9 +144,7 @@ class BackendCacheTest(unittest.TestCase):
             self.run_cmd(
                 "make", "statusgo-shared-library-build", "OS=Linux", "RELEASE_TAG=test",
                 "-o", "generate", "-o", "statusgo-c-bindings", "-o", "install-git-hooks",
-                "LIBSDS=/fixture/libsds.so", "-o", "/fixture/libsds.so",
-                "LOGOS_DELIVERY_LIB_DIR=/fixture", "LOGOS_DELIVERY_INC_DIR=/fixture",
-                "-o", "/fixture/liblogosdelivery.so",
+                "-o", "nim-libs",
                 env=dict(env, BUILD_CONTENT=content))
             library = self.root / "build/bin/libstatus.so"
             self.assertTrue(library.is_symlink())
@@ -239,7 +237,7 @@ class BackendMakeTargetTest(unittest.TestCase):
         result = self.make()
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("libsds not found", result.stderr)
-        self.assertIn("make build-libsds", result.stderr)
+        self.assertIn("make nim-libs", result.stderr)
         self.assertFalse((self.root / "wrapper.args").exists())
 
     def test_existing_shared_or_static_library_is_forwarded(self):

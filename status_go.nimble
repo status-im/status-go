@@ -49,20 +49,20 @@ proc nimblePkgDir(name: string): string =
 
 proc runBindingsTask(pkgName, taskName: string) =
   ## Delegates to the bindings' own task; they pin the library revision their
-  ## C ABI matches. The output dir and NIM_PARAMS come from the caller.
+  ## C ABI matches.
   withDir nimblePkgDir(pkgName):
     exec nimbleExe() & " " & taskName
 
-task libsds, "Build the libsds status-go links against":
-  runBindingsTask("sds_go_bindings", "libsds")
+proc buildLibsds(taskName: string) =
+  ## Skipped when LIBSDS_OUT is unset: libsds is prebuilt.
+  if getEnv("LIBSDS_OUT").len > 0:
+    runBindingsTask("sds_go_bindings", taskName)
 
-task libsdsAndroid, "Build libsds for Android; ARCH selects the architecture":
-  runBindingsTask("sds_go_bindings", "libsdsAndroid")
-
-task libsdsIOS, "Build libsds for iOS":
-  runBindingsTask("sds_go_bindings", "libsdsIOS")
-
-proc runDeliveryBindingsTask(taskName: string) =
+proc buildLiblogosdelivery(taskName: string) =
+  ## Builds liblogosdelivery without RLN. Run last: it extends NIM_PARAMS.
+  ## Skipped when LIBLOGOSDELIVERY_OUT is unset: liblogosdelivery is prebuilt.
+  if getEnv("LIBLOGOSDELIVERY_OUT").len == 0:
+    return
   var params = getEnv("NIM_PARAMS") & " -d:disable_rln"
   when defined(windows):
     # Until logos-storage/nim-leopard#29: CMake picks MSVC from vcvars.
@@ -77,11 +77,33 @@ proc runDeliveryBindingsTask(taskName: string) =
   putEnv("NIM_PARAMS", params)
   runBindingsTask("logos_delivery_go_bindings", taskName)
 
-task liblogosdelivery, "Build the liblogosdelivery status-go links against":
-  runDeliveryBindingsTask("liblogosdelivery")
+task libs, "Build libsds into LIBSDS_OUT and liblogosdelivery into LIBLOGOSDELIVERY_OUT":
+  buildLibsds("libsds")
+  buildLiblogosdelivery("liblogosdelivery")
 
-task liblogosdeliveryAndroid, "Build liblogosdelivery for Android; CPU and ABIDIR select the architecture":
-  runDeliveryBindingsTask("liblogosdeliveryAndroid")
+task libsAndroid, "Build the libraries for Android; ARCH, ANDROID_NDK_ROOT and ANDROID_API select the target":
+  let arch = getEnv("ARCH", "arm64")
+  let (cpu, abiDir) = case arch
+    of "arm64": ("arm64", "arm64-v8a")
+    of "arm": ("arm", "armeabi-v7a")
+    of "amd64", "x86_64": ("amd64", "x86_64")
+    else: raise newException(CatchableError, "unsupported ARCH: " & arch)
+  putEnv("ARCH", cpu)
+  buildLibsds("libsdsAndroid")
+  putEnv("CPU", cpu)
+  putEnv("ABIDIR", abiDir)
+  if getEnv("ANDROID_API").len > 0:
+    putEnv("ANDROID_TARGET", getEnv("ANDROID_API"))
+  buildLiblogosdelivery("liblogosdeliveryAndroid")
 
-task liblogosdeliveryIOS, "Build liblogosdelivery for iOS; IOS_SDK, IOS_ARCH and IOS_SDK_PATH select the target":
-  runDeliveryBindingsTask("liblogosdeliveryIOS")
+task libsIOS, "Build the libraries for iOS; ARCH, IPHONE_SDK and IOS_TARGET select the target":
+  let arch = getEnv("ARCH", "arm64")
+  let sdk = getEnv("IPHONE_SDK", "iphoneos")
+  putEnv("IOS_SDK_PATH", gorge("xcrun --sdk " & sdk & " --show-sdk-path").strip())
+  putEnv("ARCH", if arch == "x86_64": "amd64" else: arch)
+  buildLibsds("libsdsIOS")
+  putEnv("IOS_SDK", sdk)
+  putEnv("IOS_ARCH", arch)
+  if getEnv("IOS_TARGET").len > 0:
+    putEnv("IOS_DEPLOYMENT_TARGET", getEnv("IOS_TARGET"))
+  buildLiblogosdelivery("liblogosdeliveryIOS")
