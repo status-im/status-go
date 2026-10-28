@@ -382,11 +382,35 @@ func (a *Adapter) ConnectionChanged(connection.State) {}
 // ConfirmMessageDelivered is a no-op: the node confirms its sends itself.
 func (a *Adapter) ConfirmMessageDelivered([]common.Hash) {}
 
-// Peers returns no peers: the Messaging API exposes none.
-func (a *Adapter) Peers() types.PeerStats { return types.PeerStats{} }
+// Peers returns the node's connected peers, or none when it cannot tell.
+func (a *Adapter) Peers() types.PeerStats {
+	peers, err := a.client.ConnectedPeers()
+	if err != nil {
+		a.logger.Debug("failed to list connected peers", zap.Error(err))
+		return types.PeerStats{}
+	}
+	return peers
+}
 
-// PeerID returns an empty ID: the Messaging API does not expose the node's.
-func (a *Adapter) PeerID() peer.ID { return "" }
+// PeerID returns the node's peer ID, or an empty one when it cannot tell.
+func (a *Adapter) PeerID() peer.ID {
+	id, err := a.client.PeerID()
+	if err != nil {
+		a.logger.Debug("failed to read the peer ID", zap.Error(err))
+		return ""
+	}
+	return id
+}
+
+// Metrics returns the node's metrics in the Prometheus text format.
+func (a *Adapter) Metrics() string {
+	metrics, err := a.client.Metrics()
+	if err != nil {
+		a.logger.Debug("failed to read metrics", zap.Error(err))
+		return ""
+	}
+	return metrics
+}
 
 // StoreQuery always fails with ErrStoreQueryUnsupported.
 func (a *Adapter) StoreQuery(

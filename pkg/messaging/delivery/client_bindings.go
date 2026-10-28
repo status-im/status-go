@@ -5,10 +5,12 @@ import (
 	"encoding/hex"
 
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/libp2p/go-libp2p/core/peer"
 
 	"github.com/logos-messaging/logos-delivery-go-bindings/pkg/messaging"
 
 	"github.com/status-im/status-go/internal/panics"
+	"github.com/status-im/status-go/pkg/messaging/waku/types"
 )
 
 // bindingsClient adapts the bindings' MessagingClient to Client, translating
@@ -107,3 +109,18 @@ func (c *bindingsClient) Send(ctx context.Context, contentTopic string, payload 
 	id, err := c.mc.Send(ctx, contentTopic, payload, ephemeral)
 	return string(id), err
 }
+
+func (c *bindingsClient) ConnectedPeers() (types.PeerStats, error) {
+	peers, err := c.mc.Node().Peers().ConnectedInfo()
+	if err != nil {
+		return nil, err
+	}
+	stats := make(types.PeerStats, len(peers))
+	for id, info := range peers {
+		stats[id] = types.WakuV2Peer{Protocols: info.Protocols, Addresses: info.Addresses}
+	}
+	return stats, nil
+}
+
+func (c *bindingsClient) PeerID() (peer.ID, error) { return c.mc.Node().Debug().PeerID() }
+func (c *bindingsClient) Metrics() (string, error) { return c.mc.Node().Debug().Metrics() }

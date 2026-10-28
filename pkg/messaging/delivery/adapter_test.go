@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
@@ -24,6 +25,7 @@ type fakeClient struct {
 	sendID       string
 	beforeReturn func()
 	onSubscribe  func()
+	peers        types.PeerStats
 }
 
 func newFakeClient() *fakeClient {
@@ -58,6 +60,10 @@ func (f *fakeClient) Send(ctx context.Context, contentTopic string, payload []by
 	}
 	return f.sendID, nil
 }
+
+func (f *fakeClient) ConnectedPeers() (types.PeerStats, error) { return f.peers, nil }
+func (f *fakeClient) PeerID() (peer.ID, error)                 { return "16Uiu2HAmTest", nil }
+func (f *fakeClient) Metrics() (string, error)                 { return "metric 1", nil }
 
 func (f *fakeClient) subscriptions(contentTopic string) int {
 	f.mu.Lock()
@@ -231,6 +237,15 @@ func TestUnsubscribeKeepsTopicWhileAnotherPubsubTopicWantsIt(t *testing.T) {
 
 	require.NoError(t, a.Unsubscribe(ctx, "/waku/2/rs/16/32", []types.TopicType{topic}))
 	require.Equal(t, 0, client.subscriptions(topic.ContentTopic()))
+}
+
+func TestNodeInfoComesFromTheClient(t *testing.T) {
+	a, client := startAdapter(t)
+	client.peers = types.PeerStats{"16Uiu2HAmPeer": types.WakuV2Peer{}}
+
+	require.Equal(t, client.peers, a.Peers())
+	require.Equal(t, peer.ID("16Uiu2HAmTest"), a.PeerID())
+	require.Equal(t, "metric 1", a.Metrics())
 }
 
 func TestConnectionStatusIsTracked(t *testing.T) {

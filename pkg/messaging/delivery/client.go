@@ -3,6 +3,10 @@ package delivery
 import (
 	"context"
 	"crypto/ecdsa"
+
+	"github.com/libp2p/go-libp2p/core/peer"
+
+	"github.com/status-im/status-go/pkg/messaging/waku/types"
 )
 
 // Client is the part of a logos-delivery Messaging API client the Adapter
@@ -18,6 +22,12 @@ type Client interface {
 	// Send queues payload on contentTopic and returns the request ID that
 	// correlates it with the SentEvent, PropagatedEvent or ErrorEvent it produces.
 	Send(ctx context.Context, contentTopic string, payload []byte, ephemeral bool) (string, error)
+
+	// ConnectedPeers returns the protocols and addresses of every connected peer.
+	ConnectedPeers() (types.PeerStats, error)
+	PeerID() (peer.ID, error)
+	// Metrics returns the node's metrics in the Prometheus text format.
+	Metrics() (string, error)
 }
 
 // Event is one Messaging API event: ReceivedEvent, SentEvent, PropagatedEvent,
