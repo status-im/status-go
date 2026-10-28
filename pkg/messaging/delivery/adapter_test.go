@@ -63,6 +63,7 @@ func (f *fakeClient) Send(ctx context.Context, contentTopic string, payload []by
 func (f *fakeClient) ConnectedPeers() (types.PeerStats, error) { return f.peers, nil }
 func (f *fakeClient) PeerID() (peer.ID, error)                 { return "16Uiu2HAmTest", nil }
 func (f *fakeClient) Metrics() (string, error)                 { return "metric 1", nil }
+func (f *fakeClient) MaxMessageSize() (uint64, error)          { return 150 * 1024, nil }
 
 func (f *fakeClient) subscriptions(contentTopic string) int {
 	f.mu.Lock()
@@ -219,6 +220,7 @@ func TestNodeInfoComesFromTheClient(t *testing.T) {
 	require.Equal(t, client.peers, a.Peers())
 	require.Equal(t, peer.ID("16Uiu2HAmTest"), a.PeerID())
 	require.Equal(t, "metric 1", a.Metrics())
+	require.Equal(t, uint32(150*1024), a.MaxMessageSize())
 }
 
 func TestConnectionStatusIsTracked(t *testing.T) {

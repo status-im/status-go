@@ -124,3 +124,6 @@ func (c *bindingsClient) ConnectedPeers() (types.PeerStats, error) {
 
 func (c *bindingsClient) PeerID() (peer.ID, error) { return c.mc.Node().Debug().PeerID() }
 func (c *bindingsClient) Metrics() (string, error) { return c.mc.Node().Debug().Metrics() }
+func (c *bindingsClient) MaxMessageSize() (uint64, error) {
+	return c.mc.Node().Debug().MaxMessageSize()
+}
