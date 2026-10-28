@@ -14,7 +14,10 @@ import (
 	"github.com/status-im/status-go/pkg/messaging/waku/types"
 )
 
-var _ transport.MessagingAPI = (*Adapter)(nil)
+var (
+	_ transport.MessagingAPI     = (*Adapter)(nil)
+	_ transport.ContentTopicOnly = (*Adapter)(nil)
+)
 
 const testHash = "0x0102030405060708091011121314151617181920212223242526272829303132"
 
@@ -24,7 +27,6 @@ type fakeClient struct {
 	subscribed   map[string]int
 	sendID       string
 	beforeReturn func()
-	onSubscribe  func()
 	peers        types.PeerStats
 }
 
@@ -38,9 +40,6 @@ func (f *fakeClient) Close() error         { close(f.events); return nil }
 func (f *fakeClient) Events() <-chan Event { return f.events }
 
 func (f *fakeClient) Subscribe(contentTopic string) error {
-	if f.onSubscribe != nil {
-		f.onSubscribe()
-	}
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.subscribed[contentTopic]++
@@ -170,13 +169,10 @@ func TestSendOutcomesBecomeEnvelopeEvents(t *testing.T) {
 	require.Equal(t, types.EventEnvelopeExpired, ev.Event)
 }
 
-func TestReceivedMessageIsReportedOnce(t *testing.T) {
+func TestReceivedMessageIsReportedWithoutPubsubTopic(t *testing.T) {
 	a, client := startAdapter(t)
 	topic := types.BytesToTopic([]byte{1, 2, 3, 4})
-
 	require.NoError(t, a.Subscribe(context.Background(), "/waku/2/rs/16/32", []types.TopicType{topic}))
-	require.NoError(t, a.Subscribe(context.Background(), "/waku/2/rs/16/64", []types.TopicType{topic}))
-	require.Equal(t, 1, client.subscriptions(topic.ContentTopic()))
 
 	events := make(chan types.EnvelopeEvent, 4)
 	sub := a.SubscribeEnvelopeEvents(events)
@@ -189,7 +185,7 @@ func TestReceivedMessageIsReportedOnce(t *testing.T) {
 	msg := ev.Data.(*types.ReceivedMessage)
 	require.Equal(t, []byte("hi"), msg.Payload)
 	require.Equal(t, decodeHash(testHash), msg.Hash)
-	require.Equal(t, "/waku/2/rs/16/32", msg.PubsubTopic)
+	require.Empty(t, msg.PubsubTopic)
 
 	select {
 	case ev := <-events:
@@ -198,45 +194,22 @@ func TestReceivedMessageIsReportedOnce(t *testing.T) {
 	}
 }
 
-func TestReceivedMessageIsReportedWhileSubscribing(t *testing.T) {
+func TestSubscriptionsGoStraightToTheLibrary(t *testing.T) {
 	a, client := startAdapter(t)
-	subscribed := types.BytesToTopic([]byte{1, 2, 3, 4})
-	pending := types.BytesToTopic([]byte{5, 6, 7, 8})
-	require.NoError(t, a.Subscribe(context.Background(), "/waku/2/rs/16/32", []types.TopicType{subscribed}))
+	topic := types.BytesToTopic([]byte{1, 2, 3, 4})
+	ctx := context.Background()
 
-	events := make(chan types.EnvelopeEvent, 4)
-	sub := a.SubscribeEnvelopeEvents(events)
-	defer sub.Unsubscribe()
+	require.NoError(t, a.Subscribe(ctx, "", []types.TopicType{topic}))
+	require.Equal(t, 1, client.subscriptions(topic.ContentTopic()))
 
-	release := make(chan struct{})
-	client.onSubscribe = func() {
-		client.events <- ReceivedEvent{MessageHash: testHash, ContentTopic: subscribed.ContentTopic(), Payload: []byte("hi")}
-		nextEvent(t, events)
-		close(release)
-	}
-	require.NoError(t, a.Subscribe(context.Background(), "/waku/2/rs/16/32", []types.TopicType{pending}))
-	<-release
+	require.NoError(t, a.Unsubscribe(ctx, "", []types.TopicType{topic}))
+	require.Equal(t, 0, client.subscriptions(topic.ContentTopic()))
 }
 
 func TestStopIsIdempotent(t *testing.T) {
 	a, _ := startAdapter(t)
 	require.NoError(t, a.Stop())
 	require.NoError(t, a.Stop())
-}
-
-func TestUnsubscribeKeepsTopicWhileAnotherPubsubTopicWantsIt(t *testing.T) {
-	a, client := startAdapter(t)
-	topic := types.BytesToTopic([]byte{1, 2, 3, 4})
-	ctx := context.Background()
-
-	require.NoError(t, a.Subscribe(ctx, "/waku/2/rs/16/32", []types.TopicType{topic}))
-	require.NoError(t, a.Subscribe(ctx, "/waku/2/rs/16/64", []types.TopicType{topic}))
-
-	require.NoError(t, a.Unsubscribe(ctx, "/waku/2/rs/16/64", []types.TopicType{topic}))
-	require.Equal(t, 1, client.subscriptions(topic.ContentTopic()))
-
-	require.NoError(t, a.Unsubscribe(ctx, "/waku/2/rs/16/32", []types.TopicType{topic}))
-	require.Equal(t, 0, client.subscriptions(topic.ContentTopic()))
 }
 
 func TestNodeInfoComesFromTheClient(t *testing.T) {

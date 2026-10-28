@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"slices"
 	"sync"
 	"time"
 
@@ -51,15 +50,6 @@ type Adapter struct {
 
 	envelopeFeed event.Feed
 
-	// subscriptions maps a content topic to the pubsub topics the transport
-	// subscribed it on. A received message carries no pubsub topic, so it is
-	// reported on the lowest of them.
-	// subscribeMu serialises Subscribe and Unsubscribe; subscriptionsMu only
-	// guards the map, which the event loop reads.
-	subscribeMu     sync.Mutex
-	subscriptionsMu sync.Mutex
-	subscriptions   map[string]map[string]struct{}
-
 	// pending and early pair a request ID returned by Send with the event that
 	// settles it, whichever arrives first.
 	sendMu  sync.Mutex
@@ -83,7 +73,6 @@ func NewAdapter(client Client, logger *zap.Logger) *Adapter {
 	return &Adapter{
 		client:                 client,
 		logger:                 logger.Named("delivery"),
-		subscriptions:          make(map[string]map[string]struct{}),
 		pending:                make(map[string]chan sendResult),
 		early:                  make(map[string]sendResult),
 		connSubscribers:        make(map[string]*types.ConnStatusSubscription),
@@ -170,19 +159,9 @@ func (a *Adapter) handleEvent(ev Event) {
 	}
 }
 
-// handleReceived reports a message once, on the lowest pubsub topic its
-// content topic is subscribed on.
+// handleReceived reports a received message. It carries no pubsub topic: the
+// Messaging API delivers by content topic.
 func (a *Adapter) handleReceived(e ReceivedEvent) {
-	a.subscriptionsMu.Lock()
-	pubsubTopics := make([]string, 0, len(a.subscriptions[e.ContentTopic]))
-	for pubsubTopic := range a.subscriptions[e.ContentTopic] {
-		pubsubTopics = append(pubsubTopics, pubsubTopic)
-	}
-	a.subscriptionsMu.Unlock()
-	if len(pubsubTopics) == 0 {
-		return
-	}
-
 	hash := decodeHash(e.MessageHash)
 	a.envelopeFeed.Send(types.EnvelopeEvent{
 		Event: types.EventEnvelopeAvailable,
@@ -193,7 +172,6 @@ func (a *Adapter) handleReceived(e ReceivedEvent) {
 			Payload:      e.Payload,
 			Ephemeral:    e.Ephemeral,
 			Meta:         e.Meta,
-			PubsubTopic:  slices.Min(pubsubTopics),
 			Version:      e.Version,
 			Timestamp:    e.Timestamp,
 		},
@@ -266,64 +244,30 @@ func (a *Adapter) Send(ctx context.Context, pubsubTopic, contentTopic string, pa
 	}
 }
 
-// Subscribe subscribes the content topics. A content topic is subscribed with
-// the library once, whatever pubsub topics it is requested on.
+// Subscribe subscribes the content topics. The pubsub topic is ignored: the
+// transport counts subscriptions per content topic (see ContentTopicOnly).
 func (a *Adapter) Subscribe(ctx context.Context, pubsubTopic string, contentTopics []types.TopicType) error {
-	a.subscribeMu.Lock()
-	defer a.subscribeMu.Unlock()
-
 	for _, topic := range contentTopics {
-		contentTopic := topic.ContentTopic()
-		a.subscriptionsMu.Lock()
-		_, ok := a.subscriptions[contentTopic]
-		a.subscriptionsMu.Unlock()
-		if !ok {
-			if err := a.client.Subscribe(contentTopic); err != nil {
-				return fmt.Errorf("delivery: subscribe %s: %w", contentTopic, err)
-			}
+		if err := a.client.Subscribe(topic.ContentTopic()); err != nil {
+			return fmt.Errorf("delivery: subscribe %s: %w", topic.ContentTopic(), err)
 		}
-
-		a.subscriptionsMu.Lock()
-		pubsubTopics, ok := a.subscriptions[contentTopic]
-		if !ok {
-			pubsubTopics = make(map[string]struct{})
-			a.subscriptions[contentTopic] = pubsubTopics
-		}
-		pubsubTopics[pubsubTopic] = struct{}{}
-		a.subscriptionsMu.Unlock()
 	}
 	return nil
 }
 
-// Unsubscribe drops the content topics from pubsubTopic, and unsubscribes a
-// content topic from the library when no pubsub topic wants it any more.
+// Unsubscribe unsubscribes the content topics. The pubsub topic is ignored.
 func (a *Adapter) Unsubscribe(ctx context.Context, pubsubTopic string, contentTopics []types.TopicType) error {
-	a.subscribeMu.Lock()
-	defer a.subscribeMu.Unlock()
-
 	for _, topic := range contentTopics {
-		contentTopic := topic.ContentTopic()
-		a.subscriptionsMu.Lock()
-		pubsubTopics, ok := a.subscriptions[contentTopic]
-		if !ok {
-			a.subscriptionsMu.Unlock()
-			continue
-		}
-		delete(pubsubTopics, pubsubTopic)
-		last := len(pubsubTopics) == 0
-		if last {
-			delete(a.subscriptions, contentTopic)
-		}
-		a.subscriptionsMu.Unlock()
-		if !last {
-			continue
-		}
-		if err := a.client.Unsubscribe(contentTopic); err != nil {
-			return fmt.Errorf("delivery: unsubscribe %s: %w", contentTopic, err)
+		if err := a.client.Unsubscribe(topic.ContentTopic()); err != nil {
+			return fmt.Errorf("delivery: unsubscribe %s: %w", topic.ContentTopic(), err)
 		}
 	}
 	return nil
 }
+
+// ContentTopicOnly marks the Adapter as subscribing and delivering by content
+// topic alone.
+func (a *Adapter) ContentTopicOnly() {}
 
 // SubscribeEnvelopeEvents streams received messages and send outcomes.
 func (a *Adapter) SubscribeEnvelopeEvents(events chan<- types.EnvelopeEvent) types.Subscription {

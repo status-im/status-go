@@ -125,10 +125,10 @@ func TestAdapterExchangesMessagesOverLiblogosdelivery(t *testing.T) {
 	msg := received.Data.(*types.ReceivedMessage)
 	require.Equal(t, []byte("hello from b"), msg.Payload)
 	require.Equal(t, topic.ContentTopic(), msg.ContentTopic)
-	require.Equal(t, pubsubTopic, msg.PubsubTopic)
+	require.Empty(t, msg.PubsubTopic)
 	require.Equal(t, hash, msg.Hash, "the hash Send returned must be the wire hash the receiver sees")
 
 	sent := waitFor(t, eventsB, types.EventEnvelopeSent)
 	require.Len(t, sent.Hash.Bytes(), 32)
-	t.Logf("received %x on %s; b reported %s for %s", msg.Hash, msg.PubsubTopic, sent.Event, sent.Hash)
+	t.Logf("received %x; b reported %s for %s", msg.Hash, sent.Event, sent.Hash)
 }
