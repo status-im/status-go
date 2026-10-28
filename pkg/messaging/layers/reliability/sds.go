@@ -13,16 +13,17 @@ import (
 // payload simply not being SDS-wrapped.
 var ErrSDSManagerUnavailable = errors.New("sds reliability manager unavailable")
 
-type sdsManagerFactoryFunc func(*zap.Logger) (*sds.ReliabilityManager, error)
+type sdsManagerFactoryFunc func(*zap.Logger, sds.PersistenceCallbacks) (*sds.ReliabilityManager, error)
 
 func newSdsReliabilityManager(
 	sdsManagerFactory sdsManagerFactoryFunc,
 	logger *zap.Logger,
+	persistence sds.PersistenceCallbacks,
 	onMessageSent func(messageId sds.MessageID, channelId string),
 	onMissingDependencies func(messageId sds.MessageID, missingDeps []sds.HistoryEntry, channelId string),
 	retrievalHintProvider func(messageId sds.MessageID) []byte,
 ) (*sds.ReliabilityManager, error) {
-	reliabilityManager, err := sdsManagerFactory(logger)
+	reliabilityManager, err := sdsManagerFactory(logger, persistence)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create ReliabilityManager")
 	}
