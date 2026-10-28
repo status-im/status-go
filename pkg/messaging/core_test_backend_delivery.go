@@ -3,6 +3,7 @@ package messaging
 import (
 	"context"
 	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"net"
@@ -17,6 +18,8 @@ import (
 	libp2pcrypto "github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"go.uber.org/zap"
+
+	bindings "github.com/logos-messaging/logos-delivery-go-bindings/pkg/messaging"
 
 	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/panics"
@@ -68,16 +71,22 @@ func newDeliveryTestBackend() (*deliveryTestBackend, error) {
 	if err != nil {
 		return nil, err
 	}
-	peerNode, err := newTestDeliveryAdapter(delivery.Config{
-		NodeKey: peerKey,
-		TCPPort: peerPort,
-		DataDir: filepath.Join(dataDir, "peer"),
-	}, nil)
+	peerNode, err := newTestDeliveryAdapter(bindings.Overrides{
+		"nodekey":            hex.EncodeToString(crypto.FromECDSA(peerKey)),
+		"tcp-port":           peerPort,
+		"local-storage-path": filepath.Join(dataDir, "peer"),
+	})
 	if err != nil {
 		return nil, err
 	}
-	node, err := newTestDeliveryAdapter(delivery.Config{DataDir: filepath.Join(dataDir, "node")}, map[string]any{
-		"entry-node": []string{fmt.Sprintf("/ip4/127.0.0.1/tcp/%d/p2p/%s", peerPort, peerID)},
+	nodePort, err := freeTCPPort()
+	if err != nil {
+		return nil, err
+	}
+	node, err := newTestDeliveryAdapter(bindings.Overrides{
+		"tcp-port":           nodePort,
+		"local-storage-path": filepath.Join(dataDir, "node"),
+		"entry-node":         []string{fmt.Sprintf("/ip4/127.0.0.1/tcp/%d/p2p/%s", peerPort, peerID)},
 	})
 	if err != nil {
 		return nil, err
@@ -90,33 +99,24 @@ func newDeliveryTestBackend() (*deliveryTestBackend, error) {
 	}, nil
 }
 
-func newTestDeliveryAdapter(cfg delivery.Config, extra map[string]any) (*delivery.Adapter, error) {
-	cfg.Mode = delivery.ModeCore
-	cfg.Overrides = map[string]any{
-		"cluster-id":            16,
-		"num-shards-in-network": 1,
-		"max-msg-size":          "1024KiB",
-		"listen-address":        "127.0.0.1",
-		"discv5-discovery":      false,
-		"reliability":           false,
-		"nat":                   "none",
-		"log-level":             "ERROR",
+func newTestDeliveryAdapter(overrides bindings.Overrides) (*delivery.Adapter, error) {
+	cfg := bindings.Config{
+		Mode: bindings.ModeCore,
+		MessagingOverrides: bindings.Overrides{
+			"cluster-id":            16,
+			"num-shards-in-network": 1,
+			"max-msg-size":          "1024KiB",
+			"listen-address":        "127.0.0.1",
+			"discv5-discovery":      false,
+			"reliability":           false,
+			"nat":                   "none",
+			"log-level":             "ERROR",
+		},
 	}
-	if cfg.TCPPort == 0 {
-		port, err := freeTCPPort()
-		if err != nil {
-			return nil, err
-		}
-		cfg.TCPPort = port
+	for k, v := range overrides {
+		cfg.MessagingOverrides[k] = v
 	}
-	for k, v := range extra {
-		cfg.Overrides[k] = v
-	}
-	client, err := delivery.NewClient(cfg)
-	if err != nil {
-		return nil, err
-	}
-	return delivery.NewAdapter(client, zap.NewNop()), nil
+	return delivery.NewAdapter(cfg, zap.NewNop())
 }
 
 func freeTCPPort() (int, error) {

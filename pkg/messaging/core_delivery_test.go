@@ -5,7 +5,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/status-im/status-go/pkg/messaging/delivery"
+	bindings "github.com/logos-messaging/logos-delivery-go-bindings/pkg/messaging"
+
 	"github.com/status-im/status-go/pkg/messaging/waku"
 	"github.com/status-im/status-go/pkg/messaging/waku/fleets"
 )
@@ -19,9 +20,8 @@ func TestDeliveryConfigUsesTheFleetPreset(t *testing.T) {
 		require.NoError(t, err)
 
 		require.Equal(t, preset, cfg.Preset)
-		require.Equal(t, delivery.ModeEdge, cfg.Mode)
-		require.Equal(t, "/data", cfg.DataDir)
-		require.Empty(t, cfg.Overrides)
+		require.Equal(t, bindings.ModeEdge, cfg.Mode)
+		require.Equal(t, bindings.Overrides{"local-storage-path": "/data"}, cfg.MessagingOverrides)
 	}
 }
 
