@@ -41,6 +41,15 @@ make shell
 nix develop --extra-experimental-features 'nix-command flakes'
 ```
 
+### SDS persistence dependencies
+
+The Go bindings and native SDS library currently use the persistence branches
+in the `jrainville/sds-go-bindings` and `jrainville/nim-sds` forks.
+The revisions in `go.mod`, `status_go.nimble`, and `flake.nix` must stay
+compatible: the bindings require the native `sds_set_persistence_callback`
+export. Both Nimble and Nix build the native fork directly, without patches.
+SDS-R repair remains disabled.
+
 ### Build a library for the current platform
 
 ```shell
