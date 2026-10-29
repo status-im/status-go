@@ -108,7 +108,10 @@ func (sc *StoreClient) FetchByHashes(ctx context.Context, fetch func(ctx context
 			return nil
 		}
 		if ctx.Err() != nil {
-			return err // caller cancelled or its deadline passed — don't keep trying
+			if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+				return fmt.Errorf("%w: %w", ErrStorenodeTimeout, err)
+			}
+			return err // caller cancelled — don't keep trying
 		}
 		sc.selector.markFailure(node.ID)
 		if timedOut {
