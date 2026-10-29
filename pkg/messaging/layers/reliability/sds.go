@@ -36,7 +36,7 @@ func newSdsReliabilityManager(
 			}
 		},
 		OnMissingDependencies: func(messageId sds.MessageID, missingDeps []sds.HistoryEntry, channelId string) {
-			logger.Debug("missing dependencies",
+			logger.Info("SDS manual test: missing dependencies detected",
 				zap.String("messageId", string(messageId)),
 				zap.String("channelId", channelId),
 				zap.Any("missingDeps", missingDeps))
@@ -110,6 +110,10 @@ func (r *Reliability) UnwrapPayloadFromSDS(wrappedPayload []byte) ([]byte, error
 	}
 
 	missingDeps := *unwrappedMessage.MissingDeps
+	r.logger.Info("SDS manual test: message unwrapped",
+		zap.String("channelID", *unwrappedMessage.ChannelId),
+		zap.Int("missingDependencyCount", len(missingDeps)),
+	)
 	if len(missingDeps) > 0 {
 		r.logger.Debug("missing deps with SDS", zap.Any("missing-deps", missingDeps))
 	}

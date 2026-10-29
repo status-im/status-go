@@ -327,6 +327,12 @@ func (c *Core) fetchMissingDependenciesAsync(messageID string, missingDeps []str
 	default:
 	}
 
+	c.logger.Info("SDS manual test: missing dependencies reported",
+		zap.String("messageID", messageID),
+		zap.String("channelID", channelID),
+		zap.Strings("missingHashes", missingDeps),
+	)
+
 	c.wg.Add(1)
 	go func() {
 		defer panics.LogOnPanic()
@@ -376,6 +382,11 @@ func fetchMissingDependencies(ctx context.Context, logger *zap.Logger, fetcher m
 				missingDepsToFetch = append(missingDepsToFetch, missingDep)
 			}
 		}
+		logger.Info("SDS manual test: dependency cache checked",
+			zap.Int("alreadyProcessed", len(missingDeps)-len(missingDepsToFetch)),
+			zap.Strings("hashesToFetch", missingDepsToFetch),
+			zap.Int("attempt", attempt+1),
+		)
 		if len(missingDepsToFetch) == 0 {
 			return
 		}
@@ -384,6 +395,9 @@ func fetchMissingDependencies(ctx context.Context, logger *zap.Logger, fetcher m
 		err = fetcher.FetchMessagesByHashes(fetchCtx, missingDepsToFetch)
 		cancel()
 		if err == nil {
+			logger.Info("SDS manual test: by-hash query completed",
+				zap.Strings("requestedHashes", missingDepsToFetch),
+			)
 			return
 		}
 

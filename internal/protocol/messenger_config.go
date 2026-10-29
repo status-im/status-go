@@ -119,7 +119,8 @@ func messengerDefaultConfig() config {
 		messageResendMaxCount: 3,
 	}
 
-	c.codeControlFlags.AutoRequestHistoricMessages = true
+	// Temporary manual SDS persistence testing; restore to true before release.
+	c.codeControlFlags.AutoRequestHistoricMessages = false
 	c.codeControlFlags.CuratedCommunitiesUpdateLoopEnabled = true
 
 	c.tracer = trace.NewNoopTracer()

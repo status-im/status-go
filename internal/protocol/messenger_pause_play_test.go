@@ -18,6 +18,15 @@ func TestSetPausedUpdatesMessengerFlag(t *testing.T) {
 	require.False(t, m.isPaused())
 }
 
+func TestManualSDSTestingDisablesAutomaticHistoryByDefault(t *testing.T) {
+	config := messengerDefaultConfig()
+	require.False(t, config.codeControlFlags.AutoRequestHistoricMessages)
+
+	m := &Messenger{config: &config, logger: zap.NewNop()}
+	m.startHistoricSyncWorker()
+	require.False(t, m.historicSyncWorkerActive.Load())
+}
+
 func TestSetPausedDoesNotEnqueueForegroundCatchup(t *testing.T) {
 	m := &Messenger{
 		started:             true,

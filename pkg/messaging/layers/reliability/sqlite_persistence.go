@@ -5,6 +5,9 @@ import (
 	"fmt"
 
 	"github.com/waku-org/sds-go-bindings/sds"
+	"go.uber.org/zap"
+
+	"github.com/status-im/status-go/internal/logutils"
 )
 
 func NewSQLitePersistence(db *sql.DB) sds.PersistenceCallbacks {
@@ -63,6 +66,11 @@ func NewSQLitePersistence(db *sql.DB) sds.PersistenceCallbacks {
 			if err := tx.Commit(); err != nil {
 				return fmt.Errorf("commit SDS history update: %w", err)
 			}
+			logutils.ZapLogger().Info("SDS manual test: history update persisted",
+				zap.String("channelID", channelID),
+				zap.Int("appended", len(update.Append)),
+				zap.Int("evicted", len(update.Evict)),
+			)
 			return nil
 		},
 		LoadChannel: func(channelID string) (sds.ChannelData, error) {
@@ -102,6 +110,11 @@ func NewSQLitePersistence(db *sql.DB) sds.PersistenceCallbacks {
 			if err := rows.Close(); err != nil {
 				return sds.ChannelData{}, fmt.Errorf("close SDS message history query: %w", err)
 			}
+			logutils.ZapLogger().Info("SDS manual test: channel state loaded",
+				zap.String("channelID", channelID),
+				zap.Int("metadataBytes", len(data.Meta)),
+				zap.Int("historyMessages", len(data.MessageHistory)),
+			)
 			return data, nil
 		},
 		DropChannel: func(channelID string) error {

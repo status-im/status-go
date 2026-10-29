@@ -50,6 +50,20 @@ compatible: the bindings require the native `sds_set_persistence_callback`
 export. Both Nimble and Nix build the native fork directly, without patches.
 SDS-R repair remains disabled.
 
+For the temporary SDS manual-test build, automatic history sync defaults to
+disabled in `messengerDefaultConfig`. Manual history requests and SDS by-hash
+recovery remain enabled. Restore `AutoRequestHistoricMessages` to `true` before
+releasing this build.
+
+Filter app backend logs for `SDS manual test:` to see loaded channel history,
+persisted history updates, missing-dependency hashes, processed-cache skips,
+by-hash requests and response counts. A successful fetch only means the query
+completed, not that every requested message was returned or processed. After a
+restart, channel state loads lazily on the first SDS operation for that channel.
+A `time-range history query requested` entry means another history request ran
+and may interfere with the test. These temporary info logs include identifiers
+and hashes but not message contents; remove the instrumentation after testing.
+
 ### Build a library for the current platform
 
 ```shell

@@ -314,6 +314,7 @@ func (m *Messenger) requeueHistoricSync(request historicSyncRequest) {
 // this loop decides when to try again.
 func (m *Messenger) startHistoricSyncWorker() {
 	if !m.config.codeControlFlags.AutoRequestHistoricMessages {
+		m.logger.Warn("SDS manual test: automatic history sync disabled; manual and by-hash queries remain enabled")
 		return
 	}
 

@@ -1673,6 +1673,7 @@ func (w *Waku) StoreQuery(
 	if storeClient == nil {
 		return ErrNoStorenodesReachable
 	}
+	w.logger.Info("SDS manual test: time-range history query requested")
 	return storeClient.Query(ctx, batch, pageLimit, shouldProcessNextPage, processEnvelopes)
 }
 
@@ -1704,6 +1705,10 @@ func (w *Waku) FetchMessagesByHashes(ctx context.Context, messageHashes []string
 	}
 
 	return storeClient.FetchByHashes(ctx, func(storenode peer.AddrInfo) error {
+		w.logger.Info("SDS manual test: querying storenode by hash",
+			zap.Stringer("storenode", storenode.ID),
+			zap.Strings("requestedHashes", messageHashes),
+		)
 		return w.fetchMessagesByHashesFrom(ctx, storenode, parsedHashes)
 	})
 }
@@ -1730,11 +1735,18 @@ func (w *Waku) fetchMessagesByHashesFrom(ctx context.Context, storenode peer.Add
 	}
 
 	if result == nil {
+		w.logger.Info("SDS manual test: by-hash query returned no result",
+			zap.Stringer("storenode", storenode.ID),
+		)
 		return nil
 	}
 
 	for {
 		messages := result.Messages()
+		w.logger.Info("SDS manual test: by-hash response page received",
+			zap.Stringer("storenode", storenode.ID),
+			zap.Int("returnedMessages", len(messages)),
+		)
 
 		for _, mkv := range messages {
 			envelope := protocol.NewEnvelope(mkv.Message, mkv.Message.GetTimestamp(), mkv.GetPubsubTopic())

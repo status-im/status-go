@@ -231,6 +231,7 @@ func (s *MessengerHistoricSyncCursorSuite) TestWorkerPreservesStaleCursorUntilCa
 
 	s.m.started = true
 	s.Require().NoError(s.m.settings.SetUseMailservers(true))
+	s.m.config.codeControlFlags.AutoRequestHistoricMessages = true
 	s.m.startHistoricSyncWorker()
 	s.T().Cleanup(func() {
 		close(s.m.quit)
