@@ -88,8 +88,25 @@ func (s *StorageMemory) UpdateERC20Balances(ctx context.Context, key BalancesKey
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	balances := mergeERC20Balances(s.erc20Balances[key].balance, asked, fetched, failed)
-	return updateIfNeeded(s.erc20Balances, key, balanceEntry[ERC20Balances]{balance: balances, state: state}, isERC20BalancesEqual)
+	oldState = defaultState()
+	old, exists := s.erc20Balances[key]
+	if exists {
+		oldState = old.state
+	}
+	if state.AtBlockNumber == nil {
+		err = fmt.Errorf("new state at block number is nil")
+		return
+	}
+	// A read at the same block as the stored one adds to it: reads of one
+	// chain cover different tokens and often land in one block.
+	if oldState.AtBlockNumber != nil && state.AtBlockNumber.Cmp(oldState.AtBlockNumber) < 0 {
+		return
+	}
+
+	balances := mergeERC20Balances(old.balance, asked, fetched, failed)
+	balanceChanged = !exists || !isERC20BalancesEqual(old.balance, balances)
+	s.erc20Balances[key] = balanceEntry[ERC20Balances]{balance: balances, state: state}
+	return
 }
 
 func (s *StorageMemory) GetERC20Balances(ctx context.Context, key BalancesKey) (balances ERC20Balances, state State, err error) {

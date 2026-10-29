@@ -627,3 +627,32 @@ func TestStorageMemory_UpdateERC1155Balances_WithNilBlockNumber(t *testing.T) {
 	}
 	assert.Equal(t, initialState.AtBlockNumber, retrievedState.AtBlockNumber)
 }
+
+func TestStorageMemory_ERC20ReadAtTheSameBlockAddsToTheStoredOne(t *testing.T) {
+	storage := multistandardbalance.NewStorageMemory()
+	ctx := context.Background()
+	key := multistandardbalance.BalancesKey{Account: common.HexToAddress("0x12"), ChainID: 1}
+	usdc, dai := common.HexToAddress("0x05"), common.HexToAddress("0x06")
+	at := func(block int64) multistandardbalance.State {
+		return multistandardbalance.State{AtBlockNumber: big.NewInt(block), FetchedAt: time.Now().Unix()}
+	}
+
+	_, _, err := storage.UpdateERC20Balances(ctx, key, []multistandardbalance.ContractAddress{usdc},
+		map[multistandardbalance.ContractAddress]*big.Int{usdc: big.NewInt(5)}, nil, at(100))
+	require.NoError(t, err)
+
+	changed, _, err := storage.UpdateERC20Balances(ctx, key, []multistandardbalance.ContractAddress{dai},
+		map[multistandardbalance.ContractAddress]*big.Int{dai: big.NewInt(7)}, nil, at(100))
+	require.NoError(t, err)
+	require.True(t, changed)
+
+	changed, _, err = storage.UpdateERC20Balances(ctx, key, []multistandardbalance.ContractAddress{usdc},
+		map[multistandardbalance.ContractAddress]*big.Int{usdc: big.NewInt(1)}, nil, at(99))
+	require.NoError(t, err)
+	require.False(t, changed, "a read at an older block is dropped")
+
+	balances, state, err := storage.GetERC20Balances(ctx, key)
+	require.NoError(t, err)
+	require.Equal(t, map[multistandardbalance.ContractAddress]*big.Int{usdc: big.NewInt(5), dai: big.NewInt(7)}, balances.Balances)
+	require.Equal(t, int64(100), state.AtBlockNumber.Int64())
+}
