@@ -20,7 +20,7 @@ const (
 	// missingDepsMaxQueue caps hashes waiting to be fetched; extra ones are dropped.
 	missingDepsMaxQueue = 1000
 	// missingDepsFetchTimeout bounds one batch fetch, across storenode failovers.
-	missingDepsFetchTimeout = time.Minute
+	missingDepsFetchTimeout = 70 * time.Second
 	// missingDepsExhaustedTTL is how long a hash that failed all its attempts
 	// stays unrequestable, instead of requestedHashesTTL.
 	missingDepsExhaustedTTL = 5 * time.Minute
