@@ -122,7 +122,7 @@ IOS_TOKEN_ARCHIVE = bash scripts/tkl_bundle_archive.sh $(STATUS_GO_BIN_DIR)/libs
 
 # `nim-sds` variables
 #
-# Option 1 (default): Nimble builds libsds into build/. sds-go-bindings pins the revision.
+# Option 1 (default): Nimble builds libsds into build/. status_go.nimble pins the revision.
 # Option 2: Provide NIM_SDS_LIB_DIR and NIM_SDS_INC_DIR (used by Nix).
 
 NIMBLE ?= nimble
@@ -143,10 +143,16 @@ else
     NIMBLE_SETUP := nimble.paths
 endif
 
-# nimble.paths has every --path, so parent configs (status-app's) are skipped.
-NIMBLE_SDS_ENV = \
-	LIBSDS_OUT="$(NIM_SDS_LIB_DIR)" \
-	NIM_PARAMS="--skipParentCfg $$NIM_PARAMS $$(tr '\n' ' ' < $(CURDIR)/nimble.paths)"
+# status_go.nimble's tasks add nim/lib_params and nimble.paths to NIM_PARAMS.
+# Each library and platform gets its own LIB_OUT_DIR (libraries clean fixed
+# names inside it); the result is then copied to NIM_SDS_LIB_DIR.
+NIM_LIB_OUT_DIR = $(STATUS_GO_BUILD_DIR)/nim
+# $(call nimble-libsds,<platform>,<task>,<library file>[,<env>])
+define nimble-libsds
+	$(4) LIB_OUT_DIR="$(NIM_LIB_OUT_DIR)/sds/$(1)" $(NIMBLE) $(2)
+	mkdir -p "$(NIM_SDS_LIB_DIR)"
+	cp "$(NIM_LIB_OUT_DIR)/sds/$(1)/$(3)" "$(NIM_LIB_OUT_DIR)/sds/$(1)/libsds.h" "$(NIM_SDS_LIB_DIR)/"
+endef
 
 LIBSDS ?= $(NIM_SDS_LIB_DIR)/libsds.$(LIB_EXT)
 # override: these must survive CGO_* passed as make command-line args (else -lsds is silently dropped).
@@ -377,7 +383,7 @@ nimble-deps: nimble.paths ##@build Resolve the Nim dependencies
 $(LIBSDS): | $(NIMBLE_SETUP)
 ifeq ($(NIM_SDS_BUILD_FROM_SOURCE),true)
 	@echo "Building nim-sds: $(LIBSDS)"
-	$(NIMBLE_SDS_ENV) $(NIMBLE) libsds
+	$(call nimble-libsds,$(shell go env GOOS)-$(shell go env GOARCH),libsds,$(notdir $(LIBSDS)))
 	@test -f $(LIBSDS) || (echo "Error: libsds not found at $(LIBSDS) after build" && exit 1)
 else
 	@test -f $(LIBSDS) || (echo "Error: libsds not found at $(LIBSDS)" && exit 1)
@@ -395,12 +401,11 @@ build-libsds-android: SDSARCH = $(strip $(if $(filter arm64,$(ARCH)),arm64,\
 	$(error Unsupported ARCH '$(ARCH)'. Please set ARCH to one of: arm64, arm, amd64, x86, x86_64))))))
 build-libsds-android: | nimble.paths
 	@echo "Building nim-sds for Android" $(LIBSDS)
-	$(NIMBLE_SDS_ENV) ARCH="$(SDSARCH)" ANDROID_NDK_ROOT="$(ANDROID_NDK_ROOT)" \
-		$(NIMBLE) libsdsAndroid
+	$(call nimble-libsds,android-$(SDSARCH),libsdsAndroid,libsds.so,ARCH="$(SDSARCH)" ANDROID_NDK_ROOT="$(ANDROID_NDK_ROOT)")
 
 build-libsds-ios: | nimble.paths
 	@echo "Building nim-sds for iOS" $(LIBSDS)
-	$(NIMBLE_SDS_ENV) env -u SDKROOT -u CPATH -u LIBRARY_PATH $(NIMBLE) libsdsIOS
+	$(call nimble-libsds,ios-$(or $(ARCH),$(shell uname -m)),libsdsIOS,libsds.a,env -u SDKROOT -u CPATH -u LIBRARY_PATH)
 
 clean-libsds:
 	@echo "Removing libsds"
