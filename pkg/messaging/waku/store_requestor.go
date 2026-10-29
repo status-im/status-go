@@ -31,7 +31,9 @@ type rawStoreRequester interface {
 	RequestRaw(ctx context.Context, peerInfo peer.AddrInfo, request *storepb.StoreQueryRequest) (store.Result, error)
 }
 
-// query returns as soon as ctx is done: RequestRaw ignores ctx while it waits for the reply.
+// query returns as soon as ctx is done. RequestRaw only uses ctx to open the
+// stream, so after cancellation the request keeps running in the background until
+// the storenode replies or the connection drops.
 func (r wakuStoreRequestor) query(ctx context.Context, peerInfo peer.AddrInfo, request *storepb.StoreQueryRequest) ([]*storepb.WakuMessageKeyValue, []byte, error) {
 	type reply struct {
 		result store.Result
