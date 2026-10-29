@@ -103,7 +103,11 @@ GIT_ROOT ?= $(dir $(realpath $(lastword $(MAKEFILE_LIST))))
 # Probe git only when this tree has its own .git (dir in a clone, file in a
 # worktree/submodule): a copy inside another repo must not take that repo's version.
 GIT_ROOT_IS_CHECKOUT := $(wildcard $(GIT_ROOT).git)
-GIT_COMMIT ?= $(if $(GIT_ROOT_IS_CHECKOUT),$(shell git -C "$(GIT_ROOT)" rev-parse --short HEAD 2>/dev/null))
+# A nimble store entry has no .git: nimblemeta.json records the commit instead.
+GIT_ROOT_IS_NIMBLE_ENTRY := $(if $(GIT_ROOT_IS_CHECKOUT),,$(wildcard $(GIT_ROOT)nimblemeta.json))
+ifeq ($(origin GIT_COMMIT),undefined)
+ GIT_COMMIT := $(if $(GIT_ROOT_IS_CHECKOUT),$(shell git -C "$(GIT_ROOT)" rev-parse --short HEAD 2>/dev/null),$(if $(GIT_ROOT_IS_NIMBLE_ENTRY),$(shell bash "$(GIT_ROOT)scripts/nimble_version.sh" commit 2>/dev/null)))
+endif
 GIT_AUTHOR ?= $(shell git config user.email || echo $$USER)
 
 # Every library-build output goes here; point it outside a read-only tree.
@@ -262,7 +266,10 @@ endif
 # writes into the source tree (which may be read-only).
 VERSION_PKG := github.com/status-im/status-go/pkg/version
 SENTRY_PKG := github.com/status-im/status-go/pkg/sentry
-STATUS_GO_VERSION ?= $(if $(GIT_ROOT_IS_CHECKOUT),$(shell git -C "$(GIT_ROOT)" describe --tags 2>/dev/null))
+# Callers that know the version (a release build) pass STATUS_GO_VERSION.
+ifeq ($(origin STATUS_GO_VERSION),undefined)
+ STATUS_GO_VERSION := $(if $(GIT_ROOT_IS_CHECKOUT)$(GIT_ROOT_IS_NIMBLE_ENTRY),$(shell bash "$(GIT_ROOT)scripts/version.sh" 2>/dev/null))
+endif
 ifeq ($(strip $(STATUS_GO_VERSION)),)
  STATUS_GO_VERSION := 0.0.0-dev
 endif
@@ -747,7 +754,7 @@ commit-check:
 
 version: SHELL := /bin/sh
 version:
-	@./scripts/version.sh
+	@echo "$(STATUS_GO_VERSION)"
 
 tag-version:
 	bash scripts/tag_version.sh $(TARGET_COMMIT)
