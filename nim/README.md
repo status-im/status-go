@@ -1,4 +1,10 @@
-# Building the Nim libraries
+# status-go as a nimble package
+
+The installed package is status-go's full source, so a dependent builds libstatus from its store
+entry: `make -C <status_go> statusgo-shared-library STATUS_GO_BUILD_DIR=<out>` writes only under
+`<out>`. `srcDir` is the empty `internal/nimble/src`, so no status-go directory reaches a
+dependent's Nim module path. Install it in local-deps mode (`nimbledeps/`): nimble 0.26 global
+installs flatten `srcDir` and drop the root files.
 
 The tasks `libsds`, `libsdsAndroid` and `libsdsIOS` build the pinned nim-sds into `LIB_OUT_DIR`
 (one per library and platform; default `build/nim/sds/<os>-<cpu>`), with `NIM_PARAMS` = the

@@ -33,6 +33,7 @@ The library targets (`statusgo-library`, `statusgo-shared-library`,
 `STATUS_GO_BUILD_DIR` (default `./build`). The generated sources they need come
 from `scripts/generate-overlay.sh` (needs `protoc`) and reach `go build` through
 `-overlay`; `make generate` still generates in place for tests and editors.
+A nimble store entry of status-go is such a copy; see `nim/README.md`.
 
 Version and Sentry values are set at link time (`BUILD_VARS_LDFLAGS`):
 `STATUS_GO_VERSION` (default `git describe --tags`, else `0.0.0-dev`),

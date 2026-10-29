@@ -12,8 +12,12 @@ author      = "Status Research & Development GmbH"
 description = "Status messaging and wallet backend, built as a C archive for status-app"
 license     = "MPL-2.0"
 
-# status-go has no Nim code: this package only resolves and builds its Nim libraries.
+# The installed package is status-go's full source, so a dependent builds
+# libstatus from it (see nim/README.md). status-go has no Nim code: srcDir is an
+# empty directory, so nothing of it reaches a dependent's Nim module path.
 srcDir = "internal/nimble/src"
+installDirs = @["cmd", "internal", "mobile", "nim", "params", "pkg", "scripts", "tools"]
+installFiles = @["go.mod", "go.sum", "Makefile", "LICENSE.md", "README.md"]
 
 
 ### Dependencies

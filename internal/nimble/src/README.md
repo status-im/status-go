@@ -1,7 +1,7 @@
-# Nimble srcDir placeholder
+# No Nim code here
 
-`status_go.nimble` needs a `srcDir`, and status-go has no Nim source. Pointing it here keeps the
-installed Nimble package empty: only the `.nimble` file itself is installed, so nothing of status-go
-reaches a dependent's Nim module path.
+`status_go.nimble` points `srcDir` at this empty directory. The installed package carries
+status-go's full source (to build libstatus from it), but a dependent's Nim module path gets only
+this directory, so no status-go file is importable from Nim.
 
 Do not put Nim modules here.
