@@ -71,7 +71,10 @@ type Transport struct {
 	routed *ttlcache.Cache[common.Hash, struct{}]
 }
 
-const routedEnvelopesTTL = 20 * time.Minute
+const (
+	routedEnvelopesTTL     = 20 * time.Minute
+	routedEnvelopesMaxSize = 10_000
+)
 
 // Pause signals Transport's internal goroutines to idle and cascades to
 // EnvelopesMonitor and the underlying waku transport.
@@ -148,18 +151,21 @@ func NewTransport(
 		received:         make(map[string]map[string]*wakutypes.Message),
 		matchedPublisher: pubsub.NewTypePublisher[struct{}](),
 		subs:             newFilterSubscriptions(api, logger),
-		routed:           ttlcache.New(ttlcache.WithTTL[common.Hash, struct{}](routedEnvelopesTTL)),
+		routed: ttlcache.New(
+			ttlcache.WithTTL[common.Hash, struct{}](routedEnvelopesTTL),
+			ttlcache.WithCapacity[common.Hash, struct{}](routedEnvelopesMaxSize),
+		),
 	}
-	go func() {
-		defer panics.LogOnPanic()
-		t.routed.Start()
-	}()
-
 	for _, opt := range opts {
 		if err := opt(t); err != nil {
 			return nil, err
 		}
 	}
+
+	go func() {
+		defer panics.LogOnPanic()
+		t.routed.Start()
+	}()
 
 	t.cleanFiltersLoop()
 
