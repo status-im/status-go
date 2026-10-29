@@ -23,24 +23,23 @@ func (p *countingTokenListProvider) GetTokenContractAddresses(chainID uint64) ([
 	return []common.Address{{byte(chainID)}}, nil
 }
 
-func TestBuildFetchConfigsReadsTokenListOncePerChain(t *testing.T) {
+func TestBuildChainFetchesReadsTokenListOncePerChain(t *testing.T) {
 	provider := &countingTokenListProvider{calls: make(map[uint64]int)}
-	c := NewController(DefaultControllerConfig(), NewStorageMemory(), nil, nil, nil, nil, provider, nil, nil, nil, zap.NewNop())
+	c := NewController(DefaultControllerConfig(), NewStorageMemory(), nil, nil, nil, nil, provider, nil, nil, nil, nil, nil, zap.NewNop())
 
-	erc20 := []multistandardfetcher.ResultType{multistandardfetcher.ResultTypeERC20}
-	toFetch := make(map[BalancesKey][]multistandardfetcher.ResultType)
+	plan := newReadPlan()
 	for _, chainID := range []uint64{1, 10} {
 		for i := 0; i < 3; i++ {
-			toFetch[BalancesKey{Account: common.Address{19: byte(i + 1)}, ChainID: chainID}] = erc20
+			plan.pair(BalancesKey{Account: common.Address{19: byte(i + 1)}, ChainID: chainID}).listed = true
 		}
 	}
 
-	configs := c.buildMultiStandardFetcherFetchConfigs(toFetch)
+	fetches := c.buildChainFetches(plan)
 
 	require.Equal(t, map[uint64]int{1: 1, 10: 1}, provider.calls)
 	for _, chainID := range []uint64{1, 10} {
-		require.Len(t, configs[chainID].ERC20, 3)
-		for _, tokens := range configs[chainID].ERC20 {
+		require.Len(t, fetches[chainID].config.ERC20, 3)
+		for _, tokens := range fetches[chainID].config.ERC20 {
 			require.Equal(t, []common.Address{{byte(chainID)}}, tokens)
 		}
 	}
@@ -66,19 +65,22 @@ func (p *listBuildingTokenListProvider) GetTokenContractAddresses(uint64) ([]com
 	return addresses, nil
 }
 
-func BenchmarkBuildFetchConfigs(b *testing.B) {
+func BenchmarkBuildChainFetches(b *testing.B) {
 	provider := &listBuildingTokenListProvider{list: make([]common.Address, 8500)}
 	for i := range provider.list {
 		provider.list[i] = common.Address{0x70, 18: byte(i >> 8), 19: byte(i)}
 	}
-	c := NewController(DefaultControllerConfig(), NewStorageMemory(), nil, nil, nil, nil, provider, nil, nil, nil, zap.NewNop())
-	toFetch := map[BalancesKey][]multistandardfetcher.ResultType{}
-	for i := 0; i < 2; i++ {
-		toFetch[BalancesKey{Account: common.Address{19: byte(i + 1)}, ChainID: 1}] = []multistandardfetcher.ResultType{multistandardfetcher.ResultTypeERC20}
+	c := NewController(DefaultControllerConfig(), NewStorageMemory(), nil, nil, nil, nil, provider, nil, nil, nil, nil, nil, zap.NewNop())
+	plan := func() *readPlan {
+		plan := newReadPlan()
+		for i := 0; i < 2; i++ {
+			plan.pair(BalancesKey{Account: common.Address{19: byte(i + 1)}, ChainID: 1}).listed = true
+		}
+		return plan
 	}
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
-		_ = c.buildMultiStandardFetcherFetchConfigs(toFetch)
+		_ = c.buildChainFetches(plan())
 	}
 }
 
@@ -113,12 +115,12 @@ func TestHandleERC20Result_ZeroAndFailedAcrossFetches(t *testing.T) {
 	fails := common.Address{0x70, 19: 2}
 	ctx := context.Background()
 	config := erc20Config(account, dropsToZero, fails)
-	c := NewController(DefaultControllerConfig(), NewStorageMemory(), nil, nil, nil, nil, nil, nil, noopLastBlockManager{}, nil, zap.NewNop())
+	c := NewController(DefaultControllerConfig(), NewStorageMemory(), nil, nil, nil, nil, nil, nil, nil, nil, noopLastBlockManager{}, nil, zap.NewNop())
 
-	c.handleFetchResult(ctx, 1, config, erc20FetchResult(1, account, map[common.Address]*big.Int{dropsToZero: big.NewInt(5), fails: big.NewInt(7)}))
+	c.handleFetchResult(ctx, 1, erc20FetchResult(1, account, map[common.Address]*big.Int{dropsToZero: big.NewInt(5), fails: big.NewInt(7)}), &chainFetch{config: config})
 	require.Equal(t, int64(5), storedERC20Balances(t, c, account).Balances[dropsToZero].Int64())
 
-	c.handleFetchResult(ctx, 1, config, erc20FetchResult(2, account, map[common.Address]*big.Int{}, fails))
+	c.handleFetchResult(ctx, 1, erc20FetchResult(2, account, map[common.Address]*big.Int{}, fails), &chainFetch{config: config})
 	stored := storedERC20Balances(t, c, account)
 	require.NotContains(t, stored.Balances, dropsToZero, "5 -> 0: not stored")
 	require.Contains(t, stored.Answered, dropsToZero, "... answered, so it reads 0")
@@ -128,9 +130,9 @@ func TestHandleERC20Result_ZeroAndFailedAcrossFetches(t *testing.T) {
 func TestHandleERC20Result_FailedWithoutKnownBalanceIsUnknown(t *testing.T) {
 	account := common.Address{19: 1}
 	fails := common.Address{0x70, 19: 2}
-	c := NewController(DefaultControllerConfig(), NewStorageMemory(), nil, nil, nil, nil, nil, nil, noopLastBlockManager{}, nil, zap.NewNop())
+	c := NewController(DefaultControllerConfig(), NewStorageMemory(), nil, nil, nil, nil, nil, nil, nil, nil, noopLastBlockManager{}, nil, zap.NewNop())
 
-	c.handleFetchResult(context.Background(), 1, erc20Config(account, fails), erc20FetchResult(1, account, map[common.Address]*big.Int{}, fails))
+	c.handleFetchResult(context.Background(), 1, erc20FetchResult(1, account, map[common.Address]*big.Int{}, fails), &chainFetch{config: erc20Config(account, fails)})
 	stored := storedERC20Balances(t, c, account)
 	require.NotContains(t, stored.Balances, fails)
 	require.NotContains(t, stored.Answered, fails, "unknown, not zero")
@@ -160,15 +162,15 @@ func TestHandleERC20Result_OverlappingFetchesKeepEachOthersAnswers(t *testing.T)
 	newerToken := common.Address{0x70, 19: 2}
 	ctx := context.Background()
 	storage := &interleavingStorage{Storage: NewStorageMemory()}
-	c := NewController(DefaultControllerConfig(), storage, nil, nil, nil, nil, nil, nil, noopLastBlockManager{}, nil, zap.NewNop())
+	c := NewController(DefaultControllerConfig(), storage, nil, nil, nil, nil, nil, nil, nil, nil, noopLastBlockManager{}, nil, zap.NewNop())
 	finishedCh, unsub := pubsub.Subscribe[EventBalanceFetchFinished](c.GetPublisher(), 10)
 	defer unsub()
 
 	storage.onFirstERC20Update = func() {
-		c.handleFetchResult(ctx, 1, erc20Config(account, newerToken), erc20FetchResult(2, account, map[common.Address]*big.Int{}))
+		c.handleFetchResult(ctx, 1, erc20FetchResult(2, account, map[common.Address]*big.Int{}), &chainFetch{config: erc20Config(account, newerToken)})
 		<-finishedCh
 	}
-	c.handleFetchResult(ctx, 1, erc20Config(account, staleToken), erc20FetchResult(3, account, map[common.Address]*big.Int{}))
+	c.handleFetchResult(ctx, 1, erc20FetchResult(3, account, map[common.Address]*big.Int{}), &chainFetch{config: erc20Config(account, staleToken)})
 
 	stored := storedERC20Balances(t, c, account)
 	require.Contains(t, stored.Answered, newerToken)

@@ -30,6 +30,7 @@ type LatestBlockData struct {
 type BlockChainState struct {
 	ethClientGetter EthClientGetter
 	latestBlockData map[uint64]LatestBlockData // map[chainID]*LatestBlockData
+	readBlocks      map[uint64]readBlocks
 	sinceFn         func(time.Time) time.Duration
 	blockDurationFn func(chainID uint64) time.Duration
 	mu              sync.RWMutex
@@ -39,6 +40,7 @@ func NewBlockChainState(ethClientGetter EthClientGetter) *BlockChainState {
 	return &BlockChainState{
 		ethClientGetter: ethClientGetter,
 		latestBlockData: make(map[uint64]LatestBlockData),
+		readBlocks:      make(map[uint64]readBlocks),
 		sinceFn:         time.Since,
 		blockDurationFn: func(chainID uint64) time.Duration {
 			blockDuration, found := common.AverageBlockDurationForChain[common.ChainID(chainID)]
@@ -76,9 +78,33 @@ func (s *BlockChainState) GetEstimatedBlockTime(ctx context.Context, chainID uin
 	return blockTime, nil
 }
 
-// Set the latest known block number for a chain
+// readBlocks are the first and the last block balances of a chain were read at.
+type readBlocks struct {
+	first, last uint64
+}
+
+// SetLatestBlockNumber takes the block balances of chainID were read at.
 func (s *BlockChainState) SetLatestBlockNumber(chainID uint64, blockNumber uint64) {
 	s.setLatestBlockNumber(chainID, blockNumber)
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	blocks, exists := s.readBlocks[chainID]
+	if !exists {
+		blocks = readBlocks{first: blockNumber, last: blockNumber}
+	}
+	blocks.first = min(blocks.first, blockNumber)
+	blocks.last = max(blocks.last, blockNumber)
+	s.readBlocks[chainID] = blocks
+}
+
+// GetReadBlocks are the first and the last block balances of chainID were read
+// at; unlike the estimate, they never run ahead of the node.
+func (s *BlockChainState) GetReadBlocks(chainID uint64) (first uint64, last uint64, ok bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	blocks, ok := s.readBlocks[chainID]
+	return blocks.first, blocks.last, ok
 }
 
 func (s *BlockChainState) getOrInitializeLatestBlockData(ctx context.Context, chainID uint64) (LatestBlockData, error) {

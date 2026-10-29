@@ -782,6 +782,13 @@ func (api *API) RestartWalletReloadTimer(ctx context.Context) error {
 	return nil
 }
 
+// RefreshBalancesAfterReconnect reads the held balances at once after the
+// connection to the chains is back.
+func (api *API) RefreshBalancesAfterReconnect(ctx context.Context) error {
+	api.s.multistandardBalanceController.Reconnected()
+	return nil
+}
+
 func (api *API) IsChecksumValidForAddress(address string) (bool, error) {
 	logutils.ZapLogger().Debug("wallet.api.isChecksumValidForAddress", zap.String("address", address))
 	return abi_spec.CheckAddressChecksum(address)

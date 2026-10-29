@@ -16,9 +16,10 @@ This package provides a unified interface for:
 ### Controller
 The main orchestrator that manages transfer detection operations:
 - Monitors account and network changes
-- Debounces fetch requests (10s debounce, 10min fetch period)
+- Runs on `TriggerFetch`, debounced by 10s; the balance refresh triggers it with every periodic read (through `ChangeSource`), so it runs every 2 min on screen and every 15 min hidden
 - Coordinates between fetcher and providers
-- Manages block number tracking to prevent duplicate detection
+- Looks at the blocks after the last one it looked at, up to the last block balances were read at; it starts at the first block balances were read at
+- A range it fails to look at is a detection gap: it reports `EventTransferDetectionError` and never looks at the range again, since a full refresh of the chain covers it
 
 ### Fetcher
 Handles the actual transfer filtering using event logs:
@@ -36,7 +37,7 @@ fetcher := transferdetector.NewFetcher(ethClientGetter)
 Required interfaces for integration:
 - **AccountsProvider**: Provides wallet addresses to monitor
 - **NetworksProvider**: Provides active blockchain networks
-- **LastBlockProvider**: Provides latest block numbers for each chain
+- **LastBlockProvider**: Provides the first and the last block balances of each chain were read at; never an estimate, which can run ahead of the node and skip blocks
 - **FilterProvider**: Handles the actual transfer filtering
 
 ## Usage
@@ -45,21 +46,6 @@ Required interfaces for integration:
 // Create a new controller with default configuration
 controller := transferdetector.NewController(
     transferdetector.DefaultControllerConfig(),
-    fetcher,
-    accountsProvider,
-    accountsPublisher,
-    networksProvider,
-    lastBlockProvider,
-    logger,
-)
-
-// Or with custom configuration
-config := transferdetector.ControllerConfig{
-    FetchDebounceTime: 5 * time.Second,
-    FetchPeriod:       5 * time.Minute,
-}
-controller := transferdetector.NewController(
-    config,
     fetcher,
     accountsProvider,
     accountsPublisher,
@@ -96,9 +82,12 @@ Each event contains:
 
 ### Controller Configuration
 - **FetchDebounceTime**: 10 seconds (default) - debounce time for detection requests
-- **FetchPeriod**: 10 minutes (default) - minimum time between detections
 
-The controller automatically tracks the last fetched block number for each chain to ensure no transfers are missed and no duplicates are detected.
+The controller tracks the last block it looked at for each chain: every block after the first one balances were read at is looked at once or reported as a gap.
+
+## Change source
+
+`ChangeSource` adapts the controller to `refresh.ChangeSource` of go-wallet-sdk for the balance refresh: `Scan` triggers detection, and `Watch` tells `TransferDetected` for transfers of known tokens (token lists and custom tokens; the rest is spam) and native transfer logs (EIP-7708), and `DetectionGap` for every `EventTransferDetectionError`.
 
 ## Transfer Types
 

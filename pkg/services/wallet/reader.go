@@ -23,6 +23,7 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 
 	"github.com/status-im/go-wallet-sdk/pkg/balance/multistandardfetcher"
+	"github.com/status-im/go-wallet-sdk/pkg/balance/refresh"
 	"github.com/status-im/go-wallet-sdk/pkg/contracts/erc20"
 	"github.com/status-im/go-wallet-sdk/pkg/eventlog"
 
@@ -194,6 +195,10 @@ func (r *Reader) startTransferDetectionWatcher() {
 }
 
 func (r *Reader) processERC20TransferEvent(chainID uint64, event erc20.Erc20Transfer) error {
+	// A native transfer log (EIP-7708) comes from a system address, not a token.
+	if event.Raw.Address == refresh.NativeTransferLogAddress {
+		return nil
+	}
 	// Find token in db or if this is a community token, find its metadata
 	token, err := r.tokenManager.FindOrCreateTokenByAddress(context.TODO(), chainID, event.Raw.Address)
 	if err != nil {

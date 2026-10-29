@@ -118,3 +118,19 @@ func TestSetLatestBlockNumber(t *testing.T) {
 	require.True(t, exists)
 	require.Equal(t, uint64(150), blockData.blockNumber) // Should be updated to 150
 }
+
+func TestReadBlocksAreTheFirstAndLastBlockBalancesWereReadAt(t *testing.T) {
+	s, _ := setupTestState(t)
+
+	_, _, ok := s.GetReadBlocks(1)
+	require.False(t, ok)
+
+	s.SetLatestBlockNumber(1, 100)
+	s.SetLatestBlockNumber(1, 120)
+	s.SetLatestBlockNumber(1, 90)
+
+	first, last, ok := s.GetReadBlocks(1)
+	require.True(t, ok)
+	require.Equal(t, uint64(90), first)
+	require.Equal(t, uint64(120), last)
+}

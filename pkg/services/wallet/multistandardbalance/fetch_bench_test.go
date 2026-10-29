@@ -245,7 +245,7 @@ func newFakeFetchController(tb testing.TB, url string) (*Controller, multistanda
 
 	fetcher := NewFetcher(&fakeEthClientGetter{client: ethclient.NewEthClient(rpcClient)}, DefaultBatchSize,
 		map[uint64]common.Address{fakeChainID: fakeMulticallAddress})
-	c := NewController(DefaultControllerConfig(), NewStorageMemory(), fetcher, nil, nil, nil, nil, nil,
+	c := NewController(DefaultControllerConfig(), NewStorageMemory(), fetcher, nil, nil, nil, nil, nil, nil, nil,
 		noopLastBlockManager{}, nil, zap.NewNop())
 
 	config := multistandardfetcher.FetchConfig{ERC20: make(map[AccountAddress][]ContractAddress), OmitZeroERC20Balances: true}
@@ -261,7 +261,7 @@ func runFakeFetch(tb testing.TB, c *Controller, config multistandardfetcher.Fetc
 	resultsCh, err := c.fetcher.FetchBalances(ctx, fakeChainID, config)
 	require.NoError(tb, err)
 	for result := range resultsCh {
-		c.handleFetchResult(ctx, fakeChainID, config, result)
+		c.handleFetchResult(ctx, fakeChainID, result, &chainFetch{config: config})
 	}
 }
 
