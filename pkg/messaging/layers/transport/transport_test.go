@@ -3,6 +3,7 @@ package transport
 import (
 	"crypto/ecdsa"
 	"crypto/rand"
+	"math/big"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -372,4 +373,18 @@ func TestEnvelopesSeenWithoutTrackingSeesNothing(t *testing.T) {
 	tr := &Transport{}
 
 	require.Empty(t, tr.EnvelopesSeen([]string{common.HexToHash("0x01").Hex()}))
+}
+
+func TestRoutedEnvelopesCacheIsBounded(t *testing.T) {
+	tr, _ := newRoutingTestTransport(t)
+
+	for i := 1; i <= routedEnvelopesMaxSize+1; i++ {
+		hash := common.BigToHash(big.NewInt(int64(i)))
+		tr.markRouted(hash.Bytes())
+	}
+
+	oldest := common.BigToHash(big.NewInt(1))
+	newest := common.BigToHash(big.NewInt(routedEnvelopesMaxSize + 1))
+	require.Empty(t, tr.EnvelopesSeen([]string{oldest.Hex()}))
+	require.Equal(t, map[string]bool{newest.Hex(): true}, tr.EnvelopesSeen([]string{newest.Hex()}))
 }

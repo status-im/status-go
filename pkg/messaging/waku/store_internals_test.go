@@ -368,7 +368,7 @@ func TestStoreClientFetchByHashesParentDeadlineDoesNotBackOff(t *testing.T) {
 		return nodeCtx.Err()
 	})
 	require.Error(t, err)
-	require.NotErrorIs(t, err, ErrStorenodeTimeout)
+	require.ErrorIs(t, err, ErrStorenodeTimeout)
 	require.Len(t, tried, 1)
 	// The caller's own deadline is not the node's fault.
 	require.Equal(t, tried[0], sc.selector.candidates()[0].ID)
