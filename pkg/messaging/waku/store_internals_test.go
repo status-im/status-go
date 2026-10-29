@@ -12,6 +12,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/waku-org/go-waku/waku/v2/protocol"
+	"github.com/waku-org/go-waku/waku/v2/protocol/store"
 	storepb "github.com/waku-org/go-waku/waku/v2/protocol/store/pb"
 
 	types "github.com/status-im/status-go/pkg/messaging/waku/types"
@@ -281,4 +282,58 @@ func TestStoreClientFetchByHashesNoStorenodes(t *testing.T) {
 		return nil
 	})
 	require.ErrorIs(t, err, ErrNoStorenodesReachable)
+}
+
+// --- requestor ---
+
+type blockingStore struct {
+	release chan struct{}
+	result  store.Result
+}
+
+func (s *blockingStore) RequestRaw(context.Context, peer.AddrInfo, *storepb.StoreQueryRequest) (store.Result, error) {
+	<-s.release
+	return s.result, nil
+}
+
+type stubResult struct {
+	store.Result
+	messages []*storepb.WakuMessageKeyValue
+	cursor   []byte
+}
+
+func (r stubResult) Messages() []*storepb.WakuMessageKeyValue { return r.messages }
+func (r stubResult) Cursor() []byte                           { return r.cursor }
+
+func TestWakuStoreRequestorReturnsOnCancelWhileRequestBlocks(t *testing.T) {
+	s := &blockingStore{release: make(chan struct{}), result: stubResult{}}
+	defer close(s.release)
+	r := wakuStoreRequestor{store: s}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() {
+		_, _, err := r.query(ctx, peer.AddrInfo{ID: "n1"}, &storepb.StoreQueryRequest{})
+		done <- err
+	}()
+
+	cancel()
+	select {
+	case err := <-done:
+		require.ErrorIs(t, err, context.Canceled)
+	case <-time.After(time.Second):
+		t.Fatal("query did not return after the context was cancelled")
+	}
+}
+
+func TestWakuStoreRequestorReturnsResult(t *testing.T) {
+	messages := []*storepb.WakuMessageKeyValue{{}}
+	s := &blockingStore{release: make(chan struct{}), result: stubResult{messages: messages, cursor: []byte{1}}}
+	close(s.release)
+	r := wakuStoreRequestor{store: s}
+
+	got, cursor, err := r.query(context.Background(), peer.AddrInfo{ID: "n1"}, &storepb.StoreQueryRequest{})
+	require.NoError(t, err)
+	require.Equal(t, messages, got)
+	require.Equal(t, []byte{1}, cursor)
 }
