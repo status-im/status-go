@@ -23,11 +23,12 @@ func NewWakuV2EnvelopeEventWrapper(envelopeEvent *common.EnvelopeEvent) *types.E
 		}
 	}
 	return &types.EnvelopeEvent{
-		Event: types.EventType(envelopeEvent.Event),
-		Hash:  cryptotypes.Hash(envelopeEvent.Hash),
-		Batch: cryptotypes.Hash(envelopeEvent.Batch),
-		Peer:  types.EnodeID(envelopeEvent.Peer),
-		Data:  wrappedData,
+		Event:     types.EventType(envelopeEvent.Event),
+		RequestID: types.RequestID(envelopeEvent.RequestID),
+		Hash:      cryptotypes.Hash(envelopeEvent.Hash),
+		Batch:     cryptotypes.Hash(envelopeEvent.Batch),
+		Peer:      types.EnodeID(envelopeEvent.Peer),
+		Data:      wrappedData,
 	}
 }
 

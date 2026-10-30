@@ -532,86 +532,86 @@ func (t *Transport) RetrieveRawAll() (map[Filter][]*wakutypes.Message, error) {
 // SendPublic sends a new message using the Whisper service.
 // For public filters, chat name is used as an ID as well as
 // a topic.
-func (t *Transport) SendPublic(ctx context.Context, newMessage *wakutypes.NewMessage, chatName string) ([]byte, error) {
+func (t *Transport) SendPublic(ctx context.Context, newMessage *wakutypes.NewMessage, chatName string) (wakutypes.RequestID, error) {
 	filter, err := t.filters.LoadPublic(chatName, newMessage.PubsubTopic)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
 	if err := t.subs.Acquire(filter); err != nil {
-		return nil, err
+		return "", err
 	}
 
 	symKey, ok := t.filters.SymKey(filter.FilterID)
 	if !ok {
-		return nil, errors.New("no sym key found for filter")
+		return "", errors.New("no sym key found for filter")
 	}
 
 	encoded, err := t.encode(newMessage.Payload, symKey, nil)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
 	return t.api.Send(ctx, filter.PubsubTopic, filter.ContentTopic.ContentTopic(), encoded, newMessage.Ephemeral, newMessage.Priority)
 }
 
-func (t *Transport) SendPrivateWithSharedSecret(ctx context.Context, newMessage *wakutypes.NewMessage, publicKey *ecdsa.PublicKey, secret []byte) ([]byte, error) {
+func (t *Transport) SendPrivateWithSharedSecret(ctx context.Context, newMessage *wakutypes.NewMessage, publicKey *ecdsa.PublicKey, secret []byte) (wakutypes.RequestID, error) {
 	filter, err := t.filters.LoadNegotiated(messagingtypes.NegotiatedSecret{
 		PublicKey: publicKey,
 		Key:       secret,
 	})
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
 	if err := t.subs.Acquire(filter); err != nil {
-		return nil, err
+		return "", err
 	}
 
 	symKey, ok := t.filters.SymKey(filter.FilterID)
 	if !ok {
-		return nil, errors.New("no sym key found for filter")
+		return "", errors.New("no sym key found for filter")
 	}
 
 	encoded, err := t.encode(newMessage.Payload, symKey, nil)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
 	return t.api.Send(ctx, filter.PubsubTopic, filter.ContentTopic.ContentTopic(), encoded, newMessage.Ephemeral, newMessage.Priority)
 }
 
-func (t *Transport) SendPrivateWithPartitioned(ctx context.Context, newMessage *wakutypes.NewMessage, publicKey *ecdsa.PublicKey) ([]byte, error) {
+func (t *Transport) SendPrivateWithPartitioned(ctx context.Context, newMessage *wakutypes.NewMessage, publicKey *ecdsa.PublicKey) (wakutypes.RequestID, error) {
 	filter, err := t.filters.LoadPartitioned(publicKey, t.privateKey, false)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
 	if err := t.subs.Acquire(filter); err != nil {
-		return nil, err
+		return "", err
 	}
 
 	encoded, err := t.encode(newMessage.Payload, nil, publicKey)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
 	return t.api.Send(ctx, filter.PubsubTopic, filter.ContentTopic.ContentTopic(), encoded, newMessage.Ephemeral, newMessage.Priority)
 }
 
-func (t *Transport) SendPrivateOnPersonalTopic(ctx context.Context, newMessage *wakutypes.NewMessage, publicKey *ecdsa.PublicKey) ([]byte, error) {
+func (t *Transport) SendPrivateOnPersonalTopic(ctx context.Context, newMessage *wakutypes.NewMessage, publicKey *ecdsa.PublicKey) (wakutypes.RequestID, error) {
 	filter, err := t.filters.LoadPersonal(publicKey, t.privateKey, false)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
 	if err := t.subs.Acquire(filter); err != nil {
-		return nil, err
+		return "", err
 	}
 
 	encoded, err := t.encode(newMessage.Payload, nil, publicKey)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
 	return t.api.Send(ctx, filter.PubsubTopic, filter.ContentTopic.ContentTopic(), encoded, newMessage.Ephemeral, newMessage.Priority)
@@ -632,20 +632,20 @@ func (t *Transport) LoadKeyFilters(key *ecdsa.PrivateKey) (*Filter, error) {
 	return filter, nil
 }
 
-func (t *Transport) SendCommunityMessage(ctx context.Context, newMessage *wakutypes.NewMessage, publicKey *ecdsa.PublicKey) ([]byte, error) {
+func (t *Transport) SendCommunityMessage(ctx context.Context, newMessage *wakutypes.NewMessage, publicKey *ecdsa.PublicKey) (wakutypes.RequestID, error) {
 	// We load the filter to make sure we can post on it
 	filter, err := t.filters.LoadPublic(PubkeyToHex(publicKey)[2:], newMessage.PubsubTopic)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
 	if err := t.subs.Acquire(filter); err != nil {
-		return nil, err
+		return "", err
 	}
 
 	encoded, err := t.encode(newMessage.Payload, nil, publicKey)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
 	return t.api.Send(ctx, filter.PubsubTopic, filter.ContentTopic.ContentTopic(), encoded, newMessage.Ephemeral, newMessage.Priority)
@@ -675,21 +675,16 @@ func (t *Transport) encode(payload []byte, symKey []byte, recipient *ecdsa.Publi
 
 // Track records sent envelopes for delivery monitoring. It is the
 // single-identifier convenience wrapper around TrackMany.
-func (t *Transport) Track(identifier []byte, hashes [][]byte, newMessages []*wakutypes.NewMessage) {
-	t.TrackMany([][]byte{identifier}, hashes, newMessages)
+func (t *Transport) Track(identifier []byte, requestIDs []wakutypes.RequestID, newMessages []*wakutypes.NewMessage) {
+	t.TrackMany([][]byte{identifier}, requestIDs, newMessages)
 }
 
-func (t *Transport) TrackMany(identifiers [][]byte, hashes [][]byte, newMessages []*wakutypes.NewMessage) {
+func (t *Transport) TrackMany(identifiers [][]byte, requestIDs []wakutypes.RequestID, newMessages []*wakutypes.NewMessage) {
 	if t.envelopesMonitor == nil {
 		return
 	}
 
-	envelopeHashes := make([]cryptotypes.Hash, len(hashes))
-	for i, hash := range hashes {
-		envelopeHashes[i] = cryptotypes.BytesToHash(hash)
-	}
-
-	err := t.envelopesMonitor.Add(identifiers, envelopeHashes, newMessages)
+	err := t.envelopesMonitor.Add(identifiers, requestIDs, newMessages)
 	if err != nil {
 		t.logger.Error("failed to track messages", zap.Error(err))
 	}
@@ -697,11 +692,11 @@ func (t *Transport) TrackMany(identifiers [][]byte, hashes [][]byte, newMessages
 
 // TrackWithSDSAlias tracks an application message for publish confirmation and
 // associates its SDS ID solely for SDS retrieval hints and delivery callbacks.
-func (t *Transport) TrackWithSDSAlias(applicationMessageID, sdsMessageID []byte, hashes [][]byte, newMessages []*wakutypes.NewMessage) {
+func (t *Transport) TrackWithSDSAlias(applicationMessageID, sdsMessageID []byte, requestIDs []wakutypes.RequestID, newMessages []*wakutypes.NewMessage) {
 	if t.envelopesMonitor == nil {
 		return
 	}
-	t.Track(applicationMessageID, hashes, newMessages)
+	t.Track(applicationMessageID, requestIDs, newMessages)
 	t.envelopesMonitor.AddSDSAlias(applicationMessageID, sdsMessageID)
 }
 
@@ -724,11 +719,8 @@ func (t *Transport) TrackedEnvelopeHashes(identifier []byte) ([]string, error) {
 
 	key := cryptotypes.HexBytes(identifier).String()
 
-	t.envelopesMonitor.mu.Lock()
-	defer t.envelopesMonitor.mu.Unlock()
-
-	hashes, ok := t.envelopesMonitor.messageEnvelopeHashes[key]
-	if !ok || len(hashes) == 0 {
+	hashes := t.envelopesMonitor.wireHashes(key)
+	if len(hashes) == 0 {
 		return nil, errors.New("no tracked envelope hash found")
 	}
 
@@ -862,8 +854,8 @@ func (t *Transport) ConfirmMessageDelivered(messageID string) {
 	if t.envelopesMonitor == nil {
 		return
 	}
-	hashes, ok := t.envelopesMonitor.messageEnvelopeHashes[messageID]
-	if !ok {
+	hashes := t.envelopesMonitor.wireHashes(messageID)
+	if len(hashes) == 0 {
 		return
 	}
 	commHashes := make([]common.Hash, len(hashes))
