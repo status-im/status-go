@@ -401,8 +401,8 @@ func (tm *Manager) GetTokensByKeys(tokenKeys []string) ([]*tokentypes.Token, err
 
 // GetTokensByGroupKeys returns the tokens of the given token groups. A token's
 // group key is its cross-chain id, or its token key when it has none; keys match
-// exactly (case-sensitive). Catalogue tokens come first, in GetAllTokens order,
-// then the custom tokens.
+// exactly (case-sensitive). Each group's tokens are in GetAllTokens order; the
+// order across groups is unspecified.
 func (tm *Manager) GetTokensByGroupKeys(groupKeys []string) ([]*tokentypes.Token, error) {
 	tokens := make([]*tokentypes.Token, 0)
 	keys := make(map[string]struct{}, len(groupKeys))

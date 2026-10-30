@@ -73,7 +73,11 @@ func (s *TokensByGroupKeysSuite) TestEachGroupKeyMatchesAllTokensGrouping() {
 	for key, want := range legacy {
 		got, err := s.tm.GetTokensByGroupKeys([]string{key})
 		s.Require().NoError(err)
-		s.Require().Equal(map[string][]tokentypes.Token{key: want}, groupTokens(got), key)
+		flat := make([]tokentypes.Token, 0, len(got))
+		for _, token := range got {
+			flat = append(flat, *token)
+		}
+		s.Require().Equal(want, flat, key)
 	}
 }
 
