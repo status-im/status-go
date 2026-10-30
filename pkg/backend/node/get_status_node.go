@@ -24,6 +24,7 @@ import (
 	"github.com/status-im/status-go/internal/crypto"
 	"github.com/status-im/status-go/internal/db/multiaccounts"
 	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
+	_ "github.com/status-im/status-go/internal/gethmetrics" // drop geth's per-method RPC histograms before rpcServer serves
 	"github.com/status-im/status-go/internal/ipfs"
 	"github.com/status-im/status-go/internal/logutils"
 	"github.com/status-im/status-go/internal/panics"

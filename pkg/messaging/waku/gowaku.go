@@ -75,6 +75,7 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
 
 	"github.com/status-im/status-go/internal/connection"
+	_ "github.com/status-im/status-go/internal/enodedb" // shrink the local node's memtable before node.New opens it
 	"github.com/status-im/status-go/internal/logutils"
 	"github.com/status-im/status-go/internal/panics"
 	"github.com/status-im/status-go/internal/pausable"
