@@ -80,6 +80,7 @@ import (
 	"github.com/status-im/status-go/internal/panics"
 	"github.com/status-im/status-go/internal/pausable"
 	"github.com/status-im/status-go/internal/timesource"
+	"github.com/status-im/status-go/pkg/messaging/diagnostics"
 	"github.com/status-im/status-go/pkg/messaging/waku/common"
 	"github.com/status-im/status-go/pkg/messaging/waku/fleets"
 	"github.com/status-im/status-go/pkg/messaging/waku/types"
@@ -148,7 +149,8 @@ type Waku struct {
 
 	traffic *trafficCounter
 
-	sendQueue *publish.MessageQueue
+	sendQueue          *publish.MessageQueue
+	diagnosticAttempts sync.Map // envelope hash -> diagnostics.Metadata; removed when publication starts
 
 	msgQueue chan *common.ReceivedMessage // Message queue for waku messages that havent been decoded
 
@@ -1249,6 +1251,9 @@ func (w *Waku) Stop() error {
 func (w *Waku) OnNewEnvelopes(envelope *protocol.Envelope, msgType common.MessageType, processImmediately bool) error {
 	if envelope == nil {
 		return nil
+	}
+	if diagnostics.Enabled() {
+		diagnostics.Emit(diagnostics.Event{Stage: "received", EnvelopeHashes: []string{envelope.Hash().String()}, Source: msgType})
 	}
 
 	recvMessage := common.NewReceivedMessage(envelope, msgType)
