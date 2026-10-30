@@ -9,6 +9,7 @@ import (
 
 	"github.com/status-im/status-go/internal/crypto"
 	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
+	"github.com/status-im/status-go/pkg/messaging/diagnostics"
 	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
 	"github.com/status-im/status-go/pkg/pubsub"
 )
@@ -28,11 +29,21 @@ func (s *Sender) scheduleReliableSend(recipient *ecdsa.PublicKey, message []byte
 	return datasyncID[:], nil
 }
 
-func (s *Sender) SendPrivateReliability(recipient *ecdsa.PublicKey, wrappedPayload []byte, messages [][]byte) error {
+func (s *Sender) SendPrivateReliability(recipient *ecdsa.PublicKey, wrappedPayload []byte, messages [][]byte) (sendErr error) {
 	messageIDs := make([]cryptotypes.HexBytes, 0, len(messages))
 	for _, msgPayload := range messages {
 		messageIDs = append(messageIDs, messagingtypes.MessageID(&s.identity.PublicKey, msgPayload))
 	}
+	byteMessageIDs := make([][]byte, len(messageIDs))
+	for i, id := range messageIDs {
+		byteMessageIDs[i] = []byte(id)
+	}
+	ctx, attempt := diagnostics.Begin(context.Background(), byteMessageIDs, crypto.PubkeyToHex(recipient), "mvds")
+	defer func() {
+		if sendErr != nil {
+			diagnostics.Emit(diagnostics.Event{Metadata: attempt, Stage: "attempt_failed", Error: sendErr.Error()})
+		}
+	}()
 
 	logger := s.logger.Named("sendPrivateReliability").With(
 		zap.Stringers("messageIDs", messageIDs),
@@ -49,7 +60,7 @@ func (s *Sender) SendPrivateReliability(recipient *ecdsa.PublicKey, wrappedPaylo
 		return errors.Wrap(err, "failed to process and marshal message spec")
 	}
 
-	hashes, wakuMessages, err := s.sendPrivate(context.Background(), logger, sendPrivateParams{
+	hashes, wakuMessages, err := s.sendPrivate(ctx, logger, sendPrivateParams{
 		recipient:       recipient,
 		payload:         payload,
 		sharedSecretKey: sharedSecretKey,
@@ -62,9 +73,8 @@ func (s *Sender) SendPrivateReliability(recipient *ecdsa.PublicKey, wrappedPaylo
 		zap.Strings("hashes", cryptotypes.EncodeHexes(hashes)),
 	)
 
-	byteMessageIDs := make([][]byte, len(messageIDs))
-	for i, id := range messageIDs {
-		byteMessageIDs[i] = []byte(id)
+	if diagnostics.Enabled() {
+		diagnostics.Emit(diagnostics.Event{Metadata: attempt, Stage: "dispatch", EnvelopeHashes: diagnostics.Hexes(hashes)})
 	}
 
 	s.stack.Transport.TrackMany(byteMessageIDs, hashes, wakuMessages)
