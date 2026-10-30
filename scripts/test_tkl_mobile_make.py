@@ -28,7 +28,7 @@ class MobileBuildTest(unittest.TestCase):
                 with self.subTest(platform=platform):
                     result = subprocess.run(
                         ["make", f"statusgo-{platform}-library", "-o", "generate",
-                         "-o", "statusgo-c-bindings", "-o", f"build-libsds-{platform}",
+                         "-o", "statusgo-c-bindings", "-o", f"build-libsds-{platform}", "-o", f"build-liblogosdelivery-{platform}",
                          "-o", "install-git-hooks", "ARCH=arm64", "RELEASE_TAG=fixture",
                          "ANDROID_NDK_ROOT=/fixture/ndk", "HOST_OS=linux",
                          "IPHONE_SDK=iphoneos"],
@@ -78,7 +78,7 @@ class MobileBuildTest(unittest.TestCase):
                 with self.subTest(sdk=sdk, arch=arch, override=override):
                     command = [
                         "make", "-n", "statusgo-ios-library", "-o", "generate",
-                        "-o", "statusgo-c-bindings", "-o", "build-libsds-ios",
+                        "-o", "statusgo-c-bindings", "-o", "build-libsds-ios", "-o", "build-liblogosdelivery-ios",
                         "USE_NIM_TOKEN_LISTS=true", f"ARCH={arch}", f"IPHONE_SDK={sdk}"]
                     if override:
                         command.append(f"IOS_TARGET={override}")
@@ -108,7 +108,7 @@ class MobileBuildTest(unittest.TestCase):
                     result = subprocess.run(
                         ["make", "-n", f"statusgo-{platform}-library",
                          "-o", "generate", "-o", "statusgo-c-bindings",
-                         "-o", f"build-libsds-{platform}",
+                         "-o", f"build-libsds-{platform}", "-o", f"build-liblogosdelivery-{platform}",
                          f"USE_NIM_TOKEN_LISTS={enabled}", "ARCH=arm64",
                          "ANDROID_NDK_ROOT=/fixture/ndk", "HOST_OS=linux",
                          "IPHONE_SDK=iphonesimulator", "IOS_TARGET=14.0"],
