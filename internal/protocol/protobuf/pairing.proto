@@ -516,6 +516,10 @@ message BackedUpThread {
   uint64 metadata_clock = 7;
   bool creator_pending = 8;
   uint64 last_activity_at = 9;
+  bool deleted = 10;
+  uint64 deleted_clock = 11;
+  string deleted_by = 12;
+  uint64 deleted_at = 13;
 }
 
 message BackedUpMessageBatch {
