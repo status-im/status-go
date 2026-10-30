@@ -14,6 +14,8 @@ library="${1:?Supply the output library and build command}"
 shift
 [ "$#" -gt 0 ] || exit 2
 mkdir -p "$(dirname "$library")"
+# The reuse key hashes this git checkout; a copy without its own .git always builds.
+[ -e .git ] || exec "$@"
 stamp="$library.tkl-inputs"
 lock="$library.tkl-lock"
 fail() { echo "libtkl: $*" >&2; exit 1; }

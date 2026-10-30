@@ -1,31 +1,22 @@
 package sentry
 
 import (
-	_ "embed"
 	"os"
-	"strings"
 )
 
-//go:generate sh -c "echo $SENTRY_CONTEXT_NAME > SENTRY_CONTEXT_NAME"
-//go:generate sh -c "echo $SENTRY_CONTEXT_VERSION > SENTRY_CONTEXT_VERSION"
-//go:generate sh -c "echo $SENTRY_PRODUCTION > SENTRY_PRODUCTION"
-
-const productionEnvironment = "production"
-
+// Set at link time by the Makefile (BUILD_VARS_LDFLAGS) from SENTRY_CONTEXT_NAME,
+// SENTRY_CONTEXT_VERSION and SENTRY_PRODUCTION. Empty means no Sentry context
+// and a non-production environment.
 var (
-	//go:embed SENTRY_CONTEXT_NAME
 	defaultContextName string
 
-	//go:embed SENTRY_CONTEXT_VERSION
 	defaultContextVersion string
 
-	//go:embed SENTRY_PRODUCTION
+	// production is "true" or "1" for a production build.
 	production string
 )
 
-func init() {
-	production = strings.TrimSpace(production)
-}
+const productionEnvironment = "production"
 
 func DefaultContext() string {
 	return defaultContextName

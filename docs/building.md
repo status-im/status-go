@@ -26,6 +26,21 @@ Checkout [`status-backend docs`](../cmd/status-backend/README.md) for more detai
 - `make status-go-deps` - install required tools
 - `make generate` - compile protobuf files, build SQL migrations, generate mocks
 
+## Building the libraries from a read-only tree
+
+The library targets (`statusgo-library`, `statusgo-shared-library`,
+`statusgo-android-library`, `statusgo-ios-library`) write only under
+`STATUS_GO_BUILD_DIR` (default `./build`). The generated sources they need come
+from `scripts/generate-overlay.sh` (needs `protoc`) and reach `go build` through
+`-overlay`; `make generate` still generates in place for tests and editors.
+A nimble store entry of status-go is such a copy; see `nim/README.md`.
+
+Version and Sentry values are set at link time (`BUILD_VARS_LDFLAGS`):
+`STATUS_GO_VERSION` (default `git describe --tags`, else `0.0.0-dev`),
+`GIT_COMMIT`, `SENTRY_CONTEXT_NAME`, `SENTRY_CONTEXT_VERSION` and
+`SENTRY_PRODUCTION`. Extra link flags go in `GO_EXTRA_LDFLAGS`; overriding
+`BUILD_FLAGS` drops the stamping.
+
 ## Building with Docker
 
 ```shell

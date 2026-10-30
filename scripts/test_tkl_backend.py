@@ -143,7 +143,7 @@ class BackendCacheTest(unittest.TestCase):
         for content in ("first", "rebuilt"):
             self.run_cmd(
                 "make", "statusgo-shared-library-build", "OS=Linux", "RELEASE_TAG=test",
-                "-o", "generate", "-o", "statusgo-c-bindings", "-o", "install-git-hooks",
+                "-o", "generate", "-o", "generate-overlay", "-o", "statusgo-c-bindings", "-o", "install-git-hooks",
                 "LIBSDS=/fixture/libsds.so", "-o", "/fixture/libsds.so",
                 env=dict(env, BUILD_CONTENT=content))
             library = self.root / "build/bin/libstatus.so"
