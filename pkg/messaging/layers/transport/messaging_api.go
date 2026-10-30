@@ -13,10 +13,11 @@ import (
 // Currently satisfied by *waku.Waku. The logos-delivery Messaging API will
 // satisfy it next, after which the waku adapter is retired (pm#380).
 type MessagingAPI interface {
-	// Send publishes a pre-encoded payload on the messaging network. The
-	// payload is expected to be already encoded for WakuMessage version=1
-	// (see rfc26.Encode). Returns the wire hash on success.
-	Send(ctx context.Context, pubsubTopic, contentTopic string, payload []byte, ephemeral bool, priority *int) ([]byte, error)
+	// Send queues a payload already encrypted with rfc26.Encode and returns the
+	// ID of the request. The outcome arrives later as an envelope event with
+	// that ID: EventEnvelopeSent, which carries the wire hash, or
+	// EventEnvelopeExpired.
+	Send(ctx context.Context, pubsubTopic, contentTopic string, payload []byte, ephemeral bool, priority *int) (types.RequestID, error)
 
 	// SubscribeEnvelopeEvents returns the backend's event stream. The transport
 	// consumes it both for reception (EventEnvelopeAvailable carries a neutral

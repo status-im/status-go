@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/pkg/messaging/waku"
@@ -104,14 +105,14 @@ func (tw *testWakuWrapper) ConnectionState() types.ConnectionState {
 // Send (the transport encodes payloads via rfc26.Encode before publishing).
 // Msg is nil because Send takes raw bytes, not a NewMessage; the only
 // consumer (MessagesOrderController) reads ID.
-func (tw *testWakuWrapper) Send(ctx context.Context, pubsubTopic, contentTopic string, payload []byte, ephemeral bool, priority *int) ([]byte, error) {
+func (tw *testWakuWrapper) Send(ctx context.Context, pubsubTopic, contentTopic string, payload []byte, ephemeral bool, priority *int) (types.RequestID, error) {
 	id, err := tw.Waku.Send(ctx, pubsubTopic, contentTopic, payload, ephemeral, priority)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 	for _, s := range tw.postSubscriptions {
 		select {
-		case s <- &PostMessageSubscription{ID: id}:
+		case s <- &PostMessageSubscription{ID: common.FromHex(string(id))}:
 		default:
 			// subscription channel full
 		}

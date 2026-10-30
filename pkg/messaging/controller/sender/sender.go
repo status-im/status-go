@@ -9,12 +9,11 @@ import (
 	oteltrace "go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
 
-	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/instrumentation/trace"
 	"github.com/status-im/status-go/pkg/messaging/common"
-	"github.com/status-im/status-go/pkg/messaging/controller/utils"
 	"github.com/status-im/status-go/pkg/messaging/layers/encryption"
 	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
+	wakutypes "github.com/status-im/status-go/pkg/messaging/waku/types"
 	"github.com/status-im/status-go/pkg/pubsub"
 )
 
@@ -72,11 +71,13 @@ func (s *Sender) processAndMarshalMessageSpec(spec *encryption.ProtocolMessageSp
 	return messageBytes, sharedSecretKey, nil
 }
 
-func linkSpanWithHashes(span oteltrace.Span, hashes [][]byte) {
+func setSpanRequestIDs(span oteltrace.Span, requestIDs []wakutypes.RequestID) {
+	ids := make([]string, len(requestIDs))
+	for i, id := range requestIDs {
+		ids[i] = id.String()
+	}
 	span.SetAttributes(
-		otelattribute.StringSlice("hashes", cryptotypes.EncodeHexes(hashes)),
+		otelattribute.StringSlice("requestIDs", ids),
 		otelattribute.String("stack", string(debug.Stack())),
 	)
-	linkSpanCtx := trace.DeriveSpanContext(utils.MergeByteSlices(hashes), false)
-	span.AddLink(oteltrace.Link{SpanContext: linkSpanCtx})
 }

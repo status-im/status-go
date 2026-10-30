@@ -139,7 +139,7 @@ func (s *Sender) SendPublic(ctx context.Context, params messagingtypes.SendPubli
 		}
 	}
 
-	hashes, wakuMessages, err := s.sendPublic(ctx, logger, sendPublicParams{
+	requestIDs, wakuMessages, err := s.sendPublic(ctx, logger, sendPublicParams{
 		payload:            payload,
 		pubsubTopic:        params.PubsubTopic,
 		contentTopic:       params.ContentTopic,
@@ -152,13 +152,13 @@ func (s *Sender) SendPublic(ctx context.Context, params messagingtypes.SendPubli
 	}
 
 	logger.Debug("sent-message",
-		zap.Strings("hashes", cryptotypes.EncodeHexes(hashes)),
+		zap.Stringers("requestIDs", requestIDs),
 	)
 
 	if len(sdsMessageIDBytes) > 0 {
-		s.stack.Transport.TrackWithSDSAlias([]byte(messageID), sdsMessageIDBytes, hashes, wakuMessages)
+		s.stack.Transport.TrackWithSDSAlias([]byte(messageID), sdsMessageIDBytes, requestIDs, wakuMessages)
 	} else {
-		s.stack.Transport.Track(messageID, hashes, wakuMessages)
+		s.stack.Transport.Track(messageID, requestIDs, wakuMessages)
 	}
 
 	if spec != nil {
@@ -183,7 +183,7 @@ type sendPublicParams struct {
 	communityPublicKey *ecdsa.PublicKey
 }
 
-func (s *Sender) sendPublic(ctx context.Context, logger *zap.Logger, params sendPublicParams) ([][]byte, []*wakutypes.NewMessage, error) {
+func (s *Sender) sendPublic(ctx context.Context, logger *zap.Logger, params sendPublicParams) ([]wakutypes.RequestID, []*wakutypes.NewMessage, error) {
 	segments, err := s.segmentMessage(params.payload)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "failed to segment message")
@@ -192,10 +192,10 @@ func (s *Sender) sendPublic(ctx context.Context, logger *zap.Logger, params send
 	ctx, span := s.tracer.Start(ctx, "Sender.sendPublic")
 	defer span.End()
 
-	hashes := make([][]byte, 0, len(segments))
+	requestIDs := make([]wakutypes.RequestID, 0, len(segments))
 	wakuMessages := make([]*wakutypes.NewMessage, len(segments))
 	for i, segment := range segments {
-		var hash []byte
+		var requestID wakutypes.RequestID
 		wakuMessage := &wakutypes.NewMessage{
 			Payload:     segment,
 			PubsubTopic: params.pubsubTopic,
@@ -206,21 +206,21 @@ func (s *Sender) sendPublic(ctx context.Context, logger *zap.Logger, params send
 		if params.communityPublicKey != nil {
 			logger.Debug("sending community public message")
 			span.AddEvent("sending community public message")
-			hash, err = s.stack.Transport.SendCommunityMessage(ctx, wakuMessage, params.communityPublicKey)
+			requestID, err = s.stack.Transport.SendCommunityMessage(ctx, wakuMessage, params.communityPublicKey)
 		} else {
 			logger.Debug("sending public message")
 			span.AddEvent("sending public message")
-			hash, err = s.stack.Transport.SendPublic(ctx, wakuMessage, params.contentTopic)
+			requestID, err = s.stack.Transport.SendPublic(ctx, wakuMessage, params.contentTopic)
 		}
 		if err != nil {
 			return nil, nil, errors.Wrap(err, "failed to send message")
 		}
-		hashes = append(hashes, hash)
+		requestIDs = append(requestIDs, requestID)
 	}
 
 	if s.tracer.Enabled() {
-		linkSpanWithHashes(span, hashes)
+		setSpanRequestIDs(span, requestIDs)
 	}
 
-	return hashes, wakuMessages, nil
+	return requestIDs, wakuMessages, nil
 }

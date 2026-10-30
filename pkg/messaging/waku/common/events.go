@@ -47,10 +47,11 @@ const (
 
 // EnvelopeEvent represents an envelope event.
 type EnvelopeEvent struct {
-	Event EventType
-	Topic TopicType
-	Hash  common.Hash
-	Batch common.Hash
-	Peer  enode.ID
-	Data  interface{}
+	Event     EventType
+	Topic     TopicType
+	RequestID string
+	Hash      common.Hash
+	Batch     common.Hash
+	Peer      enode.ID
+	Data      interface{}
 }
