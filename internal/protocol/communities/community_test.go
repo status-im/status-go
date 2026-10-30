@@ -496,7 +496,16 @@ func (s *CommunitySuite) TestCanPostCanView() {
 	s.Require().NoError(err)
 	s.Require().False(result)
 
+	result, err = community.CanPost(&s.member1.PublicKey, chatID, protobuf.ApplicationMetadataMessage_THREAD_METADATA)
+	s.Require().NoError(err)
+	s.Require().False(result)
+
 	result = community.CanView(&s.member1.PublicKey, chatID)
+	s.Require().True(result)
+
+	description.Chats[chatID].Members[memberKey].ChannelRole = protobuf.CommunityMember_CHANNEL_ROLE_POSTER
+	result, err = community.CanPost(&s.member1.PublicKey, chatID, protobuf.ApplicationMetadataMessage_THREAD_METADATA)
+	s.Require().NoError(err)
 	s.Require().True(result)
 }
 
