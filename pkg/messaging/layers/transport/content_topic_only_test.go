@@ -31,8 +31,8 @@ type contentTopicOnlyAPI struct {
 
 func (a *contentTopicOnlyAPI) ContentTopicOnly() {}
 
-func (a *contentTopicOnlyAPI) Send(context.Context, string, string, []byte, bool, *int) ([]byte, error) {
-	return nil, nil
+func (a *contentTopicOnlyAPI) Send(context.Context, string, string, []byte, bool, *int) (wakutypes.RequestID, error) {
+	return "", nil
 }
 
 func (a *contentTopicOnlyAPI) SubscribeEnvelopeEvents(chan<- wakutypes.EnvelopeEvent) wakutypes.Subscription {

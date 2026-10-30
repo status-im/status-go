@@ -2,7 +2,6 @@ package delivery
 
 import (
 	"context"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"sync"
@@ -130,15 +129,16 @@ func (a *Adapter) handleEvent(ev messaging.Event) {
 		a.handleReceived(e)
 	case messaging.MessagePropagatedEvent:
 		a.envelopeFeed.Send(types.EnvelopeEvent{
-			Event: types.EventEnvelopeSent,
-			Hash:  cryptotypes.BytesToHash(requestKey(string(e.RequestID))),
-			Data:  cryptotypes.BytesToHash(decodeHash(e.MessageHash)),
+			Event:     types.EventEnvelopeSent,
+			RequestID: types.RequestID(e.RequestID),
+			Hash:      cryptotypes.BytesToHash(decodeHash(e.MessageHash)),
 		})
 	case messaging.MessageErrorEvent:
 		a.logger.Debug("send failed", zap.String("requestID", string(e.RequestID)), zap.String("error", e.Err))
 		a.envelopeFeed.Send(types.EnvelopeEvent{
-			Event: types.EventEnvelopeExpired,
-			Hash:  cryptotypes.BytesToHash(requestKey(string(e.RequestID))),
+			Event:     types.EventEnvelopeExpired,
+			RequestID: types.RequestID(e.RequestID),
+			Hash:      cryptotypes.BytesToHash(decodeHash(e.MessageHash)),
 		})
 	case messaging.ConnectionStatusEvent:
 		a.setConnectionState(toConnectionState(e.Status))
@@ -164,33 +164,17 @@ func (a *Adapter) handleReceived(e messaging.MessageReceivedEvent) {
 	})
 }
 
-// Send queues a pre-encoded payload on contentTopic and returns a key derived
-// from the library's request ID, without waiting for the message to go out.
-// The envelope events of the send carry the same key; the sent event also
-// carries the wire hash in Data.
+// Send queues a pre-encoded payload on contentTopic and returns the library's
+// request ID, without waiting for the message to go out.
 //
 // pubsubTopic and priority are not honoured: the Messaging API derives the
 // shard from the content topic and has no send priority.
-func (a *Adapter) Send(ctx context.Context, pubsubTopic, contentTopic string, payload []byte, ephemeral bool, priority *int) ([]byte, error) {
+func (a *Adapter) Send(ctx context.Context, pubsubTopic, contentTopic string, payload []byte, ephemeral bool, priority *int) (types.RequestID, error) {
 	requestID, err := a.mc.Send(ctx, contentTopic, payload, ephemeral)
 	if err != nil {
-		return nil, fmt.Errorf("delivery: send: %w", err)
+		return "", fmt.Errorf("delivery: send: %w", err)
 	}
-	key := requestKey(string(requestID))
-	if key == nil {
-		return nil, fmt.Errorf("delivery: send: unexpected request ID %q", requestID)
-	}
-	return key, nil
-}
-
-// requestKey is the envelope key of a send: its hex request ID, left-padded
-// to 32 bytes, so it matches the library's logs.
-func requestKey(requestID string) []byte {
-	id, err := hex.DecodeString(requestID)
-	if err != nil || len(id) > cryptotypes.HashLength {
-		return nil
-	}
-	return cryptotypes.BytesToHash(id).Bytes()
+	return types.RequestID(requestID), nil
 }
 
 // Subscribe subscribes the content topics. The pubsub topic is ignored: the
@@ -261,6 +245,12 @@ func (a *Adapter) OnHistoryReconcileNeeded() <-chan types.HistoryReconcileWindow
 func (a *Adapter) MaxMessageSize() uint32 {
 	return a.maxMessageSize.Load()
 }
+
+// TrafficReport is empty: the Messaging API does not report traffic.
+func (a *Adapter) TrafficReport() types.TrafficReport { return types.TrafficReport{} }
+
+// ResetTrafficStats is a no-op, see TrafficReport.
+func (a *Adapter) ResetTrafficStats() {}
 
 // Pause is a no-op: the Messaging API cannot idle the node.
 func (a *Adapter) Pause() error { return nil }

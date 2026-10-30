@@ -38,11 +38,6 @@ func nextEvent(t *testing.T, ch <-chan types.EnvelopeEvent) types.EnvelopeEvent 
 	}
 }
 
-func TestRequestKeyIsThePaddedRequestID(t *testing.T) {
-	require.Equal(t, append(make([]byte, 22), 0x0a, 0x1b, 0x2c, 0x3d, 0x4e, 0x5f, 0x60, 0x71, 0x82, 0x93), requestKey("0a1b2c3d4e5f60718293"))
-	require.Nil(t, requestKey("not-hex"))
-}
-
 func TestSendOutcomesBecomeEnvelopeEvents(t *testing.T) {
 	a := newAdapter(nil, zap.NewNop())
 	events := subscribeEvents(t, a)
@@ -51,13 +46,13 @@ func TestSendOutcomesBecomeEnvelopeEvents(t *testing.T) {
 	a.handleEvent(messaging.MessagePropagatedEvent{RequestID: "0a1b2c3d4e5f60718293", MessageHash: testHash})
 	ev := nextEvent(t, events)
 	require.Equal(t, types.EventEnvelopeSent, ev.Event)
-	require.Equal(t, requestKey("0a1b2c3d4e5f60718293"), ev.Hash.Bytes())
-	require.Equal(t, cryptotypes.BytesToHash(decodeHash(testHash)), ev.Data)
+	require.Equal(t, types.RequestID("0a1b2c3d4e5f60718293"), ev.RequestID)
+	require.Equal(t, cryptotypes.BytesToHash(decodeHash(testHash)), ev.Hash)
 
 	a.handleEvent(messaging.MessageErrorEvent{RequestID: "93827160f5e4d3c2b1a0", MessageHash: testHash, Err: "retry window elapsed"})
 	ev = nextEvent(t, events)
 	require.Equal(t, types.EventEnvelopeExpired, ev.Event)
-	require.Equal(t, requestKey("93827160f5e4d3c2b1a0"), ev.Hash.Bytes())
+	require.Equal(t, types.RequestID("93827160f5e4d3c2b1a0"), ev.RequestID)
 }
 
 func TestReceivedMessageIsReportedWithoutPubsubTopic(t *testing.T) {
