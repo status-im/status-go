@@ -174,6 +174,8 @@ def make(target) {
   if (env.PLATFORM.startsWith('windows')) {
     bat """
       call "C:\\BuildTools\\VC\\Auxiliary\\Build\\vcvars64.bat"
+      REM Nim and Nimble keep nimcache and buildtemp in the user home: https://github.com/nim-lang/nimble/issues/1910
+      set "USERPROFILE=${env.WORKSPACE_TMP}"
       REM Absolute path, because system32 precedes Git in PATH and also has a bash.exe once WSL is enabled.
       "C:\\ProgramData\\scoop\\apps\\git\\current\\bin\\bash.exe" -c "make ${target} make=/bin/sh MINGW_PATH=C:/ProgramData/scoop/apps/msys2/current/mingw64"
     """
