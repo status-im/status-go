@@ -32,6 +32,15 @@ func (m *Messenger) EditMessage(ctx context.Context, request *requests.EditMessa
 		return nil, err
 	}
 
+	if message.GetThreadId() != "" {
+		thread, err := m.persistence.ThreadByID(message.LocalChatID, message.GetThreadId())
+		if err != nil {
+			return nil, err
+		}
+		if thread.Deleted {
+			return nil, ErrThreadDeleted
+		}
+	}
 	if message.From != crypto.PubkeyToHex(&m.identity.PublicKey) {
 		return nil, ErrInvalidEditOrDeleteAuthor
 	}
@@ -252,6 +261,9 @@ func (m *Messenger) DeleteMessageAndSend(ctx context.Context, messageID string) 
 		messageToDelete.DeletedBy = deletedBy
 		err = m.persistence.SaveMessages([]*common.Message{messageToDelete})
 		if err != nil {
+			return nil, err
+		}
+		if err := m.deleteThreadForDeletedParent(chat, messageToDelete, clock, contacts.ContactIDFromPublicKey(&m.identity.PublicKey)); err != nil {
 			return nil, err
 		}
 		response.AddMessage(messageToDelete)

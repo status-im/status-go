@@ -53,6 +53,10 @@ var caseSensitiveSearchCond = "(m1.text LIKE '%' || ? || '%' OR bm.content LIKE 
 var caseInsensitiveSearchCond = "(LOWER(m1.text) LIKE LOWER('%' || ? || '%') OR LOWER(bm.content) LIKE LOWER('%' || ? || '%') OR LOWER(dm.content) LIKE LOWER('%' || ? || '%'))"
 
 type Thread struct {
+	Deleted                  bool               `json:"deleted"`
+	DeletedAt                uint64             `json:"deletedAt"`
+	DeletedClock             uint64             `json:"deletedClock"`
+	DeletedBy                string             `json:"deletedBy,omitempty"`
 	ThreadID                 string             `json:"threadId"`
 	ChatID                   string             `json:"chatId"`
 	ParentMessageID          string             `json:"parentMessageId"`
@@ -87,6 +91,9 @@ func (db sqlitePersistence) queryThreadsSummaries(queryer threadSummaryQuerier, 
 	threadByID := make(map[string]*Thread, len(threads))
 	args := make([]interface{}, 0, len(threads))
 	for _, thread := range threads {
+		if thread.Deleted {
+			continue
+		}
 		thread.ParticipantsPreviewIDs = make([]string, 0)
 		thread.ParticipantsCount = 0
 		thread.MessagesCount = 0
@@ -95,7 +102,10 @@ func (db sqlitePersistence) queryThreadsSummaries(queryer threadSummaryQuerier, 
 		args = append(args, thread.ThreadID)
 	}
 
-	placeholders := strings.Repeat(",?", len(threads))[1:]
+	if len(args) == 0 {
+		return nil
+	}
+	placeholders := strings.Repeat(",?", len(args))[1:]
 
 	summaryArgs := make([]interface{}, 0, len(args)*2+1)
 	summaryArgs = append(summaryArgs, args...)
@@ -114,7 +124,7 @@ func (db sqlitePersistence) queryThreadsSummaries(queryer threadSummaryQuerier, 
 				1 AS is_thread_creator
 			FROM threads
 			JOIN user_messages ON user_messages.id = threads.parent_message_id
-			WHERE threads.thread_id IN (%s)
+			WHERE NOT threads.deleted AND threads.thread_id IN (%s)
 			UNION ALL
 			SELECT thread_id, id, source, clock_value, 0
 			FROM user_messages
@@ -989,17 +999,22 @@ func (db sqlitePersistence) upsertThreadWithCreatorPending(tx *sql.Tx, threadID,
 	switch {
 	case errors.Is(err, sql.ErrNoRows), errors.Is(err, common.ErrRecordNotFound):
 		_, err = tx.Exec(`INSERT INTO threads(thread_id, chat_id, parent_message_id, name, creator_pending) VALUES (?, ?, ?, ?, ?)`, threadID, chatID, parentMessageID, name, creatorPending)
-		return err
+		if err != nil {
+			return err
+		}
+		return db.cascadeThreadFromDeletedParent(tx, chatID, parentMessageID)
 	case err != nil:
 		return err
 	}
 
 	if existingName == "" && name != "" {
 		_, err = tx.Exec(`UPDATE threads SET name = ? WHERE thread_id = ? AND chat_id = ?`, name, threadID, chatID)
-		return err
+		if err != nil {
+			return err
+		}
 	}
 
-	return nil
+	return db.cascadeThreadFromDeletedParent(tx, chatID, parentMessageID)
 }
 
 func (db sqlitePersistence) setThreadCreator(tx *sql.Tx, threadID, chatID, creatorID string) error {
@@ -1071,7 +1086,7 @@ func (db sqlitePersistence) UpdateThreadMetadata(chatID, threadID, name string, 
 	result, err := db.db.Exec(
 		`UPDATE threads SET name = ?, metadata_clock = ?
 		 WHERE thread_id = ? AND chat_id = ?
-		 AND (metadata_clock < ? OR (metadata_clock = ? AND name < ?))`,
+		 AND NOT deleted AND (metadata_clock < ? OR (metadata_clock = ? AND name < ?))`,
 		name, clock, threadID, chatID, clock, clock, name,
 	)
 	if err != nil {
@@ -1084,9 +1099,11 @@ func (db sqlitePersistence) UpdateThreadMetadata(chatID, threadID, name string, 
 	return affected > 0, nil
 }
 
-// PendingThreadMetadata is a thread rename received before the thread's
+// PendingThreadMetadata is a rename or deletion received before the thread's
 // creation metadata, so it could not be authorized yet.
 type PendingThreadMetadata struct {
+	Deleted      bool
+	DeletedAt    uint64
 	ChatID       string
 	ThreadID     string
 	SignerPubKey []byte
@@ -1107,10 +1124,11 @@ type PendingThreadMetadataLimits struct {
 	ExpireBefore uint64
 }
 
-// SavePendingThreadMetadata buffers a rename, keeping only the latest clock per signer.
+// SavePendingThreadMetadata buffers an operation per signer. Deletion takes
+// precedence over renames; otherwise the latest clock wins.
 // Expired rows are pruned first. Updating an already buffered (chat, thread, signer)
 // row is always allowed; new rows are dropped once a quota is reached, so existing
-// buffered renames cannot be evicted. It returns whether the rename was stored.
+// buffered operations cannot be evicted. It returns whether the operation was stored.
 func (db sqlitePersistence) SavePendingThreadMetadata(pending *PendingThreadMetadata, limits PendingThreadMetadataLimits) (stored bool, err error) {
 	tx, err := db.db.BeginTx(context.Background(), &sql.TxOptions{})
 	if err != nil {
@@ -1159,11 +1177,11 @@ func (db sqlitePersistence) SavePendingThreadMetadata(pending *PendingThreadMeta
 	}
 
 	_, err = tx.Exec(
-		`INSERT INTO pending_thread_metadata(chat_id, thread_id, signer_pubkey, name, clock, received_at) VALUES (?, ?, ?, ?, ?, ?)
-		 ON CONFLICT(chat_id, thread_id, signer_pubkey) DO UPDATE SET name = excluded.name, clock = excluded.clock, received_at = excluded.received_at
-		 WHERE excluded.clock > pending_thread_metadata.clock
-		 OR (excluded.clock = pending_thread_metadata.clock AND excluded.name < pending_thread_metadata.name)`,
-		pending.ChatID, pending.ThreadID, pending.SignerPubKey, pending.Name, pending.Clock, pending.ReceivedAt,
+		`INSERT INTO pending_thread_metadata(chat_id, thread_id, signer_pubkey, name, clock, received_at, deleted, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+		 ON CONFLICT(chat_id, thread_id, signer_pubkey) DO UPDATE SET name = excluded.name, clock = excluded.clock, received_at = excluded.received_at, deleted = excluded.deleted, deleted_at = excluded.deleted_at
+		 WHERE (excluded.deleted AND NOT pending_thread_metadata.deleted) OR (excluded.deleted = pending_thread_metadata.deleted AND (excluded.clock > pending_thread_metadata.clock
+		 OR (excluded.clock = pending_thread_metadata.clock AND excluded.name < pending_thread_metadata.name)))`,
+		pending.ChatID, pending.ThreadID, pending.SignerPubKey, pending.Name, pending.Clock, pending.ReceivedAt, pending.Deleted, pending.DeletedAt,
 	)
 	if err != nil {
 		return false, err
@@ -1173,7 +1191,7 @@ func (db sqlitePersistence) SavePendingThreadMetadata(pending *PendingThreadMeta
 
 func (db sqlitePersistence) PendingThreadMetadata(chatID, threadID string) ([]*PendingThreadMetadata, error) {
 	rows, err := db.db.Query(
-		`SELECT chat_id, thread_id, signer_pubkey, name, clock, received_at FROM pending_thread_metadata
+		`SELECT chat_id, thread_id, signer_pubkey, name, clock, received_at, deleted, deleted_at FROM pending_thread_metadata
 		 WHERE chat_id = ? AND thread_id = ? ORDER BY clock`,
 		chatID, threadID,
 	)
@@ -1185,7 +1203,7 @@ func (db sqlitePersistence) PendingThreadMetadata(chatID, threadID string) ([]*P
 	var result []*PendingThreadMetadata
 	for rows.Next() {
 		pending := &PendingThreadMetadata{}
-		if err := rows.Scan(&pending.ChatID, &pending.ThreadID, &pending.SignerPubKey, &pending.Name, &pending.Clock, &pending.ReceivedAt); err != nil {
+		if err := rows.Scan(&pending.ChatID, &pending.ThreadID, &pending.SignerPubKey, &pending.Name, &pending.Clock, &pending.ReceivedAt, &pending.Deleted, &pending.DeletedAt); err != nil {
 			return nil, err
 		}
 		result = append(result, pending)
@@ -1244,7 +1262,7 @@ func (db sqlitePersistence) UpsertThread(threadID string, chatID string, parentM
 }
 
 func (db sqlitePersistence) AllThreadsForBackup() ([]*protobuf.BackedUpThread, error) {
-	rows, err := db.db.Query(`SELECT thread_id, chat_id, parent_message_id, name, read_messages_at_clock_value, creator_id, metadata_clock, creator_pending
+	rows, err := db.db.Query(`SELECT thread_id, chat_id, parent_message_id, name, read_messages_at_clock_value, creator_id, metadata_clock, creator_pending, deleted, deleted_clock, deleted_by, deleted_at
 		FROM threads ORDER BY chat_id, thread_id`)
 	if err != nil {
 		return nil, err
@@ -1254,7 +1272,7 @@ func (db sqlitePersistence) AllThreadsForBackup() ([]*protobuf.BackedUpThread, e
 	threads := make([]*protobuf.BackedUpThread, 0)
 	for rows.Next() {
 		thread := &protobuf.BackedUpThread{}
-		if err := rows.Scan(&thread.ThreadId, &thread.ChatId, &thread.ParentMessageId, &thread.Name, &thread.ReadMessagesAtClockValue, &thread.CreatorId, &thread.MetadataClock, &thread.CreatorPending); err != nil {
+		if err := rows.Scan(&thread.ThreadId, &thread.ChatId, &thread.ParentMessageId, &thread.Name, &thread.ReadMessagesAtClockValue, &thread.CreatorId, &thread.MetadataClock, &thread.CreatorPending, &thread.Deleted, &thread.DeletedClock, &thread.DeletedBy, &thread.DeletedAt); err != nil {
 			return nil, err
 		}
 		threads = append(threads, thread)
@@ -1313,6 +1331,11 @@ func (db sqlitePersistence) SaveBackedUpThreads(threads []*protobuf.BackedUpThre
 		if err != nil {
 			return err
 		}
+		if thread.Deleted {
+			if err = db.softDeleteThread(tx, thread.ChatId, thread.ThreadId, thread.DeletedClock, thread.DeletedBy, thread.DeletedAt); err != nil {
+				return err
+			}
+		}
 	}
 	return nil
 }
@@ -1330,6 +1353,7 @@ const threadMetadataSelect = `
 			threads.name,
 			threads.creator_id,
 			threads.creator_pending,
+			threads.deleted, threads.deleted_clock, threads.deleted_by, threads.deleted_at,
 			threads.read_messages_at_clock_value,
 			(SELECT COUNT(1) FROM user_messages WHERE local_chat_id = threads.chat_id AND thread_id = threads.thread_id AND seen = 0 AND NOT(hide) AND NOT(deleted) AND NOT(deleted_for_me)),
 			(SELECT COUNT(1) FROM user_messages WHERE local_chat_id = threads.chat_id AND thread_id = threads.thread_id AND seen = 0 AND NOT(hide) AND NOT(deleted) AND NOT(deleted_for_me) AND (mentioned OR replied OR chats.type = ?))
@@ -1346,6 +1370,7 @@ func threadMetadataScanTargets(thread *Thread) []interface{} {
 		&thread.Name,
 		&thread.CreatorID,
 		&thread.CreatorPending,
+		&thread.Deleted, &thread.DeletedClock, &thread.DeletedBy, &thread.DeletedAt,
 		&thread.ReadMessagesAtClockValue,
 		&thread.UnviewedMessagesCount,
 		&thread.UnviewedMentionsCount,
@@ -1449,6 +1474,7 @@ func (db sqlitePersistence) ThreadsByChatID(chatID string) ([]*Thread, error) {
 			t.parent_message_id,
 			t.name,
 			t.creator_id,
+			t.deleted, t.deleted_clock, t.deleted_by, t.deleted_at,
 			t.read_messages_at_clock_value,
 			COUNT(CASE WHEN um.seen = 0 AND NOT(um.hide) AND NOT(um.deleted) AND NOT(um.deleted_for_me) THEN 1 END),
 			COUNT(CASE WHEN um.seen = 0 AND NOT(um.hide) AND NOT(um.deleted) AND NOT(um.deleted_for_me) AND (um.mentioned OR um.replied OR chats.type = ?) THEN 1 END)
@@ -1471,7 +1497,7 @@ func (db sqlitePersistence) ThreadsByChatID(chatID string) ([]*Thread, error) {
 	threads := make([]*Thread, 0)
 	for rows.Next() {
 		thread := &Thread{}
-		err = rows.Scan(&thread.ThreadID, &thread.ChatID, &thread.ParentMessageID, &thread.Name, &thread.CreatorID, &thread.ReadMessagesAtClockValue, &thread.UnviewedMessagesCount, &thread.UnviewedMentionsCount)
+		err = rows.Scan(&thread.ThreadID, &thread.ChatID, &thread.ParentMessageID, &thread.Name, &thread.CreatorID, &thread.Deleted, &thread.DeletedClock, &thread.DeletedBy, &thread.DeletedAt, &thread.ReadMessagesAtClockValue, &thread.UnviewedMessagesCount, &thread.UnviewedMentionsCount)
 		if err != nil {
 			return nil, err
 		}
@@ -1589,6 +1615,7 @@ func (db sqlitePersistence) threadsByParentMessageIDs(queryer threadSummaryQueri
 			threads.parent_message_id,
 			threads.name,
 			threads.creator_id,
+			threads.deleted, threads.deleted_clock, threads.deleted_by, threads.deleted_at,
 			(SELECT COUNT(1) FROM user_messages WHERE local_chat_id = threads.chat_id AND thread_id = threads.thread_id AND seen = 0 AND NOT(hide) AND NOT(deleted) AND NOT(deleted_for_me)),
 			(SELECT COUNT(1) FROM user_messages WHERE local_chat_id = threads.chat_id AND thread_id = threads.thread_id AND seen = 0 AND NOT(hide) AND NOT(deleted) AND NOT(deleted_for_me) AND (mentioned OR replied OR chats.type = ?))
 		FROM threads
@@ -1601,7 +1628,7 @@ func (db sqlitePersistence) threadsByParentMessageIDs(queryer threadSummaryQueri
 	}
 	for rows.Next() {
 		thread := &Thread{}
-		if err := rows.Scan(&thread.ThreadID, &thread.ChatID, &thread.ParentMessageID, &thread.Name, &thread.CreatorID, &thread.UnviewedMessagesCount, &thread.UnviewedMentionsCount); err != nil {
+		if err := rows.Scan(&thread.ThreadID, &thread.ChatID, &thread.ParentMessageID, &thread.Name, &thread.CreatorID, &thread.Deleted, &thread.DeletedClock, &thread.DeletedBy, &thread.DeletedAt, &thread.UnviewedMessagesCount, &thread.UnviewedMentionsCount); err != nil {
 			_ = rows.Close()
 			return nil, err
 		}
@@ -3023,6 +3050,26 @@ func (db sqlitePersistence) saveMessages(messages []*common.Message, updateThrea
 	defer stmt.Close()
 
 	for _, msg := range messages {
+		if msg.GetThreadId() != "" {
+			var deleted bool
+			var deletedBy string
+			err = tx.QueryRow(`SELECT deleted, deleted_by FROM threads WHERE chat_id = ? AND thread_id = ?`, msg.LocalChatID, msg.GetThreadId()).Scan(&deleted, &deletedBy)
+			if errors.Is(err, sql.ErrNoRows) {
+				// Creation metadata may arrive after this reply. A deleted root
+				// still suppresses the reply without granting creation rights.
+				err = tx.QueryRow(`SELECT deleted, COALESCE(NULLIF(deleted_by, ''), source)
+                    FROM user_messages WHERE local_chat_id = ? AND id = ? AND deleted`, msg.LocalChatID, msg.GetThreadId()).Scan(&deleted, &deletedBy)
+			}
+			if err != nil && !errors.Is(err, sql.ErrNoRows) {
+				return
+			}
+			err = nil
+			if deleted {
+				msg.Deleted = true
+				msg.DeletedBy = deletedBy
+				msg.Seen = true
+			}
+		}
 		var allValues []interface{}
 		allValues, err = db.tableUserMessagesAllValues(msg)
 		if err != nil {
@@ -3032,6 +3079,12 @@ func (db sqlitePersistence) saveMessages(messages []*common.Message, updateThrea
 		_, err = stmt.Exec(allValues...)
 		if err != nil {
 			return
+		}
+		if msg.Deleted && msg.GetThreadId() == "" {
+			err = db.cascadeThreadFromDeletedParent(tx, msg.LocalChatID, msg.ID)
+			if err != nil {
+				return
+			}
 		}
 
 		if updateThreadNames {

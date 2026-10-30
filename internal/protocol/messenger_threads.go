@@ -155,6 +155,9 @@ func (m *Messenger) CreateThread(chatID string, parentMessageID string) (*Messen
 	// failed after persisting the local thread.
 	thread, threadErr := m.persistence.ThreadByID(chatID, parentMessageID)
 	if threadErr == nil {
+		if thread.Deleted {
+			return nil, ErrThreadDeleted
+		}
 		if thread.CreatorID == contacts.ContactIDFromPublicKey(&m.identity.PublicKey) {
 			if err := m.dispatchThreadCreationMetadata(context.Background(), chat, thread.ThreadID, thread.Name); err != nil {
 				return nil, err
@@ -187,6 +190,9 @@ func (m *Messenger) CreateThread(chatID string, parentMessageID string) (*Messen
 	}
 	if msgErr != nil {
 		return nil, msgErr
+	}
+	if parentMsg.Deleted {
+		return nil, ErrThreadDeleted
 	}
 	if parentMsg.LocalChatID != chatID {
 		return nil, errors.New("parent message not found")
@@ -229,6 +235,14 @@ const (
 // per chat, and entries expire, so renames for thread IDs that never get
 // created cannot grow the database indefinitely. Renames over quota are dropped.
 func (m *Messenger) bufferPendingThreadMetadata(chat *Chat, metadata *ThreadMetadata, name string) error {
+	return m.bufferPendingThreadOperation(chat, metadata, name, false)
+}
+
+func (m *Messenger) bufferPendingThreadOperation(chat *Chat, metadata *ThreadMetadata, name string, deleted bool, timestamp ...uint64) error {
+	var at uint64
+	if len(timestamp) > 0 {
+		at = timestamp[0]
+	}
 	if metadata.SigPubKey == nil {
 		return ErrThreadSenderRequired
 	}
@@ -239,6 +253,8 @@ func (m *Messenger) bufferPendingThreadMetadata(chat *Chat, metadata *ThreadMeta
 		expireBefore = now - ttl
 	}
 	stored, err := m.persistence.SavePendingThreadMetadata(&PendingThreadMetadata{
+		Deleted:      deleted,
+		DeletedAt:    at,
 		ChatID:       chat.ID,
 		ThreadID:     metadata.ThreadId,
 		SignerPubKey: crypto.CompressPubkey(metadata.SigPubKey),
@@ -260,10 +276,10 @@ func (m *Messenger) bufferPendingThreadMetadata(chat *Chat, metadata *ThreadMeta
 	return nil
 }
 
-// applyPendingThreadMetadata replays renames buffered before the creation
+// applyPendingThreadMetadata replays operations buffered before the creation
 // metadata, now that the creator is known. Renames from signers that are not
 // allowed to edit the thread, or not newer than the creation, are discarded.
-// All buffered renames for the thread are removed afterwards.
+// All buffered operations for the thread are removed afterwards.
 func (m *Messenger) applyPendingThreadMetadata(chat *Chat, threadID string, creationClock uint64) (bool, error) {
 	pending, err := m.persistence.PendingThreadMetadata(chat.ID, threadID)
 	if err != nil || len(pending) == 0 {
@@ -275,26 +291,38 @@ func (m *Messenger) applyPendingThreadMetadata(chat *Chat, threadID string, crea
 	}
 
 	applied := false
-	for _, rename := range pending {
-		logger := m.logger.With(zap.String("chatID", chat.ID), zap.String("threadID", threadID), zap.Uint64("clock", rename.Clock))
-		if rename.Clock <= creationClock {
-			logger.Debug("discarding stale pending thread rename")
+	for _, operation := range pending {
+		logger := m.logger.With(zap.String("chatID", chat.ID), zap.String("threadID", threadID), zap.Uint64("clock", operation.Clock))
+		if !operation.Deleted && operation.Clock <= creationClock {
+			logger.Debug("discarding stale pending thread operation")
 			continue
 		}
-		signer, err := crypto.DecompressPubkey(rename.SignerPubKey)
+		signer, err := crypto.DecompressPubkey(operation.SignerPubKey)
 		if err != nil {
-			logger.Debug("discarding pending thread rename with invalid signer", zap.Error(err))
+			logger.Debug("discarding pending thread operation with invalid signer", zap.Error(err))
 			continue
 		}
-		allowed, err := m.senderCanEditThread(chat, thread, signer)
+		var allowed bool
+		if operation.Deleted {
+			allowed, err = m.senderCanDeleteThread(chat, thread, signer)
+		} else {
+			allowed, err = m.senderCanEditThread(chat, thread, signer)
+		}
 		if err != nil {
 			return false, err
 		}
 		if !allowed {
-			logger.Debug("discarding unauthorized pending thread rename")
+			logger.Debug("discarding unauthorized pending thread operation")
 			continue
 		}
-		updated, err := m.persistence.UpdateThreadMetadata(chat.ID, threadID, rename.Name, rename.Clock)
+		if operation.Deleted {
+			if err := m.persistence.SoftDeleteThread(chat.ID, threadID, operation.Clock, contacts.ContactIDFromPublicKey(signer), operation.DeletedAt); err != nil {
+				return false, err
+			}
+			applied = true
+			continue
+		}
+		updated, err := m.persistence.UpdateThreadMetadata(chat.ID, threadID, operation.Name, operation.Clock)
 		if err != nil {
 			return false, err
 		}
@@ -350,6 +378,9 @@ func (m *Messenger) EditThread(ctx context.Context, request *requests.EditThread
 	thread, err := m.persistence.ThreadByID(request.ChatID, request.ThreadID)
 	if err != nil {
 		return nil, err
+	}
+	if thread.Deleted {
+		return nil, ErrThreadDeleted
 	}
 	allowed, err := m.senderCanEditThread(chat, thread, &m.identity.PublicKey)
 	if err != nil {
@@ -531,6 +562,14 @@ func (m *Messenger) addAffectedThreadToResponse(response *MessengerResponse, mes
 	if err != nil {
 		return err
 	}
-	response.AddThreads(threads)
+	for _, thread := range threads {
+		if chat, ok := m.allChats.Load(message.LocalChatID); ok && thread.Deleted {
+			if err := m.addDeletedThreadToResponse(response, chat, thread); err != nil {
+				return err
+			}
+		} else {
+			response.AddThread(thread)
+		}
+	}
 	return nil
 }

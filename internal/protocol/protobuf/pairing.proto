@@ -515,6 +515,11 @@ message BackedUpThread {
   string creator_id = 6;
   uint64 metadata_clock = 7;
   bool creator_pending = 8;
+  // Field 9 is used for last_activity_at by the thread activity work.
+  bool deleted = 10;
+  uint64 deleted_clock = 11;
+  string deleted_by = 12;
+  uint64 deleted_at = 13;
 }
 
 message BackedUpMessageBatch {

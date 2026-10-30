@@ -296,6 +296,29 @@ class TestWakuextThreadRename:
     async def receiver(self, async_backend_new_profile, waku_light_client):
         return await async_backend_new_profile("receiver", waku_light_client=waku_light_client)
 
+    async def test_thread_deletion_reaches_peer_and_preserves_parent(self, sender, receiver):
+        parent_text = f"parent-{uuid4()}"
+        sender_chat, receiver_chat, parent_id, reply_id = await _one_to_one_thread(sender, receiver, parent_text, f"reply-{uuid4()}")
+        with pytest.raises(ApiResponseError):
+            receiver.wakuext_service.delete_thread(receiver_chat, parent_id)
+
+        deleted = sender.wakuext_service.delete_thread(sender_chat, parent_id)
+        assert _thread(deleted, parent_id)["deleted"] is True
+        await receiver.wait_for_signal(
+            SignalType.MESSAGES_NEW,
+            predicate=lambda signal: any(t.get("threadId") == parent_id and t.get("deleted") for t in (signal.event.get("threads") or [])),
+            timeout=60,
+            check_buffer=True,
+        )
+        for backend, chat_id in [(sender, sender_chat), (receiver, receiver_chat)]:
+            assert _thread(backend.wakuext_service.chat_threads(chat_id), parent_id)["deleted"] is True
+            parent = backend.wakuext_service.message_by_message_id(parent_id)
+            assert parent["text"] == parent_text
+            assert not parent.get("deleted", False)
+            assert backend.wakuext_service.message_by_message_id(reply_id)["deleted"] is True
+            with pytest.raises(ApiResponseError):
+                backend.wakuext_service.send_chat_message(chat_id, "late reply", thread_id=parent_id)
+
     async def test_thread_rename_reaches_the_peer(self, sender, receiver):
         parent_text = f"parent-{uuid4()}"
         reply_text = f"reply-{uuid4()}"

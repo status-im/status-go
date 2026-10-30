@@ -2006,11 +2006,21 @@ func (m *Messenger) HandleThreadMetadata(ctx context.Context, state *ReceivedMes
 		}
 	}
 	if !updated && !replayed {
+		thread, err := m.persistence.ThreadByID(chat.ID, metadata.ThreadId)
+		if err != nil {
+			return err
+		}
+		if thread.Deleted {
+			return m.addDeletedThreadToResponse(state.Response, chat, thread)
+		}
 		return nil
 	}
 	thread, err := m.persistence.ThreadWithSummaryByID(chat.ID, metadata.ThreadId)
 	if err != nil {
 		return err
+	}
+	if thread.Deleted {
+		return m.addDeletedThreadToResponse(state.Response, chat, thread)
 	}
 	state.Response.AddThread(thread)
 	return nil
@@ -2081,6 +2091,10 @@ func (m *Messenger) handleDeleteMessage(ctx context.Context, state *ReceivedMess
 		messageToDelete.DeletedBy = deleteMessage.DeleteMessage.DeletedBy
 		err := m.persistence.SaveMessages([]*common.Message{messageToDelete})
 		if err != nil {
+			return err
+		}
+
+		if err := m.deleteThreadForDeletedParent(chat, messageToDelete, deleteMessage.Clock, deleteMessage.From); err != nil {
 			return err
 		}
 
@@ -2314,6 +2328,11 @@ func (m *Messenger) handleChatMessage(ctx context.Context, state *ReceivedMessag
 		if err != nil && !errors.Is(err, common.ErrRecordNotFound) {
 			return err
 		}
+		if thread != nil && thread.Deleted {
+			receivedMessage.Deleted = true
+			receivedMessage.DeletedBy = thread.DeletedBy
+			receivedMessage.Seen = true
+		}
 		if thread != nil && thread.ReadMessagesAtClockValue >= receivedMessage.Clock {
 			receivedMessage.Seen = true
 		}
@@ -2473,6 +2492,11 @@ func (m *Messenger) handleChatMessage(ctx context.Context, state *ReceivedMessag
 		return err
 	}
 
+	if receivedMessage.Deleted && receivedMessage.GetThreadId() == "" {
+		if err := m.addAffectedThreadToResponse(state.Response, receivedMessage); err != nil {
+			return err
+		}
+	}
 	err = m.checkForDeleteForMes(receivedMessage)
 	if err != nil {
 		return err
@@ -2633,6 +2657,11 @@ func (m *Messenger) handleChatMessage(ctx context.Context, state *ReceivedMessag
 		chat.Highlight = true
 	}
 
+	// MessengerResponse omits deleted messages. Persist late replies here so
+	// their content is retained without exposing it or generating notifications.
+	if receivedMessage.Deleted && receivedMessage.GetThreadId() != "" {
+		return m.persistence.SaveMessages([]*common.Message{receivedMessage})
+	}
 	receivedMessage.New = true
 	state.Response.AddMessage(receivedMessage)
 

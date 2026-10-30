@@ -2154,9 +2154,12 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 		}
 
 		message.ThreadMetadataCreationAuthorized = true
-		_, err = m.persistence.ThreadByID(chat.ID, message.GetThreadId())
+		thread, err := m.persistence.ThreadByID(chat.ID, message.GetThreadId())
 		switch {
 		case err == nil:
+			if thread.Deleted {
+				return nil, ErrThreadDeleted
+			}
 			message.ThreadMetadataCreationAuthorized = false
 		case errors.Is(err, common.ErrRecordNotFound):
 			allowed, permissionErr := m.senderCanCreateThread(chat, &m.identity.PublicKey)

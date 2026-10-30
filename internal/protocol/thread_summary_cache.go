@@ -50,6 +50,13 @@ type threadSummaryCache struct {
 
 // Unread counts and thread metadata are not cached; callers read them live.
 func copyThreadSummary(dst, src *Thread) {
+	if dst.Deleted {
+		dst.MessagesCount = 0
+		dst.ParticipantsCount = 0
+		dst.ParticipantsPreviewIDs = []string{}
+		dst.LastMessage = nil
+		return
+	}
 	dst.MessagesCount = src.MessagesCount
 	dst.ParticipantsCount = src.ParticipantsCount
 	dst.ParticipantsPreviewIDs = append([]string{}, src.ParticipantsPreviewIDs...)
