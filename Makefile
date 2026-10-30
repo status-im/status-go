@@ -386,7 +386,7 @@ build-libsds-ios: NIM_SDS_IOS_FLAGS = -arch $(NIM_SDS_IOS_ARCH) \
 	-m$(if $(filter iphonesimulator,$(NIM_SDS_IOS_SDK)),ios-simulator,iphoneos)-version-min=$(or $(IOS_TARGET),13.0)
 build-libsds-ios: | nimble.paths
 	@echo "Building nim-sds for iOS" $(LIBSDS)
-	$(call build_nim_sds,libsdsIOS,-d:useMalloc --passC:\"$(NIM_SDS_IOS_FLAGS)\" --passL:\"$(NIM_SDS_IOS_FLAGS)\",env -u SDKROOT -u CPATH -u LIBRARY_PATH IOS_ARCH=$(NIM_SDS_IOS_ARCH))
+	$(call build_nim_sds,libsdsStatic,-d:useMalloc --passC:\"$(NIM_SDS_IOS_FLAGS)\" --passL:\"$(NIM_SDS_IOS_FLAGS)\",env -u SDKROOT -u CPATH -u LIBRARY_PATH)
 
 clean-libsds:
 	@echo "Removing libsds"
