@@ -104,14 +104,14 @@ func TestAdapterExchangesMessagesOverLiblogosdelivery(t *testing.T) {
 	}, 60*time.Second, 200*time.Millisecond, "nodes did not connect")
 
 	// A fresh relay mesh needs a heartbeat or two before it carries messages.
-	keys := map[cryptotypes.Hash]bool{}
+	requestIDs := map[types.RequestID]bool{}
 	var received types.EnvelopeEvent
 	require.Eventually(t, func() bool {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
-		key, err := b.Send(ctx, pubsubTopic, topic.ContentTopic(), []byte("hello from b"), false, nil)
+		requestID, err := b.Send(ctx, pubsubTopic, topic.ContentTopic(), []byte("hello from b"), false, nil)
 		require.NoError(t, err)
-		keys[cryptotypes.BytesToHash(key)] = true
+		requestIDs[requestID] = true
 		select {
 		case received = <-eventsA:
 			return received.Event == types.EventEnvelopeAvailable
@@ -128,8 +128,8 @@ func TestAdapterExchangesMessagesOverLiblogosdelivery(t *testing.T) {
 	wireHash := cryptotypes.BytesToHash(msg.Hash)
 	for {
 		sent := waitFor(t, eventsB, types.EventEnvelopeSent)
-		if sent.Data == wireHash {
-			require.True(t, keys[sent.Hash], "the sent event must carry a key Send returned")
+		if sent.Hash == wireHash {
+			require.True(t, requestIDs[sent.RequestID], "the sent event must carry a request ID Send returned")
 			break
 		}
 	}

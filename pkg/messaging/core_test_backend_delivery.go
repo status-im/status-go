@@ -21,7 +21,6 @@ import (
 
 	bindings "github.com/logos-messaging/logos-delivery-go-bindings/pkg/messaging"
 
-	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/panics"
 	"github.com/status-im/status-go/pkg/messaging/delivery"
 	"github.com/status-im/status-go/pkg/messaging/waku/types"
@@ -109,6 +108,7 @@ func newTestDeliveryAdapter(overrides bindings.Overrides) (*delivery.Adapter, er
 			"listen-address":        "127.0.0.1",
 			"discv5-discovery":      false,
 			"reliability":           false,
+			"backfill-enabled":      false,
 			"nat":                   "none",
 			"log-level":             "ERROR",
 		},
@@ -155,20 +155,21 @@ func (b *deliveryTestBackend) SkipPublishToTopic(value bool) {
 }
 
 // Send drops the message while skip is set, the way the go-waku backend does:
-// it returns a hash, then reports the envelope expired.
-func (b *deliveryTestBackend) Send(ctx context.Context, pubsubTopic, contentTopic string, payload []byte, ephemeral bool, priority *int) ([]byte, error) {
+// it returns a request ID, then reports the send expired.
+func (b *deliveryTestBackend) Send(ctx context.Context, pubsubTopic, contentTopic string, payload []byte, ephemeral bool, priority *int) (types.RequestID, error) {
 	if !b.skip.Load() {
 		return b.Adapter.Send(ctx, pubsubTopic, contentTopic, payload, ephemeral, priority)
 	}
-	hash := make([]byte, 32)
-	if _, err := rand.Read(hash); err != nil {
-		return nil, err
+	id := make([]byte, 10)
+	if _, err := rand.Read(id); err != nil {
+		return "", err
 	}
+	requestID := types.RequestID(hex.EncodeToString(id))
 	go func() {
 		defer panics.LogOnPanic()
-		b.failedSends.Send(types.EnvelopeEvent{Event: types.EventEnvelopeExpired, Hash: cryptotypes.BytesToHash(hash)})
+		b.failedSends.Send(types.EnvelopeEvent{Event: types.EventEnvelopeExpired, RequestID: requestID})
 	}()
-	return hash, nil
+	return requestID, nil
 }
 
 func (b *deliveryTestBackend) SubscribeEnvelopeEvents(events chan<- types.EnvelopeEvent) types.Subscription {
