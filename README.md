@@ -17,15 +17,12 @@ A comprehensive list of `status-go` functionality can be found in [Brief overvie
 
 Status-go uses the public
 [nim-token-lists](https://github.com/status-im/nim-token-lists) Go wrapper and
-native library pinned to the same revision. `make build-libtkl` prepares one
-checkout under `build/deps/nim-token-lists`, including its pinned submodules.
-It requires Git, Go, Nim 2.2.10 and the platform C toolchain. No separate library
-checkout or local Go module replacement is needed.
+native library pinned to the same revision, in `go.mod` and `status_go.nimble`.
+`make build-libtkl` builds it from status-go's Nimble resolution. It requires Go,
+Nimble 0.26 and the platform C toolchain.
 
-An unchanged build reuses the checkout and compiled archive. A changed compiler
-or build configuration rebuilds the archive. If the source pin changes, run
-`make clean` to remove the managed checkout before rebuilding. Cleanup does not
-remove the global Go module cache. `make test-libtkl` checks the dependency and ABI.
+An unchanged build reuses the compiled archive. A changed resolution, compiler or
+build configuration rebuilds it. `make test-libtkl` checks the dependency and ABI.
 
 For controlled builds with prebuilt artifacts, supply both `NIM_TKL_INC_DIR`
 (containing `tkl.h`) and `NIM_TKL_LIB_DIR` (containing the isolated `libtkl.a`).
@@ -37,8 +34,8 @@ target. Mobile Make targets discard inherited prebuilt paths and prepare their
 own target archive. The managed build supports
 Linux and macOS (amd64/arm64), Windows (amd64 with MinGW), Android (arm64/amd64)
 and iOS (arm64 device, arm64/amd64 simulator). Archives are kept separately under
-`build/deps/nim-token-lists/build/<target>/link`; device and simulator archives
-are never reused for one another. All targets share the same source checkout.
+`build/tkl/<target>/link`; device and simulator archives are never reused for
+one another.
 
 Use the existing mobile targets, for example:
 

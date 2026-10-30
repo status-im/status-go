@@ -16,5 +16,8 @@ requires "nim >= 2.2.6"
 # Pins the nim-sds revision whose C ABI the bindings match.
 requires "https://github.com/logos-messaging/sds-go-bindings#6cfd235b"
 
+# The native token library; go.mod pins its Go wrapper at the same commit.
+requires "https://github.com/igor-sirotin/nim-token-lists#9bd67fbb0bb171eda08cb3b0e51d071c77065d34"
+
 # The untagged chronos commit nim-ffi needs; the libsds compile uses this tree.
 requires "chronos#0de7b335d0ad5557ad5ba71a4b7662f7b201750e"
