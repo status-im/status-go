@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# One disposable checkout owned by status-go; no developer source override.
+# Builds libtkl from status-go's Nimble resolution, one output per target.
 set -euo pipefail
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-source_dir="$repo/build/deps/nim-token-lists"
+build_dir="$repo/build/tkl"
 action="${1:-prepare}"
 fail() { echo "libtkl: $*" >&2; exit 1; }
 lock_native() {
@@ -10,8 +10,8 @@ lock_native() {
   local owners
   [[ "$timeout" =~ ^[0-9]+$ ]] || fail "TKL_LOCK_TIMEOUT must be seconds (a non-negative integer)"
   deadline=$((SECONDS + 10#$timeout))
-  mkdir -p "$repo/build/deps"
-  lock="$repo/build/deps/.nim-token-lists-lock"
+  mkdir -p "$repo/build"
+  lock="$repo/build/.tkl-lock"
   while true; do
     if mkdir "$lock" 2>/dev/null; then
       # Use an owner-specific directory so stale waiters cannot delete a new
@@ -42,7 +42,7 @@ lock_native() {
 case "$action" in
   clean)
     lock_native
-    if [ -e "$source_dir" ]; then rm -r -- "$source_dir"; fi
+    if [ -e "$build_dir" ]; then rm -r -- "$build_dir"; fi
     exit 0 ;;
   prepare) ;;
   *) fail "Usage: $0 [prepare|clean]" ;;
@@ -79,7 +79,7 @@ if [ -n "${NIM_TKL_LIB_DIR:-}${NIM_TKL_INC_DIR:-}" ]; then
   exit 0
 fi
 
-pin="$(cat "$repo/scripts/tkl.version")"
+pin="$(sed -n 's|^requires "https://github.com/.*/nim-token-lists#\([0-9a-f]*\)"$|\1|p' "$repo/status_go.nimble")"
 if command -v sha256sum >/dev/null 2>&1; then
   tkl_sha256=(sha256sum)
 elif command -v shasum >/dev/null 2>&1; then
@@ -152,31 +152,18 @@ esac
 
 # Do not let two Make invocations publish or compile the same dependency at once.
 lock_native
-if [ ! -e "$source_dir" ]; then
-  git clone --no-checkout https://github.com/status-im/nim-token-lists.git "$source_dir" >&2
-  git -C "$source_dir" checkout --detach "$pin" >&2
-  git -C "$source_dir" submodule update --init --recursive >&2
-fi
-[ "$(git -C "$source_dir" rev-parse HEAD)" = "$pin" ] ||
-  fail "Managed checkout does not match the pin; run make clean and rebuild"
-if git -C "$source_dir" submodule status --recursive | grep -Eq '^[+U-]'; then
-  fail "Managed submodules are incomplete or at another revision; run make clean and rebuild"
-fi
-[ -f "$source_dir/abi/tkl.h" ] || fail "Incomplete checkout; run make clean and rebuild"
-git -C "$source_dir" diff --quiet HEAD -- || fail "Modified managed sources; run make clean and rebuild"
+env -u MAKEFLAGS -u MFLAGS make --no-print-directory -C "$repo" nimble.paths >&2
 
-# A token-only compiler override leaves other Nim dependencies' toolchains alone.
-nim="${TKL_NIM:-${NIM:-nim}}"
 command -v "$cc" >/dev/null || fail "CC must name one compiler executable: $cc"
 case "$(basename "$cc")" in
   *clang*) nim_cc=clang ;;
   *gcc*|cc) nim_cc=gcc ;;
   *) fail "Unsupported compiler executable: $cc" ;;
 esac
-out="$source_dir/build/$target"
+out="$build_dir/$target"
 base_cgo_cflags="${TKL_BASE_CGO_CFLAGS-${CGO_CFLAGS:-}}"
-fingerprint="$(printf '%s\n' "$pin" "$goos/$goarch" "$(command -v "$nim")" \
-  "$("$nim" --version)" "$cc" "$("$cc" --version)" \
+fingerprint="$(printf '%s\n' "$pin" "$goos/$goarch" "$(cat "$repo/nimble.paths")" \
+  "$cc" "$("$cc" --version)" \
   "$target" "$sdk_identity" "${ANDROID_API:-28}" "${IOS_TARGET:-}" \
   "${EXTRA_NIMFLAGS:-}" "$base_cgo_cflags" "${MACOSX_DEPLOYMENT_TARGET:-}" \
   "${SDKROOT:-}" "${TKL_ARCH:-}" "${TKL_MIN_OS:-}" "${TKL_SDK:-}" \
@@ -191,9 +178,15 @@ if [ -f "$out/link/libtkl.a" ] && [ -f "$out/fingerprint" ] && [ -f "$out/archiv
 fi
 if [ -d "$out" ]; then rm -r -- "$out"; fi
 mkdir -p "$out/link"
+build_task() {
+  env -u MAKEFLAGS -u MFLAGS make --no-print-directory -C "$repo" nim-libtkl \
+    TKL_TASK="$1" NIM_LIB_DIR="$out" >&2
+}
 if "$mobile"; then
-  OUT="build/$target" NIM="$nim" TKL_BUILD_TESTS=0 \
-    bash "$source_dir/scripts/build_mobile.sh" "$target" >&2
+  case "$goos" in
+    android) ARCH="$arch" TKL_BUILD_TESTS=0 build_task libtklAndroid ;;
+    ios) ARCH="$arch" TKL_BUILD_TESTS=0 build_task libtklIOS ;;
+  esac
 else
   nim_os="$goos"
   [ "$goos" != darwin ] || nim_os=macosx
@@ -201,9 +194,7 @@ else
   [ "$goos" = windows ] || flags="$flags --passC:-fPIC"
   [ "$goos" != darwin ] || flags="$flags --passC:-arch --passC:$arch"
   for flag in $base_cgo_cflags; do flags="$flags --passC:$flag"; done
-  TKL_TARGET_OS="$target_os" OUT="build/$target" EXTRA_NIMFLAGS="$flags" \
-    make -C "$source_dir" isolate NIM="$nim" >&2
-  cp "$out/libtkl_isolated.a" "$out/link/libtkl.a"
+  TKL_TARGET_OS="$target_os" EXTRA_NIMFLAGS="$flags" build_task libtkl
   if [ "$goos" = windows ]; then
     # Nim's dynlib declarations emit explicit dllexport directives. Linker
     # auto-export filters alone cannot make these private inside libstatus.
