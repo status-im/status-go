@@ -29,7 +29,11 @@ func deliveryConfig(params CoreParams) (bindings.Config, error) {
 	if params.Mode == waku.ModeEdge {
 		mode = bindings.ModeEdge
 	}
-	overrides := bindings.Overrides{}
+	overrides := bindings.Overrides{
+		// SDS tracks delivery; the Messenger catches up after a restart.
+		"reliability":      false,
+		"backfill-enabled": false,
+	}
 	if params.NodeKey != nil {
 		overrides["nodekey"] = hex.EncodeToString(crypto.FromECDSA(params.NodeKey))
 	}
@@ -41,9 +45,6 @@ func deliveryConfig(params CoreParams) (bindings.Config, error) {
 	}
 	if params.DataDir != "" {
 		overrides["local-storage-path"] = params.DataDir
-	}
-	if len(overrides) == 0 {
-		overrides = nil
 	}
 	return bindings.Config{Mode: mode, Preset: preset, MessagingOverrides: overrides}, nil
 }
