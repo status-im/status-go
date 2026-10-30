@@ -1,7 +1,9 @@
 package waku
 
 import (
+	"context"
 	"errors"
+	"time"
 
 	"go.uber.org/zap"
 
@@ -77,7 +79,16 @@ func (w *Waku) publishEnvelope(envelope *protocol.Envelope) {
 		logger.Debug("skipping publish to topic")
 		err = errors.New("test send failure")
 	} else {
-		err = w.messageSender.Send(publish.NewRequest(w.ctx, envelope))
+		send := func(ctx context.Context) error {
+			return w.messageSender.Send(publish.NewRequest(ctx, envelope))
+		}
+		if w.messageSender.PublishMethod() == publish.LightPush {
+			_, err = publishWithLightpushRetry(w.ctx, send, func(attempt int, delay time.Duration, cause error) {
+				logger.Debug("scheduling rate-limited lightpush publication retry", zap.Int("publicationAttempt", attempt), zap.Duration("retryDelay", delay))
+			})
+		} else {
+			err = send(w.ctx)
+		}
 	}
 
 	if w.metricsHandler != nil {
