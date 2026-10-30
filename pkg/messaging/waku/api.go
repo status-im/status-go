@@ -23,6 +23,7 @@ import (
 
 	"google.golang.org/protobuf/proto"
 
+	"github.com/status-im/status-go/pkg/messaging/diagnostics"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
 )
 
@@ -49,5 +50,5 @@ func (w *Waku) Send(ctx context.Context, pubsubTopic, contentTopic string, paylo
 		Meta:         []byte{}, // TODO: empty for now. Once we use Waku Archive v2, we should deprecate the timestamp and use an ULID here
 		Ephemeral:    &ephemeral,
 	}
-	return w.sendEnvelope(pubsubTopic, msg, priority)
+	return w.sendEnvelope(pubsubTopic, msg, priority, diagnostics.FromContext(ctx))
 }

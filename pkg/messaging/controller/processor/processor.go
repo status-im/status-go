@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"encoding/hex"
+	"time"
 
 	"github.com/golang/protobuf/proto"
 	"github.com/pkg/errors"
@@ -17,6 +18,7 @@ import (
 	adapters "github.com/status-im/status-go/pkg/messaging/adapters"
 	common "github.com/status-im/status-go/pkg/messaging/common"
 	"github.com/status-im/status-go/pkg/messaging/controller/utils"
+	"github.com/status-im/status-go/pkg/messaging/diagnostics"
 	encryption "github.com/status-im/status-go/pkg/messaging/layers/encryption"
 	"github.com/status-im/status-go/pkg/messaging/layers/encryption/sharedsecret"
 	"github.com/status-im/status-go/pkg/messaging/layers/segmentation"
@@ -81,7 +83,20 @@ func (r *Processor) GetEphemeralKey() (*ecdsa.PrivateKey, error) {
 	return key, nil
 }
 
-func (r *Processor) ProcessMessage(msg *messagingtypes.ReceivedMessage) (*messagingtypes.HandleMessageResponse, error) {
+func (r *Processor) ProcessMessage(msg *messagingtypes.ReceivedMessage) (result *messagingtypes.HandleMessageResponse, resultErr error) {
+	if diagnostics.Enabled() && msg != nil {
+		started := time.Now()
+		hashes := diagnostics.Hexes([][]byte{msg.Hash})
+		diagnostics.Emit(diagnostics.Event{Stage: "processing", EnvelopeHashes: hashes})
+		defer func() {
+			event := diagnostics.Event{Stage: "processing_finished", EnvelopeHashes: hashes, DurationNS: time.Since(started).Nanoseconds()}
+			if resultErr != nil {
+				event.Stage = "processing_failed"
+				event.Error = resultErr.Error()
+			}
+			diagnostics.Emit(event)
+		}()
+	}
 	response, err := r.processMessage(msg)
 	if response == nil || err != nil {
 		return nil, err
