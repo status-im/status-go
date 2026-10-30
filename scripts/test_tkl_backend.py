@@ -127,6 +127,7 @@ class BackendCacheTest(unittest.TestCase):
 
     def test_linux_shared_recipe_can_rebuild_its_existing_symlink(self):
         shutil.copy(Path(__file__).resolve().parent.parent / "Makefile", self.root)
+        shutil.copy(Path(__file__).resolve().parent.parent / "nim.mk", self.root)
         (self.root / "build/bin").mkdir(parents=True)
         bindir = self.root / "tools"
         bindir.mkdir()
@@ -215,6 +216,7 @@ class BackendMakeTargetTest(unittest.TestCase):
         self.addCleanup(self.tmp.cleanup)
         self.root = Path(self.tmp.name)
         shutil.copy(Path(__file__).resolve().parents[1] / "Makefile", self.root)
+        shutil.copy(Path(__file__).resolve().parents[1] / "nim.mk", self.root)
         scripts = self.root / "scripts"
         scripts.mkdir()
         # Observe the real Make recipe without invoking native or Go builds.
