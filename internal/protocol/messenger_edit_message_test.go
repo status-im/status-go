@@ -2,6 +2,7 @@ package protocol
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -88,6 +89,28 @@ func (s *MessengerEditMessageSuite) TestEditMessage() {
 	_, err = s.m.EditMessage(context.Background(), editedMessage)
 
 	s.Require().Equal(ErrInvalidEditOrDeleteAuthor, err)
+}
+
+func (s *MessengerEditMessageSuite) TestEditReplyWhenThreadMetadataIsMissing() {
+	s.m.featureFlags.Threads = true
+	peer := s.newMessenger()
+	chat := CreateOneToOneChat("missing-thread-metadata", &peer.identity.PublicKey, s.m.getTimesource())
+	s.Require().NoError(s.m.SaveChat(chat))
+
+	threadID := "unknown-thread"
+	message := buildTestMessage(*chat)
+	message.ID = "0x" + strings.Repeat("01", 32)
+	message.ThreadId = &threadID
+	message.From = s.m.myHexIdentity()
+	message.LocalChatID = chat.ID
+	s.Require().NoError(s.m.SaveMessages([]*common.Message{message}))
+	messageID, err := types.DecodeHex(message.ID)
+	s.Require().NoError(err)
+
+	response, err := s.m.EditMessage(context.Background(), &requests.EditMessage{ID: messageID, Text: "edited"})
+	s.Require().NoError(err)
+	s.Require().Len(response.Messages(), 1)
+	s.Require().Equal("edited", response.Messages()[0].Text)
 }
 
 func (s *MessengerEditMessageSuite) TestEditImageMessage() {
