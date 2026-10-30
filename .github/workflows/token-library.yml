@@ -35,9 +35,10 @@ jobs:
         with:
           go-version: '1.26.5'
           cache: false
-      - uses: jiro4989/setup-nim-action@189b145833368cc92f1e7b3e166a25a3e057a693
+      - uses: nim-lang/setup-nimble-action@v2
         with:
-          nim-version: '2.2.10'
+          nimble-version: '0.26.1'
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Dependency lifecycle and mandatory mobile integration
         run: |
           python3 scripts/test_tkl_native.py
@@ -72,9 +73,10 @@ jobs:
         with:
           go-version: '1.26.5'
           cache: false
-      - uses: jiro4989/setup-nim-action@189b145833368cc92f1e7b3e166a25a3e057a693
+      - uses: nim-lang/setup-nimble-action@v2
         with:
-          nim-version: '2.2.10'
+          nimble-version: '0.26.1'
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
       - uses: msys2/setup-msys2@ec48f7c5447b3140e2b088413ae3a55687bccb6e
         with:
           msystem: MINGW64
@@ -97,9 +99,10 @@ jobs:
         with:
           go-version: '1.26.5'
           cache: false
-      - uses: jiro4989/setup-nim-action@189b145833368cc92f1e7b3e166a25a3e057a693
+      - uses: nim-lang/setup-nimble-action@v2
         with:
-          nim-version: '2.2.10'
+          nimble-version: '0.26.1'
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Install NDK
         run: |
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'ndk;27.2.12479018' < <(yes)
@@ -123,9 +126,10 @@ jobs:
         with:
           go-version: '1.26.5'
           cache: false
-      - uses: jiro4989/setup-nim-action@189b145833368cc92f1e7b3e166a25a3e057a693
+      - uses: nim-lang/setup-nimble-action@v2
         with:
-          nim-version: '2.2.10'
+          nimble-version: '0.26.1'
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Cross-link device and simulator consumers
         run: |
           export CGO_ENABLED=1 GOOS=ios
