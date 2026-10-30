@@ -142,10 +142,9 @@ endif
 # $(1): the nim-sds task. $(2): target and policy flags. $(3): command prefix.
 define build_nim_sds
 	@mkdir -p "$(NIM_SDS_LIB_DIR)"
-	printf 'include "%s/sds.nimble"\n' "$$(sed -n 's#[\\/][\\/]*#/#g; s#^--path:"\(.*/sds-[^/]*\)/sds"$$#\1#p' $(CURDIR)/nimble.paths)" > "$(NIM_SDS_LIB_DIR)/sds.nims"
 	$(3) LIB_OUT_DIR="$(NIM_SDS_LIB_DIR)" \
 	NIM_PARAMS="--skipParentCfg $(NIM_SDS_POLICY) $(2) $$NIM_PARAMS $$(tr '\n' ' ' < $(CURDIR)/nimble.paths)" \
-	$(NIMBLE) shell nim --skipParentCfg $(1) "$(NIM_SDS_LIB_DIR)/sds.nims"
+	$(NIMBLE) shell nim --skipParentCfg $(1) "$$($(NIMBLE) path sds)/libsds.nims"
 endef
 
 NIM_SDS_POLICY = --mm:refc --opt:size
