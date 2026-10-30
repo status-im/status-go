@@ -2373,8 +2373,8 @@ github.com/status-im/mvds v0.0.27-0.20251219201002-7226facd5aaf h1:CKUQmbtf0fodA
 github.com/status-im/mvds v0.0.27-0.20251219201002-7226facd5aaf/go.mod h1:2fiAx0q9XYIPKYRq2B1oiO9zZESy/n4D32gWw6lMDsE=
 github.com/status-im/nim-token-lists/go/tkl v0.0.0-20261027091855-9be9a427df5b h1:crGRRibwhhyBwPaGtXNOSGIxMw4SU0cl4Wmkqamoor0=
 github.com/status-im/nim-token-lists/go/tkl v0.0.0-20261027091855-9be9a427df5b/go.mod h1:d4xQErrfMen2+tZSXPT0ckaUwZwWHsZH9ddayOJUe/c=
-github.com/status-im/zxcvbn-go v0.0.0-20220311183720-5e8676676857 h1:sPkzT7Z7uLmejOsBRlZ0kwDWpqjpHJsp834o5nbhqho=
-github.com/status-im/zxcvbn-go v0.0.0-20220311183720-5e8676676857/go.mod h1:lq9I5ROto5tcua65GmCE6SIW7VE0ucdEBs1fn4z7uWU=
+github.com/status-im/zxcvbn-go v0.0.0-20261030083113-91884ff3bbdc h1:yWXwbHMXY4o39g5dAUg930JwffvoQ0mCbArtaAD6gG0=
+github.com/status-im/zxcvbn-go v0.0.0-20261030083113-91884ff3bbdc/go.mod h1:C4UOXuxcte1dqXqPWZpdH9AeVAeboTN9fgMcDph1GXg=
 github.com/stbenjam/no-sprintf-host-port v0.3.1 h1:AyX7+dxI4IdLBPtDbsGAyqiTSLpCP9hWRrXQDU4Cm/g=
 github.com/stbenjam/no-sprintf-host-port v0.3.1/go.mod h1:ODbZesTCHMVKthBHskvUUexdcNHAQRXk9NpSsL8p/HQ=
 github.com/stefanberger/go-pkcs11uri v0.0.0-20201008174630-78d3cae3a980/go.mod h1:AO3tvPzVZ/ayst6UlUKUv6rcPQInYe3IknH3jYhAKu8=
@@ -2394,7 +2394,6 @@ github.com/stretchr/objx v0.5.0/go.mod h1:Yh+to48EsGEfYuaHDzXPcE3xhTkx73EhmCGUpE
 github.com/stretchr/objx v0.5.3 h1:jmXUvGomnU1o3W/V5h2VEradbpJDwGrzugQQvL0POH4=
 github.com/stretchr/objx v0.5.3/go.mod h1:rDQraq+vQZU7Fde9LOZLr8Tax6zZvy4kuNKF+QYS+U0=
 github.com/stretchr/testify v0.0.0-20180303142811-b89eecf5ca5d/go.mod h1:a8OnRcib4nhh0OaRAV+Yts87kKdq0PP7pXfy6kDkUVs=
-github.com/stretchr/testify v1.1.4/go.mod h1:a8OnRcib4nhh0OaRAV+Yts87kKdq0PP7pXfy6kDkUVs=
 github.com/stretchr/testify v1.2.1/go.mod h1:a8OnRcib4nhh0OaRAV+Yts87kKdq0PP7pXfy6kDkUVs=
 github.com/stretchr/testify v1.2.2/go.mod h1:a8OnRcib4nhh0OaRAV+Yts87kKdq0PP7pXfy6kDkUVs=
 github.com/stretchr/testify v1.3.0/go.mod h1:M5WIy9Dh21IEIfnGCwXGc5bZfKNJtfHm1UVUgZn+9EI=

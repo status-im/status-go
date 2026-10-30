@@ -54,7 +54,7 @@ require (
 	github.com/status-im/markdown v0.0.0-20250825083641-55c1df9bc05d
 	github.com/status-im/migrate/v4 v4.6.2-status.3
 	github.com/status-im/mvds v0.0.27-0.20251219201002-7226facd5aaf
-	github.com/status-im/zxcvbn-go v0.0.0-20220311183720-5e8676676857
+	github.com/status-im/zxcvbn-go v0.0.0-20261030083113-91884ff3bbdc
 	github.com/stretchr/testify v1.11.1
 	github.com/syndtr/goleveldb v1.0.1-0.20220614013038-64ee5596c38a // indirect
 	github.com/wealdtech/go-ens/v3 v3.6.0
