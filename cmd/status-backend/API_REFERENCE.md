@@ -524,7 +524,9 @@ List threads for a chat.
       "threadId": "0x-parent-message-id",
       "chatId": "0xcommunity...<chatUUID>",
       "parentMessageId": "0x-parent-message-id",
-      "name": "Parent message text (or empty until known)"
+      "name": "Parent message text (or empty until known)",
+      "lastActivityAt": 1761500000000,
+      "archived": false
     }
   ]
 }
@@ -533,6 +535,32 @@ List threads for a chat.
 Notes:
 - `name` may be empty when the parent message has not been persisted yet.
 - Unknown/placeholder names are intentionally client-defined; backend returns empty string until resolved.
+- Archived threads are still returned. Clients should hide `archived` threads from the chat list
+  but keep them in the chat's threads list.
+
+#### Thread archiving (TTL)
+
+A thread is archived after 7 days of inactivity. Every `threads` entry, both in RPC results and in
+messenger responses/signals, carries:
+- `lastActivityAt`: time (ms) the latest new message in the thread was sent, i.e. the message
+  timestamp rather than when it was received, capped at the current time. Old messages fetched
+  later (e.g. from store nodes) therefore don't revive an archived thread. A thread created
+  locally starts at its creation time; one created from a received message starts at that
+  message's time. Threads with no subsequent messages are archived using that initial time.
+  When creation metadata arrives after replies, initial activity also accounts for eligible
+  stored replies in the same chat, with their timestamps capped at the current time.
+  Legacy threads without a message timestamp start their inactivity period at migration time
+  because their creation time was not recorded. Edits, deletions and reactions don't count as activity.
+- `archived`: `true` when `lastActivityAt` is older than the TTL.
+
+Thread backups preserve `lastActivityAt`. Restoring a backup merges activity with the local
+thread without moving it backwards and caps incoming timestamps at the current time. Only
+legacy backups without recorded activity derive it from stored messages; a new legacy thread
+without message timestamps starts at restore time.
+
+While the app is running, the backend checks periodically and emits a `messages.new` signal
+listing the threads that have just become archived, with `"archived": true`. A new message in an
+archived thread unarchives it: the `threads` entry sent with that message has `"archived": false`.
 
 ---
 

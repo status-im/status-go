@@ -85,6 +85,56 @@ func (s *MessengerThreadsSuite) TestSenderCanCreateThreadRequiresPrivilegedCommu
 	s.Require().False(allowed)
 }
 
+func (s *MessengerThreadsSuite) TestDelayedCommunityThreadCreationPreservesReplyActivity() {
+	communityResponse, err := s.m.CreateCommunity(&requests.CreateCommunity{
+		Membership: protobuf.CommunityPermissions_AUTO_ACCEPT,
+		Name:       "thread activity", Color: "#ffffff", Description: "thread activity",
+	}, false)
+	s.Require().NoError(err)
+	community := communityResponse.Communities()[0]
+	chatResponse, err := s.m.CreateCommunityChat(community.ID(), &protobuf.CommunityChat{
+		Permissions: &protobuf.CommunityPermissions{Access: protobuf.CommunityPermissions_AUTO_ACCEPT},
+		Identity:    &protobuf.ChatIdentity{DisplayName: "thread activity"},
+	})
+	s.Require().NoError(err)
+	chat := chatResponse.Chats()[0]
+	member, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+	allowed, err := s.m.senderCanCreateThread(chat, &member.PublicKey)
+	s.Require().NoError(err)
+	s.Require().False(allowed)
+
+	now := s.m.getTimesource().GetCurrentTime()
+	old := now - uint64(threadInactivityTTL.Milliseconds()) - 1000
+	reply := buildTestMessage(*chat)
+	reply.ID = "early-member-reply"
+	reply.From = contacts.ContactIDFromPublicKey(&member.PublicKey)
+	reply.Timestamp = now
+	threadID := "delayed-community-thread"
+	reply.ChatMessage.ThreadId = &threadID
+	reply.ThreadMetadataCreationAuthorized = false
+	s.Require().NoError(s.m.SaveMessages([]*common.Message{reply}))
+	s.m.touchThreadActivity([]*common.Message{reply}, func(*common.Message) bool { return true })
+	_, err = s.m.persistence.ThreadByID(chat.ID, threadID)
+	s.Require().ErrorIs(err, common.ErrRecordNotFound)
+
+	state := &ReceivedMessageState{
+		Response: &MessengerResponse{},
+		CurrentMessageState: &CurrentMessageState{
+			PublicKey: &s.m.identity.PublicKey, WhisperTimestamp: old,
+		},
+	}
+	metadata := &protobuf.ThreadMetadata{
+		ChatId: chat.ID, ThreadId: threadID, Clock: old, Name: "Delayed thread",
+		CreatorId:   contacts.ContactIDFromPublicKey(&s.m.identity.PublicKey),
+		MessageType: protobuf.MessageType_COMMUNITY_CHAT,
+	}
+	s.Require().NoError(s.m.HandleThreadMetadata(context.Background(), state, metadata, nil))
+	s.Require().Len(state.Response.Threads(), 1)
+	s.Require().Equal(now, state.Response.Threads()[0].LastActivityAt)
+	s.Require().False(state.Response.Threads()[0].Archived)
+}
+
 func (s *MessengerThreadsSuite) TestSenderCanEditThreadRequiresVerifiedCreatorInOneToOneChat() {
 	chat := CreateOneToOneChat("thread-editor", &s.m.identity.PublicKey, s.m.getTimesource())
 	creatorID := contacts.ContactIDFromPublicKey(&s.m.identity.PublicKey)

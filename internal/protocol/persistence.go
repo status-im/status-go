@@ -33,6 +33,9 @@ type sqlitePersistence struct {
 	*common.RawMessagesPersistence
 	db                 *sql.DB
 	threadSummaryCache *threadSummaryCache
+	// threadClock returns the current time in milliseconds, used to derive
+	// whether threads are archived. Defaults to the system clock.
+	threadClock func() uint64
 }
 
 func newSQLitePersistence(db *sql.DB) *sqlitePersistence {

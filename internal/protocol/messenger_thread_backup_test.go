@@ -33,9 +33,9 @@ func seedThreadBackup(t *testing.T, m *Messenger) []*protobuf.BackedUpThread {
 		},
 	}))
 	threads := []*protobuf.BackedUpThread{
-		{ThreadId: threadID, ChatId: chat.ID, ParentMessageId: "backed-up-parent", Name: "Thread name", ReadMessagesAtClockValue: 25},
-		{ThreadId: "empty-thread", ChatId: chat.ID, ParentMessageId: "absent-parent", Name: "Empty thread"},
-		{ThreadId: "placeholder-thread", ChatId: chat.ID, ParentMessageId: "placeholder-thread", ReadMessagesAtClockValue: 30},
+		{ThreadId: threadID, ChatId: chat.ID, ParentMessageId: "backed-up-parent", Name: "Thread name", ReadMessagesAtClockValue: 25, LastActivityAt: 1000},
+		{ThreadId: "empty-thread", ChatId: chat.ID, ParentMessageId: "absent-parent", Name: "Empty thread", LastActivityAt: 2000},
+		{ThreadId: "placeholder-thread", ChatId: chat.ID, ParentMessageId: "placeholder-thread", ReadMessagesAtClockValue: 30, LastActivityAt: 3000},
 	}
 	require.NoError(t, m.persistence.SaveBackedUpThreads(threads))
 	return threads
@@ -104,7 +104,7 @@ func (s *MessengerLocalBackupSuite) TestLocalBackupThreads() {
 func (s *MessengerLocalBackupSuite) TestLocalBackupMetadataOnlyThreads() {
 	s.m.featureFlags.Threads = false
 	threads := []*protobuf.BackedUpThread{{
-		ThreadId: "empty-thread", ChatId: "missing-chat", ParentMessageId: "missing-parent", Name: "Empty", ReadMessagesAtClockValue: 12,
+		ThreadId: "empty-thread", ChatId: "missing-chat", ParentMessageId: "missing-parent", Name: "Empty", ReadMessagesAtClockValue: 12, LastActivityAt: 1000,
 	}}
 	s.Require().NoError(s.m.persistence.SaveBackedUpThreads(threads))
 	s.Require().NoError(s.m.settings.SaveSetting(settings.MessagesBackupEnabled.GetReactName(), true))
@@ -173,7 +173,7 @@ func (s *MessengerPairingSuite) TestLocalPairingThreadBatchBoundaries() {
 			threads := make([]*protobuf.BackedUpThread, count)
 			for i := range threads {
 				id := fmt.Sprintf("thread-%03d", i)
-				threads[i] = &protobuf.BackedUpThread{ThreadId: id, ChatId: "chat", ParentMessageId: id, Name: id}
+				threads[i] = &protobuf.BackedUpThread{ThreadId: id, ChatId: "chat", ParentMessageId: id, Name: id, LastActivityAt: 1000}
 			}
 			s.Require().NoError(source.persistence.SaveBackedUpThreads(threads))
 			var rawMessages []*protobuf.RawMessage

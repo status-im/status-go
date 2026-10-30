@@ -515,6 +515,7 @@ message BackedUpThread {
   string creator_id = 6;
   uint64 metadata_clock = 7;
   bool creator_pending = 8;
+  uint64 last_activity_at = 9;
 }
 
 message BackedUpMessageBatch {
