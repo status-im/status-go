@@ -1,13 +1,17 @@
 package transport
 
 import (
+	"crypto/ecdsa"
 	"crypto/rand"
+	"math/big"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	bindata "github.com/status-im/migrate/v4/source/go_bindata"
+
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
 
 	"github.com/status-im/status-go/internal/crypto"
@@ -298,4 +302,89 @@ func TestCleanFiltersLoopPausesAndResumesByLifecycle(t *testing.T) {
 	}, time.Second, 20*time.Millisecond, "expected at least one tick after resume")
 
 	shutdown()
+}
+
+func newRoutingTestTransport(t *testing.T) (*Transport, *ecdsa.PrivateKey) {
+	t.Helper()
+	db, err := testutils.SetupTestMemorySQLDB(testutils.NewTestDBInitializer([]*bindata.AssetSource{
+		{Names: migrations.AssetNames(), AssetFunc: migrations.Asset},
+	}))
+	require.NoError(t, err)
+
+	logger := testutils.MustCreateTestLogger()
+	wakuNode, err := waku.New(nil, &waku.DefaultConfig, logger, nil)
+	require.NoError(t, err)
+
+	identity, err := crypto.GenerateKey()
+	require.NoError(t, err)
+
+	tr, err := NewTransport(wakuNode, identity, NewSQLiteKeysPersistence(db), NewSQLiteProcessedMessageIDsCachePersistence(db), nil, logger)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = tr.Stop() })
+	return tr, identity
+}
+
+// TestEnvelopesSeenOnlyReportsRoutedEnvelopes checks that an envelope dropped
+// because no filter matched yet is not reported as seen, so it can still be
+// recovered once the filter exists, while a routed one is.
+func TestEnvelopesSeenOnlyReportsRoutedEnvelopes(t *testing.T) {
+	tr, identity := newRoutingTestTransport(t)
+
+	symKey := make([]byte, 32)
+	_, err := rand.Read(symKey)
+	require.NoError(t, err)
+	encoded, err := rfc26.Encode([]byte("payload"), symKey, nil, identity)
+	require.NoError(t, err)
+
+	contentTopic := wakutypes.BytesToTopic(ToTopic("late-chat"))
+	envelope := func(hash common.Hash) *wakutypes.ReceivedMessage {
+		return &wakutypes.ReceivedMessage{
+			Hash:         hash.Bytes(),
+			ContentTopic: contentTopic.ContentTopic(),
+			PubsubTopic:  waku.DefaultShardPubsubTopic(),
+			Payload:      encoded,
+			Version:      1,
+			Timestamp:    time.Now().UnixNano(),
+		}
+	}
+
+	earlyHash := common.HexToHash("0x01")
+	tr.handleReceivedMessage(envelope(earlyHash))
+	require.Empty(t, tr.EnvelopesSeen([]string{earlyHash.Hex()}))
+
+	require.NoError(t, tr.filters.addSymKey("late-filter", symKey))
+	tr.filters.filters["late-filter"] = &Filter{
+		ChatID:       "late-chat",
+		FilterID:     "late-filter",
+		ContentTopic: contentTopic,
+		PubsubTopic:  waku.DefaultShardPubsubTopic(),
+		Listen:       true,
+	}
+
+	routedHash := common.HexToHash("0x02")
+	tr.handleReceivedMessage(envelope(routedHash))
+	require.Equal(t,
+		map[string]bool{routedHash.Hex(): true},
+		tr.EnvelopesSeen([]string{earlyHash.Hex(), routedHash.Hex(), "not-a-hash", "0x0102"}),
+	)
+}
+
+func TestEnvelopesSeenWithoutTrackingSeesNothing(t *testing.T) {
+	tr := &Transport{}
+
+	require.Empty(t, tr.EnvelopesSeen([]string{common.HexToHash("0x01").Hex()}))
+}
+
+func TestRoutedEnvelopesCacheIsBounded(t *testing.T) {
+	tr, _ := newRoutingTestTransport(t)
+
+	for i := 1; i <= routedEnvelopesMaxSize+1; i++ {
+		hash := common.BigToHash(big.NewInt(int64(i)))
+		tr.markRouted(hash.Bytes())
+	}
+
+	oldest := common.BigToHash(big.NewInt(1))
+	newest := common.BigToHash(big.NewInt(routedEnvelopesMaxSize + 1))
+	require.Empty(t, tr.EnvelopesSeen([]string{oldest.Hex()}))
+	require.Equal(t, map[string]bool{newest.Hex(): true}, tr.EnvelopesSeen([]string{newest.Hex()}))
 }

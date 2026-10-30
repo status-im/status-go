@@ -3,6 +3,7 @@ package messaging
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -11,11 +12,13 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/internal/panics"
+	"github.com/status-im/status-go/pkg/messaging/waku"
 )
 
 type fakeMissingDependencyFetcher struct {
 	mu        sync.Mutex
 	processed map[string]bool
+	seen      map[string]bool
 	fetches   [][]string
 	// fetchErrs[i] is returned by the i-th fetch; fetches beyond it succeed.
 	fetchErrs []error
@@ -33,6 +36,27 @@ func (f *fakeMissingDependencyFetcher) AlreadyProcessed(hashes []string) (map[st
 		}
 	}
 	return hits, nil
+}
+
+func (f *fakeMissingDependencyFetcher) EnvelopesSeen(hashes []string) map[string]bool {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	hits := make(map[string]bool)
+	for _, h := range hashes {
+		if f.seen[h] {
+			hits[h] = true
+		}
+	}
+	return hits
+}
+
+func (f *fakeMissingDependencyFetcher) markSeen(h string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.seen == nil {
+		f.seen = make(map[string]bool)
+	}
+	f.seen[h] = true
 }
 
 func (f *fakeMissingDependencyFetcher) FetchMessagesByHashes(_ context.Context, hashes []string) error {
@@ -59,35 +83,195 @@ func (f *fakeMissingDependencyFetcher) markProcessed(h string) {
 	f.processed[h] = true
 }
 
-var noRetryDelays = []time.Duration{0, 0, 0}
+type fakeClock struct {
+	mu  sync.Mutex
+	now time.Time
+}
 
-func TestFetchMissingDependencies_SuccessNoRetry(t *testing.T) {
+func (c *fakeClock) Now() time.Time {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.now
+}
+
+func (c *fakeClock) advance(d time.Duration) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.now = c.now.Add(d)
+}
+
+func newTestMissingDepsFetcher(f missingDependencyFetcher) (*missingDepsFetcher, *fakeClock) {
+	clock := &fakeClock{now: time.Unix(1000, 0)}
+	requested := newRequestedHashes(time.Hour, 100)
+	requested.now = clock.Now
+	fetcher := newMissingDepsFetcher(zap.NewNop(), f, requested)
+	fetcher.now = clock.Now
+	return fetcher, clock
+}
+
+// step runs one worker iteration at the current fake time and reports whether
+// a batch was taken.
+func step(t *testing.T, m *missingDepsFetcher) bool {
+	t.Helper()
+	batch, _ := m.takeBatch(m.now())
+	if len(batch) == 0 {
+		return false
+	}
+	m.fetchBatch(context.Background(), batch)
+	return true
+}
+
+func TestMissingDepsFetcher_WaitsBatchDelay(t *testing.T) {
 	f := &fakeMissingDependencyFetcher{}
+	m, clock := newTestMissingDepsFetcher(f)
 
-	fetchMissingDependencies(context.Background(), zap.NewNop(), f, []string{"0x01", "0x02"}, noRetryDelays)
+	m.enqueue([]string{"0x01"})
+	require.False(t, step(t, m))
 
-	require.Equal(t, [][]string{{"0x01", "0x02"}}, f.fetches)
+	clock.advance(missingDepsBatchDelay)
+	require.True(t, step(t, m))
+	require.Equal(t, [][]string{{"0x01"}}, f.fetches)
+	require.Zero(t, m.pendingCount())
 }
 
-func TestFetchMissingDependencies_RetriesAfterFailure(t *testing.T) {
+func TestMissingDepsFetcher_BatchesCallbacksIntoOneQuery(t *testing.T) {
+	f := &fakeMissingDependencyFetcher{}
+	m, clock := newTestMissingDepsFetcher(f)
+
+	m.enqueue([]string{"0x01", "0x02"})
+	clock.advance(time.Second)
+	m.enqueue([]string{"0x02", "0x03"})
+	clock.advance(time.Second)
+
+	require.True(t, step(t, m))
+	require.False(t, step(t, m))
+	require.Equal(t, [][]string{{"0x01", "0x02", "0x03"}}, f.fetches)
+}
+
+func TestMissingDepsFetcher_RespectsMaxBatch(t *testing.T) {
+	f := &fakeMissingDependencyFetcher{}
+	m, clock := newTestMissingDepsFetcher(f)
+	m.maxBatch = 2
+
+	m.enqueue([]string{"0x01", "0x02", "0x03"})
+	clock.advance(missingDepsBatchDelay)
+
+	require.True(t, step(t, m))
+	require.True(t, step(t, m))
+	require.False(t, step(t, m))
+	require.Equal(t, [][]string{{"0x01", "0x02"}, {"0x03"}}, f.fetches)
+}
+
+func TestMissingDepsFetcher_SkipsRecentlyRequested(t *testing.T) {
+	f := &fakeMissingDependencyFetcher{}
+	m, clock := newTestMissingDepsFetcher(f)
+
+	m.enqueue([]string{"0x01", "0x02"})
+	clock.advance(missingDepsBatchDelay)
+	step(t, m)
+
+	// 0x01/0x02 were not processed (e.g. failed processing or not in store), but
+	// must not be requested again; only the new hash is fetched.
+	queued, _ := m.enqueue([]string{"0x01", "0x02", "0x03"})
+	require.Equal(t, 1, queued)
+	clock.advance(missingDepsBatchDelay)
+	step(t, m)
+
+	require.Equal(t, [][]string{{"0x01", "0x02"}, {"0x03"}}, f.fetches)
+}
+
+func TestMissingDepsFetcher_SkipsAlreadyProcessed(t *testing.T) {
+	f := &fakeMissingDependencyFetcher{}
+	f.markProcessed("0x01")
+	m, clock := newTestMissingDepsFetcher(f)
+
+	m.enqueue([]string{"0x01"})
+	clock.advance(missingDepsBatchDelay)
+	step(t, m)
+
+	require.Empty(t, f.fetches)
+	require.Zero(t, m.pendingCount())
+}
+
+func TestMissingDepsFetcher_SkipsSeenOnEnqueue(t *testing.T) {
+	f := &fakeMissingDependencyFetcher{}
+	f.markSeen("0x01")
+	m, clock := newTestMissingDepsFetcher(f)
+
+	queued, _ := m.enqueue([]string{"0x01", "0x02"})
+	require.Equal(t, 1, queued)
+	clock.advance(missingDepsBatchDelay)
+	step(t, m)
+
+	require.Equal(t, [][]string{{"0x02"}}, f.fetches)
+	// Seen hashes were never requested from the store, so they are not blocked.
+	require.Equal(t, []string{"0x01"}, m.requested.claim([]string{"0x01"}))
+}
+
+func TestMissingDepsFetcher_DropsHashesSeenWhileQueued(t *testing.T) {
+	f := &fakeMissingDependencyFetcher{}
+	m, clock := newTestMissingDepsFetcher(f)
+
+	m.enqueue([]string{"0x01", "0x02"})
+	// 0x01 arrives (e.g. through history sync) while waiting for the batch,
+	// then fails processing so it is never marked as processed.
+	f.markSeen("0x01")
+	clock.advance(missingDepsBatchDelay)
+	step(t, m)
+
+	require.Equal(t, [][]string{{"0x02"}}, f.fetches)
+	require.Zero(t, m.pendingCount())
+}
+
+func TestMissingDepsFetcher_NoQueryWhenAllSeen(t *testing.T) {
+	f := &fakeMissingDependencyFetcher{}
+	m, clock := newTestMissingDepsFetcher(f)
+
+	m.enqueue([]string{"0x01", "0x02"})
+	f.markSeen("0x01")
+	f.markSeen("0x02")
+	clock.advance(missingDepsBatchDelay)
+	step(t, m)
+
+	require.Empty(t, f.fetches)
+	require.Zero(t, m.pendingCount())
+}
+
+func TestMissingDepsFetcher_RetriesWithBackoff(t *testing.T) {
 	eof := errors.New("EOF")
-	f := &fakeMissingDependencyFetcher{fetchErrs: []error{eof, eof}}
+	f := &fakeMissingDependencyFetcher{fetchErrs: []error{eof}}
+	m, clock := newTestMissingDepsFetcher(f)
 
-	fetchMissingDependencies(context.Background(), zap.NewNop(), f, []string{"0x01"}, noRetryDelays)
+	m.enqueue([]string{"0x01"})
+	clock.advance(missingDepsBatchDelay)
+	step(t, m)
 
-	require.Len(t, f.fetches, 3) // two failures, then success
+	clock.advance(missingDepsRetryDelays[0] - time.Millisecond)
+	require.False(t, step(t, m))
+	clock.advance(time.Millisecond)
+	require.True(t, step(t, m))
+
+	require.Equal(t, [][]string{{"0x01"}, {"0x01"}}, f.fetches)
+	require.Zero(t, m.pendingCount())
 }
 
-func TestFetchMissingDependencies_GivesUpAfterRetries(t *testing.T) {
-	eof := errors.New("EOF")
-	f := &fakeMissingDependencyFetcher{fetchErrs: []error{eof, eof, eof, eof, eof}}
+func TestMissingDepsFetcher_TimeoutUsesLongerBackoff(t *testing.T) {
+	timeout := fmt.Errorf("%w: %w", waku.ErrStorenodeTimeout, context.DeadlineExceeded)
+	f := &fakeMissingDependencyFetcher{fetchErrs: []error{timeout}}
+	m, clock := newTestMissingDepsFetcher(f)
 
-	fetchMissingDependencies(context.Background(), zap.NewNop(), f, []string{"0x01"}, noRetryDelays)
+	m.enqueue([]string{"0x01"})
+	clock.advance(missingDepsBatchDelay)
+	step(t, m)
 
-	require.Len(t, f.fetches, len(noRetryDelays)+1)
+	clock.advance(missingDepsRetryDelays[0])
+	require.False(t, step(t, m))
+	clock.advance(missingDepsTimeoutRetryDelays[0] - missingDepsRetryDelays[0])
+	require.True(t, step(t, m))
+	require.Len(t, f.fetches, 2)
 }
 
-func TestFetchMissingDependencies_RetrySkipsAlreadyReceived(t *testing.T) {
+func TestMissingDepsFetcher_RetrySkipsAlreadyReceived(t *testing.T) {
 	f := &fakeMissingDependencyFetcher{fetchErrs: []error{errors.New("EOF")}}
 	// The first attempt delivers 0x01 before the connection drops.
 	f.onFetch = func(attempt int) {
@@ -95,37 +279,228 @@ func TestFetchMissingDependencies_RetrySkipsAlreadyReceived(t *testing.T) {
 			f.markProcessed("0x01")
 		}
 	}
+	m, clock := newTestMissingDepsFetcher(f)
 
-	fetchMissingDependencies(context.Background(), zap.NewNop(), f, []string{"0x01", "0x02"}, noRetryDelays)
+	m.enqueue([]string{"0x01", "0x02"})
+	clock.advance(missingDepsBatchDelay)
+	step(t, m)
+	clock.advance(missingDepsRetryDelays[0])
+	step(t, m)
 
 	require.Equal(t, [][]string{{"0x01", "0x02"}, {"0x02"}}, f.fetches)
 }
 
-func TestFetchMissingDependencies_SkipsWhenAllProcessed(t *testing.T) {
-	f := &fakeMissingDependencyFetcher{}
-	f.markProcessed("0x01")
+func TestMissingDepsFetcher_NewHashesJoinDueRetry(t *testing.T) {
+	f := &fakeMissingDependencyFetcher{fetchErrs: []error{errors.New("EOF")}}
+	m, clock := newTestMissingDepsFetcher(f)
 
-	fetchMissingDependencies(context.Background(), zap.NewNop(), f, []string{"0x01"}, noRetryDelays)
+	m.enqueue([]string{"0x01"})
+	clock.advance(missingDepsBatchDelay)
+	step(t, m)
 
-	require.Empty(t, f.fetches)
+	clock.advance(missingDepsRetryDelays[0])
+	m.enqueue([]string{"0x02"})
+	require.True(t, step(t, m))
+
+	require.Equal(t, [][]string{{"0x01"}, {"0x01", "0x02"}}, f.fetches)
 }
 
-func TestFetchMissingDependencies_StopsWhenContextCancelled(t *testing.T) {
+func TestMissingDepsFetcher_GivesUpThenAllowsLaterRequest(t *testing.T) {
+	eof := errors.New("EOF")
+	f := &fakeMissingDependencyFetcher{fetchErrs: []error{eof, eof, eof, eof}}
+	m, clock := newTestMissingDepsFetcher(f)
+
+	m.enqueue([]string{"0x01"})
+	clock.advance(missingDepsBatchDelay)
+	step(t, m)
+	for _, d := range missingDepsRetryDelays {
+		clock.advance(d)
+		require.True(t, step(t, m))
+	}
+	require.Len(t, f.fetches, len(missingDepsRetryDelays)+1)
+	require.Zero(t, m.pendingCount())
+
+	// Exhausted hashes are not re-requested right away...
+	queued, _ := m.enqueue([]string{"0x01"})
+	require.Zero(t, queued)
+	// ...but sooner than successfully requested ones.
+	clock.advance(missingDepsExhaustedTTL)
+	queued, _ = m.enqueue([]string{"0x01"})
+	require.Equal(t, 1, queued)
+}
+
+func TestMissingDepsFetcher_DropsOverCapacity(t *testing.T) {
+	f := &fakeMissingDependencyFetcher{}
+	m, clock := newTestMissingDepsFetcher(f)
+	m.maxQueue = 2
+
+	queued, dropped := m.enqueue([]string{"0x01", "0x02", "0x03"})
+	require.Equal(t, 2, queued)
+	require.Equal(t, 1, dropped)
+
+	clock.advance(missingDepsBatchDelay)
+	step(t, m)
+
+	// The dropped hash was never requested, so it can be queued again.
+	queued, _ = m.enqueue([]string{"0x03"})
+	require.Equal(t, 1, queued)
+}
+
+func TestMissingDepsFetcher_RepeatedOverflowKeepsRequestedCacheBounded(t *testing.T) {
+	f := &fakeMissingDependencyFetcher{}
+	m, _ := newTestMissingDepsFetcher(f)
+	m.maxQueue = 2
+	maxSize := m.requested.maxSize
+
+	queued, _ := m.enqueue([]string{"0xaa", "0xbb"})
+	require.Equal(t, 2, queued)
+
+	// The queue is full, so every callback claims hashes and releases them on
+	// drop, leaving stale records behind the live queued ones.
+	for i := 0; i < 50*maxSize; i++ {
+		_, dropped := m.enqueue([]string{fmt.Sprintf("0xdrop%x", i)})
+		require.Equal(t, 1, dropped)
+		require.LessOrEqual(t, len(m.requested.order), 2*maxSize)
+	}
+
+	require.Equal(t, 2, m.requested.len())
+	require.Empty(t, m.requested.claim([]string{"0xaa", "0xbb"}))
+}
+
+func TestMissingDepsFetcher_CancelledFetchKeepsPending(t *testing.T) {
+	f := &fakeMissingDependencyFetcher{fetchErrs: []error{context.Canceled}}
+	m, clock := newTestMissingDepsFetcher(f)
 	ctx, cancel := context.WithCancel(context.Background())
-	f := &fakeMissingDependencyFetcher{fetchErrs: []error{errors.New("EOF"), errors.New("EOF")}}
 	f.onFetch = func(int) { cancel() }
 
+	m.enqueue([]string{"0x01"})
+	clock.advance(missingDepsBatchDelay)
+	batch, _ := m.takeBatch(m.now())
+	m.fetchBatch(ctx, batch)
+
+	require.Equal(t, 1, m.pendingCount())
+}
+
+func TestMissingDepsFetcher_RunSingleWorkerFetchesEachHashOnce(t *testing.T) {
+	var inFlight, maxInFlight int
+	var inFlightMu sync.Mutex
+	f := &fakeMissingDependencyFetcher{}
+	f.onFetch = func(int) {
+		inFlightMu.Lock()
+		inFlight++
+		maxInFlight = max(maxInFlight, inFlight)
+		inFlightMu.Unlock()
+		time.Sleep(5 * time.Millisecond)
+		inFlightMu.Lock()
+		inFlight--
+		inFlightMu.Unlock()
+	}
+	m := newMissingDepsFetcher(zap.NewNop(), f, newRequestedHashes(time.Hour, 100))
+	m.batchDelay = 20 * time.Millisecond
+
+	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan struct{})
 	go func() {
-		defer close(done)
 		defer panics.LogOnPanic()
-		fetchMissingDependencies(ctx, zap.NewNop(), f, []string{"0x01"}, []time.Duration{time.Hour})
+		defer close(done)
+		m.run(ctx)
 	}()
 
+	var wg sync.WaitGroup
+	for i := 0; i < 20; i++ {
+		wg.Add(1)
+		go func() {
+			defer panics.LogOnPanic()
+			defer wg.Done()
+			m.enqueue([]string{"0x01", "0x02", "0x03"})
+		}()
+	}
+	wg.Wait()
+
+	require.Eventually(t, func() bool { return m.pendingCount() == 0 }, 5*time.Second, 5*time.Millisecond)
+	cancel()
 	select {
 	case <-done:
 	case <-time.After(5 * time.Second):
-		t.Fatal("fetchMissingDependencies did not stop after context cancellation")
+		t.Fatal("run did not stop after context cancellation")
 	}
+
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	counts := make(map[string]int)
+	for _, fetch := range f.fetches {
+		for _, h := range fetch {
+			counts[h]++
+		}
+	}
+	require.Equal(t, map[string]int{"0x01": 1, "0x02": 1, "0x03": 1}, counts)
 	require.Len(t, f.fetches, 1)
+	require.Equal(t, 1, maxInFlight)
+}
+
+func TestRequestedHashes_ExpiresAfterTTL(t *testing.T) {
+	now := time.Unix(0, 0)
+	r := newRequestedHashes(time.Minute, 100)
+	r.now = func() time.Time { return now }
+
+	require.Equal(t, []string{"0x01"}, r.claim([]string{"0x01"}))
+	require.Empty(t, r.claim([]string{"0x01"}))
+
+	now = now.Add(time.Minute)
+	require.Equal(t, []string{"0x01"}, r.claim([]string{"0x01"}))
+	require.Equal(t, 1, r.len())
+}
+
+func TestRequestedHashes_EvictsOldestWhenFull(t *testing.T) {
+	now := time.Unix(0, 0)
+	r := newRequestedHashes(time.Hour, 2)
+	r.now = func() time.Time { return now }
+
+	r.claim([]string{"0x01"})
+	now = now.Add(time.Second)
+	r.claim([]string{"0x02"})
+	now = now.Add(time.Second)
+	r.claim([]string{"0x03"})
+
+	require.Equal(t, 2, r.len())
+	require.Equal(t, []string{"0x01"}, r.claim([]string{"0x01"}))
+	require.Empty(t, r.claim([]string{"0x03"}))
+}
+
+func TestRequestedHashes_NilClaimsEverything(t *testing.T) {
+	var r *requestedHashes
+	require.Equal(t, []string{"0x01", "0x02"}, r.claim([]string{"0x01", "0x02"}))
+}
+
+func TestRequestedHashes_ReleaseAndExpireIn(t *testing.T) {
+	now := time.Unix(0, 0)
+	r := newRequestedHashes(time.Hour, 100)
+	r.now = func() time.Time { return now }
+
+	r.claim([]string{"0x01", "0x02"})
+	r.release([]string{"0x01"})
+	require.Equal(t, []string{"0x01"}, r.claim([]string{"0x01"}))
+
+	r.expireIn([]string{"0x02"}, time.Minute)
+	require.Empty(t, r.claim([]string{"0x02"}))
+	now = now.Add(time.Minute)
+	require.Equal(t, []string{"0x02"}, r.claim([]string{"0x02"}))
+}
+
+func TestRequestedHashes_CompactsStaleRecordsBehindLiveHead(t *testing.T) {
+	now := time.Unix(0, 0)
+	r := newRequestedHashes(time.Hour, 10)
+	r.now = func() time.Time { return now }
+
+	r.claim([]string{"0xlive"})
+	for i := 0; i < 1000; i++ {
+		h := fmt.Sprintf("0xdrop%x", i)
+		require.Equal(t, []string{h}, r.claim([]string{h}))
+		r.release([]string{h})
+		r.expireIn([]string{"0xlive"}, time.Hour)
+		require.LessOrEqual(t, len(r.order), 2*r.maxSize)
+	}
+
+	require.Equal(t, 1, r.len())
+	require.Empty(t, r.claim([]string{"0xlive"}))
 }
