@@ -235,8 +235,8 @@ func (a *Adapter) SubscribeToConnStatusChanges() (*types.ConnStatusSubscription,
 	return sub, nil
 }
 
-// OnHistoryReconcileNeeded never fires: the node recovers missed messages
-// from store itself and reports them as received.
+// OnHistoryReconcileNeeded never fires: the node fills the gaps of an outage
+// from store itself and reports the messages as received.
 func (a *Adapter) OnHistoryReconcileNeeded() <-chan types.HistoryReconcileWindow {
 	return a.historyReconcileNeeded
 }
