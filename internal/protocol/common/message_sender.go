@@ -339,6 +339,7 @@ func shouldCommunityMessageBeEncrypted(msgType protobuf.ApplicationMetadataMessa
 	return msgType == protobuf.ApplicationMetadataMessage_CHAT_MESSAGE ||
 		msgType == protobuf.ApplicationMetadataMessage_EDIT_MESSAGE ||
 		msgType == protobuf.ApplicationMetadataMessage_THREAD_METADATA ||
+		msgType == protobuf.ApplicationMetadataMessage_DELETE_THREAD ||
 		msgType == protobuf.ApplicationMetadataMessage_DELETE_MESSAGE ||
 		msgType == protobuf.ApplicationMetadataMessage_PIN_MESSAGE ||
 		msgType == protobuf.ApplicationMetadataMessage_EMOJI_REACTION
