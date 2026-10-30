@@ -453,7 +453,7 @@ require (
 	github.com/spf13/viper v1.21.0 // indirect
 	github.com/ssgreg/nlreturn/v2 v2.2.1 // indirect
 	github.com/status-im/goroutine-defer-guard v0.3.1 // indirect
-	github.com/status-im/nim-token-lists/go/tkl v0.0.0-20261027091855-9be9a427df5b
+	github.com/status-im/nim-token-lists/go/tkl v0.0.0-20261030170115-9bd67fbb0bb1
 	github.com/stbenjam/no-sprintf-host-port v0.3.1 // indirect
 	github.com/stretchr/objx v0.5.3 // indirect
 	github.com/subosito/gotenv v1.6.0 // indirect
@@ -539,3 +539,6 @@ require (
 	sigs.k8s.io/yaml v1.6.0 // indirect
 	zombiezen.com/go/sqlite v0.8.0 // indirect
 )
+
+// Until status-im/nim-token-lists has libtkl.nims.
+replace github.com/status-im/nim-token-lists/go/tkl => github.com/igor-sirotin/nim-token-lists/go/tkl v0.0.0-20261030170115-9bd67fbb0bb1

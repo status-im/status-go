@@ -1386,6 +1386,8 @@ github.com/huin/goupnp v1.3.0/go.mod h1:gnGPsThkYa7bFi/KWmEysQRf48l2dvR5bxr2OFck
 github.com/iancoleman/strcase v0.2.0/go.mod h1:iwCmte+B7n89clKwxIoIXy/HfoL7AsD47ZCWhYzw7ho=
 github.com/ianlancetaylor/demangle v0.0.0-20181102032728-5e5cf60278f6/go.mod h1:aSSvb/t6k1mPoxDqO4vJh6VOCGPwU4O0C2/Eqndh1Sc=
 github.com/ianlancetaylor/demangle v0.0.0-20200824232613-28f6c0f3b639/go.mod h1:aSSvb/t6k1mPoxDqO4vJh6VOCGPwU4O0C2/Eqndh1Sc=
+github.com/igor-sirotin/nim-token-lists/go/tkl v0.0.0-20261030170115-9bd67fbb0bb1 h1:8UbfFQVG8Q2yFlIJdpqUT0YCHzD7+4Liq9P1xeGDy8k=
+github.com/igor-sirotin/nim-token-lists/go/tkl v0.0.0-20261030170115-9bd67fbb0bb1/go.mod h1:d4xQErrfMen2+tZSXPT0ckaUwZwWHsZH9ddayOJUe/c=
 github.com/imdario/mergo v0.3.5/go.mod h1:2EnlNZ0deacrJVfApfmtdGgDfMuh/nq6Ok1EcJh5FfA=
 github.com/imdario/mergo v0.3.8/go.mod h1:2EnlNZ0deacrJVfApfmtdGgDfMuh/nq6Ok1EcJh5FfA=
 github.com/imdario/mergo v0.3.10/go.mod h1:jmQim1M+e3UYxmgPu/WyfjB3N3VflVyUjjjwH0dnCYA=
@@ -2371,8 +2373,6 @@ github.com/status-im/migrate/v4 v4.6.2-status.3 h1:Khwjb59NzniloUr5i9s9AtkEyqBbQ
 github.com/status-im/migrate/v4 v4.6.2-status.3/go.mod h1:c/kc90n47GZu/58nnz1OMLTf7uE4Da4gZP5qmU+A/v8=
 github.com/status-im/mvds v0.0.27-0.20251219201002-7226facd5aaf h1:CKUQmbtf0fodAQRwAcORa8Fk2Ej6x6PMn/yKipK14Es=
 github.com/status-im/mvds v0.0.27-0.20251219201002-7226facd5aaf/go.mod h1:2fiAx0q9XYIPKYRq2B1oiO9zZESy/n4D32gWw6lMDsE=
-github.com/status-im/nim-token-lists/go/tkl v0.0.0-20261027091855-9be9a427df5b h1:crGRRibwhhyBwPaGtXNOSGIxMw4SU0cl4Wmkqamoor0=
-github.com/status-im/nim-token-lists/go/tkl v0.0.0-20261027091855-9be9a427df5b/go.mod h1:d4xQErrfMen2+tZSXPT0ckaUwZwWHsZH9ddayOJUe/c=
 github.com/status-im/zxcvbn-go v0.0.0-20220311183720-5e8676676857 h1:sPkzT7Z7uLmejOsBRlZ0kwDWpqjpHJsp834o5nbhqho=
 github.com/status-im/zxcvbn-go v0.0.0-20220311183720-5e8676676857/go.mod h1:lq9I5ROto5tcua65GmCE6SIW7VE0ucdEBs1fn4z7uWU=
 github.com/stbenjam/no-sprintf-host-port v0.3.1 h1:AyX7+dxI4IdLBPtDbsGAyqiTSLpCP9hWRrXQDU4Cm/g=

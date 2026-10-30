@@ -617,9 +617,16 @@ lint-fix: generate
 clean: clean-storage clean-libtkl ##@other Cleanup
 	rm -fr build/bin/*
 
-.PHONY: build-libtkl clean-libtkl test-libtkl test-libtkl-coexistence
+.PHONY: build-libtkl nim-libtkl clean-libtkl test-libtkl test-libtkl-coexistence
 build-libtkl: ##@build Prepare the pinned native token library
 	bash scripts/tkl_native.sh
+
+# scripts/tkl_native.sh picks the task and output for the target. libtkl sets its
+# own memory manager and flags.
+nim-libtkl: NIM_POLICY =
+nim-libtkl: NIM_FLAGS =
+nim-libtkl: | nimble.paths
+	$(NIM_TASK) $(TKL_TASK) "$$($(NIMBLE) path tokenlists)/libtkl.nims"
 
 clean-libtkl: ##@other Remove the managed token-library checkout and build
 	bash scripts/tkl_native.sh clean
