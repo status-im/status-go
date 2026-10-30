@@ -22,13 +22,15 @@ var (
 )
 
 type envelopeEventsHandlerMock struct {
-	envelopeSentCalls [][][]byte // slice of EnvelopeSent arguments
+	envelopeSentCalls    [][][]byte // slice of EnvelopeSent arguments
+	envelopeExpiredCalls [][][]byte // slice of EnvelopeExpired arguments
 }
 
 func (h *envelopeEventsHandlerMock) EnvelopeSent(identifiers [][]byte) {
 	h.envelopeSentCalls = append(h.envelopeSentCalls, identifiers)
 }
-func (h *envelopeEventsHandlerMock) EnvelopeExpired([][]byte, error) {
+func (h *envelopeEventsHandlerMock) EnvelopeExpired(identifiers [][]byte, _ error) {
+	h.envelopeExpiredCalls = append(h.envelopeExpiredCalls, identifiers)
 }
 func (h *envelopeEventsHandlerMock) MailServerRequestCompleted(cryptotypes.Hash, cryptotypes.Hash, []byte, error) {
 }
@@ -70,6 +72,17 @@ func (s *EnvelopesMonitorSuite) TestEnvelopePosted() {
 	})
 	s.Contains(s.monitor.envelopes, testHash)
 	s.Equal(EnvelopeSent, s.monitor.envelopes[testHash].state)
+}
+
+func (s *EnvelopesMonitorSuite) TestEnvelopeExpiredBeforeAdded() {
+	s.monitor.handleEvent(wakutypes.EnvelopeEvent{
+		Event: wakutypes.EventEnvelopeExpired,
+		Hash:  testHash,
+	})
+	s.Require().NoError(s.monitor.Add(testIDs, testHashes, []*wakutypes.NewMessage{{}}))
+	s.Equal([][][]byte{testIDs}, s.eventsHandlerMock.envelopeExpiredCalls)
+	s.NotContains(s.monitor.envelopes, testHash)
+	s.Empty(s.monitor.earlyFailures)
 }
 
 func (s *EnvelopesMonitorSuite) TestSDSAliasDoesNotProduceSeparateSentMessage() {
