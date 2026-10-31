@@ -56,10 +56,20 @@ const (
 	EnvelopeOtherError
 )
 
+// RequestID identifies one send. A backend assigns it when a message is queued,
+// before the message goes out, and may not know the wire hash until later.
+type RequestID string
+
+// String returns the ID as the backend reported it.
+func (id RequestID) String() string { return string(id) }
+
 // EnvelopeEvent used for envelopes events.
 type EnvelopeEvent struct {
 	Event EventType
 	Topic TopicType
+	// RequestID identifies the send a send lifecycle event belongs to.
+	RequestID RequestID
+	// Hash is the wire hash of the message, when it is known.
 	Hash  cryptotypes.Hash
 	Batch cryptotypes.Hash
 	Peer  EnodeID
@@ -68,6 +78,7 @@ type EnvelopeEvent struct {
 
 // EnvelopeError code and optional description of the error.
 type EnvelopeError struct {
+	RequestID   RequestID
 	Hash        cryptotypes.Hash
 	Code        uint
 	Description string

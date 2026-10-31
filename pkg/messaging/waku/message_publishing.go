@@ -13,12 +13,13 @@ import (
 
 	"github.com/status-im/status-go/internal/panics"
 	common "github.com/status-im/status-go/pkg/messaging/waku/common"
+	"github.com/status-im/status-go/pkg/messaging/waku/types"
 )
 
 // sendEnvelope injects a prebuilt WakuMessage envelope into the waku send
 // queue, to be distributed in the network in the coming cycles. It is the
 // low-level publish step shared by the exported Send method and tests.
-func (w *Waku) sendEnvelope(pubsubTopic string, msg *pb.WakuMessage, priority *int) ([]byte, error) {
+func (w *Waku) sendEnvelope(pubsubTopic string, msg *pb.WakuMessage, priority *int) (types.RequestID, error) {
 	pubsubTopic = w.GetPubsubTopic(pubsubTopic)
 
 	envelope := protocol.NewEnvelope(msg, msg.GetTimestamp(), pubsubTopic)
@@ -26,12 +27,12 @@ func (w *Waku) sendEnvelope(pubsubTopic string, msg *pb.WakuMessage, priority *i
 	if priority != nil {
 		err := w.sendQueue.Push(w.ctx, envelope, *priority)
 		if err != nil {
-			return nil, err
+			return "", err
 		}
 	} else {
 		err := w.sendQueue.Push(w.ctx, envelope)
 		if err != nil {
-			return nil, err
+			return "", err
 		}
 	}
 
@@ -44,7 +45,12 @@ func (w *Waku) sendEnvelope(pubsubTopic string, msg *pb.WakuMessage, priority *i
 		w.addEnvelope(recvMessage)
 	}
 
-	return envelope.Hash().Bytes(), nil
+	return types.RequestID(requestID(envelope)), nil
+}
+
+// requestID is the ID of a send: go-waku knows the wire hash before it publishes.
+func requestID(envelope *protocol.Envelope) string {
+	return envelope.Hash().String()
 }
 
 func (w *Waku) broadcast() {
@@ -91,15 +97,17 @@ func (w *Waku) publishEnvelope(envelope *protocol.Envelope) {
 	if err != nil {
 		logger.Error("could not send message", zap.Error(err))
 		w.SendEnvelopeEvent(common.EnvelopeEvent{
-			Hash:  gethcommon.BytesToHash(envelope.Hash().Bytes()),
-			Event: common.EventEnvelopeExpired,
+			RequestID: requestID(envelope),
+			Hash:      gethcommon.BytesToHash(envelope.Hash().Bytes()),
+			Event:     common.EventEnvelopeExpired,
 		})
 		return
 	}
 
 	// A successful publish is the authoritative sent confirmation.
 	w.SendEnvelopeEvent(common.EnvelopeEvent{
-		Hash:  gethcommon.BytesToHash(envelope.Hash().Bytes()),
-		Event: common.EventEnvelopeSent,
+		RequestID: requestID(envelope),
+		Hash:      gethcommon.BytesToHash(envelope.Hash().Bytes()),
+		Event:     common.EventEnvelopeSent,
 	})
 }

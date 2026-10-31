@@ -54,29 +54,31 @@ func NewEnvelopesMonitor(w wakutypes.Waku, config EnvelopesMonitorConfig) *Envel
 		isMailserver:                     config.IsMailserver,
 		logger:                           logger.With(zap.Namespace("EnvelopesMonitor")),
 
-		// key is envelope hash (event.Hash)
-		envelopes: map[cryptotypes.Hash]*monitoredEnvelope{},
+		// key is the send's request ID (event.RequestID)
+		envelopes: map[wakutypes.RequestID]*monitoredEnvelope{},
 
 		// key is hash of the batch (event.Batch)
-		batches: map[cryptotypes.Hash]map[cryptotypes.Hash]struct{}{},
+		batches: map[cryptotypes.Hash]map[wakutypes.RequestID]struct{}{},
 
 		// key is stringified message identifier
-		messageEnvelopeHashes: make(map[string][]cryptotypes.Hash),
+		messageRequestIDs: make(map[string][]wakutypes.RequestID),
 
 		// key is an SDS message identifier; value is its application message
 		// identifier. SDS aliases are tracked for retrieval hints but must never
 		// be reported as independently sent UI messages.
 		sdsApplicationMessageIDs: make(map[string]string),
 
-		// key is an envelope hash that failed before it was added.
-		earlyFailures: make(map[cryptotypes.Hash]error),
+		// key is a request ID that failed before it was added.
+		earlyFailures: make(map[wakutypes.RequestID]error),
 	}
 }
 
 type monitoredEnvelope struct {
-	envelopeHashID cryptotypes.Hash
-	state          EnvelopeState
-	messageIDs     [][]byte
+	requestID wakutypes.RequestID
+	// wireHash is known once the envelope is sent.
+	wireHash   cryptotypes.Hash
+	state      EnvelopeState
+	messageIDs [][]byte
 }
 
 // EnvelopesMonitor is responsible for monitoring waku envelopes state.
@@ -88,11 +90,11 @@ type EnvelopesMonitor struct {
 
 	mu sync.Mutex
 
-	envelopes                map[cryptotypes.Hash]*monitoredEnvelope
-	batches                  map[cryptotypes.Hash]map[cryptotypes.Hash]struct{}
-	messageEnvelopeHashes    map[string][]cryptotypes.Hash
+	envelopes                map[wakutypes.RequestID]*monitoredEnvelope
+	batches                  map[cryptotypes.Hash]map[wakutypes.RequestID]struct{}
+	messageRequestIDs        map[string][]wakutypes.RequestID
 	sdsApplicationMessageIDs map[string]string
-	earlyFailures            map[cryptotypes.Hash]error
+	earlyFailures            map[wakutypes.RequestID]error
 
 	awaitOnlyMailServerConfirmations bool
 
@@ -104,7 +106,7 @@ type EnvelopesMonitor struct {
 }
 
 // AddSDSAlias records the SDS identifier associated with an application
-// message. The alias shares its envelope hashes for retrieval hints but is not
+// message. The alias shares its request IDs for retrieval hints but is not
 // added to monitoredEnvelope.messageIDs, so publish acknowledgements only emit
 // the application identifier.
 func (m *EnvelopesMonitor) AddSDSAlias(applicationMessageID, sdsMessageID []byte) {
@@ -113,11 +115,11 @@ func (m *EnvelopesMonitor) AddSDSAlias(applicationMessageID, sdsMessageID []byte
 
 	applicationKey := cryptotypes.HexBytes(applicationMessageID).String()
 	sdsKey := cryptotypes.HexBytes(sdsMessageID).String()
-	hashes, ok := m.messageEnvelopeHashes[applicationKey]
+	hashes, ok := m.messageRequestIDs[applicationKey]
 	if !ok {
 		return
 	}
-	m.messageEnvelopeHashes[sdsKey] = hashes
+	m.messageRequestIDs[sdsKey] = hashes
 	m.sdsApplicationMessageIDs[sdsKey] = applicationKey
 }
 
@@ -137,8 +139,22 @@ func (m *EnvelopesMonitor) TakeApplicationMessageIDForSDS(sdsMessageID []byte) (
 		return nil, false
 	}
 	delete(m.sdsApplicationMessageIDs, sdsKey)
-	delete(m.messageEnvelopeHashes, sdsKey)
+	delete(m.messageRequestIDs, sdsKey)
 	return applicationMessageID, true
+}
+
+// wireHashes returns the wire hashes known so far for a message key.
+func (m *EnvelopesMonitor) wireHashes(messageKey string) []cryptotypes.Hash {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	var hashes []cryptotypes.Hash
+	for _, requestID := range m.messageRequestIDs[messageKey] {
+		if envelope, ok := m.envelopes[requestID]; ok && envelope.wireHash != (cryptotypes.Hash{}) {
+			hashes = append(hashes, envelope.wireHash)
+		}
+	}
+	return hashes
 }
 
 // Start processing events.
@@ -158,34 +174,34 @@ func (m *EnvelopesMonitor) Stop() {
 	m.wg.Wait()
 }
 
-// Add hashes to a tracker.
+// Add request IDs to a tracker.
 // Identifiers may be backed by multiple envelopes. It happens when message is split in segmentation layer.
-func (m *EnvelopesMonitor) Add(messageIDs [][]byte, envelopeHashes []cryptotypes.Hash, messages []*wakutypes.NewMessage) error {
-	if len(envelopeHashes) != len(messages) {
-		return errors.New("hashes don't match messages")
+func (m *EnvelopesMonitor) Add(messageIDs [][]byte, requestIDs []wakutypes.RequestID, messages []*wakutypes.NewMessage) error {
+	if len(requestIDs) != len(messages) {
+		return errors.New("request IDs don't match messages")
 	}
 
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	for _, messageID := range messageIDs {
-		m.messageEnvelopeHashes[cryptotypes.HexBytes(messageID).String()] = envelopeHashes
+		m.messageRequestIDs[cryptotypes.HexBytes(messageID).String()] = requestIDs
 	}
 
-	for _, envelopeHash := range envelopeHashes {
-		if _, ok := m.envelopes[envelopeHash]; !ok {
-			m.envelopes[envelopeHash] = &monitoredEnvelope{
-				envelopeHashID: envelopeHash,
-				state:          EnvelopePosted,
-				messageIDs:     messageIDs,
+	for _, requestID := range requestIDs {
+		if _, ok := m.envelopes[requestID]; !ok {
+			m.envelopes[requestID] = &monitoredEnvelope{
+				requestID:  requestID,
+				state:      EnvelopePosted,
+				messageIDs: messageIDs,
 			}
 		}
 	}
 
-	for _, envelopeHash := range envelopeHashes {
-		if err, ok := m.earlyFailures[envelopeHash]; ok {
-			delete(m.earlyFailures, envelopeHash)
-			m.handleEnvelopeFailure(envelopeHash, err)
+	for _, requestID := range requestIDs {
+		if err, ok := m.earlyFailures[requestID]; ok {
+			delete(m.earlyFailures, requestID)
+			m.handleEnvelopeFailure(requestID, err)
 			return nil
 		}
 	}
@@ -195,10 +211,10 @@ func (m *EnvelopesMonitor) Add(messageIDs [][]byte, envelopeHashes []cryptotypes
 	return nil
 }
 
-func (m *EnvelopesMonitor) GetState(hash cryptotypes.Hash) EnvelopeState {
+func (m *EnvelopesMonitor) GetState(requestID wakutypes.RequestID) EnvelopeState {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	envelope, exist := m.envelopes[hash]
+	envelope, exist := m.envelopes[requestID]
 	if !exist {
 		return NotRegistered
 	}
@@ -249,25 +265,26 @@ func (m *EnvelopesMonitor) handleEventEnvelopeSent(event wakutypes.EnvelopeEvent
 
 	confirmationExpected := event.Batch != (cryptotypes.Hash{})
 
-	envelope, ok := m.envelopes[event.Hash]
+	envelope, ok := m.envelopes[event.RequestID]
 
 	// If confirmations are not expected, we keep track of the envelope
 	// being sent
 	if !ok && !confirmationExpected {
-		m.envelopes[event.Hash] = &monitoredEnvelope{envelopeHashID: event.Hash, state: EnvelopeSent}
+		m.envelopes[event.RequestID] = &monitoredEnvelope{requestID: event.RequestID, wireHash: event.Hash, state: EnvelopeSent}
 		return
 	}
+	envelope.wireHash = event.Hash
 
 	// if message was already confirmed - skip it
 	if envelope.state == EnvelopeSent {
 		return
 	}
-	m.logger.Debug("envelope is sent", zap.String("hash", event.Hash.String()), zap.String("peer", event.Peer.String()))
+	m.logger.Debug("envelope is sent", zap.Stringer("requestID", event.RequestID), zap.String("hash", event.Hash.String()), zap.String("peer", event.Peer.String()))
 	if confirmationExpected {
 		if _, ok := m.batches[event.Batch]; !ok {
-			m.batches[event.Batch] = map[cryptotypes.Hash]struct{}{}
+			m.batches[event.Batch] = map[wakutypes.RequestID]struct{}{}
 		}
-		m.batches[event.Batch][event.Hash] = struct{}{}
+		m.batches[event.Batch][event.RequestID] = struct{}{}
 		m.logger.Debug("waiting for a confirmation", zap.String("batch", event.Batch.String()))
 	} else {
 		m.logger.Debug("confirmation not expected, marking as sent")
@@ -294,27 +311,27 @@ func (m *EnvelopesMonitor) handleAcknowledgedBatch(event wakutypes.EnvelopeEvent
 	if event.Data != nil && !ok {
 		m.logger.Error("received unexpected data in the the confirmation event", zap.Any("data", event.Data))
 	}
-	failedEnvelopes := map[cryptotypes.Hash]struct{}{}
+	failedEnvelopes := map[wakutypes.RequestID]struct{}{}
 	for i := range envelopeErrors {
 		envelopeError := envelopeErrors[i]
-		_, exist := m.envelopes[envelopeError.Hash]
+		_, exist := m.envelopes[envelopeError.RequestID]
 		if exist {
-			m.logger.Warn("envelope that was posted by us is discarded", zap.String("hash", envelopeError.Hash.String()), zap.String("peer", event.Peer.String()), zap.String("error", envelopeError.Description))
+			m.logger.Warn("envelope that was posted by us is discarded", zap.Stringer("requestID", envelopeError.RequestID), zap.String("peer", event.Peer.String()), zap.String("error", envelopeError.Description))
 			var err error
 			switch envelopeError.Code {
 			case wakutypes.EnvelopeTimeNotSynced:
 				err = errors.New("envelope wasn't delivered due to time sync issues")
 			}
-			m.handleEnvelopeFailure(envelopeError.Hash, err)
+			m.handleEnvelopeFailure(envelopeError.RequestID, err)
 		}
-		failedEnvelopes[envelopeError.Hash] = struct{}{}
+		failedEnvelopes[envelopeError.RequestID] = struct{}{}
 	}
 
-	for hash := range envelopes {
-		if _, exist := failedEnvelopes[hash]; exist {
+	for requestID := range envelopes {
+		if _, exist := failedEnvelopes[requestID]; exist {
 			continue
 		}
-		envelope, ok := m.envelopes[hash]
+		envelope, ok := m.envelopes[requestID]
 		if !ok || envelope.state == EnvelopeSent {
 			continue
 		}
@@ -327,7 +344,7 @@ func (m *EnvelopesMonitor) handleAcknowledgedBatch(event wakutypes.EnvelopeEvent
 func (m *EnvelopesMonitor) handleEventEnvelopeExpired(event wakutypes.EnvelopeEvent) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.handleEnvelopeFailure(event.Hash, errors.New("envelope expired due to connectivity issues"))
+	m.handleEnvelopeFailure(event.RequestID, errors.New("envelope expired due to connectivity issues"))
 }
 
 // handleEnvelopeFailure is a common code path for processing envelopes failures. not thread safe, lock
@@ -337,17 +354,17 @@ func (m *EnvelopesMonitor) handleEventEnvelopeExpired(event wakutypes.EnvelopeEv
 // performs retransmission internally. A failed envelope is now reported as
 // expired immediately; the message stays unconfirmed and the app layer (raw
 // message resend) remains the backstop until the Messaging API is integrated.
-func (m *EnvelopesMonitor) handleEnvelopeFailure(hash cryptotypes.Hash, err error) {
-	envelope, ok := m.envelopes[hash]
+func (m *EnvelopesMonitor) handleEnvelopeFailure(requestID wakutypes.RequestID, err error) {
+	envelope, ok := m.envelopes[requestID]
 	if !ok {
-		m.earlyFailures[hash] = err
+		m.earlyFailures[requestID] = err
 		return
 	}
-	m.clearMessageState(hash)
+	m.clearMessageState(requestID)
 	if envelope.state == EnvelopeSent {
 		return
 	}
-	m.logger.Debug("envelope expired", zap.String("hash", hash.String()))
+	m.logger.Debug("envelope expired", zap.Stringer("requestID", requestID))
 	if m.handler != nil {
 		m.handler.EnvelopeExpired(envelope.messageIDs, err)
 	}
@@ -359,11 +376,11 @@ func (m *EnvelopesMonitor) handleEventEnvelopeReceived(event wakutypes.EnvelopeE
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	envelope, ok := m.envelopes[event.Hash]
+	envelope, ok := m.envelopes[event.RequestID]
 	if !ok || envelope.state != EnvelopePosted {
 		return
 	}
-	m.logger.Debug("expected envelope received", zap.String("hash", event.Hash.String()), zap.String("peer", event.Peer.String()))
+	m.logger.Debug("expected envelope received", zap.Stringer("requestID", event.RequestID), zap.String("peer", event.Peer.String()))
 	envelope.state = EnvelopeSent
 	m.processMessageIDs(envelope.messageIDs)
 }
@@ -372,15 +389,15 @@ func (m *EnvelopesMonitor) processMessageIDs(messageIDs [][]byte) {
 	sentMessageIDs := make([][]byte, 0, len(messageIDs))
 
 	for _, messageID := range messageIDs {
-		hashes, ok := m.messageEnvelopeHashes[cryptotypes.HexBytes(messageID).String()]
+		requestIDs, ok := m.messageRequestIDs[cryptotypes.HexBytes(messageID).String()]
 		if !ok {
 			continue
 		}
 
 		sent := true
 		// Consider message as sent if all corresponding envelopes are in EnvelopeSent state
-		for _, hash := range hashes {
-			envelope, ok := m.envelopes[hash]
+		for _, requestID := range requestIDs {
+			envelope, ok := m.envelopes[requestID]
 			if !ok || envelope.state != EnvelopeSent {
 				sent = false
 				break
@@ -398,19 +415,19 @@ func (m *EnvelopesMonitor) processMessageIDs(messageIDs [][]byte) {
 
 // clearMessageState removes all message and envelope state.
 // not thread-safe, should be protected on a higher level.
-func (m *EnvelopesMonitor) clearMessageState(envelopeID cryptotypes.Hash) {
-	envelope, ok := m.envelopes[envelopeID]
+func (m *EnvelopesMonitor) clearMessageState(requestID wakutypes.RequestID) {
+	envelope, ok := m.envelopes[requestID]
 	if !ok {
 		return
 	}
-	delete(m.envelopes, envelopeID)
+	delete(m.envelopes, requestID)
 	for _, messageID := range envelope.messageIDs {
 		messageKey := cryptotypes.HexBytes(messageID).String()
-		delete(m.messageEnvelopeHashes, messageKey)
+		delete(m.messageRequestIDs, messageKey)
 		for sdsKey, applicationKey := range m.sdsApplicationMessageIDs {
 			if applicationKey == messageKey {
 				delete(m.sdsApplicationMessageIDs, sdsKey)
-				delete(m.messageEnvelopeHashes, sdsKey)
+				delete(m.messageRequestIDs, sdsKey)
 			}
 		}
 	}

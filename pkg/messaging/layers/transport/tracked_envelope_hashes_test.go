@@ -10,7 +10,7 @@ import (
 	wakutypes "github.com/status-im/status-go/pkg/messaging/waku/types"
 )
 
-func TestTrackedEnvelopeHashes_ReturnsAllHashes(t *testing.T) {
+func TestTrackedEnvelopeHashes_ReturnsWireHashesOfSentEnvelopes(t *testing.T) {
 	monitor := NewEnvelopesMonitor(nil, EnvelopesMonitorConfig{
 		IsMailserver: func(wakutypes.EnodeID) bool { return false },
 		Logger:       zap.NewNop(),
@@ -18,9 +18,16 @@ func TestTrackedEnvelopeHashes_ReturnsAllHashes(t *testing.T) {
 	tr := &Transport{envelopesMonitor: monitor}
 
 	id := []byte("message-id")
+	requestIDs := []wakutypes.RequestID{"req-1", "req-2", "req-3"}
 	hashes := []types.Hash{{0x01}, {0x02}, {0x03}}
-	err := monitor.Add([][]byte{id}, hashes, []*wakutypes.NewMessage{{}, {}, {}})
-	require.NoError(t, err)
+	require.NoError(t, monitor.Add([][]byte{id}, requestIDs, []*wakutypes.NewMessage{{}, {}, {}}))
+
+	_, err := tr.TrackedEnvelopeHashes(id)
+	require.Error(t, err)
+
+	for i := range requestIDs {
+		monitor.handleEvent(wakutypes.EnvelopeEvent{Event: wakutypes.EventEnvelopeSent, RequestID: requestIDs[i], Hash: hashes[i]})
+	}
 
 	got, err := tr.TrackedEnvelopeHashes(id)
 	require.NoError(t, err)

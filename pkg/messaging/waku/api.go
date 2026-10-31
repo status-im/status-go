@@ -24,6 +24,8 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
+
+	"github.com/status-im/status-go/pkg/messaging/waku/types"
 )
 
 // (Waku.Post was removed: all sends now go through Send with payloads
@@ -35,11 +37,11 @@ import (
 // is expected to be already RFC26-encoded (see transport/rfc26.Encode); this
 // method just wraps it in a WakuMessage envelope and hands it to the publish
 // path. The `version` field is a wire label independent of that encoding, and
-// is advertised as 0. Returns the wire hash.
+// is advertised as 0. Returns the request ID, which is the wire hash's hex.
 //
 // ctx is accepted for symmetry with transport.MessagingAPI; the send queue
 // uses the waku instance's own lifecycle context.
-func (w *Waku) Send(ctx context.Context, pubsubTopic, contentTopic string, payload []byte, ephemeral bool, _ *int) ([]byte, error) {
+func (w *Waku) Send(ctx context.Context, pubsubTopic, contentTopic string, payload []byte, ephemeral bool, _ *int) (types.RequestID, error) {
 	var version uint32 = 0 // wire label only; the payload is RFC26-encoded by the caller
 	msg := &pb.WakuMessage{
 		Payload:      payload,
