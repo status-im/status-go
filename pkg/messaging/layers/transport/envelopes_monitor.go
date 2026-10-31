@@ -67,6 +67,9 @@ func NewEnvelopesMonitor(w wakutypes.Waku, config EnvelopesMonitorConfig) *Envel
 		// identifier. SDS aliases are tracked for retrieval hints but must never
 		// be reported as independently sent UI messages.
 		sdsApplicationMessageIDs: make(map[string]string),
+
+		// key is an envelope hash that failed before it was added.
+		earlyFailures: make(map[cryptotypes.Hash]error),
 	}
 }
 
@@ -89,6 +92,7 @@ type EnvelopesMonitor struct {
 	batches                  map[cryptotypes.Hash]map[cryptotypes.Hash]struct{}
 	messageEnvelopeHashes    map[string][]cryptotypes.Hash
 	sdsApplicationMessageIDs map[string]string
+	earlyFailures            map[cryptotypes.Hash]error
 
 	awaitOnlyMailServerConfirmations bool
 
@@ -175,6 +179,14 @@ func (m *EnvelopesMonitor) Add(messageIDs [][]byte, envelopeHashes []cryptotypes
 				state:          EnvelopePosted,
 				messageIDs:     messageIDs,
 			}
+		}
+	}
+
+	for _, envelopeHash := range envelopeHashes {
+		if err, ok := m.earlyFailures[envelopeHash]; ok {
+			delete(m.earlyFailures, envelopeHash)
+			m.handleEnvelopeFailure(envelopeHash, err)
+			return nil
 		}
 	}
 
@@ -326,15 +338,18 @@ func (m *EnvelopesMonitor) handleEventEnvelopeExpired(event wakutypes.EnvelopeEv
 // expired immediately; the message stays unconfirmed and the app layer (raw
 // message resend) remains the backstop until the Messaging API is integrated.
 func (m *EnvelopesMonitor) handleEnvelopeFailure(hash cryptotypes.Hash, err error) {
-	if envelope, ok := m.envelopes[hash]; ok {
-		m.clearMessageState(hash)
-		if envelope.state == EnvelopeSent {
-			return
-		}
-		m.logger.Debug("envelope expired", zap.String("hash", hash.String()))
-		if m.handler != nil {
-			m.handler.EnvelopeExpired(envelope.messageIDs, err)
-		}
+	envelope, ok := m.envelopes[hash]
+	if !ok {
+		m.earlyFailures[hash] = err
+		return
+	}
+	m.clearMessageState(hash)
+	if envelope.state == EnvelopeSent {
+		return
+	}
+	m.logger.Debug("envelope expired", zap.String("hash", hash.String()))
+	if m.handler != nil {
+		m.handler.EnvelopeExpired(envelope.messageIDs, err)
 	}
 }
 
