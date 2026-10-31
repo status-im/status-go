@@ -24,6 +24,8 @@ import (
 type FilterSubscriptions struct {
 	api    MessagingAPI // nil for offline transports (tests)
 	logger *zap.Logger
+	// contentTopicOnly counts pairs by content topic alone; see ContentTopicOnly.
+	contentTopicOnly bool
 
 	mu sync.Mutex
 	// known records the pair each acquired FilterID is counted under;
@@ -34,18 +36,24 @@ type FilterSubscriptions struct {
 }
 
 func newFilterSubscriptions(api MessagingAPI, logger *zap.Logger) *FilterSubscriptions {
+	_, contentTopicOnly := api.(ContentTopicOnly)
 	return &FilterSubscriptions{
-		api:    api,
-		logger: logger.With(zap.Namespace("FilterSubscriptions")),
-		known:  make(map[string]types.TopicSubscription),
-		counts: make(map[types.TopicSubscription]int),
+		api:              api,
+		logger:           logger.With(zap.Namespace("FilterSubscriptions")),
+		contentTopicOnly: contentTopicOnly,
+		known:            make(map[string]types.TopicSubscription),
+		counts:           make(map[types.TopicSubscription]int),
 	}
 }
 
 // pairOf returns the wire-subscription pair a filter listens on, normalized
 // the same way received messages are routed (WatchersByTopic): an empty
-// pubsub topic means the default shard.
-func pairOf(filter *Filter) types.TopicSubscription {
+// pubsub topic means the default shard. For a ContentTopicOnly backend the
+// pair has no pubsub topic.
+func (s *FilterSubscriptions) pairOf(filter *Filter) types.TopicSubscription {
+	if s.contentTopicOnly {
+		return types.TopicSubscription{ContentTopic: filter.ContentTopic}
+	}
 	pubsubTopic := filter.PubsubTopic
 	if pubsubTopic == "" {
 		pubsubTopic = waku.DefaultShardPubsubTopic()
@@ -65,7 +73,7 @@ func (s *FilterSubscriptions) Acquire(filters ...*Filter) error {
 	defer s.mu.Unlock()
 
 	for _, filter := range filters {
-		pair := pairOf(filter)
+		pair := s.pairOf(filter)
 		old, ok := s.known[filter.FilterID]
 		if ok && old == pair {
 			continue

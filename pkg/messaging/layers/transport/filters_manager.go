@@ -89,7 +89,8 @@ func (f *FiltersManager) deleteSymKey(filterID string) {
 // (pubsub, content) routing the waku layer used. A single content topic can be
 // shared by distinct chats (content topics are a 4-byte hash of the chat id),
 // so the caller must still confirm the match by decoding with each candidate's
-// own key.
+// own key. An empty pubsubTopic, from a ContentTopicOnly backend, matches
+// filters on any pubsub topic.
 func (f *FiltersManager) WatchersByTopic(pubsubTopic, contentTopic string) []*Filter {
 	f.mutex.Lock()
 	defer f.mutex.Unlock()
@@ -103,7 +104,7 @@ func (f *FiltersManager) WatchersByTopic(pubsubTopic, contentTopic string) []*Fi
 		if filterPubsubTopic == "" {
 			filterPubsubTopic = waku.DefaultShardPubsubTopic()
 		}
-		if filterPubsubTopic == pubsubTopic {
+		if pubsubTopic == "" || filterPubsubTopic == pubsubTopic {
 			res = append(res, filter)
 		}
 	}
