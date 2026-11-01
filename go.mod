@@ -25,7 +25,7 @@ replace github.com/libp2p/go-libp2p-pubsub v0.13.1 => github.com/waku-org/go-lib
 
 require (
 	github.com/anacrolix/torrent v1.41.0
-	github.com/beevik/ntp v0.3.0
+	github.com/beevik/ntp v1.5.0
 	github.com/cenkalti/backoff/v3 v3.2.2
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/ethereum/go-ethereum v1.16.3
