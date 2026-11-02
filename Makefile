@@ -118,8 +118,6 @@ IOS_TOKEN_ARCHIVE = bash scripts/tkl_bundle_archive.sh build/bin/libstatus.a
 # Option 1 (default): Nimble builds libsds into build/. sds-go-bindings pins the revision.
 # Option 2: Provide NIM_SDS_LIB_DIR and NIM_SDS_INC_DIR (used by Nix).
 
-NIMBLE ?= nimble
-
 ifdef NIM_SDS_LIB_DIR
 ifdef NIM_SDS_INC_DIR
     # External lib/include approach (e.g. used in Nix)
@@ -136,10 +134,7 @@ else
     NIMBLE_SETUP := nimble.paths
 endif
 
-# nimble.paths has every --path, so parent configs (status-app's) are skipped.
-NIMBLE_SDS_ENV = \
-	LIBSDS_OUT="$(NIM_SDS_LIB_DIR)" \
-	NIM_PARAMS="--skipParentCfg $$NIM_PARAMS $$(tr '\n' ' ' < $(CURDIR)/nimble.paths)"
+include nim.mk
 
 LIBSDS ?= $(NIM_SDS_LIB_DIR)/libsds.$(LIB_EXT)
 CGO_CFLAGS+=-I$(NIM_SDS_INC_DIR)
@@ -330,17 +325,10 @@ USE_SYSTEM_NIM ?= 1
 
 # libsds targets
 
-.PHONY: nimble-deps
-
-nimble.paths: status_go.nimble
-	env -u SDKROOT -u CPATH -u LIBRARY_PATH $(NIMBLE) setup --localdeps -y
-
-nimble-deps: nimble.paths ##@build Resolve the Nim dependencies
-
 $(LIBSDS): | $(NIMBLE_SETUP)
 ifeq ($(NIM_SDS_BUILD_FROM_SOURCE),true)
 	@echo "Building nim-sds: $(LIBSDS)"
-	$(NIMBLE_SDS_ENV) $(NIMBLE) libsds
+	$(NIM_TASK) libsds "$$($(NIMBLE) path sds)/libsds.nims"
 	@test -f $(LIBSDS) || (echo "Error: libsds not found at $(LIBSDS) after build" && exit 1)
 else
 	@test -f $(LIBSDS) || (echo "Error: libsds not found at $(LIBSDS)" && exit 1)
@@ -349,21 +337,16 @@ endif
 build-libsds: $(LIBSDS)
 
 
-## Target-specific architecture mapping for libsds Android build
-# Note: nim-sds uses 'amd64' for both x86 and x86_64
-build-libsds-android: SDSARCH = $(strip $(if $(filter arm64,$(ARCH)),arm64,\
-	$(if $(filter arm,$(ARCH)),arm,\
-	$(if $(filter amd64,$(ARCH)),amd64,\
-	$(if $(filter x86 x86_64,$(ARCH)),amd64,\
-	$(error Unsupported ARCH '$(ARCH)'. Please set ARCH to one of: arm64, arm, amd64, x86, x86_64))))))
+build-libsds-android build-libsds-ios $(LIBSDS): NIM_LIB_DIR = $(NIM_SDS_LIB_DIR)
+build-libsds-android: NIM_FLAGS = $(NIM_FLAGS_ANDROID)
+build-libsds-android: NIM_LIB_EXT = so
+build-libsds-ios: NIM_FLAGS = $(NIM_FLAGS_IOS)
+
 build-libsds-android: | nimble.paths
-	@echo "Building nim-sds for Android" $(LIBSDS)
-	$(NIMBLE_SDS_ENV) ARCH="$(SDSARCH)" ANDROID_NDK_ROOT="$(ANDROID_NDK_ROOT)" \
-		$(NIMBLE) libsdsAndroid
+	$(NIM_TASK) libsds "$$($(NIMBLE) path sds)/libsds.nims"
 
 build-libsds-ios: | nimble.paths
-	@echo "Building nim-sds for iOS" $(LIBSDS)
-	$(NIMBLE_SDS_ENV) env -u SDKROOT -u CPATH -u LIBRARY_PATH $(NIMBLE) libsdsIOS
+	$(NIM_TASK) libsdsStatic "$$($(NIMBLE) path sds)/libsds.nims"
 
 clean-libsds:
 	@echo "Removing libsds"
