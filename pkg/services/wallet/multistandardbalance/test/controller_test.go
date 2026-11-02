@@ -934,10 +934,10 @@ func TestController_FetchImmediatelyWithConfig(t *testing.T) {
 		controller.Start()
 		defer controller.Stop()
 
-		// Wait for the initial full fetch (2 active chains) to complete.
-		require.Eventually(t, func() bool {
-			return len(getFetchCallsCopy(fetchCalls, fetchMutex)) >= 2
-		}, 500*time.Millisecond, 10*time.Millisecond, "initial fetch should complete")
+		// Wait for the initial full fetch (2 active chains) to complete and the
+		// wallet events watcher to subscribe.
+		synctest.Wait()
+		require.Len(t, getFetchCallsCopy(fetchCalls, fetchMutex), 2, "initial fetch should complete")
 		resetFetchCallsShared(fetchCalls, fetchMutex)
 
 		// Send a success event for a regular token transfer.
@@ -961,9 +961,7 @@ func TestController_FetchImmediatelyWithConfig(t *testing.T) {
 		})
 
 		// Fetch must happen immediately — no debounce involved.
-		require.Eventually(t, func() bool {
-			return len(getFetchCallsCopy(fetchCalls, fetchMutex)) >= 2
-		}, 500*time.Millisecond, 10*time.Millisecond, "immediate fetch should happen for both chains")
+		synctest.Wait()
 
 		calls := getFetchCallsCopy(fetchCalls, fetchMutex)
 		require.Len(t, calls, 2, "expected exactly one fetch call per chain")
@@ -1008,10 +1006,10 @@ func TestController_FetchImmediatelyWithConfig_IgnoresNonSuccessStatus(t *testin
 		controller.Start()
 		defer controller.Stop()
 
-		// Wait for the initial full fetch to complete, then reset.
-		require.Eventually(t, func() bool {
-			return len(getFetchCallsCopy(fetchCalls, fetchMutex)) >= 2
-		}, 500*time.Millisecond, 10*time.Millisecond, "initial fetch should complete")
+		// Wait for the initial full fetch to complete and the wallet events
+		// watcher to subscribe, then reset.
+		synctest.Wait()
+		require.Len(t, getFetchCallsCopy(fetchCalls, fetchMutex), 2, "initial fetch should complete")
 		resetFetchCallsShared(fetchCalls, fetchMutex)
 
 		for _, status := range []ac.TxStatus{ac.Pending, ac.Failed} {
@@ -1036,8 +1034,7 @@ func TestController_FetchImmediatelyWithConfig_IgnoresNonSuccessStatus(t *testin
 				Message: string(payloadJSON),
 			})
 
-			// Give the watcher goroutine time to process the event.
-			time.Sleep(100 * time.Millisecond)
+			synctest.Wait()
 			require.Empty(t, getFetchCallsCopy(fetchCalls, fetchMutex),
 				"status %q should NOT trigger an immediate fetch", status)
 		}
