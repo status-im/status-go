@@ -2649,6 +2649,21 @@ func (b *StatusBackend) StartLocalNotifications() error {
 
 // Logout clears whisper identities.
 func (b *StatusBackend) Logout() error {
+	return b.logout(false)
+}
+
+// LogoutAndAdvanceSignalEpoch is the client-requested logout: once the old node is
+// stopped it starts a new signal epoch, so the client can drop signals of the old
+// session it receives late. Internal logouts (re-encryption, pairing) keep the epoch
+// because the client session continues across them.
+func (b *StatusBackend) LogoutAndAdvanceSignalEpoch() (uint64, error) {
+	if err := b.logout(true); err != nil {
+		return signal.Epoch(), err
+	}
+	return signal.Epoch(), nil
+}
+
+func (b *StatusBackend) logout(advanceSignalEpoch bool) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
@@ -2678,6 +2693,12 @@ func (b *StatusBackend) Logout() error {
 
 	if !b.LocalPairingStateManager.IsPairing() {
 		signal.SendNodeStopped()
+	}
+
+	// node.stopped is the old session's last signal; everything the re-initialized
+	// backend emits below belongs to the new epoch.
+	if advanceSignalEpoch {
+		signal.AdvanceEpoch()
 	}
 
 	if err = b.switchToPreLoginLog(); err != nil {

@@ -31,3 +31,37 @@ func TestEnvelopeMarshalsTypeFirst(t *testing.T) {
 
 	require.True(t, bytes.HasPrefix(emitted, []byte(`{"type":"community.found",`)), string(emitted))
 }
+
+// Clients prefix-scan the epoch right after the type to reject signals of a
+// previous session without parsing the event payload.
+func TestEnvelopeMarshalsEpochSecond(t *testing.T) {
+	var emitted []byte
+	SetHandler(func(data []byte) { emitted = data })
+	defer ResetHandler()
+
+	send("community.found", map[string]interface{}{"a": 1})
+	require.True(t, bytes.HasPrefix(emitted, fmt.Appendf(nil, `{"type":"community.found","epoch":%d,`, Epoch())), string(emitted))
+}
+
+func TestAdvanceEpochStampsLaterSignals(t *testing.T) {
+	var emitted []byte
+	SetHandler(func(data []byte) { emitted = data })
+	defer ResetHandler()
+
+	before := Epoch()
+	require.NotZero(t, before)
+
+	send("a", nil)
+	var first Envelope
+	require.NoError(t, json.Unmarshal(emitted, &first))
+	require.Equal(t, before, first.Epoch)
+
+	advanced := AdvanceEpoch()
+	require.Equal(t, before+1, advanced)
+	require.Equal(t, advanced, Epoch())
+
+	send("b", nil)
+	var second Envelope
+	require.NoError(t, json.Unmarshal(emitted, &second))
+	require.Equal(t, advanced, second.Epoch)
+}
