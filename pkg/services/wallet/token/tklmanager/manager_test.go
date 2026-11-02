@@ -392,3 +392,44 @@ func TestCrossChainTokensMatchUniqueTokens(t *testing.T) {
 	require.NoError(t, m.SetChains([]uint64{10}))
 	check()
 }
+
+func TestCrossChainIDsAndKeysReadOneRevision(t *testing.T) {
+	const status = `{"name":"Status","timestamp":"2026-01-01T00:00:00Z","version":{"major":1,"minor":0,"patch":0},"tokens":[{"crossChainId":"one","name":"One","symbol":"ONE","decimals":18,"contracts":{"1":"0x0000000000000000000000000000000000000001","10":"0x00000000000000000000000000000000000000AB"}}]}`
+	const standard = `{"name":"Test","timestamp":"2026-01-01T00:00:00Z","version":{"major":1,"minor":0,"patch":0},"tokens":[{"chainId":10,"address":"0x0000000000000000000000000000000000000004","symbol":"NOID","name":"None","decimals":2}]}`
+	m, err := New(tkl.Config{
+		Chains:       []uint64{1, 10},
+		InitialLists: []tkl.ListContent{{ID: "status", Format: tkl.StatusFormat}, {ID: "test", Format: tkl.StandardFormat}},
+	}, withBodies(tkl.ListBody{ID: "status", Origin: tkl.Bundled, Data: []byte(status)}, tkl.ListBody{ID: "test", Origin: tkl.Bundled, Data: []byte(standard)}))
+	require.NoError(t, err)
+	defer func() { _ = m.Stop() }()
+	noID := types.TokenKey(10, common.HexToAddress("0x4"))
+	ids := []string{"one", noID, "unknown", "01-0x1"}
+	require.Empty(t, m.GetTokensByCrossChainIDsAndKeys(ids))
+	require.NoError(t, m.Start(context.Background(), false, nil))
+
+	symbols := func(tokens []*types.Token) []string {
+		result := make([]string, len(tokens))
+		for i, token := range tokens {
+			result[i] = fmt.Sprintf("%d-%s", token.ChainID, token.Symbol)
+		}
+		return result
+	}
+	require.Equal(t, []string{"1-ONE", "10-ONE", "10-NOID", "1-ONE"}, symbols(m.GetTokensByCrossChainIDsAndKeys(ids)))
+	require.Empty(t, m.GetTokensByCrossChainIDsAndKeys(nil))
+	require.NoError(t, m.SetChains([]uint64{1}))
+	require.Equal(t, []string{"1-ONE", "1-ONE"}, symbols(m.GetTokensByCrossChainIDsAndKeys(ids)))
+
+	// Switch the active chain between the cross-chain query and the key query.
+	switched := false
+	testHookBetweenGroupQueries = func() {
+		if switched {
+			return
+		}
+		switched = true
+		require.NoError(t, m.SetChains([]uint64{10}))
+	}
+	defer func() { testHookBetweenGroupQueries = nil }()
+	got := m.GetTokensByCrossChainIDsAndKeys(ids)
+	require.True(t, switched)
+	require.Equal(t, []string{"10-ONE", "10-NOID"}, symbols(got))
+}

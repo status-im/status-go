@@ -426,17 +426,7 @@ func (tm *Manager) GetTokensByGroupKeys(groupKeys []string) ([]*tokentypes.Token
 		return ok
 	}
 
-	crossChainTokens := tm.tokensManager.GetCrossChainTokens(uniqueKeys, nil)
-	catalogueKeys := make([]string, 0, len(crossChainTokens)+len(uniqueKeys))
-	for _, token := range crossChainTokens {
-		catalogueKeys = append(catalogueKeys, types.TokenKey(token.ChainID, token.Address))
-	}
-	// Keys of tokens without a cross-chain id; other keys are skipped or filtered out.
-	catalogueKeys = append(catalogueKeys, uniqueKeys...)
-	catalogueTokens, err := tm.tokensManager.GetTokensByKeys(catalogueKeys)
-	if err != nil {
-		return nil, err
-	}
+	catalogueTokens := tm.tokensManager.GetTokensByCrossChainIDsAndKeys(uniqueKeys)
 	seen := make(map[string]struct{}, len(catalogueTokens))
 	for _, wsdkToken := range catalogueTokens {
 		token := &tokentypes.Token{Token: wsdkToken}
