@@ -1,6 +1,6 @@
 .PHONY: statusgo all test clean help
 .PHONY: statusgo-ios-library statusgo-android-library
-.PHONY: build-libsds clean-libsds rebuild-libsds
+.PHONY: build-libsds clean-libsds rebuild-libsds build-liblogosdelivery build-liblogosdelivery-android build-liblogosdelivery-ios
 .PHONY: clone-storage build-storage clean-storage test-storage test-torrent
 .PHONY: history-archive-help
 
@@ -139,6 +139,12 @@ include nim.mk
 LIBSDS ?= $(NIM_SDS_LIB_DIR)/libsds.$(LIB_EXT)
 CGO_CFLAGS+=-I$(NIM_SDS_INC_DIR)
 CGO_LDFLAGS+=-L$(NIM_SDS_LIB_DIR) -lsds
+
+# Not linked yet. Nix builds have no Nimble on PATH, and don't need it until then.
+LIBLOGOSDELIVERY ?= $(CURDIR)/build/liblogosdelivery.$(LIB_EXT)
+ifeq ($(NIM_SDS_BUILD_FROM_SOURCE),true)
+    LIBLOGOSDELIVERY_BUILD_DEP := $(LIBLOGOSDELIVERY)
+endif
 
 # `logos-storage` variables (opt-in)
 USE_LOGOS_STORAGE ?= false
@@ -348,6 +354,39 @@ build-libsds-android: | nimble.paths
 build-libsds-ios: | nimble.paths
 	$(NIM_TASK) libsdsStatic "$$($(NIMBLE) path sds)/libsds.nims"
 
+# logos-delivery sets its own memory manager and optimisation, and keeps its own
+# Android and iOS tasks: they take the target from these variables.
+$(LIBLOGOSDELIVERY) build-liblogosdelivery-android build-liblogosdelivery-ios: NIM_POLICY =
+$(LIBLOGOSDELIVERY) build-liblogosdelivery-android build-liblogosdelivery-ios: NIM_FLAGS = -d:disable_rln $(NIM_DELIVERY_WINDOWS_FLAGS)
+$(LIBLOGOSDELIVERY): NIM_LIB_DIR = $(CURDIR)/build
+# Inside nimbledeps, Leopard-RS's object paths overrun CMake's limit on Windows.
+$(LIBLOGOSDELIVERY): NIM_FLAGS += --nimcache:$(CURDIR)/build/nimcache-delivery
+build-liblogosdelivery-android: NIM_LIB_DIR = $(CURDIR)/build/android
+build-liblogosdelivery-ios: NIM_LIB_DIR = $(CURDIR)/build/ios
+ifeq ($(detected_OS),Windows)
+    # Until logos-storage/nim-leopard#30: CMake picks MSVC from vcvars.
+    NIM_DELIVERY_ENV = CC=gcc CXX=g++ CMAKE_GENERATOR="MSYS Makefiles"
+    # Static libgomp needs dlfcn-win32's -ldl after it.
+    NIM_DELIVERY_WINDOWS_FLAGS = -d:LeopardExtraLinkerFlags=-Wl,--push-state,-Bstatic,-lgomp,-ldl,--pop-state
+endif
+NIM_DELIVERY_ENTRY = "$$($(NIMBLE) path logos_delivery)/liblogosdelivery.nims"
+
+$(LIBLOGOSDELIVERY): | nimble.paths
+	$(NIM_DELIVERY_ENV) $(NIM_TASK) liblogosdelivery $(NIM_DELIVERY_ENTRY)
+	@test -f $@ || (echo "Error: liblogosdelivery not found at $@ after build" && exit 1)
+
+build-liblogosdelivery: $(LIBLOGOSDELIVERY) ##@build Build liblogosdelivery
+
+build-liblogosdelivery-android: | nimble.paths
+	CPU=$(NIM_ANDROID_CPU) ABIDIR=$(if $(filter arm64,$(NIM_ANDROID_CPU)),arm64-v8a,$(if $(filter arm,$(NIM_ANDROID_CPU)),armeabi-v7a,x86_64)) \
+	ANDROID_NDK_ROOT="$(ANDROID_NDK_ROOT)" ANDROID_TARGET=$(or $(ANDROID_API),28) \
+	$(NIM_TASK) libLogosDeliveryAndroid $(NIM_DELIVERY_ENTRY)
+
+build-liblogosdelivery-ios: | nimble.paths
+	IOS_SDK=$(NIM_IOS_SDK) IOS_ARCH=$(NIM_IOS_ARCH) IOS_SDK_PATH="$$(xcrun --sdk $(NIM_IOS_SDK) --show-sdk-path)" \
+	IOS_DEPLOYMENT_TARGET=$(or $(IOS_TARGET),13.0) \
+	$(NIM_TASK) libLogosDeliveryIOS $(NIM_DELIVERY_ENTRY)
+
 clean-libsds:
 	@echo "Removing libsds"
 	rm $(LIBSDS)
@@ -418,7 +457,7 @@ statusgo-library: statusgo-c-bindings $(LIBSDS)  ##@cross-compile Build status-g
 statusgo-shared-library-tkl: statusgo-shared-library
 
 statusgo-shared-library: TKL_LIBSDS = $(firstword $(wildcard $(LIBSDS) $(NIM_SDS_LIB_DIR)/libsds.a))
-statusgo-shared-library: $(if $(filter true,$(NIM_SDS_BUILD_FROM_SOURCE)),$(LIBSDS))
+statusgo-shared-library: $(if $(filter true,$(NIM_SDS_BUILD_FROM_SOURCE)),$(LIBSDS)) $(LIBLOGOSDELIVERY_BUILD_DEP)
 	@test -n "$(TKL_LIBSDS)" || { echo "libsds not found in $(NIM_SDS_LIB_DIR); run 'make build-libsds' first" >&2; exit 1; }
 	$(GOBIN_SHARED_LIB_CFLAGS) TKL_HIDE_EXPORTS=1 \
 		CGO_CFLAGS='$(CGO_CFLAGS)' CGO_LDFLAGS='$(CGO_LDFLAGS) -Wl,-rpath,$(NIM_SDS_LIB_DIR)' \
@@ -454,7 +493,7 @@ endif
 	@echo "Shared library built:"
 	@ls -la build/bin/libstatus.*
 
-statusgo-android-library: generate statusgo-c-bindings build-libsds-android ##@cross-compile Build status-go as Android mobile library
+statusgo-android-library: generate statusgo-c-bindings build-libsds-android build-liblogosdelivery-android ##@cross-compile Build status-go as Android mobile library
 	@echo "Building Android mobile library..."
 	$(ANDROID_BUILD_FLAGS) CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
 	$(ANDROID_TOKEN_ENV) go build -buildmode=c-shared -tags '$(MOBILE_BUILD_TAGS)' \
@@ -465,7 +504,7 @@ statusgo-android-library: generate statusgo-c-bindings build-libsds-android ##@c
 	TKL_TARGET_OS=android NM="$(ANDROID_NDK_ROOT)/toolchains/llvm/prebuilt/$(HOST_OS)-x86_64/bin/llvm-nm" \
 		bash scripts/check_tkl_exports.sh build/bin/libstatus.so
 
-statusgo-ios-library: generate statusgo-c-bindings build-libsds-ios ##@cross-compile Build status-go as iOS mobile library
+statusgo-ios-library: generate statusgo-c-bindings build-libsds-ios build-liblogosdelivery-ios ##@cross-compile Build status-go as iOS mobile library
 	@echo "Building iOS mobile library..."
 	DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" \
 	CC="$$(xcrun --sdk $(IPHONE_SDK) --find clang)" \
