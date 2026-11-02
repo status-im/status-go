@@ -136,9 +136,6 @@ func (s *CommunityEventsEventualConsistencySuite) testRequestsToJoin(actions []r
 	// ensure events are received in order
 	s.messagesOrderController.order = messagesOrder
 
-	response, err = s.owner.RetrieveAll()
-	s.Require().NoError(err)
-
 	lastAction := actions[len(actions)-1]
 	responseChecker := func(mr *MessengerResponse) bool {
 		if len(mr.RequestsToJoinCommunity()) == 0 || len(mr.Communities()) == 0 {
@@ -157,9 +154,13 @@ func (s *CommunityEventsEventualConsistencySuite) testRequestsToJoin(actions []r
 
 	switch messagesOrder {
 	case messagesOrderAsPosted:
+		// The control node accepts or declines in the background and signals the
+		// result, so retrieve only once the signals handler is in place.
 		_, err = WaitOnSignaledMessengerResponse(s.owner, responseChecker, "lack of eventual consistency")
 		s.Require().NoError(err)
 	case messagesOrderReversed:
+		response, err = s.owner.RetrieveAll()
+		s.Require().NoError(err)
 		s.Require().True(responseChecker(response))
 	}
 }
