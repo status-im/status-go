@@ -82,7 +82,10 @@ class ConnectorClient:
     def wallet_revoke_permissions(self):
         self._send("wallet_revokePermissions")
 
-    def _send(self, method, params=None):
+    def eth_chain_id_with_client_id(self, client_id: str):
+        self._send("eth_chainId", client_id=client_id)
+
+    def _send(self, method, params=None, client_id=None):
         assert self.ws_conn is not None
 
         request_id = self.request_id
@@ -95,6 +98,8 @@ class ConnectorClient:
         }
         if params is not None:
             request["params"] = params
+        if client_id is not None:
+            request["clientId"] = client_id
 
         wrapped_request = {
             "jsonrpc": "2.0",

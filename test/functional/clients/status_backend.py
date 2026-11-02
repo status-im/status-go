@@ -22,6 +22,8 @@ from clients.services.connector import ConnectorService
 from clients.services.ens import EnsService
 from clients.services.eth import EthService
 from clients.services.linkpreview import LinkPreviewService
+from clients.services.browsers import BrowsersService
+from clients.services.preferences import PreferencesService
 from clients.services.multiaccounts import MultiAccountsService
 from clients.services.networks import NetworksService
 from clients.services.newsfeed import NewsFeedService
@@ -117,6 +119,8 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
             self.ens_service = EnsService(self)
             self.eth_service = EthService(self)
             self.linkpreview_service = LinkPreviewService(self)
+            self.browsers_service = BrowsersService(self)
+            self.preferences_service = PreferencesService(self)
             self.expvar_client = ExpvarClient(self.base_url)
         except Exception:
             if self.container:
