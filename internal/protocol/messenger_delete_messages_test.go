@@ -2,6 +2,8 @@ package protocol
 
 import (
 	"context"
+	"crypto/ecdsa"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -137,6 +139,10 @@ func (s *MessengerDeleteMessagesSuite) TestDeleteMessageErrors() {
 	_, err = s.owner.DeleteCommunityMemberMessages(deleteMessagesRequest)
 	s.Require().ErrorIs(err, requests.ErrDeleteCommunityMemberMessagesInvalidMsgChatID)
 
+	deleteMessagesRequest.Messages = []*protobuf.DeleteCommunityMemberMessage{nil}
+	_, err = s.owner.DeleteCommunityMemberMessages(deleteMessagesRequest)
+	s.Require().ErrorIs(err, requests.ErrDeleteCommunityMemberMessagesInvalidData)
+
 	// messages id provided but with flag deleteAll
 	deleteMessagesRequest.CommunityID = community.ID()
 	deleteMessagesRequest.Messages = []*protobuf.DeleteCommunityMemberMessage{&protobuf.DeleteCommunityMemberMessage{
@@ -156,6 +162,12 @@ func (s *MessengerDeleteMessagesSuite) TestDeleteMessageErrors() {
 	deleteMessagesRequest.MemberPubKey = s.owner.IdentityPublicKeyString()
 	_, err = s.admin.DeleteCommunityMemberMessages(deleteMessagesRequest)
 	s.Require().ErrorIs(err, communities.ErrNotOwner)
+
+	deleteMessagesRequest.MemberPubKey = s.admin.IdentityPublicKeyString()
+	_, err = s.owner.DeleteCommunityMemberMessages(deleteMessagesRequest)
+	s.Require().ErrorIs(err, ErrCommunityMessageScopeMismatch)
+	_, err = s.owner.persistence.MessageByID(bobMessage.ID)
+	s.Require().NoError(err)
 }
 
 func (s *MessengerDeleteMessagesSuite) TestDeleteMessage() {
@@ -241,6 +253,7 @@ func (s *MessengerDeleteMessagesSuite) TestDeleteMessage() {
 	s.checkAllMembersHasMemberMessages(s.owner.IdentityPublicKeyString(), expectedMsgsToRemove, communityID)
 
 	// check that owner can delete member message
+	deleteMessagesRequest.MemberPubKey = s.admin.IdentityPublicKeyString()
 	deleteMessagesRequest.Messages = []*protobuf.DeleteCommunityMemberMessage{&protobuf.DeleteCommunityMemberMessage{
 		Id:     adminMessage.ID,
 		ChatId: adminMessage.ChatId,
@@ -258,6 +271,8 @@ func (s *MessengerDeleteMessagesSuite) TestDeleteMessage() {
 	s.checkAllMembersHasMemberMessages(s.owner.IdentityPublicKeyString(), 1, communityID)
 
 	// check that owner can delete his own message
+	memberPubKey := s.owner.IdentityPublicKeyString()
+	deleteMessagesRequest.MemberPubKey = memberPubKey[:2] + strings.ToUpper(memberPubKey[2:])
 	deleteMessagesRequest.Messages = []*protobuf.DeleteCommunityMemberMessage{&protobuf.DeleteCommunityMemberMessage{
 		Id:     ownerMessage.ID,
 		ChatId: ownerMessage.ChatId,
@@ -272,6 +287,156 @@ func (s *MessengerDeleteMessagesSuite) TestDeleteMessage() {
 	s.Require().NoError(err)
 
 	s.checkAllMembersHasMemberMessages(s.owner.IdentityPublicKeyString(), 0, communityID)
+}
+
+func (s *MessengerDeleteMessagesSuite) TestDeleteMessageScope() {
+	community, communityChat := createCommunity(&s.Suite, s.owner)
+	advertiseCommunityTo(&s.Suite, community, s.owner, s.bob)
+	advertiseCommunityTo(&s.Suite, community, s.owner, s.admin)
+	joinCommunity(&s.Suite, community.ID(), s.owner, s.admin, alicePassword, []string{aliceAddress1})
+	grantPermission(&s.Suite, community, s.owner, s.admin, protobuf.CommunityMember_ROLE_ADMIN)
+	otherCommunity, otherChat := createCommunity(&s.Suite, s.bob)
+	directChat := CreateOneToOneChat(s.admin.IdentityPublicKeyString(), s.admin.IdentityPublicKey(), s.bob.getTimesource())
+	s.Require().NoError(s.bob.persistence.SaveChats([]*Chat{communityChat, otherChat, directChat}))
+	s.Require().NoError(s.admin.persistence.SaveChats([]*Chat{communityChat}))
+
+	for _, entry := range []struct {
+		id, chatID, communityID, author string
+	}{
+		{"valid", communityChat.ID, community.IDString(), s.admin.IdentityPublicKeyString()},
+		{"direct", directChat.ID, "", s.admin.IdentityPublicKeyString()},
+		{"other", otherChat.ID, otherCommunity.IDString(), s.admin.IdentityPublicKeyString()},
+		{"wrong-author", communityChat.ID, community.IDString(), s.bob.IdentityPublicKeyString()},
+	} {
+		s.Require().NoError(s.bob.persistence.SaveMessages([]*common.Message{{
+			ID: entry.id, LocalChatID: entry.chatID, CommunityID: entry.communityID, From: entry.author,
+			ChatMessage: &protobuf.ChatMessage{ChatId: entry.chatID, Text: entry.id},
+		}}))
+	}
+	s.Require().False(community.ControlNode().Equal(s.owner.IdentityPublicKey()))
+	for _, test := range []struct {
+		name      string
+		sender    *ecdsa.PublicKey
+		deleteAll bool
+		rejected  bool
+	}{
+		{name: "admin-owner-message", sender: s.admin.IdentityPublicKey(), rejected: true},
+		{name: "admin-all-owner-messages", sender: s.admin.IdentityPublicKey(), deleteAll: true, rejected: true},
+		{name: "owner-message", sender: s.owner.IdentityPublicKey()},
+		{name: "owner-all-messages", sender: s.owner.IdentityPublicKey(), deleteAll: true},
+		{name: "control-node-owner-message", sender: community.ControlNode()},
+		{name: "control-node-all-owner-messages", sender: community.ControlNode(), deleteAll: true},
+	} {
+		s.Run(test.name, func() {
+			for _, id := range []string{"owner-message", "owner-message2"} {
+				s.Require().NoError(s.admin.persistence.SaveMessages([]*common.Message{{
+					ID: id, LocalChatID: communityChat.ID, CommunityID: community.IDString(),
+					From:        s.owner.IdentityPublicKeyString(),
+					ChatMessage: &protobuf.ChatMessage{ChatId: communityChat.ID, Text: id},
+				}}))
+			}
+			state := s.admin.buildMessageState()
+			state.CurrentMessageState = &CurrentMessageState{PublicKey: test.sender}
+			request := &protobuf.DeleteCommunityMemberMessages{
+				CommunityId: community.ID(), MemberId: s.owner.IdentityPublicKeyString(),
+			}
+			if !test.deleteAll {
+				request.Messages = []*protobuf.DeleteCommunityMemberMessage{{Id: "owner-message", ChatId: communityChat.ID}}
+			}
+			err := s.admin.HandleDeleteCommunityMemberMessages(context.Background(), state, request, nil)
+			expected := map[string]string{}
+			if test.rejected {
+				s.Require().ErrorIs(err, communities.ErrNotOwner)
+				s.Require().Empty(state.Response.DeletedMessages())
+			} else {
+				s.Require().NoError(err)
+				expected["owner-message"] = communityChat.ID
+				if test.deleteAll {
+					expected["owner-message2"] = communityChat.ID
+				}
+				s.Require().Equal(expected, state.Response.DeletedMessages())
+			}
+			s.Require().Empty(state.Response.Messages())
+			for _, id := range []string{"owner-message", "owner-message2"} {
+				_, err = s.admin.persistence.MessageByID(id)
+				if _, deleted := expected[id]; deleted {
+					s.Require().ErrorIs(err, common.ErrRecordNotFound)
+				} else {
+					s.Require().NoError(err)
+				}
+			}
+		})
+	}
+
+	for _, test := range []struct {
+		name, id, chatID string
+	}{
+		{"direct-message", "direct", directChat.ID},
+		{"other-community", "other", otherChat.ID},
+		{"forged-community-chat", "direct", communityChat.ID},
+		{"forged-chat", "valid", otherChat.ID},
+		{"wrong-author", "wrong-author", communityChat.ID},
+	} {
+		s.Run(test.name, func() {
+			state := s.bob.buildMessageState()
+			state.CurrentMessageState = &CurrentMessageState{PublicKey: community.ControlNode()}
+			request := &protobuf.DeleteCommunityMemberMessages{
+				CommunityId: community.ID(), MemberId: s.admin.IdentityPublicKeyString(),
+				Messages: []*protobuf.DeleteCommunityMemberMessage{
+					{Id: "valid", ChatId: communityChat.ID},
+					{Id: test.id, ChatId: test.chatID},
+				},
+			}
+			err := s.bob.HandleDeleteCommunityMemberMessages(context.Background(), state, request, nil)
+			s.Require().ErrorIs(err, ErrCommunityMessageScopeMismatch)
+			s.Require().Empty(state.Response.DeletedMessages())
+			s.Require().Empty(state.Response.Messages())
+			for _, id := range []string{"valid", "direct", "other", "wrong-author"} {
+				_, err = s.bob.persistence.MessageByID(id)
+				s.Require().NoError(err)
+			}
+		})
+	}
+
+	for _, test := range []struct {
+		name     string
+		member   string
+		messages []*protobuf.DeleteCommunityMemberMessage
+	}{
+		{name: "missing-member"},
+		{name: "invalid-member", member: "not-a-public-key"},
+		{name: "nil-message", member: s.admin.IdentityPublicKeyString(), messages: []*protobuf.DeleteCommunityMemberMessage{nil}},
+		{name: "missing-message-id", member: s.admin.IdentityPublicKeyString(), messages: []*protobuf.DeleteCommunityMemberMessage{{ChatId: communityChat.ID}}},
+		{name: "missing-chat-id", member: s.admin.IdentityPublicKeyString(), messages: []*protobuf.DeleteCommunityMemberMessage{{Id: "valid"}}},
+	} {
+		s.Run(test.name, func() {
+			state := s.bob.buildMessageState()
+			state.CurrentMessageState = &CurrentMessageState{PublicKey: community.ControlNode()}
+			err := s.bob.HandleDeleteCommunityMemberMessages(context.Background(), state, &protobuf.DeleteCommunityMemberMessages{
+				CommunityId: community.ID(), MemberId: test.member, Messages: test.messages,
+			}, nil)
+			s.Require().Error(err)
+			s.Require().Empty(state.Response.DeletedMessages())
+			_, err = s.bob.persistence.MessageByID("valid")
+			s.Require().NoError(err)
+		})
+	}
+
+	state := s.bob.buildMessageState()
+	state.CurrentMessageState = &CurrentMessageState{PublicKey: community.ControlNode()}
+	request := &protobuf.DeleteCommunityMemberMessages{
+		CommunityId: community.ID(), MemberId: s.admin.IdentityPublicKeyString(),
+		Messages: []*protobuf.DeleteCommunityMemberMessage{
+			{Id: "valid", ChatId: communityChat.ID},
+			{Id: "valid", ChatId: communityChat.ID},
+			{Id: "missing", ChatId: communityChat.ID},
+		},
+	}
+	s.Require().NoError(s.bob.HandleDeleteCommunityMemberMessages(context.Background(), state, request, nil))
+	s.Require().Equal(map[string]string{"valid": communityChat.ID}, state.Response.DeletedMessages())
+	state.Response = &MessengerResponse{}
+	s.Require().NoError(s.bob.HandleDeleteCommunityMemberMessages(context.Background(), state, request, nil))
+	s.Require().Empty(state.Response.DeletedMessages())
 }
 
 func (s *MessengerDeleteMessagesSuite) TestDeleteAllMemberMessage() {
@@ -324,4 +489,18 @@ func (s *MessengerDeleteMessagesSuite) TestDeleteAllMemberMessage() {
 	expectedMsgsToRemove = 1
 	s.checkAllMembersHasMemberMessages(s.admin.IdentityPublicKeyString(), expectedMsgsToRemove, communityID)
 	s.checkAllMembersHasMemberMessages(s.owner.IdentityPublicKeyString(), expectedMsgsToRemove, communityID)
+
+	deleteMessagesRequest.MemberPubKey = s.owner.IdentityPublicKeyString()
+	response, err = s.owner.DeleteCommunityMemberMessages(deleteMessagesRequest)
+	s.Require().NoError(err)
+	checkOwnerMessageDeleted := func(response *MessengerResponse) bool {
+		return len(response.DeletedMessages()) == 1
+	}
+	s.Require().True(checkOwnerMessageDeleted(response))
+	_, err = WaitOnMessengerResponse(s.bob, checkOwnerMessageDeleted, "owner messages were not deleted for bob")
+	s.Require().NoError(err)
+	_, err = WaitOnMessengerResponse(s.admin, checkOwnerMessageDeleted, "owner messages were not deleted for admin")
+	s.Require().NoError(err)
+	s.checkAllMembersHasMemberMessages(s.owner.IdentityPublicKeyString(), 0, communityID)
+	s.checkAllMembersHasMemberMessages(s.admin.IdentityPublicKeyString(), 1, communityID)
 }
