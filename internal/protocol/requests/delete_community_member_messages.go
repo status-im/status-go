@@ -41,6 +41,9 @@ func (d *DeleteCommunityMemberMessages) Validate() error {
 
 	if d.Messages != nil {
 		for _, message := range d.Messages {
+			if message == nil {
+				return ErrDeleteCommunityMemberMessagesInvalidData
+			}
 			if len(message.Id) == 0 {
 				return ErrDeleteCommunityMemberMessagesInvalidMsgID
 			}
