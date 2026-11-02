@@ -344,9 +344,23 @@ func (r *Processor) processSDSLayer(msg *messagingtypes.Message) error {
 		return nil
 	}
 
-	unwrappedPayload, err := r.stack.Reliability.UnwrapPayloadFromSDS(msg.EncryptionLayer.Payload)
+	unwrappedPayload, sdsMessageID, channelID, isSDS, err := r.stack.Reliability.UnwrapPayloadFromSDSWithMetadata(msg.EncryptionLayer.Payload)
 	if err != nil {
 		return err
+	}
+
+	if isSDS {
+		envelopeHashes := [][]byte{msg.TransportLayer.Hash}
+		if msg.SegmentationLayer.Segmented {
+			envelopeHashes = msg.SegmentationLayer.Hashes
+		}
+		if err := r.stack.Reliability.RecordSDSRetrievalHints(channelID, sdsMessageID, envelopeHashes); err != nil {
+			r.logger.Error("failed to persist received SDS retrieval hints",
+				zap.String("channelID", channelID),
+				zap.String("messageID", types.EncodeHex(sdsMessageID)),
+				zap.Error(err),
+			)
+		}
 	}
 
 	msg.SDSWrapped = !bytes.Equal(msg.EncryptionLayer.Payload, unwrappedPayload)
