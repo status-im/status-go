@@ -175,6 +175,7 @@ func newCore(waku wakutypes.Waku, params CoreParams, config *config) (*Core, err
 	)
 
 	stack.Reliability.SetRetrievalHintProvider(core.resolveSDSRetrievalHint)
+	stack.Reliability.SetSDSRetrievalHintPersistence(config.persistence.SDSEnvelopeHashesStorage())
 	stack.Reliability.SetMessageSentHandler(core.handleSDSMessageSent)
 
 	return core, nil
@@ -199,9 +200,21 @@ func buildSDSRetrievalHint(logger *zap.Logger, tracker sdsEnvelopeHashesTracker,
 		return nil
 	}
 
-	envelopeHashes := make([][]byte, len(hashes))
+	encodedHashes := make([][]byte, len(hashes))
 	for i, hash := range hashes {
-		envelopeHashes[i] = []byte(hash)
+		encodedHashes[i] = []byte(hash)
+	}
+	return buildSDSRetrievalHintFromHashes(logger, messageID, encodedHashes)
+}
+
+func buildSDSRetrievalHintFromHashes(logger *zap.Logger, messageID string, hashes [][]byte) []byte {
+	if len(hashes) == 0 {
+		return nil
+	}
+
+	envelopeHashes := make([][]byte, len(hashes))
+	for i := range hashes {
+		envelopeHashes[i] = hashes[i]
 	}
 
 	hint, err := proto.Marshal(&reliabilitypb.RetrievalHint{
@@ -219,7 +232,31 @@ func buildSDSRetrievalHint(logger *zap.Logger, tracker sdsEnvelopeHashesTracker,
 }
 
 func (c *Core) resolveSDSRetrievalHint(messageID string) []byte {
+	return c.resolveSDSRetrievalHintForChannel(c.stack.Reliability.CurrentSDSChannelID(), messageID)
+}
+
+func (c *Core) resolveSDSRetrievalHintForChannel(channelID, messageID string) []byte {
+	hashes, err := c.stack.Reliability.SDSEnvelopeHashes(channelID, messageID)
+	if err != nil {
+		c.logger.Debug("failed to load persisted SDS retrieval hints",
+			zap.String("channelID", channelID),
+			zap.String("messageID", messageID),
+			zap.Error(err),
+		)
+	} else if len(hashes) > 0 {
+		if hint := buildSDSRetrievalHintFromHashes(c.logger, messageID, hashesAsHex(hashes)); hint != nil {
+			return hint
+		}
+	}
 	return buildSDSRetrievalHint(c.logger, c.stack.Transport, messageID)
+}
+
+func hashesAsHex(hashes [][]byte) [][]byte {
+	encoded := make([][]byte, len(hashes))
+	for i, hash := range hashes {
+		encoded[i] = []byte(cryptotypes.EncodeHex(hash))
+	}
+	return encoded
 }
 
 func (c *Core) handleSDSMessageSent(sdsMessageID string) {
