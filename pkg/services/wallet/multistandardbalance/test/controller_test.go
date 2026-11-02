@@ -137,16 +137,15 @@ func TestController_RequestedRefreshSkipsTheDebounce(t *testing.T) {
 		defer controller.Stop()
 
 		// Start reads every balance at once
-		require.Eventually(t, func() bool {
-			return getFetchCalls() == 1
-		}, 2*debounceTime, 10*time.Millisecond, "Expected 1 fetch call after Start")
+		synctest.Wait()
+		require.Equal(t, 1, getFetchCalls(), "Expected 1 fetch call after Start")
 		resetFetchCalls()
 
 		// A requested refresh reads at once, without the debounce
-		controller.TriggerFullFetch()
-		controller.TriggerFullFetch()
-		controller.TriggerFullFetch()
-		synctest.Wait()
+		for range 3 {
+			controller.TriggerFullFetch()
+			synctest.Wait()
+		}
 		require.Equal(t, 3, getFetchCalls(), "Expected a fetch call for each TriggerFullFetch call")
 		resetFetchCalls()
 
