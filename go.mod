@@ -2,6 +2,11 @@ module github.com/status-im/status-go
 
 go 1.26.0
 
+// Go >= 1.24 enables Multipath TCP on Linux listeners by default. We don't rely on
+// MPTCP, and an MPTCP listener is the known exploitation vector for the kernel
+// handshake use-after-free (CVE-2026-98432), so opt out across all binaries.
+godebug multipathtcp=0
+
 tool (
 	github.com/kevinburke/go-bindata/v4/go-bindata
 	github.com/oNaiPs/go-generate-fast
