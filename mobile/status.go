@@ -570,9 +570,27 @@ func Logout() string {
 	return callWithResponse(logout)
 }
 
-// logout is equivalent to clearing whisper identities.
+// logout is equivalent to clearing whisper identities. The response carries the
+// signal epoch of the backend session that starts with the logout.
 func logout() string {
-	return makeJSONResponse(statusBackend.Logout())
+	signalEpoch, err := statusBackend.LogoutAndAdvanceSignalEpoch()
+	errString := ""
+	if err != nil {
+		logutils.ZapLogger().Error("logout failed", zap.Error(err))
+		errString = err.Error()
+	}
+	outBytes, _ := json.Marshal(LogoutResponse{Error: errString, SignalEpoch: signalEpoch})
+	return string(outBytes)
+}
+
+// SignalEpoch returns the epoch stamped on signals the backend sends from now on.
+func SignalEpoch() string {
+	return callWithResponse(signalEpoch)
+}
+
+func signalEpoch() string {
+	outBytes, _ := json.Marshal(SignalEpochResponse{SignalEpoch: signal.Epoch()})
+	return string(outBytes)
 }
 
 func DeleteMultiaccount(requestJSON string) string {
