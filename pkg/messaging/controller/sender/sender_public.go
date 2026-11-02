@@ -25,14 +25,13 @@ type publicSDSWrapper interface {
 	WrapPayloadForSDS(payload []byte, channelID string) (wrappedPayload []byte, messageID []byte, err error)
 }
 
-func wrapPayloadForPublicSDS(logger *zap.Logger, wrapper publicSDSWrapper, payload []byte, communityID string) ([]byte, []byte, error) {
-	if len(communityID) == 0 {
+func wrapPayloadForPublicSDS(logger *zap.Logger, wrapper publicSDSWrapper, payload []byte, channelID string) ([]byte, []byte, error) {
+	if len(channelID) == 0 {
 		logger.Warn("SDS wrap skipped for public community payload due to missing community ID")
 		return payload, nil, nil
 	}
 
-	sdsChannelID := reliability.BuildChannelID(communityID)
-	sdsWrappedPayload, sdsMessageIDBytes, err := wrapper.WrapPayloadForSDS(payload, sdsChannelID)
+	sdsWrappedPayload, sdsMessageIDBytes, err := wrapper.WrapPayloadForSDS(payload, channelID)
 	if err != nil {
 		if strings.Contains(err.Error(), "reMessageTooLarge") {
 			logger.Warn("SDS wrap skipped for oversized public community payload",
@@ -53,12 +52,26 @@ func wrapPublicParamsForSDS(logger *zap.Logger, wrapper publicSDSWrapper, params
 		return params.Payload, nil, nil
 	}
 
-	communityID := params.CommunityID
-	if len(communityID) == 0 && params.CommunityPublicKey != nil {
-		communityID = cryptotypes.EncodeHex(crypto.CompressPubkey(params.CommunityPublicKey))
+	return wrapPayloadForPublicSDS(logger, wrapper, params.Payload, publicSDSChannelID(params))
+}
+
+func publicSDSCommunityID(params messagingtypes.SendPublicParams) string {
+	if len(params.CommunityID) > 0 {
+		return params.CommunityID
+	}
+	if params.CommunityPublicKey != nil {
+		return cryptotypes.EncodeHex(crypto.CompressPubkey(params.CommunityPublicKey))
+	}
+	return ""
+}
+
+func publicSDSChannelID(params messagingtypes.SendPublicParams) string {
+	communityID := publicSDSCommunityID(params)
+	if communityID == "" {
+		return ""
 	}
 
-	return wrapPayloadForPublicSDS(logger, wrapper, params.Payload, communityID)
+	return reliability.BuildChannelID(communityID, params.ContentTopic)
 }
 
 func (s *Sender) SendPublic(ctx context.Context, params messagingtypes.SendPublicParams) error {
@@ -157,6 +170,14 @@ func (s *Sender) SendPublic(ctx context.Context, params messagingtypes.SendPubli
 
 	if len(sdsMessageIDBytes) > 0 {
 		s.stack.Transport.TrackWithSDSAlias([]byte(messageID), sdsMessageIDBytes, hashes, wakuMessages)
+		channelID := publicSDSChannelID(params)
+		if err := s.stack.Reliability.RecordSDSRetrievalHints(channelID, sdsMessageIDBytes, hashes); err != nil {
+			logger.Error("failed to persist sent SDS retrieval hints",
+				zap.String("channelID", channelID),
+				zap.String("sdsMessageID", cryptotypes.EncodeHex(sdsMessageIDBytes)),
+				zap.Error(err),
+			)
+		}
 	} else {
 		s.stack.Transport.Track(messageID, hashes, wakuMessages)
 	}

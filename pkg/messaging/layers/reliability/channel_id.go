@@ -1,8 +1,11 @@
 package reliability
 
-// BuildChannelID returns the SDS channel ID format for community public
-// messages. Keep the format centralized so sender/receiver code changes in one
-// place.
-func BuildChannelID(communityID string) string {
-	return communityID
+// BuildChannelID scopes community SDS history to a content topic. Messages
+// without a content topic retain the community-level channel.
+func BuildChannelID(communityID, contentTopic string) string {
+	if contentTopic == "" {
+		return communityID
+	}
+
+	return communityID + ":" + contentTopic
 }
