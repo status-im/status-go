@@ -22,3 +22,6 @@ class ConnectorService(Service):
         }
         response = self.rpc_request("sendTransactionAccepted", [params])
         return response
+
+    def get_permitted_dapps_list(self):
+        return self.rpc_request("getPermittedDAppsList") or []

@@ -1173,3 +1173,12 @@ class WakuextService(Service):
             params = [{}]
         response = self.rpc_request("enableLogosStorageCommunityHistoryArchiveProtocol", params)
         return response
+
+    def add_browser(self, browser: dict):
+        return self.rpc_request("addBrowser", [browser])
+
+    def get_browsers(self):
+        return self.rpc_request("getBrowsers") or []
+
+    def delete_browser(self, browser_id: str):
+        return self.rpc_request("deleteBrowser", [browser_id])
