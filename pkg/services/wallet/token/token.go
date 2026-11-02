@@ -407,12 +407,16 @@ func (tm *Manager) GetTokensByGroupKeys(groupKeys []string) ([]*tokentypes.Token
 	tokens := make([]*tokentypes.Token, 0)
 	keys := make(map[string]struct{}, len(groupKeys))
 	uniqueKeys := make([]string, 0, len(groupKeys))
+	hasTokenKey := false
 	for _, key := range groupKeys {
 		if _, ok := keys[key]; ok || key == "" {
 			continue
 		}
 		keys[key] = struct{}{}
 		uniqueKeys = append(uniqueKeys, key)
+		if !hasTokenKey {
+			_, _, hasTokenKey = types.ChainAndAddressFromTokenKey(key)
+		}
 	}
 	if len(uniqueKeys) == 0 {
 		return tokens, nil
@@ -437,6 +441,9 @@ func (tm *Manager) GetTokensByGroupKeys(groupKeys []string) ([]*tokentypes.Token
 		tokens = append(tokens, token)
 	}
 
+	if !hasTokenKey {
+		return tokens, nil
+	}
 	communityTokens, err := tm.GetCustoms(true)
 	if err != nil {
 		logutils.ZapLogger().Error("failed to get custom tokens", zap.Error(err))

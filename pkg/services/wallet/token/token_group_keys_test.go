@@ -133,7 +133,30 @@ func (s *TokensByGroupKeysSuite) TestCustomsFailureKeepsCatalogueTokens() {
 	_, err := s.tm.walletDB.Exec("DROP TABLE tokens")
 	s.Require().NoError(err)
 
-	got, err := s.tm.GetTokensByGroupKeys([]string{"usd-coin"})
+	got, err := s.tm.GetTokensByGroupKeys([]string{"usd-coin", types.TokenKey(walletcommon.EthereumMainnet, common.HexToAddress("0xbeef"))})
 	s.Require().NoError(err)
 	s.Require().Equal(map[string][]tokentypes.Token{"usd-coin": want}, groupTokens(got))
+}
+
+type countingImageBuilder struct{ calls int }
+
+func (b *countingImageBuilder) MakeCommunityTokenImagesURL(string, uint64, string) string {
+	b.calls++
+	return ""
+}
+
+func (s *TokensByGroupKeysSuite) TestOnlyTokenKeysReadCustoms() {
+	custom := s.addCustom(walletcommon.EthereumMainnet, "0xbeef")
+	builder := &countingImageBuilder{}
+	s.tm.communityTokenImageBuilder = builder
+
+	got, err := s.tm.GetTokensByGroupKeys([]string{"usd-coin", "not-a-group"})
+	s.Require().NoError(err)
+	s.Require().NotEmpty(got)
+	s.Require().Zero(builder.calls)
+
+	got, err = s.tm.GetTokensByGroupKeys([]string{"usd-coin", custom.Key()})
+	s.Require().NoError(err)
+	s.Require().Contains(groupTokens(got), custom.Key())
+	s.Require().NotZero(builder.calls)
 }
