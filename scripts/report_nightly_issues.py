@@ -89,6 +89,18 @@ class GitHub:
             return "created-assignment-incomplete", issue["html_url"]
         return "created", issue["html_url"]
 
+    def close_resolved(self, body):
+        closed = []
+        issues = [
+            issue for issue in self.pages("/issues?state=open&sort=created&direction=asc")
+            if "pull_request" not in issue and TITLE_PREFIX in issue.get("title", "")
+        ]
+        for issue in issues:
+            self.request("POST", f"/issues/{issue['number']}/comments", {"body": body})
+            self.request("PATCH", f"/issues/{issue['number']}", {"state": "closed", "state_reason": "completed"})
+            closed.append(issue["html_url"])
+        return closed
+
 
 def failure_details(failures):
     groups = {}
@@ -117,6 +129,7 @@ def report(report_dir, output_dir, environ=None, github_factory=GitHub):
         build_url = environ.get("BUILD_URL", "").rstrip("/") + "/"
         if build_url == "/":
             raise ValueError("BUILD_URL is required so every reported issue links to its Jenkins run")
+        mentions = " ".join(f"@{user}" for user in ASSIGNEES)
         reports, failures = failed_tests(report_dir)
         summary["failed_tests"] = failures
         if not reports:
@@ -124,10 +137,25 @@ def report(report_dir, output_dir, environ=None, github_factory=GitHub):
             return 0
         if not failures:
             summary["action"] = "no-failures"
+            if environ.get("NIGHTLY_BUILD_RESULT") != "SUCCESS":
+                return 0
+            token = environ.get("GH_TOKEN", "")
+            if not token:
+                raise ValueError("No GitHub token bound. Check the existing status-im-auto Jenkins username/token credential.")
+            closed = github_factory(token).close_resolved(
+                f"All tests passed in {build_url}, closing.\n\n"
+                f"status-go commit: `{environ.get('GIT_COMMIT', 'not recorded')}`\n\n"
+                f"Delivery image: `{environ.get('WAKU_IMAGE', 'not recorded')}`"
+            )
+            if closed:
+                summary.update(action="closed", issue_url=closed[-1], closed_issues=closed)
+                url_path.write_text(closed[-1] + "\n")
+                print(f"\nGITHUB ISSUE CLOSED: {', '.join(closed)}\n", flush=True)
             return 0
         marker = f"<!-- logos-delivery-nightly:run:{hashlib.sha256(build_url.encode()).hexdigest()} -->"
         title = f"{TITLE_PREFIX} {datetime.now(timezone.utc):%d.%m.%Y}"
         body = (
+            f"{mentions}\n\n"
             "This issue was created automatically based on failing automated tests from the Logos Delivery nightly job.\n\n"
             f"{marker}\n\nJenkins build: {build_url}\n\n"
             f"Test report: {build_url}testReport/\n\n"
