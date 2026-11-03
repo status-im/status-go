@@ -2009,6 +2009,11 @@ func (m *Messenger) HandleThreadMetadata(ctx context.Context, state *ReceivedMes
 		if err != nil {
 			return err
 		}
+		followed, err := m.persistence.AutoFollowOwnedThread(chat.ID, metadata.ThreadId, m.myHexIdentity())
+		if err != nil {
+			return err
+		}
+		replayed = replayed || followed
 	}
 	if err := m.addDeletedActivityCenterNotificationsToResponse(state.Response, deletedNotifications); err != nil {
 		return err

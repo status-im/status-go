@@ -462,6 +462,42 @@ message is created or changed.
 
 ---
 
+### wakuext_followThread / wakuext_unfollowThread
+
+Follow or unfollow a thread for the current account. Following is local to the
+account (synced to paired devices) and is never broadcast to other chat members.
+
+**Params:**
+```json
+[{
+  "chatId": "<chatId>",
+  "threadId": "<threadId>"
+}]
+```
+
+**Result:** standard messenger response with the updated `threads` entry.
+
+Every thread returned by the backend (`chatThreads`, `threads` in messenger
+responses/`messages.new`, thread summaries) includes a boolean `followed`, which
+clients use to decide whether the thread appears in the chat list. Archived
+threads may be followed; clients keep them hidden until they become active again.
+
+Follow rules:
+- Threads are not followed by default.
+- A thread is followed automatically when the current account created it or when
+  it was started on the current account's message, unless the account has already
+  explicitly followed/unfollowed it.
+- Sending a reply in a thread follows it again, even after an explicit unfollow.
+- Replies from other members never change the follow state.
+
+**Errors:**
+- `"follow-thread: chat ID and thread ID are required"` — identifier is missing.
+- `"threads feature is disabled"` — feature flag is off.
+- `"thread is deleted"` — deleted threads cannot be followed or unfollowed.
+- Missing chat/thread errors also apply.
+
+---
+
 ### wakuext_startThreadFromNewMessage
 
 Create a new thread and send its first message in one call. The backend first
