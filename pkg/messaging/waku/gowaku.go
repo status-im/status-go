@@ -96,6 +96,17 @@ const randomPeersKeepAliveInterval = 5 * time.Second
 const allPeersKeepAliveInterval = 5 * time.Minute
 const pausedModePeerExchangeMinPeers = 3
 
+const (
+	// Outgoing publications share one bucket across chat payloads and MVDS control traffic.
+	outgoingPublishRate  = 20
+	outgoingPublishBurst = 60
+
+	// LightPush admission is per sending peer, with headroom above outgoing pacing
+	// to accommodate bursts and variations in transport timing.
+	lightpushPeerRate  = 25
+	lightpushPeerBurst = 80
+)
+
 type SentEnvelope struct {
 	Envelope      *protocol.Envelope
 	PublishMethod publish.PublishMethod
@@ -349,7 +360,7 @@ func New(nodeKey *ecdsa.PrivateKey, cfg *Config, logger *zap.Logger, ts timesour
 			filter.WithMaxSubscribers(20),
 			filter.WithFullNodeRateLimiter(15, 20),
 		))
-		opts = append(opts, node.WithLightPush(lightpush.WithRateLimiter(5, 10)))
+		opts = append(opts, node.WithLightPush(lightpush.WithRateLimiter(lightpushPeerRate, lightpushPeerBurst)))
 	}
 
 	if cfg.EnablePeerExchangeServer {
@@ -1182,12 +1193,12 @@ func (w *Waku) startMessageSender() error {
 		sender.WithMessageSentEmitter(w.node.Host())
 	}
 
+	publishRate := rate.Limit(outgoingPublishRate)
 	if !w.cfg.UseThrottledPublish || testing.Testing() {
-		// To avoid delaying the tests, or for when we dont want to rate limit, we set up an infinite rate limiter,
-		// basically disabling the rate limit functionality
-		limiter := publish.NewDefaultRateLimiter(rate.Inf, 1)
-		sender.WithRateLimiting(limiter)
+		// Preserve unthrottled publishing when explicitly disabled or running tests.
+		publishRate = rate.Inf
 	}
+	sender.WithRateLimiting(publish.NewDefaultRateLimiter(publishRate, outgoingPublishBurst))
 
 	w.messageSender = sender
 	w.messageSender.Start()
