@@ -13,9 +13,11 @@ import (
 	multiaccountscommon "github.com/status-im/status-go/internal/db/multiaccounts/common"
 	"github.com/status-im/status-go/internal/db/multiaccounts/settings"
 	"github.com/status-im/status-go/internal/images"
+	"github.com/status-im/status-go/internal/protocol/common"
 	"github.com/status-im/status-go/internal/protocol/contacts"
 
 	"github.com/status-im/status-go/internal/protocol/protobuf"
+	"github.com/status-im/status-go/pkg/pubsub"
 )
 
 func TestGroupChatSuite(t *testing.T) {
@@ -133,6 +135,55 @@ func (s *MessengerGroupChatSuite) TestGroupChatCreation() {
 			s.verifyGroupChatCreated(member, testCase.expectedAddedMemberChatActive)
 		} else {
 			s.Require().EqualError(err, "group-chat: can't add members who are not mutual contacts")
+		}
+	}
+}
+
+func (s *MessengerGroupChatSuite) TestGroupChatMessageSendCountWith20Members() {
+	const memberCount = 20
+	const recipientCount = memberCount - 1
+
+	admin := s.m
+	members := make([]string, 0, recipientCount)
+	for range recipientCount {
+		memberKey, err := crypto.GenerateKey()
+		s.Require().NoError(err)
+		s.Require().NoError(makeMutualContact(admin, &memberKey.PublicKey))
+		members = append(members, crypto.PubkeyToHex(&memberKey.PublicKey))
+	}
+
+	groupChat := s.createGroupChat(admin, "20-member-group", members)
+	s.Require().Len(groupChat.Members, memberCount)
+
+	messageEvents, unsubscribe := pubsub.Subscribe[common.MessageEvent](admin.sender.Publisher(), 64)
+	defer unsubscribe()
+
+	message := buildTestMessage(*groupChat)
+	response, err := admin.SendChatMessage(context.Background(), message)
+	s.Require().NoError(err)
+	s.Require().Len(response.Messages(), 1)
+	messageID := response.Messages()[0].ID
+
+	scheduledCount := 0
+	scheduledRecipients := make(map[string]struct{}, recipientCount)
+	for {
+		select {
+		case event := <-messageEvents:
+			if event.ScheduledMessage == nil ||
+				event.ScheduledMessage.RawMessage == nil ||
+				event.ScheduledMessage.RawMessage.ID != messageID ||
+				event.ScheduledMessage.Recipient == nil {
+				continue
+			}
+			scheduledCount++
+			scheduledRecipients[crypto.PubkeyToHex(event.ScheduledMessage.Recipient)] = struct{}{}
+		default:
+			s.Require().Len(scheduledRecipients, recipientCount)
+			s.Require().Equal(recipientCount, scheduledCount)
+			for _, member := range members {
+				s.Require().Contains(scheduledRecipients, member)
+			}
+			return
 		}
 	}
 }

@@ -93,6 +93,8 @@ const maxRelayPeers = 300
 const randomPeersKeepAliveInterval = 5 * time.Second
 const allPeersKeepAliveInterval = 5 * time.Minute
 const pausedModePeerExchangeMinPeers = 3
+const lightpushServerRateLimit = 5
+const lightpushServerRateLimitBurst = 10
 
 type SentEnvelope struct {
 	Envelope      *protocol.Envelope
@@ -346,7 +348,7 @@ func New(nodeKey *ecdsa.PrivateKey, cfg *Config, logger *zap.Logger, ts timesour
 			filter.WithMaxSubscribers(20),
 			filter.WithFullNodeRateLimiter(15, 20),
 		))
-		opts = append(opts, node.WithLightPush(lightpush.WithRateLimiter(5, 10)))
+		opts = append(opts, node.WithLightPush(lightpush.WithRateLimiter(lightpushServerRateLimit, lightpushServerRateLimitBurst)))
 	}
 
 	if cfg.EnablePeerExchangeServer {
