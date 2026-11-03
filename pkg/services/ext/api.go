@@ -584,6 +584,14 @@ func (api *PublicAPI) EditThread(ctx context.Context, request *requests.EditThre
 	return api.service.messenger.EditThread(ctx, request)
 }
 
+func (api *PublicAPI) FollowThread(ctx context.Context, request *requests.FollowThread) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.FollowThread(ctx, request)
+}
+
+func (api *PublicAPI) UnfollowThread(ctx context.Context, request *requests.UnfollowThread) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.UnfollowThread(ctx, request)
+}
+
 func (api *PublicAPI) StartThreadFromNewMessage(ctx context.Context, request *requests.StartThreadFromNewMessage) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.StartThreadFromNewMessage(ctx, request)
 }
