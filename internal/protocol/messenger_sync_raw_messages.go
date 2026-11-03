@@ -104,6 +104,17 @@ func (m *Messenger) HandleSyncRawMessages(rawMessages []*protobuf.RawMessage) er
 				m.logger.Error("failed to HandleSyncThreadMessagesRead when HandleSyncRawMessages", zap.Error(err))
 				continue
 			}
+		case protobuf.ApplicationMetadataMessage_SYNC_THREAD_FOLLOW:
+			var message protobuf.SyncThreadFollow
+			err := proto.Unmarshal(rawMessage.GetPayload(), &message)
+			if err != nil {
+				return err
+			}
+			err = m.HandleSyncThreadFollow(ctx, state, &message, nil)
+			if err != nil {
+				m.logger.Error("failed to HandleSyncThreadFollow when HandleSyncRawMessages", zap.Error(err))
+				continue
+			}
 		case protobuf.ApplicationMetadataMessage_SYNC_CLEAR_HISTORY:
 			var message protobuf.SyncClearHistory
 			err := proto.Unmarshal(rawMessage.GetPayload(), &message)
