@@ -143,7 +143,7 @@ def report(report_dir, output_dir, environ=None, github_factory=GitHub):
             if not token:
                 raise ValueError("No GitHub token bound. Check the existing status-im-auto Jenkins username/token credential.")
             closed = github_factory(token).close_resolved(
-                f"{mentions}\n\nAll tests passed in {build_url}, closing.\n\n"
+                f"All tests passed in {build_url}, closing.\n\n"
                 f"status-go commit: `{environ.get('GIT_COMMIT', 'not recorded')}`\n\n"
                 f"Delivery image: `{environ.get('WAKU_IMAGE', 'not recorded')}`"
             )
