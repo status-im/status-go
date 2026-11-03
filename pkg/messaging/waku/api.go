@@ -37,7 +37,7 @@ import (
 // is expected to be already RFC26-encoded (see transport/rfc26.Encode); this
 // method just wraps it in a WakuMessage envelope and hands it to the publish
 // path. The `version` field is a wire label independent of that encoding, and
-// is advertised as 0. Returns the request ID, which is the wire hash's hex.
+// is advertised as 0. Returns the request ID of the send.
 //
 // ctx is accepted for symmetry with transport.MessagingAPI; the send queue
 // uses the waku instance's own lifecycle context.

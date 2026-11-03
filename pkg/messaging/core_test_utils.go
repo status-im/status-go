@@ -7,9 +7,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
 	"go.uber.org/zap"
 
+	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
+	"github.com/status-im/status-go/internal/panics"
 	"github.com/status-im/status-go/pkg/messaging/waku"
 	"github.com/status-im/status-go/pkg/messaging/waku/types"
 )
@@ -81,7 +82,9 @@ func (f *TestMessagingEnvironment) SimulateOffline() func() {
 // envelope events, i.e. transport.MessagingAPI — are promoted too.
 type testWakuWrapper struct {
 	*waku.Waku
+	postSubscriptionsMu     sync.Mutex
 	postSubscriptions       []chan *PostMessageSubscription
+	posts                   postOrder
 	connectionStateMu       sync.RWMutex
 	connectionStateOverride *types.ConnectionState
 
@@ -100,24 +103,96 @@ func (tw *testWakuWrapper) ConnectionState() types.ConnectionState {
 	return tw.Waku.ConnectionState()
 }
 
-// Send overrides the embedded Waku's Send to fan out post events to any
-// subscribers registered via SubscribePostEvents. Primary sends go through
-// Send (the transport encodes payloads via rfc26.Encode before publishing).
-// Msg is nil because Send takes raw bytes, not a NewMessage; the only
-// consumer (MessagesOrderController) reads ID.
+// Send overrides the embedded Waku's Send to record the order of sends for
+// SubscribePostEvents.
 func (tw *testWakuWrapper) Send(ctx context.Context, pubsubTopic, contentTopic string, payload []byte, ephemeral bool, priority *int) (types.RequestID, error) {
 	id, err := tw.Waku.Send(ctx, pubsubTopic, contentTopic, payload, ephemeral, priority)
 	if err != nil {
 		return "", err
 	}
-	for _, s := range tw.postSubscriptions {
-		select {
-		case s <- &PostMessageSubscription{ID: common.FromHex(string(id))}:
-		default:
-			// subscription channel full
+	tw.publishPosts(tw.posts.sent(id))
+	return id, nil
+}
+
+// watchSends publishes the wire hash of each send to the post subscribers once
+// its outcome arrives, in the order of the sends. An expired send is still
+// delivered locally, so it keeps its place when its event has the hash.
+func (tw *testWakuWrapper) watchSends() {
+	events := make(chan types.EnvelopeEvent, 100)
+	tw.Waku.SubscribeEnvelopeEvents(events)
+	go func() {
+		defer panics.LogOnPanic()
+		for event := range events {
+			if event.Event != types.EventEnvelopeSent && event.Event != types.EventEnvelopeExpired {
+				continue
+			}
+			var hash []byte
+			if event.Hash != (cryptotypes.Hash{}) {
+				hash = event.Hash.Bytes()
+			}
+			tw.publishPosts(tw.posts.resolved(event.RequestID, hash))
+		}
+	}()
+}
+
+func (tw *testWakuWrapper) publishPosts(hashes [][]byte) {
+	tw.postSubscriptionsMu.Lock()
+	defer tw.postSubscriptionsMu.Unlock()
+	for _, hash := range hashes {
+		for _, s := range tw.postSubscriptions {
+			select {
+			case s <- &PostMessageSubscription{ID: hash}:
+			default:
+				// subscription channel full
+			}
 		}
 	}
-	return id, nil
+}
+
+// postOrder holds back the outcome of a send until the earlier sends have one.
+type postOrder struct {
+	mu       sync.Mutex
+	pending  []types.RequestID
+	outcomes map[types.RequestID][]byte
+}
+
+// sent records a send and returns the wire hashes now in order: its outcome
+// may arrive before Send returns.
+func (o *postOrder) sent(id types.RequestID) [][]byte {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	o.pending = append(o.pending, id)
+	return o.flush()
+}
+
+// resolved records the wire hash of a send, nil when unknown, and returns the
+// wire hashes now in order.
+func (o *postOrder) resolved(id types.RequestID, hash []byte) [][]byte {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	if o.outcomes == nil {
+		o.outcomes = make(map[types.RequestID][]byte)
+	}
+	o.outcomes[id] = hash
+	return o.flush()
+}
+
+// flush returns the wire hashes of the sends at the head of the order whose
+// outcome is known. Not thread-safe: the caller holds mu.
+func (o *postOrder) flush() [][]byte {
+	var hashes [][]byte
+	for len(o.pending) > 0 {
+		hash, ok := o.outcomes[o.pending[0]]
+		if !ok {
+			break
+		}
+		delete(o.outcomes, o.pending[0])
+		o.pending = o.pending[1:]
+		if hash != nil {
+			hashes = append(hashes, hash)
+		}
+	}
+	return hashes
 }
 
 func (tw *testWakuWrapper) StoreQuery(
@@ -135,6 +210,8 @@ func (tw *testWakuWrapper) StoreQuery(
 
 func (tw *testWakuWrapper) SubscribePostEvents() chan *PostMessageSubscription {
 	subscription := make(chan *PostMessageSubscription, 100)
+	tw.postSubscriptionsMu.Lock()
+	defer tw.postSubscriptionsMu.Unlock()
 	tw.postSubscriptions = append(tw.postSubscriptions, subscription)
 	return subscription
 }
@@ -174,7 +251,9 @@ func newTestWakuWrapper() (*testWakuWrapper, error) {
 		return nil, err
 	}
 
-	return &testWakuWrapper{Waku: w}, nil
+	tw := &testWakuWrapper{Waku: w}
+	tw.watchSends()
+	return tw, nil
 }
 
 type TestUtils struct {

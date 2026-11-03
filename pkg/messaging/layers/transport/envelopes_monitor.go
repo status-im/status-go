@@ -115,11 +115,11 @@ func (m *EnvelopesMonitor) AddSDSAlias(applicationMessageID, sdsMessageID []byte
 
 	applicationKey := cryptotypes.HexBytes(applicationMessageID).String()
 	sdsKey := cryptotypes.HexBytes(sdsMessageID).String()
-	hashes, ok := m.messageRequestIDs[applicationKey]
+	requestIDs, ok := m.messageRequestIDs[applicationKey]
 	if !ok {
 		return
 	}
-	m.messageRequestIDs[sdsKey] = hashes
+	m.messageRequestIDs[sdsKey] = requestIDs
 	m.sdsApplicationMessageIDs[sdsKey] = applicationKey
 }
 
