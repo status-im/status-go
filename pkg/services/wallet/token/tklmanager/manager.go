@@ -61,6 +61,9 @@ var _ types.Catalogue = (*Manager)(nil)
 // testHookBeforeBatchQuery runs between a batch lookup's alias read and its query.
 var testHookBeforeBatchQuery func()
 
+// testHookBetweenGroupQueries runs between a group lookup's cross-chain query and its key query.
+var testHookBetweenGroupQueries func()
+
 func New(config tkl.Config, load Loader, options ...RefreshOptions) (*Manager, error) {
 	if load == nil {
 		return nil, errors.New("bootstrap loader is required")
@@ -448,6 +451,55 @@ func (m *Manager) GetTokensByKeys(keys []string) ([]*types.Token, error) {
 		tokens = make([]*types.Token, 0)
 	}
 	return tokens, nil
+}
+
+// GetTokensByCrossChainIDsAndKeys returns the catalogue tokens whose
+// cross-chain id is one of ids, in UniqueTokens order, followed by the tokens
+// of the ids that are token keys, in request order. Both are read at one
+// catalogue revision. Keys are parsed like ChainAndAddressFromTokenKey.
+func (m *Manager) GetTokensByCrossChainIDsAndKeys(ids []string) []*types.Token {
+	tokens := make([]*types.Token, 0)
+	h := m.readHandle()
+	if h == nil || len(ids) == 0 {
+		return tokens
+	}
+	buf := packedTokens.Get().(*[]tkl.ChainToken)
+	defer packedTokens.Put(buf)
+	var pairs []tkl.Identity
+	var page tkl.Page[tkl.Token]
+	for {
+		packed, revision, err := h.GetByCrossChainIDsPacked(ids, *buf)
+		*buf = packed
+		if err != nil {
+			return tokens
+		}
+		pairs = slices.Grow(pairs[:0], len(packed)+len(ids))
+		for _, t := range packed {
+			pairs = append(pairs, tkl.Identity{ChainID: t.ChainID, Address: hexAddress(common.Address(t.Address))})
+		}
+		for _, id := range ids {
+			if chain, address, ok := types.ChainAndAddressFromTokenKey(strings.ToLower(id)); ok {
+				pairs = append(pairs, tkl.Identity{ChainID: chain, Address: hexAddress(address)})
+			}
+		}
+		if testHookBetweenGroupQueries != nil {
+			testHookBetweenGroupQueries()
+		}
+		if len(pairs) == 0 {
+			return tokens
+		}
+		if page, err = h.GetByChainAddresses(pairs); err != nil {
+			return tokens
+		}
+		if page.Revision == revision {
+			break
+		}
+	}
+	tokens = slices.Grow(tokens, len(page.Items))
+	for _, t := range page.Items {
+		tokens = append(tokens, convertToken(t))
+	}
+	return tokens
 }
 
 func (m *Manager) TokenLists() []*types.TokenList {
