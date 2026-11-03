@@ -2361,8 +2361,6 @@ github.com/status-im/go-sqlcipher/v4 v4.5.5 h1:Sq+785b/GEI3jJTHr9sXOQ8gTsogzE+/L
 github.com/status-im/go-sqlcipher/v4 v4.5.5/go.mod h1:mF2UmIpBnzFeBdu/ypTDb/LdbS0nk0dfSN1WUsWTjMA=
 github.com/status-im/go-wallet-sdk v0.0.0-20261027195616-2b8382a7fa11 h1:edBVnF/qRZ1d4u1SxR5X4giZYHbw0lqeYQ4KvrhhvQA=
 github.com/status-im/go-wallet-sdk v0.0.0-20261027195616-2b8382a7fa11/go.mod h1:E4E1D0mflc2pcjsutZpvMYSjI+a231uBHQf8UjdT1Ug=
-github.com/status-im/gomoji v1.1.3-0.20220213022530-e5ac4a8732d4 h1:CtobZoiNdHpx+xurFxnuJ1xsGm3oKMfcZkB3vmomJmA=
-github.com/status-im/gomoji v1.1.3-0.20220213022530-e5ac4a8732d4/go.mod h1:hmpnZzkzSZJbFYWAUkrPV8I36x7mdYiPhPqnALP4fKA=
 github.com/status-im/goroutine-defer-guard v0.3.1 h1:cZhcJ3gO6OgMYBOfEaAAUZaZgKZeSzMlGNEjMyejuRo=
 github.com/status-im/goroutine-defer-guard v0.3.1/go.mod h1:HwUfqi1wF8tg8OEEEYKlJuJwsgNNlu5Kq5SzE1DNe3k=
 github.com/status-im/markdown v0.0.0-20250825083641-55c1df9bc05d h1:0jQiaymp0t7XwC45c08/cYpjFDxFSMTE6VznZ03Jktg=
