@@ -100,5 +100,6 @@ message ApplicationMetadataMessage {
     SYNC_THREAD_MESSAGES_READ = 92;
     THREAD_METADATA = 93;
     DELETE_THREAD = 94;
+    SYNC_THREAD_FOLLOW = 95;
   }
 }

@@ -74,6 +74,10 @@ type Thread struct {
 	LastActivityAt uint64 `json:"lastActivityAt"`
 	// Archived is derived from LastActivityAt and the thread inactivity TTL.
 	Archived bool `json:"archived"`
+	// Followed threads are shown in the chat list; others only in the message view.
+	Followed bool `json:"followed"`
+	// FollowedClock is 0 until the user explicitly follows or unfollows.
+	FollowedClock uint64 `json:"-"`
 }
 
 const defaultThreadParticipantPreviewLimit = 6
@@ -1336,7 +1340,7 @@ func (db sqlitePersistence) ThreadsInactiveBetween(from, to uint64) ([]threadIde
 }
 
 func (db sqlitePersistence) AllThreadsForBackup() ([]*protobuf.BackedUpThread, error) {
-	rows, err := db.db.Query(`SELECT thread_id, chat_id, parent_message_id, name, read_messages_at_clock_value, creator_id, metadata_clock, creator_pending, deleted, deleted_clock, deleted_by, deleted_at, last_activity_at
+	rows, err := db.db.Query(`SELECT thread_id, chat_id, parent_message_id, name, read_messages_at_clock_value, creator_id, metadata_clock, creator_pending, deleted, deleted_clock, deleted_by, deleted_at, last_activity_at, followed, followed_clock
 		FROM threads ORDER BY chat_id, thread_id`)
 	if err != nil {
 		return nil, err
@@ -1346,7 +1350,7 @@ func (db sqlitePersistence) AllThreadsForBackup() ([]*protobuf.BackedUpThread, e
 	threads := make([]*protobuf.BackedUpThread, 0)
 	for rows.Next() {
 		thread := &protobuf.BackedUpThread{}
-		if err := rows.Scan(&thread.ThreadId, &thread.ChatId, &thread.ParentMessageId, &thread.Name, &thread.ReadMessagesAtClockValue, &thread.CreatorId, &thread.MetadataClock, &thread.CreatorPending, &thread.Deleted, &thread.DeletedClock, &thread.DeletedBy, &thread.DeletedAt, &thread.LastActivityAt); err != nil {
+		if err := rows.Scan(&thread.ThreadId, &thread.ChatId, &thread.ParentMessageId, &thread.Name, &thread.ReadMessagesAtClockValue, &thread.CreatorId, &thread.MetadataClock, &thread.CreatorPending, &thread.Deleted, &thread.DeletedClock, &thread.DeletedBy, &thread.DeletedAt, &thread.LastActivityAt, &thread.Followed, &thread.FollowedClock); err != nil {
 			return nil, err
 		}
 		threads = append(threads, thread)
@@ -1429,6 +1433,11 @@ func (db sqlitePersistence) SaveBackedUpThreads(threads []*protobuf.BackedUpThre
 				return err
 			}
 		}
+		if thread.Followed || thread.FollowedClock > 0 {
+			if err = db.mergeThreadFollowed(tx, thread.ChatId, thread.ThreadId, thread.Followed, thread.FollowedClock); err != nil {
+				return err
+			}
+		}
 		if thread.Deleted {
 			if err = db.softDeleteThread(tx, thread.ChatId, thread.ThreadId, thread.DeletedClock, thread.DeletedBy, thread.DeletedAt); err != nil {
 				return err
@@ -1454,6 +1463,7 @@ const threadMetadataSelect = `
 			threads.deleted, threads.deleted_clock, threads.deleted_by, threads.deleted_at,
 			threads.read_messages_at_clock_value,
 			threads.last_activity_at,
+			threads.followed, threads.followed_clock,
 			(SELECT COUNT(1) FROM user_messages WHERE local_chat_id = threads.chat_id AND thread_id = threads.thread_id AND seen = 0 AND NOT(hide) AND NOT(deleted) AND NOT(deleted_for_me)),
 			(SELECT COUNT(1) FROM user_messages WHERE local_chat_id = threads.chat_id AND thread_id = threads.thread_id AND seen = 0 AND NOT(hide) AND NOT(deleted) AND NOT(deleted_for_me) AND (mentioned OR replied OR chats.type = ?))
 		FROM threads
@@ -1472,6 +1482,7 @@ func threadMetadataScanTargets(thread *Thread) []interface{} {
 		&thread.Deleted, &thread.DeletedClock, &thread.DeletedBy, &thread.DeletedAt,
 		&thread.ReadMessagesAtClockValue,
 		&thread.LastActivityAt,
+		&thread.Followed, &thread.FollowedClock,
 		&thread.UnviewedMessagesCount,
 		&thread.UnviewedMentionsCount,
 	}
@@ -1579,6 +1590,7 @@ func (db sqlitePersistence) ThreadsByChatID(chatID string) ([]*Thread, error) {
 			t.deleted, t.deleted_clock, t.deleted_by, t.deleted_at,
 			t.read_messages_at_clock_value,
 			t.last_activity_at,
+			t.followed, t.followed_clock,
 			COUNT(CASE WHEN um.seen = 0 AND NOT(um.hide) AND NOT(um.deleted) AND NOT(um.deleted_for_me) THEN 1 END),
 			COUNT(CASE WHEN um.seen = 0 AND NOT(um.hide) AND NOT(um.deleted) AND NOT(um.deleted_for_me) AND (um.mentioned OR um.replied OR chats.type = ?) THEN 1 END)
 		FROM threads t
@@ -1590,7 +1602,7 @@ func (db sqlitePersistence) ThreadsByChatID(chatID string) ([]*Thread, error) {
 			ON um.local_chat_id = t.chat_id
 			AND um.thread_id = t.thread_id
 		WHERE t.chat_id = ?
-		GROUP BY t.thread_id, t.chat_id, t.parent_message_id, t.name, t.creator_id, t.read_messages_at_clock_value, t.last_activity_at, chats.type
+		GROUP BY t.thread_id, t.chat_id, t.parent_message_id, t.name, t.creator_id, t.read_messages_at_clock_value, t.last_activity_at, t.followed, t.followed_clock, chats.type
 		ORDER BY COALESCE(parent.clock_value, 0) DESC, t.thread_id DESC`, ChatTypeOneToOne, chatID)
 	if err != nil {
 		return nil, err
@@ -1600,7 +1612,7 @@ func (db sqlitePersistence) ThreadsByChatID(chatID string) ([]*Thread, error) {
 	threads := make([]*Thread, 0)
 	for rows.Next() {
 		thread := &Thread{}
-		err = rows.Scan(&thread.ThreadID, &thread.ChatID, &thread.ParentMessageID, &thread.Name, &thread.CreatorID, &thread.Deleted, &thread.DeletedClock, &thread.DeletedBy, &thread.DeletedAt, &thread.ReadMessagesAtClockValue, &thread.LastActivityAt, &thread.UnviewedMessagesCount, &thread.UnviewedMentionsCount)
+		err = rows.Scan(&thread.ThreadID, &thread.ChatID, &thread.ParentMessageID, &thread.Name, &thread.CreatorID, &thread.Deleted, &thread.DeletedClock, &thread.DeletedBy, &thread.DeletedAt, &thread.ReadMessagesAtClockValue, &thread.LastActivityAt, &thread.Followed, &thread.FollowedClock, &thread.UnviewedMessagesCount, &thread.UnviewedMentionsCount)
 		if err != nil {
 			return nil, err
 		}
@@ -1722,6 +1734,7 @@ func (db sqlitePersistence) threadsByParentMessageIDs(queryer threadSummaryQueri
 			threads.creator_id,
 			threads.last_activity_at,
 			threads.deleted, threads.deleted_clock, threads.deleted_by, threads.deleted_at,
+			threads.followed, threads.followed_clock,
 			(SELECT COUNT(1) FROM user_messages WHERE local_chat_id = threads.chat_id AND thread_id = threads.thread_id AND seen = 0 AND NOT(hide) AND NOT(deleted) AND NOT(deleted_for_me)),
 			(SELECT COUNT(1) FROM user_messages WHERE local_chat_id = threads.chat_id AND thread_id = threads.thread_id AND seen = 0 AND NOT(hide) AND NOT(deleted) AND NOT(deleted_for_me) AND (mentioned OR replied OR chats.type = ?))
 		FROM threads
@@ -1734,7 +1747,7 @@ func (db sqlitePersistence) threadsByParentMessageIDs(queryer threadSummaryQueri
 	}
 	for rows.Next() {
 		thread := &Thread{}
-		if err := rows.Scan(&thread.ThreadID, &thread.ChatID, &thread.ParentMessageID, &thread.Name, &thread.CreatorID, &thread.LastActivityAt, &thread.Deleted, &thread.DeletedClock, &thread.DeletedBy, &thread.DeletedAt, &thread.UnviewedMessagesCount, &thread.UnviewedMentionsCount); err != nil {
+		if err := rows.Scan(&thread.ThreadID, &thread.ChatID, &thread.ParentMessageID, &thread.Name, &thread.CreatorID, &thread.LastActivityAt, &thread.Deleted, &thread.DeletedClock, &thread.DeletedBy, &thread.DeletedAt, &thread.Followed, &thread.FollowedClock, &thread.UnviewedMessagesCount, &thread.UnviewedMentionsCount); err != nil {
 			_ = rows.Close()
 			return nil, err
 		}

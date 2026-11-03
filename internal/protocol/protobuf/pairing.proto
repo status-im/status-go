@@ -209,6 +209,13 @@ message SyncThreadMessagesRead {
   string thread_id = 3;
 }
 
+message SyncThreadFollow {
+  uint64 clock = 1;
+  string chat_id = 2;
+  string thread_id = 3;
+  bool followed = 4;
+}
+
 message SyncActivityCenterRead {
   uint64 clock = 1;
   repeated bytes ids = 2;
@@ -520,6 +527,8 @@ message BackedUpThread {
   uint64 deleted_clock = 11;
   string deleted_by = 12;
   uint64 deleted_at = 13;
+  bool followed = 14;
+  uint64 followed_clock = 15;
 }
 
 message BackedUpMessageBatch {

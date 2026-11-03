@@ -208,6 +208,9 @@ func (m *Messenger) CreateThread(chatID string, parentMessageID string) (*Messen
 	if err := m.persistence.SetThreadCreator(parentMessageID, chatID, contacts.ContactIDFromPublicKey(&m.identity.PublicKey)); err != nil {
 		return nil, err
 	}
+	if _, err := m.persistence.AutoFollowOwnedThread(chatID, parentMessageID, contacts.ContactIDFromPublicKey(&m.identity.PublicKey)); err != nil {
+		return nil, err
+	}
 	if err := m.dispatchThreadCreationMetadata(context.Background(), chat, parentMessageID, name); err != nil {
 		return nil, err
 	}
