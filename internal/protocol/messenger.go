@@ -2887,11 +2887,6 @@ func (m *Messenger) RetrieveAll() (*MessengerResponse, error) {
 	return m.handleRetrievedMessages(chatWithMessages, true, false)
 }
 
-// retrieveMessagesDebounceInterval coalesces bursts of matched envelopes
-// (e.g. storenode history fetch) into a single ProcessAllMessages call,
-// preserving the same ~1s latency as the previous polling loop.
-const retrieveMessagesDebounceInterval = time.Second
-
 func (m *Messenger) StartRetrieveMessagesLoop(_ time.Duration, cancel <-chan struct{}) {
 	m.shutdownWaitGroup.Add(1)
 	go func() {
@@ -2901,32 +2896,7 @@ func (m *Messenger) StartRetrieveMessagesLoop(_ time.Duration, cancel <-chan str
 		matchedCh := m.messaging.SubscribeFilterMatched()
 		defer m.messaging.UnsubscribeFilterMatched(matchedCh)
 
-		var debounceTimer *time.Timer
-		var debounceCh <-chan time.Time
-
-		for {
-			select {
-			case <-matchedCh:
-				// Reset the debounce window on every new match to coalesce bursts.
-				if debounceTimer != nil && !debounceTimer.Stop() {
-					select {
-					case <-debounceTimer.C:
-					default:
-					}
-				}
-				debounceTimer = time.NewTimer(retrieveMessagesDebounceInterval)
-				debounceCh = debounceTimer.C
-
-			case <-debounceCh:
-				debounceCh = nil
-				m.ProcessAllMessages()
-
-			case <-cancel:
-				return
-			case <-m.quit:
-				return
-			}
-		}
+		runRetrieveMessagesLoop(matchedCh, cancel, m.quit, m.ProcessAllMessages)
 	}()
 }
 
