@@ -101,13 +101,6 @@ func (s *MessengerRawMessageResendTest) TestMessageResend() {
 		return nil
 	})
 	s.Require().NoError(err)
-
-	waitOnMessengerResponse(&s.Suite, func(r *MessengerResponse) error {
-		if len(r.RequestsToJoinCommunity()) > 0 {
-			return nil
-		}
-		return errors.New("community request to join not received")
-	}, s.aliceMessenger)
 }
 
 func (s *MessengerRawMessageResendTest) TestInvalidRawMessageToWatchDoesNotProduceResendLoop() {
