@@ -272,6 +272,7 @@ func (s *LiFiProcessor) BuildTransactionV2(sendArgs *wallettypes.SendTxArgs, las
 	if err != nil {
 		return nil, 0, createLiFiErrorResponse(err)
 	}
+	gas = gasForQuotedTx(sendArgs.Gas, gas)
 
 	gasPrice, err := hexutil.DecodeBig(txReq.GasPrice)
 	if err != nil {

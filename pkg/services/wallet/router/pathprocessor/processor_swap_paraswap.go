@@ -303,6 +303,7 @@ func (s *SwapParaswapProcessor) BuildTransactionV2(sendArgs *wallettypes.SendTxA
 	if err != nil {
 		return nil, 0, createSwapParaswapErrorResponse(err)
 	}
+	gas = gasForQuotedTx(sendArgs.Gas, gas)
 
 	gasPrice, ok := new(big.Int).SetString(tx.GasPrice, 10)
 	if !ok {
