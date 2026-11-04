@@ -5,6 +5,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/stretchr/testify/require"
+
+	pathprocessorcommon "github.com/status-im/status-go/pkg/services/wallet/router/pathprocessor/common"
 )
 
 func TestGasForQuotedTx(t *testing.T) {
@@ -27,4 +29,16 @@ func TestGasForQuotedTx(t *testing.T) {
 			require.Equal(t, tc.expected, gasForQuotedTx(tc.routerGas, tc.quotedGas))
 		})
 	}
+}
+
+func TestBufferGasEstimate(t *testing.T) {
+	require.Equal(t, uint64(22050), BufferGasEstimate(21000, pathprocessorcommon.IncreaseEstimatedGasFactor))
+	// truncated, so the raw estimate is ceil(buffered / factor)
+	require.Equal(t, uint64(217760), BufferGasEstimate(207391, pathprocessorcommon.IncreaseEstimatedGasFactor))
+	require.Equal(t, uint64(240001), BufferGasEstimate(200001, pathprocessorcommon.IncreaseEstimatedGasFactorForBridge))
+}
+
+func TestGasBufferFactorDefaultsToIncreaseEstimatedGasFactor(t *testing.T) {
+	require.Equal(t, pathprocessorcommon.IncreaseEstimatedGasFactor, GasBufferFactor(&TransferProcessor{}, ProcessorInputParams{}))
+	require.Equal(t, pathprocessorcommon.IncreaseEstimatedGasFactorForBridge, GasBufferFactor(&HopBridgeProcessor{}, ProcessorInputParams{}))
 }

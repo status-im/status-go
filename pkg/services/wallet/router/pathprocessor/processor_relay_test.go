@@ -427,7 +427,7 @@ func TestRelayEstimateGas(t *testing.T) {
 
 		estimation, err := processor.EstimateGas(p, []byte{0xab, 0xcd})
 		require.NoError(t, err)
-		require.Equal(t, uint64(float64(80000)*pathProcessorCommon.IncreaseEstimatedGasFactor), estimation)
+		require.Equal(t, uint64(80000), estimation)
 	})
 
 	t.Run("bridge uses the bridge gas factor", func(t *testing.T) {
@@ -445,7 +445,9 @@ func TestRelayEstimateGas(t *testing.T) {
 
 		estimation, err := processor.EstimateGas(p, []byte{})
 		require.NoError(t, err)
-		require.Equal(t, uint64(float64(21000)*pathProcessorCommon.IncreaseEstimatedGasFactorForBridge), estimation)
+		require.Equal(t, uint64(21000), estimation)
+		// bridge buffer
+		require.Equal(t, pathProcessorCommon.IncreaseEstimatedGasFactorForBridge, GasBufferFactor(processor, p))
 	})
 
 	t.Run("erc20 estimation error is propagated; the router asks for the gas before approval instead", func(t *testing.T) {

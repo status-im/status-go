@@ -98,6 +98,7 @@ func (r *Router) requireApproval(ctx context.Context, sendType sendtype.SendType
 	return true, params.AmountIn, nil
 }
 
+// estimateGasForApproval returns the raw node estimate; see bufferApprovalGas.
 func (r *Router) estimateGasForApproval(params pathprocessor.ProcessorInputParams, input []byte) (uint64, error) {
 	ethClient, err := r.rpcClient.EthClient(params.FromChain.ChainID)
 	if err != nil {
@@ -121,21 +122,16 @@ func (r *Router) estimateGasForApproval(params pathprocessor.ProcessorInputParam
 			zap.Error(err))
 		return 0, err
 	}
-	bufferedGas := bufferApprovalGas(gas)
 	r.logger.Debug("estimateGasForApproval: gas estimated",
 		zap.Uint64("chainId", params.FromChain.ChainID),
 		zap.String("token", params.FromToken.Symbol),
-		zap.Uint64("gas", gas),
-		zap.Uint64("bufferedGas", bufferedGas))
-	return bufferedGas, nil
+		zap.Uint64("gas", gas))
+	return gas, nil
 }
 
-// bufferApprovalGas adds the same headroom the path processors add to their own estimates.
-// A first approval of a spender writes a fresh allowance slot, which is state gas after
-// Glamsterdam (EIP-8037); signing exactly the node estimate leaves no room for that cost to move
-// between estimation and inclusion.
+// bufferApprovalGas applies the default buffer, like for the main tx.
 func bufferApprovalGas(estimation uint64) uint64 {
-	return uint64(float64(estimation) * pathProcessorCommon.IncreaseEstimatedGasFactor)
+	return pathprocessor.BufferGasEstimate(estimation, pathProcessorCommon.IncreaseEstimatedGasFactor)
 }
 
 func (r *Router) calculateL1Fee(chainID uint64, data []byte) (*big.Int, error) {

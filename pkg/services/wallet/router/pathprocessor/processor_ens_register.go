@@ -124,9 +124,7 @@ func (s *ENSRegisterProcessor) EstimateGas(params ProcessorInputParams, input []
 		return 0, createENSRegisterProcessorErrorResponse(err)
 	}
 
-	increasedEstimation := float64(estimation) * pathProcessorCommon.IncreaseEstimatedGasFactor
-
-	return uint64(increasedEstimation), nil
+	return estimation, nil
 }
 
 func (s *ENSRegisterProcessor) BuildTransactionV2(sendArgs *wallettypes.SendTxArgs, lastUsedNonce int64) (*ethTypes.Transaction, uint64, error) {

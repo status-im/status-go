@@ -33,6 +33,8 @@ type Path struct {
 	SuggestedTxGasAmount            uint64               // Suggested gas amount for the transaction
 	SuggestedApprovalTxNonce        *hexutil.Uint64      // Suggested nonce for the approval transaction
 	SuggestedApprovalGasAmount      uint64               // Suggested gas amount for the approval transaction
+	EstimatedTxGasAmount            uint64               // Node's gas estimate for the transaction, before the buffer added to SuggestedTxGasAmount; 0 when the suggestion is not a node estimate (e.g. a stand-in before the approval is mined)
+	EstimatedApprovalGasAmount      uint64               // Node's gas estimate for the approval transaction, before the buffer added to SuggestedApprovalGasAmount
 	CurrentBaseFee                  *hexutil.Big         // Current network base fee (in base unit of the chain eg. WEI for ETH or BNB)
 	UsedContractAddress             *common.Address      // Address of the contract that will be used for the transaction
 
@@ -116,6 +118,8 @@ func (p *Path) Copy() *Path {
 		Tool:                       p.Tool,
 		SuggestedTxGasAmount:       p.SuggestedTxGasAmount,
 		SuggestedApprovalGasAmount: p.SuggestedApprovalGasAmount,
+		EstimatedTxGasAmount:       p.EstimatedTxGasAmount,
+		EstimatedApprovalGasAmount: p.EstimatedApprovalGasAmount,
 		TxGasFeeMode:               p.TxGasFeeMode,
 		TxGasAmount:                p.TxGasAmount,
 		TxEstimatedTime:            p.TxEstimatedTime,

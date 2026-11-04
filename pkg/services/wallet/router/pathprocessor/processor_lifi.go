@@ -219,7 +219,8 @@ func (s *LiFiProcessor) EstimateGas(params ProcessorInputParams, input []byte) (
 
 	estimation, err := ethClient.EstimateGas(context.Background(), msg)
 	if err != nil {
-		// ERC20 estimation reverts before approval; fall back to the quote's gas limit.
+		// ERC20 estimation reverts before approval; the quote's gas is a fee preview only, the main
+		// tx is re-estimated once the approval is mined.
 		if isNative {
 			return 0, createLiFiErrorResponse(err)
 		}
@@ -230,14 +231,15 @@ func (s *LiFiProcessor) EstimateGas(params ProcessorInputParams, input []byte) (
 		estimation = quotedGas
 	}
 
-	gasFactor := pathProcessorCommon.IncreaseEstimatedGasFactor
+	return estimation, nil
+}
+
+// GasBufferFactor implements GasBufferFactorProvider.
+func (s *LiFiProcessor) GasBufferFactor(params ProcessorInputParams) float64 {
 	if isLiFiBridge(params) {
-		gasFactor = pathProcessorCommon.IncreaseEstimatedGasFactorForBridge
+		return pathProcessorCommon.IncreaseEstimatedGasFactorForBridge
 	}
-
-	increasedEstimation := float64(estimation) * gasFactor
-
-	return uint64(increasedEstimation), nil
+	return pathProcessorCommon.IncreaseEstimatedGasFactor
 }
 
 func (s *LiFiProcessor) fetchAndStoreQuoteFromSendTxArgs(sendArgs *wallettypes.SendTxArgs) (*lifi.Quote, error) {
