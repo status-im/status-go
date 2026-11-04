@@ -1,0 +1,78 @@
+name: build_linux_pkgs
+
+on:
+  push:
+    tags:
+    - 'v*' # "e.g. v0.4"
+
+  workflow_dispatch:
+
+jobs:
+  env:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+
+    - uses: xom9ikk/dotenv@v2
+      with:
+        path: ".github/"
+    - run: |
+        echo "go_version=${{ env.GO_VERSION }}" >> $GITHUB_OUTPUT
+
+    - run: |
+        VERSION=$(cat ./VERSION)
+        echo "waku_version=$VERSION" >> $GITHUB_OUTPUT
+
+  
+  build-linux:
+    needs: env
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    strategy:
+      matrix:
+        ext: [deb, rpm]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Get submodules hash
+        id: submodules
+        run: |
+          echo "hash=$(git submodule status | awk '{print $1}' | sort | shasum -a 256 | sed 's/[ -]*//g')" >> $GITHUB_OUTPUT
+
+      - name: Cache submodules
+        uses: actions/cache@v3
+        with:
+          path: |
+            vendor/
+            .git/modules
+          key: ${{ runner.os }}-vendor-modules-${{ steps.submodules.outputs.hash }}
+      
+      - name: Install Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ needs.env.outputs.go_version }}
+          cache: false
+
+      - name: Build
+        id: build
+        run: |
+          make build
+          mkdir ./build/linux
+          cp ./build/waku ./build/linux/.
+          strip --strip-unneeded ./build/linux/waku
+
+      - name: Package ${{ matrix.ext }}
+        uses: bpicode/github-action-fpm@master
+        with:
+          fpm_args: ./build/linux/waku=/usr/bin/waku
+          fpm_opts: '-p gowaku-${{ needs.env.outputs.waku_version }}-x86_64.${{ matrix.ext }} -n go-waku -t ${{ matrix.ext }} -s dir --license "MIT, Apache 2.0" --version ${{ needs.env.outputs.waku_version }} --architecture x86_64 --depends libc6 --description "Go implementation of Waku v2 protocols" --url "https://github.com/waku-org/go-waku" --maintainer "Richard Ramos <richard@status.im>"'
+
+      - name: Upload ${{ matrix.ext }}
+        uses: actions/upload-artifact@v3
+        with:
+          name: gowaku-${{ needs.env.outputs.waku_version }}-x86_64.${{ matrix.ext }}
+          path: ./gowaku-${{ needs.env.outputs.waku_version }}-x86_64.${{ matrix.ext }}
+          if-no-files-found: error

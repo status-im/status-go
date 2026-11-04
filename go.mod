@@ -26,6 +26,9 @@ replace github.com/mutecomm/go-sqlcipher/v4 v4.4.2 => github.com/status-im/go-sq
 
 replace github.com/libp2p/go-libp2p-pubsub v0.13.1 => github.com/waku-org/go-libp2p-pubsub v0.13.1-gowaku
 
+// Pinned source snapshot with optional Filter diagnostics; see third_party/go-waku/FILTER_TRACING.md.
+replace github.com/waku-org/go-waku v0.10.3 => ./third_party/go-waku
+
 require (
 	github.com/anacrolix/torrent v1.41.0
 	github.com/beevik/ntp v0.3.0

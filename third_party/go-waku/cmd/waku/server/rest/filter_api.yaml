@@ -1,0 +1,337 @@
+openapi: 3.0.3
+info:
+  title: Waku V2 node REST API
+  version: 1.0.0
+  contact:
+    name: VAC Team
+    url: https://forum.vac.dev/
+tags:
+  - name: filter
+    description: Filter REST API for WakuV2 node
+
+paths:
+  /filter/v2/subscriptions/{requestId}:
+    get: # get_waku_v2_filter_v2_subscription - ping
+      summary: Subscriber-ping - a peer can query if there is a registered subscription for it
+      description: |
+          Subscriber peer can query its subscription existence on service node.
+          Returns HTTP200 if exists and HTTP404 if not.
+          Client must not fill anything but requestId in the request body.
+      operationId: subscriberPing
+      tags:
+        - filter
+      parameters:
+        - in: path
+          name: requestId
+          required: true
+          schema:
+            type: string
+          description: Id of ping request
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FilterSubscriptionResponse'
+        '400':
+          description: Bad request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FilterSubscriptionResponse'
+        '404':
+          description: Not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FilterSubscriptionResponse'
+        '5XX':
+          description: Unexpected error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FilterSubscriptionResponse'
+
+
+  /filter/v2/subscriptions:
+    post: # post_waku_v2_filter_v2_subscription
+      summary: Subscribe a peer to an array of content topics under a pubsubTopic
+      description: |
+          Subscribe a peer to an array of content topics under a pubsubTopic.
+
+          It is allowed to refresh or add new content topic to an existing subscription.
+
+          Fields pubsubTopic and contentFilters must be filled.
+      operationId: postSubscriptions
+      tags:
+        - filter
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FilterSubscribeRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FilterSubscriptionResponse'
+        # TODO: Review the possible errors of this endpoint
+        '400':
+          description: Bad request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FilterSubscriptionResponse'
+        '404':
+          description: Not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FilterSubscriptionResponse'
+        '5XX':
+          description: Unexpected error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FilterSubscriptionResponse'
+    delete: # delete_waku_v2_filter_v2_subscription
+      summary: Unsubscribe a peer from content topics
+      description: |
+          Unsubscribe a peer from content topics
+          Only that subscription will be removed which matches existing.
+      operationId: deleteSubscriptions
+      tags:
+        - filter
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FilterUnsubscribeRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FilterSubscriptionResponse'
+        '400':
+          description: Bad request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FilterSubscriptionResponse'
+        '404':
+          description: Not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FilterSubscriptionResponse'
+        '5XX':
+          description: Unexpected error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FilterSubscriptionResponse'
+
+  /filter/v2/subscriptions/all:
+    delete: # delete_waku_v2_filter_v2_subscription
+      summary: Unsubscribe a peer from all content topics
+      description: |
+          Unsubscribe a peer from all content topics
+      operationId: deleteAllSubscriptions
+      tags:
+        - filter
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FilterUnsubscribeAllRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FilterSubscriptionResponse'
+        '400':
+          description: Bad request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FilterSubscriptionResponse'
+        '404':
+          description: Not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FilterSubscriptionResponse'
+        '5XX':
+          description: Unexpected error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FilterSubscriptionResponse'
+  /filter/v2/messages/{contentTopic}:
+    get: # get_waku_v2_filter_v2_messages
+      summary: Get the latest messages on the polled content topic
+      description: Get a list of messages that were received on a subscribed content topic after the last time this method was called.
+      operationId: getMessagesByTopic
+      tags:
+        - filter
+      parameters:
+        - in: path
+          name: contentTopic  # Note the name is the same as in the path
+          required: true
+          schema:
+            type: string
+          description: Content topic of message
+      responses:
+        '200':
+          description: The latest messages on the polled topic.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FilterGetMessagesResponse'
+        # TODO: Review the possible errors of this endpoint
+        '400':
+          description: Bad request.
+          content:
+            text/plain:
+              schema:
+                type: string
+        '404':
+          description: Not found.
+          content:
+            text/plain:
+              schema:
+                type: string
+        '5XX':
+          description: Unexpected error.
+          content:
+            text/plain:
+              schema:
+                type: string
+  /filter/v2/messages/{pubsubTopic}/{contentTopic}:
+    get: # get_waku_v2_filter_v2_messages
+      summary: Get the latest messages on the polled pubsub/content topic pair
+      description: Get a list of messages that were received on a subscribed content topic after the last time this method was called.
+      operationId: getMessagesByTopic
+      tags:
+        - filter
+      parameters:
+        - in: path
+          name: contentTopic  # Note the name is the same as in the path
+          required: true
+          schema:
+            type: string
+          description: Content topic of message
+        - in: path
+          name: pubsubTopic  # Note the name is the same as in the path
+          required: true
+          schema:
+            type: string
+          description: pubsub topic of message
+      responses:
+        '200':
+          description: The latest messages on the polled topic.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FilterGetMessagesResponse'
+        # TODO: Review the possible errors of this endpoint
+        '400':
+          description: Bad request.
+          content:
+            text/plain:
+              schema:
+                type: string
+        '404':
+          description: Not found.
+          content:
+            text/plain:
+              schema:
+                type: string
+        '5XX':
+          description: Unexpected error.
+          content:
+            text/plain:
+              schema:
+                type: string
+
+components:
+    PubSubTopic:
+      type: string
+    ContentTopic:
+      type: string
+
+    FilterSubscriptionResponse:
+      type: object
+      properties:
+        requestId:
+          type: string
+        statusDesc:
+          type: string
+      required:
+        -  requestId
+
+    FilterSubscribeRequest:
+      type: object
+      properties:
+        requestId:
+          type: string
+        contentFilters:
+          type: array
+          items:
+            $ref: '#/components/schemas/ContentTopic'
+        pubsubTopic:
+          $ref: "#/components/schemas/PubSubTopic"
+      required:
+        -  requestId
+        -  contentFilters
+        -  pubsubTopic
+
+    FilterUnsubscribeRequest:
+      type: object
+      properties:
+        requestId:
+          type: string
+        contentFilters:
+          type: array
+          items:
+            $ref: '#/components/schemas/ContentTopic'
+        pubsubTopic:
+          $ref: "#/components/schemas/PubSubTopic"
+      required:
+        -  requestId
+        -  contentFilters
+
+    FilterUnsubscribeAllRequest:
+      type: object
+      properties:
+        requestId:
+          type: string
+      required:
+        -  requestId
+
+    FilterGetMessagesResponse:
+      type: array
+      items:
+        $ref: '#/components/schemas/FilterWakuMessage'
+
+    FilterWakuMessage:
+      type: object
+      properties:
+        payload:
+          type: string
+          format: byte
+        contentTopic:
+          $ref: '#/components/schemas/ContentTopic'
+        version:
+          type: number
+        timestamp:
+          type: number
+      required:
+        - payload

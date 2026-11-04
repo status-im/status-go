@@ -1,0 +1,65 @@
+library 'status-jenkins-lib@v1.9.39'
+
+pipeline {
+  agent {
+    label 'linux && nix-2.24 && x86_64'
+  }
+
+  options {
+    timestamps()
+    disableRestartFromStage()
+    disableConcurrentBuilds()
+    /* Prevent Jenkins jobs from running forever */
+    timeout(time: 30, unit: 'MINUTES')
+    /* Limit builds retained */
+    buildDiscarder(logRotator(
+      numToKeepStr: '10',
+      daysToKeepStr: '20',
+      artifactNumToKeepStr: '10',
+    ))
+  }
+
+  environment {
+    TARGET = 'nix-flake'
+  }
+
+  stages {
+    stage('Node') {
+      stages {
+        stage('Build') {
+          steps { script {
+            nix.flake('node')
+          } }
+        }
+        stage('Check') {
+          steps {
+            sh './result/bin/waku --version'
+          }
+        }
+      }
+    }
+
+    stage('Library') {
+      stages {
+        stage('Build') {
+          steps { script {
+            nix.flake('static-library')
+          } }
+        }
+        stage('Check') {
+          steps {
+            sh 'readelf -h ./result/bin/libgowaku.a'
+          }
+        }
+      }
+    }
+  }
+  post {
+    always { script { /* No artifact but a PKG_URL is necessary. */
+      env.PKG_URL = "${currentBuild.absoluteUrl}consoleText"
+    } }
+    success { script { github.notifyPR(true) } }
+    failure { script { github.notifyPR(false) } }
+    cleanup { cleanWs() }
+  }
+}

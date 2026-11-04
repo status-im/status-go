@@ -1,0 +1,41 @@
+openapi: 3.0.3
+info:
+  title: Waku V2 node Health REST API
+  version: 1.0.0
+  contact:
+    name: VAC Team
+    url: https://forum.vac.dev/
+
+tags:
+  - name: health
+    description: Healt check REST API for WakuV2 node
+
+paths:
+  /health:
+    get:
+      summary: Get node health status
+      description: Retrieve readiness of a Waku v2 node.
+      operationId: healthcheck
+      tags:
+        - health
+      responses:
+        '200':
+          description: Waku v2 node is up and running.
+          content:
+            text/plain:
+                schema:
+                  type: string
+                  example: Node is healty
+        '500':
+          description: Internal server error
+          content:
+            text/plain:
+                schema:
+                  type: string
+        '503':
+          description: Node not initialized or having issues
+          content:
+            text/plain:
+                schema:
+                  type: string
+                  example: Node is not initialized
