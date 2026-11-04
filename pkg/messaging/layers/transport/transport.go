@@ -709,6 +709,15 @@ func (t *Transport) TakeApplicationMessageIDForSDS(sdsMessageID []byte) ([]byte,
 	return t.envelopesMonitor.TakeApplicationMessageIDForSDS(sdsMessageID)
 }
 
+// WaitForEnvelopeHashes waits until the wire hashes of every envelope of a
+// message are known, or the message is no longer tracked.
+func (t *Transport) WaitForEnvelopeHashes(ctx context.Context, identifier []byte) error {
+	if t.envelopesMonitor == nil {
+		return nil
+	}
+	return t.envelopesMonitor.waitForWireHashes(ctx, cryptotypes.HexBytes(identifier).String())
+}
+
 // TrackedEnvelopeHashes returns all tracked envelope hashes for a given message
 // identifier. A single message maps to multiple envelopes when it is split by
 // the segmentation layer. The returned hashes are hex-encoded (0x-prefixed).

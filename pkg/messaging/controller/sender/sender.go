@@ -24,6 +24,8 @@ type Sender struct {
 	publisher *pubsub.Publisher
 	logger    *zap.Logger
 	tracer    trace.Tracer
+
+	sdsChannels sdsChannels
 }
 
 func NewSender(

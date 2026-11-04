@@ -53,12 +53,27 @@ func wrapPublicParamsForSDS(logger *zap.Logger, wrapper publicSDSWrapper, params
 		return params.Payload, nil, nil
 	}
 
-	communityID := params.CommunityID
-	if len(communityID) == 0 && params.CommunityPublicKey != nil {
-		communityID = cryptotypes.EncodeHex(crypto.CompressPubkey(params.CommunityPublicKey))
-	}
+	return wrapPayloadForPublicSDS(logger, wrapper, params.Payload, publicSDSCommunityID(params))
+}
 
-	return wrapPayloadForPublicSDS(logger, wrapper, params.Payload, communityID)
+func publicSDSCommunityID(params messagingtypes.SendPublicParams) string {
+	if len(params.CommunityID) == 0 && params.CommunityPublicKey != nil {
+		return cryptotypes.EncodeHex(crypto.CompressPubkey(params.CommunityPublicKey))
+	}
+	return params.CommunityID
+}
+
+// publicSDSChannel returns the SDS channel a public message is wrapped for, or
+// nil when it is not wrapped.
+func (s *Sender) publicSDSChannel(params messagingtypes.SendPublicParams) *sdsChannel {
+	if !sdsForCommunitiesEnabled || params.SkipSDS {
+		return nil
+	}
+	communityID := publicSDSCommunityID(params)
+	if len(communityID) == 0 {
+		return nil
+	}
+	return s.sdsChannels.get(reliability.BuildChannelID(communityID))
 }
 
 func (s *Sender) SendPublic(ctx context.Context, params messagingtypes.SendPublicParams) error {
@@ -81,6 +96,13 @@ func (s *Sender) SendPublic(ctx context.Context, params messagingtypes.SendPubli
 		zap.String("contentTopic", params.ContentTopic),
 		zap.Any("hashRatchet", params.HashRatchet),
 	)
+
+	channel := s.publicSDSChannel(params)
+	if channel != nil {
+		channel.mu.Lock()
+		defer channel.mu.Unlock()
+		s.waitForRetrievalHint(ctx, logger, channel.last)
+	}
 
 	var err error
 	params.Payload, sdsMessageIDBytes, err = wrapPublicParamsForSDS(logger, s.stack.Reliability, params)
@@ -157,6 +179,7 @@ func (s *Sender) SendPublic(ctx context.Context, params messagingtypes.SendPubli
 
 	if len(sdsMessageIDBytes) > 0 {
 		s.stack.Transport.TrackWithSDSAlias([]byte(messageID), sdsMessageIDBytes, requestIDs, wakuMessages)
+		channel.last = sdsMessageIDBytes
 	} else {
 		s.stack.Transport.Track(messageID, requestIDs, wakuMessages)
 	}

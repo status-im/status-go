@@ -1,6 +1,7 @@
 package transport
 
 import (
+	"context"
 	"errors"
 	"sync"
 
@@ -70,6 +71,8 @@ func NewEnvelopesMonitor(w wakutypes.Waku, config EnvelopesMonitorConfig) *Envel
 
 		// key is a request ID that failed before it was added.
 		earlyFailures: make(map[wakutypes.RequestID]error),
+
+		wireHashesChanged: make(chan struct{}),
 	}
 }
 
@@ -95,6 +98,9 @@ type EnvelopesMonitor struct {
 	messageRequestIDs        map[string][]wakutypes.RequestID
 	sdsApplicationMessageIDs map[string]string
 	earlyFailures            map[wakutypes.RequestID]error
+	// wireHashesChanged is closed and replaced whenever a wire hash is learned
+	// or an envelope stops being tracked.
+	wireHashesChanged chan struct{}
 
 	awaitOnlyMailServerConfirmations bool
 
@@ -155,6 +161,41 @@ func (m *EnvelopesMonitor) wireHashes(messageKey string) []cryptotypes.Hash {
 		}
 	}
 	return hashes
+}
+
+// waitForWireHashes waits until every envelope of a message has a wire hash, or
+// the message is no longer tracked.
+func (m *EnvelopesMonitor) waitForWireHashes(ctx context.Context, messageKey string) error {
+	for {
+		m.mu.Lock()
+		known := m.wireHashesKnown(messageKey)
+		changed := m.wireHashesChanged
+		m.mu.Unlock()
+		if known {
+			return nil
+		}
+		select {
+		case <-changed:
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+}
+
+// wireHashesKnown is not thread-safe, the caller holds mu.
+func (m *EnvelopesMonitor) wireHashesKnown(messageKey string) bool {
+	for _, requestID := range m.messageRequestIDs[messageKey] {
+		if envelope, ok := m.envelopes[requestID]; ok && envelope.wireHash == (cryptotypes.Hash{}) {
+			return false
+		}
+	}
+	return true
+}
+
+// notifyWireHashes is not thread-safe, the caller holds mu.
+func (m *EnvelopesMonitor) notifyWireHashes() {
+	close(m.wireHashesChanged)
+	m.wireHashesChanged = make(chan struct{})
 }
 
 // Start processing events.
@@ -271,9 +312,11 @@ func (m *EnvelopesMonitor) handleEventEnvelopeSent(event wakutypes.EnvelopeEvent
 	// being sent
 	if !ok && !confirmationExpected {
 		m.envelopes[event.RequestID] = &monitoredEnvelope{requestID: event.RequestID, wireHash: event.Hash, state: EnvelopeSent}
+		m.notifyWireHashes()
 		return
 	}
 	envelope.wireHash = event.Hash
+	m.notifyWireHashes()
 
 	// if message was already confirmed - skip it
 	if envelope.state == EnvelopeSent {
@@ -420,6 +463,7 @@ func (m *EnvelopesMonitor) clearMessageState(requestID wakutypes.RequestID) {
 	if !ok {
 		return
 	}
+	defer m.notifyWireHashes()
 	delete(m.envelopes, requestID)
 	for _, messageID := range envelope.messageIDs {
 		messageKey := cryptotypes.HexBytes(messageID).String()
