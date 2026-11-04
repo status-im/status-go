@@ -12,16 +12,20 @@ import (
 )
 
 type Metadata struct {
-	AttemptID   string   `json:"attemptId,omitempty"`
-	MessageIDs  []string `json:"messageIds,omitempty"`
-	Recipient   string   `json:"recipient,omitempty"`
-	Reliability string   `json:"reliability,omitempty"`
+	AttemptID      string   `json:"attemptId,omitempty"`
+	MessageIDs     []string `json:"messageIds,omitempty"`
+	MVDSMessageIDs []string `json:"mvdsMessageIds,omitempty"`
+	AckIDs         []string `json:"ackIds,omitempty"`
+	Peer           string   `json:"peer,omitempty"`
+	Recipient      string   `json:"recipient,omitempty"`
+	Reliability    string   `json:"reliability,omitempty"`
 }
 
 // TimestampNS is captured at the instrumentation point, before asynchronous
 // delivery. Encode it as a string so JavaScript clients do not lose precision.
 type Event struct {
 	Metadata
+	Version            int      `json:"version"`
 	Stage              string   `json:"stage"`
 	TimestampNS        int64    `json:"timestampNs,string"`
 	Sequence           uint64   `json:"sequence"`
@@ -32,6 +36,8 @@ type Event struct {
 	DurationNS         int64    `json:"durationNs,omitempty"`
 	PublicationAttempt int      `json:"publicationAttempt,omitempty"`
 	RetryDelayNS       int64    `json:"retryDelayNs,omitempty"`
+	QueueDepth         int      `json:"queueDepth,omitempty"`
+	QueueCapacity      int      `json:"queueCapacity,omitempty"`
 }
 
 type emitter struct {
@@ -76,6 +82,7 @@ func Emit(event Event) {
 	if e == nil {
 		return
 	}
+	event.Version = 2
 	if event.TimestampNS == 0 {
 		event.TimestampNS = time.Now().UnixNano()
 	}
@@ -94,13 +101,18 @@ func Begin(ctx context.Context, messageIDs [][]byte, recipient, reliability stri
 	if !Enabled() {
 		return ctx, Metadata{}
 	}
+	return BeginWithMetadata(ctx, Metadata{MessageIDs: Hexes(messageIDs), Recipient: recipient, Reliability: reliability})
+}
+
+// BeginWithMetadata preserves reliability IDs on every subsequent envelope event.
+func BeginWithMetadata(ctx context.Context, metadata Metadata) (context.Context, Metadata) {
+	if !Enabled() {
+		return ctx, Metadata{}
+	}
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	metadata := Metadata{
-		AttemptID:  strconv.FormatInt(time.Now().UnixNano(), 16) + "-" + strconv.FormatUint(attempts.Add(1), 16),
-		MessageIDs: Hexes(messageIDs), Recipient: recipient, Reliability: reliability,
-	}
+	metadata.AttemptID = strconv.FormatInt(time.Now().UnixNano(), 16) + "-" + strconv.FormatUint(attempts.Add(1), 16)
 	Emit(Event{Metadata: metadata, Stage: "attempt_started"})
 	return context.WithValue(ctx, contextKey{}, metadata), metadata
 }
