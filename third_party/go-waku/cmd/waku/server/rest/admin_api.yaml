@@ -1,0 +1,92 @@
+openapi: 3.0.3
+info:
+  title: Waku V2 node REST API
+  version: 1.0.0
+  contact:
+    name: VAC Team
+    url: https://forum.vac.dev/
+
+tags:
+  - name: admin
+    description: Admin REST API for WakuV2 node
+
+paths:
+  /admin/v1/peers:
+    get:
+      summary: Get connected peers info
+      description: Retrieve information about connected peers.
+      operationId: getPeerInfo
+      tags:
+        - admin
+      responses:
+        '200':
+          description: Information about a Waku v2 node.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/WakuPeer'
+        '5XX':
+          description: Unexpected error.
+    post:
+      summary: Adds new peer(s) to connect with
+      description: Adds new peer(s) to connect with.
+      operationId: postPeerInfo
+      tags:
+        - admin
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              items:
+                $ref: '#/components/schemas/WakuPeerInfo'
+      responses:
+        '200':
+          description: Ok
+        '400':
+          description: Cannot connect to one or more peers.
+        '5XX':
+          description: Unexpected error.
+
+components:
+  schemas:
+    WakuPeerInfo:
+      type: object
+      required:
+        - multiaddr
+        - shards
+        - protocols
+        protocols:
+          type: array
+          items:
+            type: string
+        shards:
+          type: array
+          items:
+            type: integer
+    WakuPeer:
+      type: object
+      required:
+        - id
+        - addrs
+        - protocols
+        - connected
+      properties:
+        connected:
+          type: string
+        addrs:
+          type: array
+          items:
+            type: string
+        protocols:
+          type: array
+          items:
+            type: string
+        connected:
+          type: boolean
+        pubsubTopics:
+          type: array
+          items:
+            type: string

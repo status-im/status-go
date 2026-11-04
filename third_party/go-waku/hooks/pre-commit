@@ -1,0 +1,50 @@
+#!/bin/bash
+
+echo "Running pre commit hook"
+
+## this will retrieve all of the .go files that have been 
+## changed since the last commit
+STAGED_GO_FILES=$(git diff --cached --name-only -- '*.go')
+
+## we can check to see if this is empty
+if [[ $STAGED_GO_FILES == "" ]]; then
+    echo "No Go Files to Update"
+else
+    for file in $STAGED_GO_FILES; do
+        ## format our file
+        go fmt $file
+        ## add any potential changes from our formatting to the 
+        ## commit
+        git add $file
+    done
+fi
+
+# Run go mod tidy in all folders that have go.mod
+go-modules() {
+       find . \( -name '[._].*' \) -prune -o -name go.mod -print | sed 's:/go.mod$::'
+}
+
+fail=false
+
+for m in $(go-modules);
+do
+	cd $m > /dev/null
+	if go build . 2>&1 | grep -q 'updates to go.mod needed'; then
+		go mod tidy -v
+		echo "updates to go.mod needed in $m"
+		fail=true
+	fi
+	cd - > /dev/null
+done
+
+if [ $fail = "true" ]; then
+	exit 1
+fi
+
+git diff --exit-code go.* &> /dev/null
+
+if [ $? -eq 1 ]; then
+    echo "go.mod or go.sum differs, please re-add it to your commit"
+
+    exit 1
+fi

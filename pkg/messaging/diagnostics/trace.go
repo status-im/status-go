@@ -38,6 +38,17 @@ type Event struct {
 	RetryDelayNS       int64    `json:"retryDelayNs,omitempty"`
 	QueueDepth         int      `json:"queueDepth,omitempty"`
 	QueueCapacity      int      `json:"queueCapacity,omitempty"`
+	LocalPeerID        string   `json:"localPeerId,omitempty"`
+	RemotePeerID       string   `json:"remotePeerId,omitempty"`
+	FilterTraceID      string   `json:"filterTraceId,omitempty"`
+	StreamID           string   `json:"streamId,omitempty"`
+	PubsubTopic        string   `json:"pubsubTopic,omitempty"`
+	ContentTopic       string   `json:"contentTopic,omitempty"`
+	SubscriptionID     string   `json:"subscriptionId,omitempty"`
+	Reason             string   `json:"reason,omitempty"`
+	MatchingPeers      []string `json:"matchingPeers,omitempty"`
+	Rate               float64  `json:"rate,omitempty"`
+	Burst              int      `json:"burst,omitempty"`
 }
 
 type emitter struct {
@@ -82,7 +93,7 @@ func Emit(event Event) {
 	if e == nil {
 		return
 	}
-	event.Version = 2
+	event.Version = 3
 	if event.TimestampNS == 0 {
 		event.TimestampNS = time.Now().UnixNano()
 	}
