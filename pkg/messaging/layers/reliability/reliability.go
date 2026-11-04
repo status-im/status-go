@@ -16,6 +16,7 @@ import (
 	mvdsproto "github.com/status-im/mvds/protobuf"
 	mvdsstate "github.com/status-im/mvds/state"
 
+	"github.com/status-im/status-go/pkg/messaging/diagnostics"
 	"github.com/status-im/status-go/pkg/messaging/layers/reliability/datasync"
 	datasyncpeer "github.com/status-im/status-go/pkg/messaging/layers/reliability/datasync/peer"
 	"github.com/status-im/status-go/pkg/messaging/layers/reliability/protobuf"
@@ -239,7 +240,7 @@ func (r *Reliability) Start(dispatch MessageDispatcher) error {
 func (r *Reliability) buildNode(duration time.Duration) error {
 	transport := datasync.NewNodeTransport()
 	node, err := mvdsnode.NewPersistentNode(
-		datasync.WithTracePersistence(r.mvdsPersistence),
+		datasync.WithTracePersistence(r.mvdsPersistence, duration),
 		transport,
 		datasyncpeer.PublicKeyToPeerID(r.identity.PublicKey),
 		mvdsnode.BATCH,
@@ -394,13 +395,22 @@ func (r *Reliability) UnwrapAndAcknowledgeMessage(publicKey *ecdsa.PublicKey, me
 
 // ReportPeerOnline reports to MVDS that a peer is online at a given event time.
 func (r *Reliability) ReportPeerOnline(publicKey *ecdsa.PublicKey, eventTime uint64) {
+	peerID := datasyncpeer.PublicKeyToPeerID(*publicKey)
+	reason := "queued"
 	select {
 	case r.mvdsStatusChangeEvent <- mvdsnode.PeerStatusChangeEvent{
-		PeerID:    datasyncpeer.PublicKeyToPeerID(*publicKey),
+		PeerID:    peerID,
 		Status:    mvdsnode.OnlineStatus,
 		EventTime: eventTime,
 	}:
 	default:
+		reason = "queue_full"
 		r.logger.Debug("mvdsStatusChangeEvent channel is full")
+	}
+	if diagnostics.Enabled() {
+		diagnostics.Emit(diagnostics.Event{Metadata: diagnostics.Metadata{
+			Reliability: "mvds", Peer: diagnostics.Hexes([][]byte{peerID[:]})[0],
+		}, Stage: "mvds_peer_online", Reason: reason, PeerEventTime: eventTime,
+			QueueDepth: len(r.mvdsStatusChangeEvent), QueueCapacity: cap(r.mvdsStatusChangeEvent)})
 	}
 }
