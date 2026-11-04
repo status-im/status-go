@@ -4,6 +4,7 @@ import (
 	"math/big"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 
@@ -55,6 +56,9 @@ func TestCopyPath(t *testing.T) {
 		RequiredTokenBalance:    big.NewInt(100),
 		RequiredNativeBalance:   big.NewInt(100),
 		SubtractFees:            true,
+		AmountInOriginal:        (*hexutil.Big)(big.NewInt(150)),
+		TxGasEstimatedAt:        time.Unix(1000, 0),
+		ApprovalGasEstimatedAt:  time.Unix(2000, 0),
 	}
 
 	newPath := path.Copy()

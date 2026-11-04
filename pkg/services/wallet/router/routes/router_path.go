@@ -3,6 +3,7 @@ package routes
 import (
 	"fmt"
 	"math/big"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -74,6 +75,12 @@ type Path struct {
 	RequiredNativeBalance *big.Int // (in base unit of the chain eg. WEI for ETH or BNB)
 	SubtractFees          bool
 
+	// AmountInOriginal is the built-for amount; with SubtractFees, AmountIn is recomputed from it.
+	AmountInOriginal *hexutil.Big `json:"-"`
+	// When the main / approval tx gas was last estimated; see GasEstimateFresh.
+	TxGasEstimatedAt       time.Time `json:"-"`
+	ApprovalGasEstimatedAt time.Time `json:"-"`
+
 	// used internally
 	communityParams *requests.CommunityRouteInputParams
 }
@@ -118,6 +125,12 @@ func (p *Path) Copy() *Path {
 		ApprovalGasAmount:          p.ApprovalGasAmount,
 		ApprovalEstimatedTime:      p.ApprovalEstimatedTime,
 		SubtractFees:               p.SubtractFees,
+		TxGasEstimatedAt:           p.TxGasEstimatedAt,
+		ApprovalGasEstimatedAt:     p.ApprovalGasEstimatedAt,
+	}
+
+	if p.AmountInOriginal != nil {
+		newPath.AmountInOriginal = (*hexutil.Big)(big.NewInt(0).Set(p.AmountInOriginal.ToInt()))
 	}
 
 	if p.FromChain != nil {

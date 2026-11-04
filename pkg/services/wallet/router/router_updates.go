@@ -178,6 +178,8 @@ func (r *Router) subscribeForUdates(chainID uint64, address common.Address) erro
 						r.logger.Debug("subscribeForUdates: re-evaluating active route paths",
 							zap.Uint64("chainId", chainID),
 							zap.Int("paths", len(r.activeRoutes.Route)))
+						r.refreshGasEstimates(chainID, r.activeRoutes.Route, time.Now())
+
 						usedNonces := make(map[uint64]uint64)
 						for _, path := range r.activeRoutes.Route {
 							err = r.evaluateAndUpdatePathDetails(ctx, path, fees, usedNonces, noBaseFee, noPriorityFee)
@@ -194,7 +196,7 @@ func (r *Router) subscribeForUdates(chainID uint64, address common.Address) erro
 							continue
 						}
 
-						err = r.checkBalancesForTheBestRoute(r.activeRoutes.Route)
+						err = r.checkBalancesForRouteAndAdjustAmountIn(r.activeRoutes.Route)
 						if err != nil {
 							r.logger.Error("subscribeForUdates: balance check failed after fee refresh",
 								zap.Uint64("chainId", chainID),

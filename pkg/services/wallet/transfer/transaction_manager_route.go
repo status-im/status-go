@@ -5,6 +5,9 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math/big"
+	"time"
+
+	"go.uber.org/zap"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -13,6 +16,7 @@ import (
 	"github.com/status-im/status-go/internal/crypto"
 	"github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/errors"
+	"github.com/status-im/status-go/internal/logutils"
 	"github.com/status-im/status-go/internal/transactions"
 	walletCommon "github.com/status-im/status-go/pkg/services/wallet/common"
 	"github.com/status-im/status-go/pkg/services/wallet/requests"
@@ -210,10 +214,37 @@ func buildTxForPath(path *routes.Path, pathProcessors map[string]pathprocessor.P
 	}, nil
 }
 
+// checkGasEstimatesFresh refuses a route with a gas estimate older than routes.GasEstimateMaxAge
+// for a tx this pass builds. The router re-estimates every routes.GasReestimateInterval while it
+// tracks the route; once it stops (a failed estimate, the update loop's timeout) the route
+// expires and has to be requested again rather than signed with gas the chain may no longer
+// accept.
+//
+// An approval-pending path is checked on its approval only. Its main tx can't be estimated until
+// the approval is mined, and is estimated again then (swaps: ReevaluateRouterPath).
+func checkGasEstimatesFresh(route routes.Route, approvalPlaced func(processorName string) bool, now time.Time) (*routes.Path, error) {
+	for _, path := range route {
+		approvalPending := path.ApprovalRequired && !approvalPlaced(path.ProcessorName)
+		if !path.GasEstimateFresh(approvalPending, now) {
+			return path, ErrRouteGasEstimateExpired
+		}
+	}
+	return nil, nil
+}
+
 func (tm *TransactionManager) BuildTransactionsFromRoute(route routes.Route, pathProcessors map[string]pathprocessor.PathProcessor,
 	processorInputParams *pathprocessor.ProcessorInputParams) (*responses.SigningDetails, uint64, uint64, error) {
 	if len(route) == 0 {
 		return nil, 0, 0, ErrNoRoute
+	}
+
+	if stalePath, err := checkGasEstimatesFresh(route, tm.ApprovalPlacedForPath, time.Now()); err != nil {
+		logutils.ZapLogger().Warn("BuildTransactionsFromRoute: gas estimate out of date",
+			zap.String("processor", stalePath.ProcessorName),
+			zap.Uint64("fromChain", stalePath.FromChain.ChainID),
+			zap.Time("txGasEstimatedAt", stalePath.TxGasEstimatedAt),
+			zap.Time("approvalGasEstimatedAt", stalePath.ApprovalGasEstimatedAt))
+		return nil, stalePath.FromChain.ChainID, stalePath.ToChain.ChainID, err
 	}
 
 	accFrom, err := tm.accountsDB.GetAccountByAddress(types.Address(processorInputParams.FromAddr))
