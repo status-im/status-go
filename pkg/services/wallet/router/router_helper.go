@@ -632,7 +632,12 @@ func (r *Router) evaluateAndUpdatePathDetails(ctx context.Context, path *routes.
 	requiredTokenBalance := big.NewInt(0)
 
 	if path.FromToken.IsNative() {
-		requiredNativeBalance.Add(requiredNativeBalance, path.AmountIn.ToInt())
+		if path.SubtractFees && path.AmountInOriginal != nil {
+			// fees come out of the amount, so the whole original amount is needed
+			requiredNativeBalance.Add(requiredNativeBalance, path.AmountInOriginal.ToInt())
+		} else {
+			requiredNativeBalance.Add(requiredNativeBalance, path.AmountIn.ToInt())
+		}
 		if !path.SubtractFees {
 			requiredNativeBalance.Add(requiredNativeBalance, ethTotalFees)
 		}
