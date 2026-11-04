@@ -121,11 +121,21 @@ func (r *Router) estimateGasForApproval(params pathprocessor.ProcessorInputParam
 			zap.Error(err))
 		return 0, err
 	}
+	bufferedGas := bufferApprovalGas(gas)
 	r.logger.Debug("estimateGasForApproval: gas estimated",
 		zap.Uint64("chainId", params.FromChain.ChainID),
 		zap.String("token", params.FromToken.Symbol),
-		zap.Uint64("gas", gas))
-	return gas, nil
+		zap.Uint64("gas", gas),
+		zap.Uint64("bufferedGas", bufferedGas))
+	return bufferedGas, nil
+}
+
+// bufferApprovalGas adds the same headroom the path processors add to their own estimates.
+// A first approval of a spender writes a fresh allowance slot, which is state gas after
+// Glamsterdam (EIP-8037); signing exactly the node estimate leaves no room for that cost to move
+// between estimation and inclusion.
+func bufferApprovalGas(estimation uint64) uint64 {
+	return uint64(float64(estimation) * pathProcessorCommon.IncreaseEstimatedGasFactor)
 }
 
 func (r *Router) calculateL1Fee(chainID uint64, data []byte) (*big.Int, error) {
