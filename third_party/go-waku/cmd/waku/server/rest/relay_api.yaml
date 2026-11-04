@@ -1,0 +1,245 @@
+openapi: 3.0.3
+info:
+  title: Waku V2 node Relay REST API 
+  version: 1.0.0
+  contact:
+    name: VAC Team
+    url: https://forum.vac.dev/
+
+tags:
+  - name: relay
+    description: Relay REST API for WakuV2 node
+
+paths:
+  /relay/v1/messages/{topic}:  # Note the plural in messages
+    get: # get_waku_v2_relay_v1_messages
+      summary: Get the latest messages on the polled topic
+      description: Get a list of messages that were received on a subscribed PubSub topic after the last time this method was called.
+      operationId: getMessagesByTopic
+      tags:
+        - relay
+      parameters:
+        - in: path
+          name: topic   # Note the name is the same as in the path
+          required: true
+          schema:
+            type: string
+          description: The user ID
+      responses:
+        '200':
+          description: The latest messages on the polled topic.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RelayGetMessagesResponse'
+        # TODO: Review the possible errors of this endpoint
+        '5XX':
+          description: Unexpected error.
+
+    post: # post_waku_v2_relay_v1_message
+      summary: Publish a message to be relayed
+      description: Publishes a message to be relayed on a PubSub topic.
+      operationId: postMessagesToTopic
+      tags:
+        - relay
+      parameters:
+        - in: path
+          name: topic   # Note the name is the same as in the path
+          description: The messages content topic
+          required: true
+          schema:
+            $ref: '#/components/schemas/RelayPostMessagesRequest'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RelayPostMessagesRequest'
+      responses:
+        '200':
+          description: OK
+        # TODO: Review the possible errors of this endpoint
+        '5XX':
+          description: Unexpected error.
+
+  /relay/v1/subscriptions:
+    post: # post_waku_v2_relay_v1_subscriptions
+      summary: Subscribe a node to an array of topics
+      description: Subscribe a node to an array of PubSub topics.
+      operationId: postSubscriptions
+      tags:
+        - relay
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RelayPostSubscriptionsRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            text/plain:
+              schema:
+                type: string
+        # TODO: Review the possible errors of this endpoint
+        '5XX':
+          description: Unexpected error.
+
+    delete: # delete_waku_v2_relay_v1_subscriptions
+      summary: Unsubscribe a node from an array of topics
+      description: Unsubscribe a node from an array of PubSub topics.
+      operationId: deleteSubscriptions
+      tags:
+        - relay
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RelayDeleteSubscriptionsRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            text/plain:
+              schema:
+                type: string
+        # TODO: Review the possible errors of this endpoint
+        '5XX':
+          description: Unexpected error.
+
+  /relay/v1/auto/messages/{contentTopic}:  # Note the plural in messages
+    get: # get_waku_v2_relay_v1_auto_messages
+      summary: Get the latest messages on the polled topic
+      description: Get a list of messages that were received on a subscribed Content topic after the last time this method was called.
+      operationId: getMessagesByTopic
+      tags:
+        - relay
+      parameters:
+        - in: path
+          name: contentTopic   # Note the name is the same as in the path
+          required: true
+          schema:
+            type: string
+          description: The user ID
+      responses:
+        '200':
+          description: The latest messages on the polled topic.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RelayGetMessagesResponse'
+        '4XX':
+          description: Bad request.
+        '5XX':
+          description: Unexpected error.
+
+    /relay/v1/auto/messages:  # Note the plural in messages
+      post: # post_waku_v2_relay_v1_auto_message
+      summary: Publish a message to be relayed
+      description: Publishes a message to be relayed on a Content topic.
+      operationId: postMessagesToTopic
+      tags:
+        - relay
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RelayPostMessagesRequest'
+      responses:
+        '200':
+          description: OK
+        '4XX':
+          description: Bad request.
+        '5XX':
+          description: Unexpected error.
+
+  /relay/v1/auto/subscriptions:
+    post: # post_waku_v2_relay_v1_auto_subscriptions
+      summary: Subscribe a node to an array of topics
+      description: Subscribe a node to an array of Content topics.
+      operationId: postSubscriptions
+      tags:
+        - relay
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type array:
+              items:
+                $ref: '#/components/schemas/ContentTopic'
+      responses:
+        '200':
+          description: OK
+          content:
+            text/plain:
+              schema:
+                type: string
+        '4XX':
+          description: Bad request.
+        '5XX':
+          description: Unexpected error.
+
+    delete: # delete_waku_v2_relay_v1_auto_subscriptions
+      summary: Unsubscribe a node from an array of topics
+      description: Unsubscribe a node from an array of Content topics.
+      operationId: deleteSubscriptions
+      tags:
+        - relay
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type array:
+              items:
+                $ref: '#/components/schemas/ContentTopic'
+      responses:
+        '200':
+          description: OK
+          content:
+            text/plain:
+              schema:
+                type: string
+        '4XX':
+          description: Bad request.
+        '5XX':
+          description: Unexpected error.
+
+components:
+  schemas:
+    PubSubTopic:
+      type: string
+    ContentTopic:
+      type: string
+    
+    RelayWakuMessage:
+      type: object
+      properties:
+        payload:
+          type: string
+          format: byte
+        contentTopic:
+          $ref: '#/components/schemas/ContentTopic'
+        version:
+          type: number
+        timestamp:
+          type: number
+      required:
+        - payload
+
+    RelayGetMessagesResponse:
+      type: array
+      items:
+        $ref: '#/components/schemas/RelayWakuMessage'
+        
+    RelayPostMessagesRequest:
+      $ref: '#/components/schemas/RelayWakuMessage'
+
+    RelayPostSubscriptionsRequest:
+      type: array
+      items:
+        $ref: '#/components/schemas/PubSubTopic'
+
+    RelayDeleteSubscriptionsRequest:
+      type: array
+      items:
+        $ref: '#/components/schemas/PubSubTopic'
+  

@@ -1,0 +1,43 @@
+openapi: 3.0.3
+info:
+  title: Waku V2 node Debug REST API 
+  version: 1.0.0
+  contact:
+    name: VAC Team
+    url: https://forum.vac.dev/
+
+tags:
+  - name: debug
+    description: Debug REST API for WakuV2 node
+
+paths:
+  /debug/v1/info:
+    get:
+      summary: Get node info
+      description: Retrieve information about a Waku v2 node.
+      operationId: getNodeInfo
+      tags:
+        - debug
+      responses:
+        '200':
+          description: Information about a Waku v2 node.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WakuInfo'
+        '5XX':
+          description: Unexpected error.
+
+components:
+  schemas:
+    WakuInfo:
+      type: object
+      properties:
+        listenAddresses:
+          type: array
+          items:
+            type: string
+        enrUri:
+          type: string
+      required:
+        - listenAddresses

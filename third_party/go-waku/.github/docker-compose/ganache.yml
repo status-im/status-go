@@ -1,0 +1,6 @@
+services:
+  ganache:
+    image: "trufflesuite/ganache:latest"
+    command: ["-m='swim relax risk shy chimney please usual search industry board music segment'"]
+    ports:
+      - "8545:8545"

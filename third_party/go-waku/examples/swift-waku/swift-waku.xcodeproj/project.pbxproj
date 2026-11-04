@@ -1,0 +1,386 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 55;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		791190E528047A5900A81D4A /* Gowaku.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 791190E328047A4500A81D4A /* Gowaku.xcframework */; };
+		797CFE202828077C00D0B7E7 /* WakuNode.swift in Sources */ = {isa = PBXBuildFile; fileRef = 797CFE1F2828077C00D0B7E7 /* WakuNode.swift */; };
+		797CFE2428285C3100D0B7E7 /* Config.swift in Sources */ = {isa = PBXBuildFile; fileRef = 797CFE2328285C3100D0B7E7 /* Config.swift */; };
+		797CFE2628285C5500D0B7E7 /* Message.swift in Sources */ = {isa = PBXBuildFile; fileRef = 797CFE2528285C5500D0B7E7 /* Message.swift */; };
+		797CFE2828285C7300D0B7E7 /* DecodedPayload.swift in Sources */ = {isa = PBXBuildFile; fileRef = 797CFE2728285C7300D0B7E7 /* DecodedPayload.swift */; };
+		797CFE2C28285CA700D0B7E7 /* JsonResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = 797CFE2B28285CA700D0B7E7 /* JsonResult.swift */; };
+		797CFE3028285CDE00D0B7E7 /* Response.swift in Sources */ = {isa = PBXBuildFile; fileRef = 797CFE2F28285CDE00D0B7E7 /* Response.swift */; };
+		798FB3D028046F7F00937EDF /* swift_wakuApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 798FB3CF28046F7F00937EDF /* swift_wakuApp.swift */; };
+		798FB3D228046F7F00937EDF /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 798FB3D128046F7F00937EDF /* ContentView.swift */; };
+		798FB3D428046F8200937EDF /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 798FB3D328046F8200937EDF /* Assets.xcassets */; };
+		798FB3D728046F8200937EDF /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 798FB3D628046F8200937EDF /* Preview Assets.xcassets */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		791190E328047A4500A81D4A /* Gowaku.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; path = Gowaku.xcframework; sourceTree = "<group>"; };
+		797CFE1F2828077C00D0B7E7 /* WakuNode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WakuNode.swift; sourceTree = "<group>"; };
+		797CFE2328285C3100D0B7E7 /* Config.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Config.swift; sourceTree = "<group>"; };
+		797CFE2528285C5500D0B7E7 /* Message.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Message.swift; sourceTree = "<group>"; };
+		797CFE2728285C7300D0B7E7 /* DecodedPayload.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecodedPayload.swift; sourceTree = "<group>"; };
+		797CFE2B28285CA700D0B7E7 /* JsonResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JsonResult.swift; sourceTree = "<group>"; };
+		797CFE2F28285CDE00D0B7E7 /* Response.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Response.swift; sourceTree = "<group>"; };
+		798FB3CC28046F7F00937EDF /* swift-waku.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "swift-waku.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		798FB3CF28046F7F00937EDF /* swift_wakuApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = swift_wakuApp.swift; sourceTree = "<group>"; };
+		798FB3D128046F7F00937EDF /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		798FB3D328046F8200937EDF /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		798FB3D628046F8200937EDF /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		798FB3C928046F7F00937EDF /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				791190E528047A5900A81D4A /* Gowaku.xcframework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		791190E2280479CB00A81D4A /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				791190E328047A4500A81D4A /* Gowaku.xcframework */,
+			);
+			path = Frameworks;
+			sourceTree = "<group>";
+		};
+		798FB3C328046F7F00937EDF = {
+			isa = PBXGroup;
+			children = (
+				791190E2280479CB00A81D4A /* Frameworks */,
+				798FB3CE28046F7F00937EDF /* swift-waku */,
+				798FB3CD28046F7F00937EDF /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		798FB3CD28046F7F00937EDF /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				798FB3CC28046F7F00937EDF /* swift-waku.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		798FB3CE28046F7F00937EDF /* swift-waku */ = {
+			isa = PBXGroup;
+			children = (
+				798FB3CF28046F7F00937EDF /* swift_wakuApp.swift */,
+				798FB3D128046F7F00937EDF /* ContentView.swift */,
+				798FB3D328046F8200937EDF /* Assets.xcassets */,
+				798FB3D528046F8200937EDF /* Preview Content */,
+				797CFE1F2828077C00D0B7E7 /* WakuNode.swift */,
+				797CFE2328285C3100D0B7E7 /* Config.swift */,
+				797CFE2528285C5500D0B7E7 /* Message.swift */,
+				797CFE2728285C7300D0B7E7 /* DecodedPayload.swift */,
+				797CFE2B28285CA700D0B7E7 /* JsonResult.swift */,
+				797CFE2F28285CDE00D0B7E7 /* Response.swift */,
+			);
+			path = "swift-waku";
+			sourceTree = "<group>";
+		};
+		798FB3D528046F8200937EDF /* Preview Content */ = {
+			isa = PBXGroup;
+			children = (
+				798FB3D628046F8200937EDF /* Preview Assets.xcassets */,
+			);
+			path = "Preview Content";
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		798FB3CB28046F7F00937EDF /* swift-waku */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 798FB3DA28046F8200937EDF /* Build configuration list for PBXNativeTarget "swift-waku" */;
+			buildPhases = (
+				798FB3C828046F7F00937EDF /* Sources */,
+				798FB3C928046F7F00937EDF /* Frameworks */,
+				798FB3CA28046F7F00937EDF /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = "swift-waku";
+			productName = "swift-waku";
+			productReference = 798FB3CC28046F7F00937EDF /* swift-waku.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		798FB3C428046F7F00937EDF /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1330;
+				LastUpgradeCheck = 1330;
+				TargetAttributes = {
+					798FB3CB28046F7F00937EDF = {
+						CreatedOnToolsVersion = 13.3;
+					};
+				};
+			};
+			buildConfigurationList = 798FB3C728046F7F00937EDF /* Build configuration list for PBXProject "swift-waku" */;
+			compatibilityVersion = "Xcode 13.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 798FB3C328046F7F00937EDF;
+			productRefGroup = 798FB3CD28046F7F00937EDF /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				798FB3CB28046F7F00937EDF /* swift-waku */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		798FB3CA28046F7F00937EDF /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				798FB3D728046F8200937EDF /* Preview Assets.xcassets in Resources */,
+				798FB3D428046F8200937EDF /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		798FB3C828046F7F00937EDF /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				797CFE3028285CDE00D0B7E7 /* Response.swift in Sources */,
+				797CFE202828077C00D0B7E7 /* WakuNode.swift in Sources */,
+				797CFE2428285C3100D0B7E7 /* Config.swift in Sources */,
+				797CFE2628285C5500D0B7E7 /* Message.swift in Sources */,
+				797CFE2828285C7300D0B7E7 /* DecodedPayload.swift in Sources */,
+				798FB3D228046F7F00937EDF /* ContentView.swift in Sources */,
+				798FB3D028046F7F00937EDF /* swift_wakuApp.swift in Sources */,
+				797CFE2C28285CA700D0B7E7 /* JsonResult.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		798FB3D828046F8200937EDF /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++17";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_BITCODE = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.4;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		798FB3D928046F8200937EDF /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++17";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_BITCODE = NO;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.4;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		798FB3DB28046F8200937EDF /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_ASSET_PATHS = "\"swift-waku/Preview Content\"";
+				DEVELOPMENT_TEAM = 3VA3W764MV;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				"OTHER_CODE_SIGN_FLAGS[sdk=*]" = "--deep";
+				PRODUCT_BUNDLE_IDENTIFIER = "status-im.swift-waku";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRIP_BITCODE_FROM_COPIED_FILES = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		798FB3DC28046F8200937EDF /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_ASSET_PATHS = "\"swift-waku/Preview Content\"";
+				DEVELOPMENT_TEAM = 3VA3W764MV;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				"OTHER_CODE_SIGN_FLAGS[sdk=*]" = "--deep";
+				PRODUCT_BUNDLE_IDENTIFIER = "status-im.swift-waku";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRIP_BITCODE_FROM_COPIED_FILES = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		798FB3C728046F7F00937EDF /* Build configuration list for PBXProject "swift-waku" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				798FB3D828046F8200937EDF /* Debug */,
+				798FB3D928046F8200937EDF /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		798FB3DA28046F8200937EDF /* Build configuration list for PBXNativeTarget "swift-waku" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				798FB3DB28046F8200937EDF /* Debug */,
+				798FB3DC28046F8200937EDF /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 798FB3C428046F7F00937EDF /* Project object */;
+}

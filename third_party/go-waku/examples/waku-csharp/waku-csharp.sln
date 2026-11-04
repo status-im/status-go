@@ -1,0 +1,25 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.1.32319.34
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "waku-csharp", "waku-csharp\waku-csharp.csproj", "{DF7E520D-8CD7-4E26-B364-323FB907200F}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{DF7E520D-8CD7-4E26-B364-323FB907200F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{DF7E520D-8CD7-4E26-B364-323FB907200F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{DF7E520D-8CD7-4E26-B364-323FB907200F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{DF7E520D-8CD7-4E26-B364-323FB907200F}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {CF131A12-1D34-4683-A5BE-DD7326B38FE3}
+	EndGlobalSection
+EndGlobal
