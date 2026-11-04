@@ -188,3 +188,89 @@ func TestFullBalanceSendSubtractsFeesOnce(t *testing.T) {
 	require.Contains(t, err.Error(), ErrNotEnoughNativeBalance.Code)
 	require.Equal(t, big.NewInt(balance-21_000), path.AmountIn.ToInt())
 }
+
+func TestRefreshStaleGasEstimates(t *testing.T) {
+	logger := logutils.ZapLogger().Named("router-test")
+	now := time.Unix(1_000_000, 0)
+	stale := now.Add(-routes.GasEstimateMaxAge - time.Second)
+	fresh := now.Add(-time.Second)
+
+	newPath := func(processor string, approvalRequired bool, txEstimatedAt, approvalEstimatedAt time.Time) *routes.Path {
+		return &routes.Path{
+			ProcessorName:              processor,
+			FromChain:                  &params.Network{ChainID: 1},
+			ApprovalRequired:           approvalRequired,
+			SuggestedTxGasAmount:       157500,
+			EstimatedTxGasAmount:       150000,
+			TxGasAmount:                157500,
+			TxGasEstimatedAt:           txEstimatedAt,
+			SuggestedApprovalGasAmount: 48300,
+			EstimatedApprovalGasAmount: 46000,
+			ApprovalGasAmount:          48300,
+			ApprovalGasEstimatedAt:     approvalEstimatedAt,
+		}
+	}
+	noApprovalPlaced := func(string) bool { return false }
+	approvalPlaced := func(string) bool { return true }
+
+	type estimators struct{ tx, approval *gasEstimator }
+	run := func(route routes.Route, placed func(string) bool, e estimators) {
+		refreshStaleGasEstimates(route, placed, now,
+			func(*routes.Path) gasEstimatorFunc { return e.tx.estimate },
+			func(*routes.Path) gasEstimatorFunc { return e.approval.estimate },
+			logger)
+	}
+
+	t.Run("swap signed a while after its approval was mined: the main tx is re-estimated", func(t *testing.T) {
+		// re-evaluated when the approval was mined, then the user waited
+		path := newPath("Paraswap", true, stale, stale)
+		e := estimators{tx: &gasEstimator{gas: 163800, raw: 156000}, approval: &gasEstimator{}}
+		run(routes.Route{path}, approvalPlaced, e)
+
+		require.Equal(t, 1, e.tx.calls)
+		require.Equal(t, 0, e.approval.calls, "a placed approval is never estimated again")
+		require.Equal(t, uint64(163800), path.SuggestedTxGasAmount)
+		require.Equal(t, uint64(156000), path.EstimatedTxGasAmount)
+		require.Equal(t, now, path.TxGasEstimatedAt)
+		// the confirmed gas is kept; the build compares it with the new estimate
+		require.Equal(t, uint64(157500), path.TxGasAmount)
+	})
+
+	t.Run("approval pending: only the approval is re-estimated", func(t *testing.T) {
+		path := newPath("Paraswap", true, time.Time{}, stale)
+		e := estimators{tx: &gasEstimator{}, approval: &gasEstimator{gas: 50400, raw: 48000}}
+		run(routes.Route{path}, noApprovalPlaced, e)
+
+		require.Equal(t, 0, e.tx.calls)
+		require.Equal(t, 1, e.approval.calls)
+		require.Equal(t, uint64(48000), path.EstimatedApprovalGasAmount)
+		require.Equal(t, now, path.ApprovalGasEstimatedAt)
+		require.Equal(t, uint64(48300), path.ApprovalGasAmount)
+	})
+
+	t.Run("fresh estimates aren't re-estimated", func(t *testing.T) {
+		route := routes.Route{newPath("Transfer", false, fresh, time.Time{}), newPath("Paraswap", true, time.Time{}, fresh)}
+		e := estimators{tx: &gasEstimator{}, approval: &gasEstimator{}}
+		run(route, noApprovalPlaced, e)
+
+		require.Equal(t, 0, e.tx.calls)
+		require.Equal(t, 0, e.approval.calls)
+	})
+
+	t.Run("a failed re-estimate leaves the estimate stale", func(t *testing.T) {
+		path := newPath("Transfer", false, stale, time.Time{})
+		e := estimators{tx: &gasEstimator{err: errors.New("rpc down")}, approval: &gasEstimator{}}
+		run(routes.Route{path}, noApprovalPlaced, e)
+
+		require.Equal(t, 1, e.tx.calls)
+		require.Equal(t, stale, path.TxGasEstimatedAt)
+		require.Equal(t, uint64(150000), path.EstimatedTxGasAmount)
+	})
+}
+
+func TestMainTxGasEstimatedAt(t *testing.T) {
+	now := time.Unix(1_000_000, 0)
+	require.Equal(t, now, mainTxGasEstimatedAt(false, 150000, now))
+	require.Equal(t, now, mainTxGasEstimatedAt(true, 150000, now), "estimated before the approval was mined")
+	require.True(t, mainTxGasEstimatedAt(true, 0, now).IsZero(), "a stand-in is no estimate")
+}
