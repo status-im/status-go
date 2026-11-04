@@ -10,7 +10,6 @@ import (
 
 	"github.com/status-im/status-go/internal/rpc"
 	"github.com/status-im/status-go/internal/transactions"
-	pathProcessorCommon "github.com/status-im/status-go/pkg/services/wallet/router/pathprocessor/common"
 	"github.com/status-im/status-go/pkg/services/wallet/thirdparty"
 	"github.com/status-im/status-go/pkg/services/wallet/wallettypes"
 )
@@ -72,5 +71,5 @@ func (h *BaseNFTHandler) EstimateGas(params ProcessorInputParams, input []byte, 
 		return 0, err
 	}
 
-	return uint64(float64(estimation) * pathProcessorCommon.IncreaseEstimatedGasFactor), nil
+	return estimation, nil
 }

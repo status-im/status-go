@@ -95,8 +95,7 @@ func (s *TransferProcessor) EstimateGas(params ProcessorInputParams, input []byt
 
 	}
 
-	increasedEstimation := float64(estimation) * pathProcessorCommon.IncreaseEstimatedGasFactor
-	return uint64(increasedEstimation), nil
+	return estimation, nil
 }
 
 func (s *TransferProcessor) BuildTransactionV2(sendArgs *wallettypes.SendTxArgs, lastUsedNonce int64) (*ethTypes.Transaction, uint64, error) {

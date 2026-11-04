@@ -18,15 +18,21 @@ func (r *Router) refreshGasEstimates(chainID uint64, route routes.Route, now tim
 			continue
 		}
 		refreshPathGasEstimates(path, now,
-			func() (uint64, error) { return r.estimateTxGasForPath(path) },
-			func() (uint64, error) { return r.estimateApprovalGasForPath(path) },
+			func() (gasEstimate, error) { return r.estimateTxGasForPath(path) },
+			func() (gasEstimate, error) { return r.estimateApprovalGasForPath(path) },
 			r.logger)
 	}
 }
 
+// gasEstimate is a raw node estimate and its buffered limit.
+type gasEstimate struct {
+	estimated uint64
+	limit     uint64
+}
+
 // refreshPathGasEstimates re-estimates the path's due gas; a failure keeps the old estimate and time.
-func refreshPathGasEstimates(path *routes.Path, now time.Time, estimateTx func() (uint64, error),
-	estimateApproval func() (uint64, error), logger *zap.Logger) {
+func refreshPathGasEstimates(path *routes.Path, now time.Time, estimateTx func() (gasEstimate, error),
+	estimateApproval func() (gasEstimate, error), logger *zap.Logger) {
 	if path.ApprovalRequired {
 		if path.GasEstimateDue(true, now) {
 			gas, err := estimateApproval()
@@ -41,8 +47,10 @@ func refreshPathGasEstimates(path *routes.Path, now time.Time, estimateTx func()
 					zap.String("processor", path.ProcessorName),
 					zap.Uint64("fromChain", path.FromChain.ChainID),
 					zap.Uint64("previousGas", path.SuggestedApprovalGasAmount),
-					zap.Uint64("gas", gas))
-				path.SuggestedApprovalGasAmount = gas
+					zap.Uint64("estimatedGas", gas.estimated),
+					zap.Uint64("gas", gas.limit))
+				path.SuggestedApprovalGasAmount = gas.limit
+				path.EstimatedApprovalGasAmount = gas.estimated
 				path.ApprovalGasEstimatedAt = now
 			}
 		}
@@ -67,29 +75,42 @@ func refreshPathGasEstimates(path *routes.Path, now time.Time, estimateTx func()
 		zap.String("processor", path.ProcessorName),
 		zap.Uint64("fromChain", path.FromChain.ChainID),
 		zap.Uint64("previousGas", path.SuggestedTxGasAmount),
-		zap.Uint64("gas", gas))
-	path.SuggestedTxGasAmount = gas
+		zap.Uint64("estimatedGas", gas.estimated),
+		zap.Uint64("gas", gas.limit))
+	path.SuggestedTxGasAmount = gas.limit
+	path.EstimatedTxGasAmount = gas.estimated
 	path.TxGasEstimatedAt = now
 }
 
-func (r *Router) estimateTxGasForPath(path *routes.Path) (uint64, error) {
+func (r *Router) estimateTxGasForPath(path *routes.Path) (gasEstimate, error) {
 	processor, ok := r.pathProcessors[path.ProcessorName]
 	if !ok {
-		return 0, ErrCannotFindPathProcessorForProvidedIdentity
+		return gasEstimate{}, ErrCannotFindPathProcessorForProvidedIdentity
 	}
 	processorInputParams, err := r.processorInputParamsForPath(path)
 	if err != nil {
-		return 0, err
+		return gasEstimate{}, err
 	}
-	return processor.EstimateGas(processorInputParams, path.TxPackedData)
+	estimated, err := processor.EstimateGas(processorInputParams, path.TxPackedData)
+	if err != nil {
+		return gasEstimate{}, err
+	}
+	return gasEstimate{
+		estimated: estimated,
+		limit:     pathprocessor.BufferedGasEstimate(processor, processorInputParams, estimated),
+	}, nil
 }
 
-func (r *Router) estimateApprovalGasForPath(path *routes.Path) (uint64, error) {
+func (r *Router) estimateApprovalGasForPath(path *routes.Path) (gasEstimate, error) {
 	processorInputParams, err := r.processorInputParamsForPath(path)
 	if err != nil {
-		return 0, err
+		return gasEstimate{}, err
 	}
-	return r.estimateGasForApproval(processorInputParams, path.ApprovalPackedData)
+	estimated, err := r.estimateGasForApproval(processorInputParams, path.ApprovalPackedData)
+	if err != nil {
+		return gasEstimate{}, err
+	}
+	return gasEstimate{estimated: estimated, limit: bufferApprovalGas(estimated)}, nil
 }
 
 // processorInputParamsForPath rebuilds the processor params the path was built with.

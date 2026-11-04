@@ -252,7 +252,7 @@ func TestLiFiEstimateGas(t *testing.T) {
 
 		estimation, err := processor.EstimateGas(testInputParams, []byte{})
 		require.NoError(t, err)
-		require.Equal(t, uint64(float64(80000)*pathProcessorCommon.IncreaseEstimatedGasFactor), estimation)
+		require.Equal(t, uint64(80000), estimation)
 	})
 
 	t.Run("erc20 estimation error falls back to the quoted gas limit", func(t *testing.T) {
@@ -296,7 +296,7 @@ func TestLiFiEstimateGas(t *testing.T) {
 		estimation, err := processor.EstimateGas(testInputParams, []byte{})
 		require.NoError(t, err)
 		// GasLimit 0x3e8 = 1000
-		require.Equal(t, uint64(float64(1000)*pathProcessorCommon.IncreaseEstimatedGasFactor), estimation)
+		require.Equal(t, uint64(1000), estimation)
 	})
 
 	t.Run("native estimation error is propagated", func(t *testing.T) {

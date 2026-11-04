@@ -26,5 +26,5 @@ func TestStickersBuyProcessorEstimateGas(t *testing.T) {
 	}, nil)
 
 	require.NoError(t, err)
-	require.Equal(t, uint64(1050), gas)
+	require.Equal(t, uint64(1000), gas) // raw, unbuffered
 }

@@ -260,6 +260,11 @@ func (h *HopBridgeProcessor) packTxInputDataInternally(params ProcessorInputPara
 	return []byte{}, ErrContractTypeNotSupported
 }
 
+// GasBufferFactor implements GasBufferFactorProvider.
+func (h *HopBridgeProcessor) GasBufferFactor(_ ProcessorInputParams) float64 {
+	return pathProcessorCommon.IncreaseEstimatedGasFactorForBridge
+}
+
 func (h *HopBridgeProcessor) EstimateGas(params ProcessorInputParams, input []byte) (uint64, error) {
 	value := big.NewInt(0)
 	if params.FromToken.IsNative() {
@@ -286,6 +291,8 @@ func (h *HopBridgeProcessor) EstimateGas(params ProcessorInputParams, input []by
 	estimation, err := ethClient.EstimateGas(context.Background(), msg)
 	if err != nil {
 		if !params.FromToken.IsNative() {
+			// Hop is unregistered; if re-enabled it must defer its main tx until the approval is
+			// mined (walletCommon.IsProcessorSwap), or this stand-in gets signed.
 			// TODO: this is a temporary solution until we find a better way to estimate the gas
 			// hardcoding the estimation for other than ETH, cause we cannot get a proper estimation without having an approval placed first
 			// this is an error we're facing otherwise: `execution reverted: ERC20: transfer amount exceeds allowance`
@@ -295,8 +302,7 @@ func (h *HopBridgeProcessor) EstimateGas(params ProcessorInputParams, input []by
 		}
 	}
 
-	increasedEstimation := float64(estimation) * pathProcessorCommon.IncreaseEstimatedGasFactorForBridge
-	return uint64(increasedEstimation), nil
+	return estimation, nil
 }
 
 func (h *HopBridgeProcessor) GetContractAddress(params ProcessorInputParams) (common.Address, error) {

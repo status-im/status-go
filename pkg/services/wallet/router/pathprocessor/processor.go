@@ -25,7 +25,7 @@ type PathProcessor interface {
 	CalculateFees(params ProcessorInputParams) (*big.Int, *big.Int, error)
 	// PackTxInputData packs tx for sending
 	PackTxInputData(params ProcessorInputParams) ([]byte, error)
-	// EstimateGas estimates the gas
+	// EstimateGas returns the raw node estimate; the router applies the buffer (BufferedGasEstimate)
 	EstimateGas(params ProcessorInputParams, input []byte) (uint64, error)
 	// CalculateAmountOut calculates the amount out
 	CalculateAmountOut(params ProcessorInputParams) (*big.Int, error)
