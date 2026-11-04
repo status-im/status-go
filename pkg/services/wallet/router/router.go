@@ -1175,6 +1175,17 @@ func (r *Router) estimateMainTx(input *requests.RouteInputParams, pathProcessor 
 	return txPackedData, gasLimit, estimatedGas, nil
 }
 
+// mainTxGasEstimatedAt is the estimate time to record for a path's main tx gas. A main tx that
+// could only get a stand-in while its approval is pending (estimatedGas == 0) gets none, so once
+// the approval is placed it can't be signed before it is estimated (ReevaluateRouterPath, or
+// RefreshStaleGasEstimates at build time).
+func mainTxGasEstimatedAt(approvalRequired bool, estimatedGas uint64, now time.Time) time.Time {
+	if approvalRequired && estimatedGas == 0 {
+		return time.Time{}
+	}
+	return now
+}
+
 func (r *Router) buildPath(ctx context.Context, input *requests.RouteInputParams, fromToken *tokentypes.Token,
 	toToken *tokentypes.Token, pathProcessor pathprocessor.PathProcessor, fetchedFees *fees.SuggestedFees,
 	usedNonces map[uint64]uint64, noBaseFee bool, noPriorityFee bool, useCommunityTokenTransferDetailsAtIndex int) (*routes.Path, error) {
@@ -1290,8 +1301,6 @@ func (r *Router) buildPath(ctx context.Context, input *requests.RouteInputParams
 	if err != nil {
 		return nil, err
 	}
-	// both estimates above are now current; an approval-pending main tx that couldn't be estimated
-	// is never checked for freshness (see transfer.checkGasEstimatesFresh)
 	gasEstimatedAt := time.Now()
 
 	amountOut, err := pathProcessor.CalculateAmountOut(processorInputParams)
@@ -1323,7 +1332,7 @@ func (r *Router) buildPath(ctx context.Context, input *requests.RouteInputParams
 		SuggestedApprovalGasAmount: approvalGasLimit,
 		EstimatedTxGasAmount:       estimatedGas,
 		EstimatedApprovalGasAmount: approvalGasRaw,
-		TxGasEstimatedAt:           gasEstimatedAt,
+		TxGasEstimatedAt:           mainTxGasEstimatedAt(approvalRequired, estimatedGas, gasEstimatedAt),
 
 		UsedContractAddress: &contractAddress,
 		TxPackedData:        txPackedData,
