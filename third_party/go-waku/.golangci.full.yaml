@@ -1,0 +1,8 @@
+issues:
+  include:
+    - EXC0012
+    - EXC0014
+
+linters:
+  enable:
+    - revive

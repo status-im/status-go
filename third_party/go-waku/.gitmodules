@@ -1,0 +1,6 @@
+[submodule "libs/waku-rln-contract"]
+	path = libs/waku-rln-contract
+	url = https://github.com/waku-org/waku-rln-contract.git
+[submodule "waku/v2/protocol/waku-proto"]
+	path = waku/v2/protocol/waku-proto
+	url = https://github.com/waku-org/waku-proto

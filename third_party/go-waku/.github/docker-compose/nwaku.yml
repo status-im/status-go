@@ -1,0 +1,13 @@
+services:
+  nwaku:
+    image: "harbor.status.im/wakuorg/nwaku:v0.35.1"
+    command:
+      [
+        "--relay",
+        "--store",
+        "--nodekey=1122334455667788990011223344556677889900112233445566778899001122",
+        "--cluster-id=99",
+        "--shard=1",
+      ]
+    ports:
+      - "60000"

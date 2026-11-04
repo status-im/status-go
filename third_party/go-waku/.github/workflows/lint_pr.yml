@@ -1,0 +1,43 @@
+name: "Conventional Commits"
+
+on:
+  pull_request:
+    types:
+      - opened
+      - edited
+      - synchronize
+jobs:
+  main:
+    name: Validate format
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - uses: amannn/action-semantic-pull-request@v5
+        id: lint_pr_title
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - uses: richard-ramos/action-conventional-commits@v1.1.1
+        id: lint_pr_commits
+      - uses: marocchino/sticky-pull-request-comment@v2
+        # When the previous steps fails, the workflow would stop. By adding this
+        # condition you can continue the execution with the populated error message.
+        if: always() && (steps.lint_pr_title.outputs.error_message != null || steps.lint_pr_commits.outputs.error_message != null )
+        with:
+          header: pr-title-lint-error
+          message: |
+            Thank you for opening this pull request!
+            
+            We require pull request titles and commits to follow the [Conventional Commits specification](https://www.conventionalcommits.org/en/v1.0.0/) and it looks like your PR needs to be adjusted.
+
+            Details:
+          
+            > ${{ steps.lint_pr_title.outputs.error_message }}
+            > ${{ steps.lint_pr_commits.outputs.error_message }}
+
+      # Delete a previous comment when the issue has been resolved
+      - if: ${{ steps.lint_pr_title.outputs.error_message == null && steps.lint_pr_commits.outputs.error_message == null }}
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:   
+          header: pr-title-lint-error
+          delete: true

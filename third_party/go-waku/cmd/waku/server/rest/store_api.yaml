@@ -1,0 +1,135 @@
+# /store/v3/messages:
+get:
+  summary: Gets message history
+  description: >
+    Retrieves Waku message history. The returned history
+    can be potentially filtered by optional request parameters.
+  operationId: getMessageHistory
+  tags:
+    - store
+  parameters:
+    - name: peerAddr
+      in: query
+      schema:
+        type: string
+      required: true
+      description: >
+        P2P fully qualified peer multiaddress
+        in the format `(ip4|ip6)/tcp/p2p/$peerId` and URL-encoded.
+      example: '%2Fip4%2F127.0.0.1%2Ftcp%2F60001%2Fp2p%2F16Uiu2HAmVFXtAfSj4EiR7mL2KvL4EE2wztuQgUSBoj2Jx2KeXFLN'
+
+    - name: includeData
+      in: query
+      schema:
+        type: string
+      description: >
+        Boolean indicating if the query should return messages (data) or hashes only.
+        A value of 'false' returns hashes only.
+        A value of 'true' returns hashes AND messages.
+        Default value is 'false'
+      example: 'true'
+
+    - name: pubsubTopic
+      in: query
+      schema:
+        type: string
+      description: >
+        The pubsub topic on which a WakuMessage is published.
+        If left empty, no filtering is applied.
+        It is also intended for pagination purposes.
+        It should be a URL-encoded string.
+      example: 'my%20pubsub%20topic'
+
+    - name: contentTopics
+      in: query
+      schema: string
+      description: >
+        Comma-separated list of content topics. When specified,
+        only WakuMessages that are linked to any of the given
+        content topics will be delivered in the get response.
+        It should be a URL-encoded-comma-separated string.
+      example: 'my%20first%20content%20topic%2Cmy%20second%20content%20topic%2Cmy%20third%20content%20topic'
+
+    - name: startTime
+      in: query
+      schema:
+        type: string
+      description: >
+        The inclusive lower bound on the timestamp of
+        queried WakuMessages. This field holds the
+        Unix epoch time in nanoseconds as a 64-bits
+        integer value.
+      example: '1680590945000000000'
+
+    - name: endTime
+      in: query
+      schema:
+        type: string
+      description: >
+        The inclusive upper bound on the timestamp of
+        queried WakuMessages. This field holds the
+        Unix epoch time in nanoseconds as a 64-bits
+        integer value.
+      example: '1680590945000000000'
+
+    - name: hashes
+      in: query
+      schema:
+        type: string
+      description: >
+        Comma-separated list of message hashes.
+        URL-base64-encoded string computed as a hash of messages.
+        Used to find messages by hash.
+      example: 'Gc4ACThW5t2QQO82huq3WnDv%2FapPPJpD%2FwJfxDxAnR0%3D'
+
+    - name: cursor
+      in: query
+      schema:
+        type: string
+      description: >
+        Cursor field intended for pagination purposes.
+        URL-base64-encoded string computed as a hash of a message.
+        It could be empty for retrieving the first page,
+        and will be returned from the GET response so that
+        it can be part of the next page request.
+      example: 'Gc4ACThW5t2QQO82huq3WnDv%2FapPPJpD%2FwJfxDxAnR0%3D'
+
+    - name: pageSize
+      in: query
+      schema:
+        type: string
+      description: >
+        Number of messages to retrieve per page
+      example: '5'
+
+    - name: ascending
+      in: query
+      schema:
+        type: string
+      description: >
+        "true" for paging forward, "false" for paging backward.
+        If not specified or if specified with an invalid value, the default is "true".
+      example: "true"
+
+  responses:
+    '200':
+      description: Waku message history.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/StoreQueryResponse'
+    '400':
+      description: Bad request error.
+      content:
+        text/plain:
+          type: string
+    '412':
+      description: Precondition failed.
+      content:
+        text/plain:
+          type: string
+    '500':
+      description: Internal server error.
+      content:
+        text/plain:
+          type: string

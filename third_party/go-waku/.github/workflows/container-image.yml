@@ -1,0 +1,50 @@
+name: container-image-build
+
+on:
+  workflow_call:
+    inputs:
+      image_tag:
+        type: string
+        default: ${{ github.event.number }}
+    outputs:
+      image:
+        description: The resulting image link
+        value: ${{ jobs.build-docker-image.outputs.image }}
+
+  workflow_dispatch:
+
+jobs:
+  build-docker-image:
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+
+    name: docker-build-${{ matrix.os }}
+    outputs:
+      image: ${{ steps.build.outputs.image }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Build image
+        id: build
+        run: |
+
+          SHORT_REF=$(git rev-parse --short HEAD)
+
+          TAG=$([ "${PR_NUMBER}" == "" ] && echo "${SHORT_REF}" || echo "${PR_NUMBER}")
+          IMAGE=quay.io/wakuorg/go-waku-pr:${TAG}
+
+          echo "image=${IMAGE}" >> $GITHUB_OUTPUT
+          echo "commit_hash=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
+
+          docker login -u ${QUAY_USER} -p ${QUAY_PASSWORD} quay.io
+          docker build -t ${IMAGE} -f docker/Dockerfile.test.amd64 --label quay.expires-after=7d .
+          docker push ${IMAGE}
+        env:
+          QUAY_PASSWORD: ${{ secrets.QUAY_PASSWORD }}
+          QUAY_USER: ${{ secrets.QUAY_USER }}
+          PR_NUMBER: ${{ inputs.image_tag }}
+

@@ -57,6 +57,7 @@ RUN mkdir -p /go/src/github.com/status-im/status-go
 WORKDIR /go/src/github.com/status-im/status-go
 
 ADD go.mod go.sum ./
+COPY third_party/go-waku/go.mod third_party/go-waku/go.sum ./third_party/go-waku/
 RUN go mod download
 
 ADD . .

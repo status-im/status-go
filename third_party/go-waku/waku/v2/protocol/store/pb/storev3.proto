@@ -1,0 +1,42 @@
+syntax = "proto3";
+
+// Protocol identifier: /vac/waku/store/3.0.0
+package waku.store.v3;
+
+import "waku/message/v1/message.proto";
+
+message WakuMessageKeyValue {
+  optional bytes message_hash = 1; // Globally unique key for a Waku Message
+  optional waku.message.v1.WakuMessage message = 2; // Full message content as value
+  optional string pubsub_topic = 3;
+}
+
+message StoreQueryRequest {
+  string request_id = 1;
+  bool include_data = 2; // Response should include full message content
+  
+  // Filter criteria for content-filtered queries
+  optional string pubsub_topic = 10;
+  repeated string content_topics = 11;
+  optional sint64 time_start = 12;
+  optional sint64 time_end = 13;
+
+  // List of key criteria for lookup queries
+  repeated bytes message_hashes = 20; // Message hashes (keys) to lookup
+  
+  // Pagination info. 50 Reserved
+  optional bytes pagination_cursor = 51; // Message hash (key) from where to start query (exclusive)
+  bool pagination_forward = 52;
+  optional uint64 pagination_limit = 53;
+}
+
+message StoreQueryResponse {
+  string request_id = 1;
+
+  optional uint32 status_code = 10;
+  optional string status_desc = 11;
+
+  repeated WakuMessageKeyValue messages = 20;
+
+  optional bytes pagination_cursor = 51;
+}

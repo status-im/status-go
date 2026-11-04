@@ -105,6 +105,11 @@ const (
 	// to accommodate bursts and variations in transport timing.
 	lightpushPeerRate  = 25
 	lightpushPeerBurst = 80
+
+	// Incoming Filter pushes share a bucket per serving relay across peer traffic
+	// and copies of our own publications on negotiated topics, including MVDS ACKs.
+	filterPushPeerRate  = 25
+	filterPushPeerBurst = 80
 )
 
 type SentEnvelope struct {
@@ -336,7 +341,10 @@ func New(nodeKey *ecdsa.PrivateKey, cfg *Config, logger *zap.Logger, ts timesour
 	}
 	waku.defaultShardInfo = shards[0]
 	if cfg.IsLightClient() {
-		opts = append(opts, node.WithWakuFilterLightNode())
+		opts = append(opts, node.WithWakuFilterLightNode(
+			filter.WithLightNodeRateLimiter(filterPushPeerRate, filterPushPeerBurst),
+			filter.WithLightNodeObserver(filterTraceObserver()),
+		))
 		waku.defaultShardInfo = shards[0]
 		opts = append(opts, node.WithMaxPeerConnections(cfg.DiscoveryLimit))
 		//TODO: temporary work-around to improve lightClient connectivity, need to be removed once community sharding is implemented
@@ -359,6 +367,7 @@ func New(nodeKey *ecdsa.PrivateKey, cfg *Config, logger *zap.Logger, ts timesour
 		opts = append(opts, node.WithWakuFilterFullNode(
 			filter.WithMaxSubscribers(20),
 			filter.WithFullNodeRateLimiter(15, 20),
+			filter.WithObserver(filterTraceObserver()),
 		))
 		opts = append(opts, node.WithLightPush(lightpush.WithRateLimiter(lightpushPeerRate, lightpushPeerBurst)))
 	}
@@ -842,6 +851,14 @@ func (w *Waku) ConfirmMessageDelivered(hashes []gethcommon.Hash) {
 
 // OnNewEnvelope is an interface from Waku FilterManager API that gets invoked when any new message is received by Filter.
 func (w *Waku) OnNewEnvelope(env *protocol.Envelope) error {
+	if diagnostics.Enabled() && env != nil {
+		event := diagnostics.Event{Stage: "filter_api_handoff", Source: "filter", EnvelopeHashes: []string{env.Hash().String()},
+			PubsubTopic: env.PubsubTopic(), ContentTopic: env.Message().ContentTopic}
+		if w.node != nil && w.node.Host() != nil {
+			event.LocalPeerID = w.node.Host().ID().String()
+		}
+		diagnostics.Emit(event)
+	}
 	return w.OnNewEnvelopes(env, common.RelayedMessageType, false)
 }
 
