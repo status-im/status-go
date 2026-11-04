@@ -25,30 +25,41 @@ type Metadata struct {
 // delivery. Encode it as a string so JavaScript clients do not lose precision.
 type Event struct {
 	Metadata
-	Version            int      `json:"version"`
-	Stage              string   `json:"stage"`
-	TimestampNS        int64    `json:"timestampNs,string"`
-	Sequence           uint64   `json:"sequence"`
-	Dropped            uint64   `json:"dropped"`
-	EnvelopeHashes     []string `json:"envelopeHashes,omitempty"`
-	Source             string   `json:"source,omitempty"`
-	Error              string   `json:"error,omitempty"`
-	DurationNS         int64    `json:"durationNs,omitempty"`
-	PublicationAttempt int      `json:"publicationAttempt,omitempty"`
-	RetryDelayNS       int64    `json:"retryDelayNs,omitempty"`
-	QueueDepth         int      `json:"queueDepth,omitempty"`
-	QueueCapacity      int      `json:"queueCapacity,omitempty"`
-	LocalPeerID        string   `json:"localPeerId,omitempty"`
-	RemotePeerID       string   `json:"remotePeerId,omitempty"`
-	FilterTraceID      string   `json:"filterTraceId,omitempty"`
-	StreamID           string   `json:"streamId,omitempty"`
-	PubsubTopic        string   `json:"pubsubTopic,omitempty"`
-	ContentTopic       string   `json:"contentTopic,omitempty"`
-	SubscriptionID     string   `json:"subscriptionId,omitempty"`
-	Reason             string   `json:"reason,omitempty"`
-	MatchingPeers      []string `json:"matchingPeers,omitempty"`
-	Rate               float64  `json:"rate,omitempty"`
-	Burst              int      `json:"burst,omitempty"`
+	Version                int      `json:"version"`
+	Stage                  string   `json:"stage"`
+	TimestampNS            int64    `json:"timestampNs,string"`
+	Sequence               uint64   `json:"sequence"`
+	Dropped                uint64   `json:"dropped"`
+	EnvelopeHashes         []string `json:"envelopeHashes,omitempty"`
+	Source                 string   `json:"source,omitempty"`
+	Error                  string   `json:"error,omitempty"`
+	DurationNS             int64    `json:"durationNs,omitempty"`
+	PublicationAttempt     int      `json:"publicationAttempt,omitempty"`
+	RetryDelayNS           int64    `json:"retryDelayNs,omitempty"`
+	QueueDepth             int      `json:"queueDepth,omitempty"`
+	QueueCapacity          int      `json:"queueCapacity,omitempty"`
+	LocalPeerID            string   `json:"localPeerId,omitempty"`
+	RemotePeerID           string   `json:"remotePeerId,omitempty"`
+	FilterTraceID          string   `json:"filterTraceId,omitempty"`
+	StreamID               string   `json:"streamId,omitempty"`
+	PubsubTopic            string   `json:"pubsubTopic,omitempty"`
+	ContentTopic           string   `json:"contentTopic,omitempty"`
+	SubscriptionID         string   `json:"subscriptionId,omitempty"`
+	Reason                 string   `json:"reason,omitempty"`
+	MatchingPeers          []string `json:"matchingPeers,omitempty"`
+	Rate                   float64  `json:"rate,omitempty"`
+	Burst                  int      `json:"burst,omitempty"`
+	ScheduleOperationID    string   `json:"scheduleOperationId,omitempty"`
+	StateType              string   `json:"stateType,omitempty"`
+	PreviousSendCount      *uint64  `json:"previousSendCount,omitempty"`
+	SendCount              *uint64  `json:"sendCount,omitempty"`
+	PreviousSendEpoch      *int64   `json:"previousSendEpoch,omitempty"`
+	SendEpoch              *int64   `json:"sendEpoch,omitempty"`
+	CurrentEpoch           *int64   `json:"currentEpoch,omitempty"`
+	EpochDurationNS        int64    `json:"epochDurationNs,omitempty"`
+	OperationCompletedAtNS int64    `json:"operationCompletedAtNs,string,omitempty"`
+	PeerEventTime          uint64   `json:"peerEventTime,omitempty"`
+	StateCount             *int     `json:"stateCount,omitempty"`
 }
 
 type emitter struct {
@@ -93,7 +104,7 @@ func Emit(event Event) {
 	if e == nil {
 		return
 	}
-	event.Version = 3
+	event.Version = 4
 	if event.TimestampNS == 0 {
 		event.TimestampNS = time.Now().UnixNano()
 	}
