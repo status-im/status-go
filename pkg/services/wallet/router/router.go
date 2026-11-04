@@ -302,10 +302,10 @@ func (r *Router) setCustomTxDetails(ctx context.Context, pathTxIdentity *request
 				zap.Error(err))
 			return err
 		}
-		err = r.checkBalancesForTheBestRoute(r.activeRoutes.Route)
+		err = r.checkBalancesForRouteAndAdjustAmountIn(r.activeRoutes.Route)
 		// inform the client about the changes
 		if err != nil {
-			r.logger.Error("setCustomTxDetails: checkBalancesForTheBestRoute returned an error",
+			r.logger.Error("setCustomTxDetails: balance check returned an error",
 				zap.String("uuid", pathTxIdentity.RouterInputParamsUuid),
 				zap.Error(err))
 		}
