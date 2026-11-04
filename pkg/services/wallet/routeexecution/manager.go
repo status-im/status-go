@@ -3,6 +3,7 @@ package routeexecution
 import (
 	"context"
 	"database/sql"
+	"time"
 
 	"go.uber.org/zap"
 
@@ -70,7 +71,10 @@ func (m *Manager) BuildTransactionsFromRoute(ctx context.Context, uuid string) {
 
 		defer func() {
 			if err != nil {
-				m.ClearLocalRouteData()
+				// nothing was built; keep e.g. a placed approval so it isn't sent twice
+				if !transfer.RouteNeedsReview(err) {
+					m.ClearLocalRouteData()
+				}
 				err = statusErrors.CreateErrorResponseFromError(err)
 				response.SendDetails.ErrorResponse = err.(*statusErrors.ErrorResponse)
 			}
@@ -102,6 +106,10 @@ func (m *Manager) BuildTransactionsFromRoute(ctx context.Context, uuid string) {
 
 		// notify client that sending transactions started (has 3 steps, building txs, signing txs, sending txs)
 		signal.SendWalletEvent(signal.RouterSendingTransactionsStarted, response.SendDetails)
+
+		// the update loop stopped above (and stops on its own after a while); estimates the build
+		// would refuse as too old get one more chance here
+		m.router.RefreshStaleGasEstimates(m.transactionManager.ApprovalPlacedForPath, time.Now())
 
 		var fromChainID, toChainID uint64
 		response.SigningDetails, fromChainID, toChainID, err = m.transactionManager.BuildTransactionsFromRoute(
