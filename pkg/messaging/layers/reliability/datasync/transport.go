@@ -12,6 +12,8 @@ import (
 	"github.com/status-im/mvds/state"
 	"github.com/status-im/mvds/transport"
 	"go.uber.org/zap"
+
+	"github.com/status-im/status-go/pkg/messaging/diagnostics"
 )
 
 const backoffInterval = 60
@@ -52,7 +54,13 @@ func (t *NodeTransport) Init(dispatch func(state.PeerID, *protobuf.Payload) erro
 func (t *NodeTransport) AddPacket(p transport.Packet) {
 	select {
 	case t.packets <- p:
+		if diagnostics.Enabled() {
+			diagnostics.Emit(diagnostics.Event{Metadata: PayloadTraceMetadata(p.Sender, p.Payload), Stage: "mvds_packet_queued", QueueDepth: len(t.packets), QueueCapacity: cap(t.packets)})
+		}
 	default:
+		if diagnostics.Enabled() {
+			diagnostics.Emit(diagnostics.Event{Metadata: PayloadTraceMetadata(p.Sender, p.Payload), Stage: "mvds_packet_dropped", Error: "queue_full", QueueDepth: len(t.packets), QueueCapacity: cap(t.packets)})
+		}
 		if t.logger != nil {
 			t.logger.Debug("datasync: dropped inbound packet (node not consuming)")
 		}
@@ -64,6 +72,9 @@ func (t *NodeTransport) Watch(ctx context.Context) (*transport.Packet, bool) {
 	case <-ctx.Done():
 		return nil, false
 	case p := <-t.packets:
+		if diagnostics.Enabled() {
+			diagnostics.Emit(diagnostics.Event{Metadata: PayloadTraceMetadata(p.Sender, p.Payload), Stage: "mvds_packet_consumed", QueueDepth: len(t.packets), QueueCapacity: cap(t.packets)})
+		}
 		return &p, true
 	}
 }
