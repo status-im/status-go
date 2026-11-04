@@ -197,10 +197,9 @@ func (s *CommunityBurnProcessor) EstimateGas(params ProcessorInputParams, input 
 		return 0, createCommunityBurnErrorResponse(err)
 	}
 
-	increasedEstimation := float64(estimation) * pathProcessorCommon.IncreaseEstimatedGasFactor
-	logutils.ZapLogger().Debug("CommunityBurnProcessor estimation", zap.Uint64("gas", uint64(increasedEstimation)))
+	logutils.ZapLogger().Debug("CommunityBurnProcessor estimation", zap.Uint64("gas", estimation))
 
-	return uint64(increasedEstimation), nil
+	return estimation, nil
 }
 
 func (s *CommunityBurnProcessor) BuildTransactionV2(sendArgs *wallettypes.SendTxArgs, lastUsedNonce int64) (*ethTypes.Transaction, uint64, error) {

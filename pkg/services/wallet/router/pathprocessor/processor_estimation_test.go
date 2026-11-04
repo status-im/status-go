@@ -82,7 +82,7 @@ func TestTransferProcessor_PackTxInputDataAndEstimateGas(t *testing.T) {
 
 		estimation, err := processor.EstimateGas(params, input)
 		require.NoError(t, err)
-		assert.Equal(t, uint64(float64(21000)*pathProcessorCommon.IncreaseEstimatedGasFactor), estimation)
+		assert.Equal(t, uint64(21000), estimation)
 	})
 
 	t.Run("erc20 token estimates through the eth client", func(t *testing.T) {
@@ -119,7 +119,7 @@ func TestTransferProcessor_PackTxInputDataAndEstimateGas(t *testing.T) {
 
 		estimation, err := processor.EstimateGas(params, input)
 		require.NoError(t, err)
-		assert.Equal(t, uint64(float64(50000)*pathProcessorCommon.IncreaseEstimatedGasFactor), estimation)
+		assert.Equal(t, uint64(50000), estimation)
 	})
 
 	t.Run("transactor error is propagated", func(t *testing.T) {
@@ -269,7 +269,8 @@ func TestHopBridgeProcessor_EstimateGas(t *testing.T) {
 
 		estimation, err := processor.EstimateGas(params, []byte{})
 		require.NoError(t, err)
-		assert.Equal(t, uint64(float64(100000)*pathProcessorCommon.IncreaseEstimatedGasFactorForBridge), estimation)
+		assert.Equal(t, uint64(100000), estimation)
+		assert.Equal(t, pathProcessorCommon.IncreaseEstimatedGasFactorForBridge, GasBufferFactor(processor, params))
 	})
 
 	t.Run("erc20 estimation error falls back to the hardcoded estimation", func(t *testing.T) {
@@ -286,7 +287,7 @@ func TestHopBridgeProcessor_EstimateGas(t *testing.T) {
 
 		estimation, err := processor.EstimateGas(params, []byte{})
 		require.NoError(t, err)
-		assert.Equal(t, uint64(float64(600000)*pathProcessorCommon.IncreaseEstimatedGasFactorForBridge), estimation)
+		assert.Equal(t, uint64(600000), estimation)
 	})
 
 	t.Run("eth client getter error is propagated", func(t *testing.T) {
@@ -382,7 +383,7 @@ func TestSwapParaswapProcessor_PackTxInputDataAndEstimateGas(t *testing.T) {
 
 		estimation, err := processor.EstimateGas(params, []byte{})
 		require.NoError(t, err)
-		assert.Equal(t, uint64(float64(30000)*pathProcessorCommon.IncreaseEstimatedGasFactor), estimation)
+		assert.Equal(t, uint64(30000), estimation)
 	})
 
 	t.Run("price route fetch error is propagated", func(t *testing.T) {
@@ -436,7 +437,7 @@ func TestERC1155Processor_PackTxInputDataAndEstimateGas(t *testing.T) {
 
 		estimation, err := processor.EstimateGas(params, input)
 		require.NoError(t, err)
-		assert.Equal(t, uint64(float64(40000)*pathProcessorCommon.IncreaseEstimatedGasFactor), estimation)
+		assert.Equal(t, uint64(40000), estimation)
 	})
 
 	t.Run("pack without a collectible token id fails", func(t *testing.T) {
@@ -482,7 +483,7 @@ func TestStickersBuyProcessor_EstimateGas(t *testing.T) {
 
 		estimation, err := processor.EstimateGas(params, []byte{0x01})
 		require.NoError(t, err)
-		assert.Equal(t, uint64(float64(25000)*pathProcessorCommon.IncreaseEstimatedGasFactor), estimation)
+		assert.Equal(t, uint64(25000), estimation)
 	})
 
 	t.Run("eth client getter error is propagated", func(t *testing.T) {

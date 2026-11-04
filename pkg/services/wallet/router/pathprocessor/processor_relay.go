@@ -389,10 +389,11 @@ func (s *RelayProcessor) EstimateGas(params ProcessorInputParams, input []byte) 
 		return 0, createRelayErrorResponse(err)
 	}
 
-	return uint64(float64(estimation) * s.relayGasFactor(params)), nil
+	return estimation, nil
 }
 
-func (s *RelayProcessor) relayGasFactor(params ProcessorInputParams) float64 {
+// GasBufferFactor implements GasBufferFactorProvider.
+func (s *RelayProcessor) GasBufferFactor(params ProcessorInputParams) float64 {
 	if isRelayBridge(params) {
 		return pathProcessorCommon.IncreaseEstimatedGasFactorForBridge
 	}
@@ -415,7 +416,8 @@ func (s *RelayProcessor) GasBeforeApproval(params ProcessorInputParams) (uint64,
 		zap.String("requestId", quote.RequestID),
 		zap.Uint64("gasLimit", gas),
 		zap.String("source", source))
-	return uint64(float64(gas) * s.relayGasFactor(params)), true
+	// a stand-in, so already buffered
+	return uint64(float64(gas) * s.GasBufferFactor(params)), true
 }
 
 func (s *RelayProcessor) fetchAndStoreQuoteFromSendTxArgs(sendArgs *wallettypes.SendTxArgs) (*relay.Quote, error) {

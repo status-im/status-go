@@ -23,14 +23,15 @@ import (
 func bigHex(v int64) *hexutil.Big { return (*hexutil.Big)(big.NewInt(v)) }
 
 type gasEstimator struct {
-	gas   uint64
+	gas   uint64 // buffered limit
+	raw   uint64 // node estimate
 	err   error
 	calls int
 }
 
-func (e *gasEstimator) estimate() (uint64, error) {
+func (e *gasEstimator) estimate() (gasEstimate, error) {
 	e.calls++
-	return e.gas, e.err
+	return gasEstimate{estimated: e.raw, limit: e.gas}, e.err
 }
 
 func TestRefreshPathGasEstimates(t *testing.T) {
@@ -55,12 +56,13 @@ func TestRefreshPathGasEstimates(t *testing.T) {
 
 	t.Run("successful re-estimate updates the suggestion and its timestamp only", func(t *testing.T) {
 		path := newPath(false, due, time.Time{})
-		tx, approval := &gasEstimator{gas: 217760}, &gasEstimator{}
+		tx, approval := &gasEstimator{gas: 217760, raw: 207391}, &gasEstimator{}
 		refreshPathGasEstimates(path, now, tx.estimate, approval.estimate, logger)
 
 		require.Equal(t, 1, tx.calls)
 		require.Equal(t, 0, approval.calls)
 		require.Equal(t, uint64(217760), path.SuggestedTxGasAmount)
+		require.Equal(t, uint64(207391), path.EstimatedTxGasAmount)
 		require.Equal(t, now, path.TxGasEstimatedAt)
 		// the tx gas amount follows the suggestion in the next fee evaluation, unless it's custom
 		require.Equal(t, uint64(30000), path.TxGasAmount)
@@ -88,12 +90,13 @@ func TestRefreshPathGasEstimates(t *testing.T) {
 
 	t.Run("approval-pending path re-estimates the approval, never the main tx", func(t *testing.T) {
 		path := newPath(true, time.Time{}, due)
-		tx, approval := &gasEstimator{gas: 999999}, &gasEstimator{gas: 150213}
+		tx, approval := &gasEstimator{gas: 999999}, &gasEstimator{gas: 150213, raw: 143060}
 		refreshPathGasEstimates(path, now, tx.estimate, approval.estimate, logger)
 
 		require.Equal(t, 0, tx.calls)
 		require.Equal(t, 1, approval.calls)
 		require.Equal(t, uint64(150213), path.SuggestedApprovalGasAmount)
+		require.Equal(t, uint64(143060), path.EstimatedApprovalGasAmount)
 		require.Equal(t, now, path.ApprovalGasEstimatedAt)
 		require.Equal(t, uint64(22050), path.SuggestedTxGasAmount)
 		require.True(t, path.TxGasEstimatedAt.IsZero())

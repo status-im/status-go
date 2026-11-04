@@ -20,7 +20,6 @@ import (
 	mock_ethclient "github.com/status-im/status-go/internal/rpc/chain/ethclient/mock/client/ethclient"
 	mock_rpcclient "github.com/status-im/status-go/internal/rpc/mock/client"
 	walletCommon "github.com/status-im/status-go/pkg/services/wallet/common"
-	pathProcessorCommon "github.com/status-im/status-go/pkg/services/wallet/router/pathprocessor/common"
 )
 
 // fakeEnsResolver satisfies ensResolverIface for tests.
@@ -70,7 +69,7 @@ func TestENSReleaseProcessor_EstimateGas(t *testing.T) {
 
 		estimation, err := processor.EstimateGas(params, input)
 		require.NoError(t, err)
-		assert.Equal(t, uint64(float64(60000)*pathProcessorCommon.IncreaseEstimatedGasFactor), estimation)
+		assert.Equal(t, uint64(60000), estimation)
 	})
 
 	t.Run("resolver error is propagated", func(t *testing.T) {
@@ -127,7 +126,7 @@ func TestENSPublicKeyProcessor_EstimateGas(t *testing.T) {
 
 		estimation, err := processor.EstimateGas(params, input)
 		require.NoError(t, err)
-		assert.Equal(t, uint64(float64(70000)*pathProcessorCommon.IncreaseEstimatedGasFactor), estimation)
+		assert.Equal(t, uint64(70000), estimation)
 	})
 
 	t.Run("zero resolver address is an error", func(t *testing.T) {
@@ -212,7 +211,7 @@ func TestENSRegisterProcessor_EstimateGas(t *testing.T) {
 
 		estimation, err := processor.EstimateGas(params, []byte{0x01})
 		require.NoError(t, err)
-		assert.Equal(t, uint64(float64(90000)*pathProcessorCommon.IncreaseEstimatedGasFactor), estimation)
+		assert.Equal(t, uint64(90000), estimation)
 	})
 
 	t.Run("estimation error is propagated", func(t *testing.T) {

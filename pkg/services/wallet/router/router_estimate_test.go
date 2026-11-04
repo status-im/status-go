@@ -40,7 +40,8 @@ func TestEstimateMainTx(t *testing.T) {
 		expectedGas       uint64
 		expectErr         bool
 	}{
-		{"swap with approval estimates when it can", "Relay", sendtype.Swap, true, nil, nil, 0, packed, 150000, false},
+		// the router buffers the processor's raw estimate (default factor 1.05)
+		{"swap with approval estimates when it can", "Relay", sendtype.Swap, true, nil, nil, 0, packed, 157500, false},
 		// the allowance isn't there yet, so a revert is expected; the fee stays unknown until the
 		// path is re-evaluated after the approval is mined
 		{"swap with approval tolerates an estimation failure", "Relay", sendtype.Swap, true, nil, errors.New("execution reverted"), 0, packed, 0, false},
@@ -81,7 +82,7 @@ func TestEstimateMainTx(t *testing.T) {
 			r := &Router{logger: logutils.ZapLogger().Named("router-test")}
 			input := &requests.RouteInputParams{SendType: tc.sendType}
 
-			data, gas, err := r.estimateMainTx(input, processor, pathprocessor.ProcessorInputParams{}, tc.approvalRequired)
+			data, gas, estimated, err := r.estimateMainTx(input, processor, pathprocessor.ProcessorInputParams{}, tc.approvalRequired)
 			if tc.expectErr {
 				require.Error(t, err)
 				return
@@ -89,6 +90,12 @@ func TestEstimateMainTx(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, tc.expectedData, data)
 			require.Equal(t, tc.expectedGas, gas)
+			// a stand-in or an unknown fee is not a node estimate
+			expectedEstimated := uint64(0)
+			if tc.packErr == nil && tc.estimateErr == nil {
+				expectedEstimated = 150000
+			}
+			require.Equal(t, expectedEstimated, estimated)
 		})
 	}
 }

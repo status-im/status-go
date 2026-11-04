@@ -439,7 +439,7 @@ func (r *Router) ReevaluateRouterPath(ctx context.Context, pathTxIdentity *reque
 				return err
 			}
 
-			gasLimit, err := pProcessor.EstimateGas(processorInputParams, txPackedData)
+			estimatedGas, err := pProcessor.EstimateGas(processorInputParams, txPackedData)
 			if err != nil {
 				r.logger.Error("ReevaluateRouterPath: EstimateGas failed",
 					zap.String("uuid", pathTxIdentity.RouterInputParamsUuid),
@@ -450,9 +450,11 @@ func (r *Router) ReevaluateRouterPath(ctx context.Context, pathTxIdentity *reque
 			r.logger.Debug("ReevaluateRouterPath: gas estimated",
 				zap.String("uuid", pathTxIdentity.RouterInputParamsUuid),
 				zap.String("processor", pProcessor.Name()),
-				zap.Uint64("gasLimit", gasLimit))
+				zap.Uint64("estimatedGas", estimatedGas))
 
+			gasLimit := pathprocessor.BufferedGasEstimate(pProcessor, processorInputParams, estimatedGas)
 			path.SuggestedTxGasAmount = gasLimit
+			path.EstimatedTxGasAmount = estimatedGas
 			path.TxGasAmount = gasLimit
 			path.TxPackedData = txPackedData
 			path.TxGasEstimatedAt = time.Now()
@@ -1119,26 +1121,26 @@ func (r *Router) resolveRoute(ctx context.Context, input *requests.RouteInputPar
 }
 
 func (r *Router) estimateMainTx(input *requests.RouteInputParams, pathProcessor pathprocessor.PathProcessor,
-	processorInputParams pathprocessor.ProcessorInputParams, approvalRequired bool) ([]byte, uint64, error) {
+	processorInputParams pathprocessor.ProcessorInputParams, approvalRequired bool) (txPackedData []byte, gasLimit uint64, estimatedGas uint64, err error) {
 	tolerateFailure := walletCommon.IsProcessorSwap(pathProcessor.Name()) && approvalRequired
 
-	txPackedData, err := pathProcessor.PackTxInputData(processorInputParams)
+	txPackedData, err = pathProcessor.PackTxInputData(processorInputParams)
 	if err != nil {
 		if tolerateFailure {
 			r.logger.Debug("buildPath: PackTxInputData failed, fee unknown until the approval is mined",
 				zap.String("uuid", input.Uuid),
 				zap.String("processor", pathProcessor.Name()),
 				zap.Error(err))
-			return nil, 0, nil
+			return nil, 0, 0, nil
 		}
 		r.logger.Error("buildPath: PackTxInputData failed",
 			zap.String("uuid", input.Uuid),
 			zap.String("processor", pathProcessor.Name()),
 			zap.Error(err))
-		return nil, 0, err
+		return nil, 0, 0, err
 	}
 
-	gasLimit, err := pathProcessor.EstimateGas(processorInputParams, txPackedData)
+	estimatedGas, err = pathProcessor.EstimateGas(processorInputParams, txPackedData)
 	if err != nil {
 		if tolerateFailure {
 			if estimator, ok := pathProcessor.(pathprocessor.ApprovalPendingGasEstimator); ok {
@@ -1148,27 +1150,29 @@ func (r *Router) estimateMainTx(input *requests.RouteInputParams, pathProcessor 
 						zap.String("processor", pathProcessor.Name()),
 						zap.Uint64("gasLimit", gas),
 						zap.Error(err))
-					return txPackedData, gas, nil
+					return txPackedData, gas, 0, nil
 				}
 			}
 			r.logger.Debug("buildPath: EstimateGas failed, fee unknown until the approval is mined",
 				zap.String("uuid", input.Uuid),
 				zap.String("processor", pathProcessor.Name()),
 				zap.Error(err))
-			return txPackedData, 0, nil
+			return txPackedData, 0, 0, nil
 		}
 		r.logger.Error("buildPath: EstimateGas failed",
 			zap.String("uuid", input.Uuid),
 			zap.String("processor", pathProcessor.Name()),
 			zap.Error(err))
-		return nil, 0, err
+		return nil, 0, 0, err
 	}
 
+	gasLimit = pathprocessor.BufferedGasEstimate(pathProcessor, processorInputParams, estimatedGas)
 	r.logger.Debug("buildPath: tx gas estimated",
 		zap.String("uuid", input.Uuid),
 		zap.String("processor", pathProcessor.Name()),
+		zap.Uint64("estimatedGas", estimatedGas),
 		zap.Uint64("gasLimit", gasLimit))
-	return txPackedData, gasLimit, nil
+	return txPackedData, gasLimit, estimatedGas, nil
 }
 
 func (r *Router) buildPath(ctx context.Context, input *requests.RouteInputParams, fromToken *tokentypes.Token,
@@ -1252,6 +1256,8 @@ func (r *Router) buildPath(ctx context.Context, input *requests.RouteInputParams
 
 	var (
 		approvalGasLimit   uint64
+		approvalGasRaw     uint64
+		estimatedGas       uint64
 		approvalPackedData []byte
 		gasLimit           uint64
 		txPackedData       []byte
@@ -1265,7 +1271,7 @@ func (r *Router) buildPath(ctx context.Context, input *requests.RouteInputParams
 				zap.Error(err))
 			return nil, err
 		}
-		approvalGasLimit, err = r.estimateGasForApproval(processorInputParams, approvalPackedData)
+		approvalGasRaw, err = r.estimateGasForApproval(processorInputParams, approvalPackedData)
 		if err != nil {
 			r.logger.Error("buildPath: estimateGasForApproval failed",
 				zap.String("uuid", input.Uuid),
@@ -1273,13 +1279,14 @@ func (r *Router) buildPath(ctx context.Context, input *requests.RouteInputParams
 				zap.Error(err))
 			return nil, err
 		}
+		approvalGasLimit = bufferApprovalGas(approvalGasRaw)
 		r.logger.Debug("buildPath: approval gas estimated",
 			zap.String("uuid", input.Uuid),
 			zap.String("processor", pathProcessor.Name()),
 			zap.Uint64("approvalGasLimit", approvalGasLimit))
 	}
 
-	txPackedData, gasLimit, err = r.estimateMainTx(input, pathProcessor, processorInputParams, approvalRequired)
+	txPackedData, gasLimit, estimatedGas, err = r.estimateMainTx(input, pathProcessor, processorInputParams, approvalRequired)
 	if err != nil {
 		return nil, err
 	}
@@ -1314,6 +1321,8 @@ func (r *Router) buildPath(ctx context.Context, input *requests.RouteInputParams
 		// set params that we don't want to be recalculated with every new block creation
 		SuggestedTxGasAmount:       gasLimit,
 		SuggestedApprovalGasAmount: approvalGasLimit,
+		EstimatedTxGasAmount:       estimatedGas,
+		EstimatedApprovalGasAmount: approvalGasRaw,
 		TxGasEstimatedAt:           gasEstimatedAt,
 
 		UsedContractAddress: &contractAddress,
