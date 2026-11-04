@@ -105,8 +105,11 @@ func (r *Reliability) UnwrapPayloadFromSDS(wrappedPayload []byte) ([]byte, error
 	unwrappedMessage, err := manager.UnwrapReceivedMessage(wrappedPayload)
 	if err != nil {
 		r.logger.Debug("failed to unwrap received message with SDS", zap.Error(err))
-		// return original payload since wrapping is not mandatory for all kinds of messages
-		return wrappedPayload, nil
+		if errors.Is(err, sds.ErrNotSDS) {
+			// Legacy messages are not necessarily SDS-wrapped.
+			return wrappedPayload, nil
+		}
+		return nil, errors.Wrap(err, "failed to unwrap message with SDS")
 	}
 
 	missingDeps := *unwrappedMessage.MissingDeps

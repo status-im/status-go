@@ -53,6 +53,58 @@ func (p *historyCountingPersistence) UpdateHistory(channelID string, update sds.
 	return p.PersistenceCallbacks.UpdateHistory(channelID, update)
 }
 
+func TestSDSUnwrapPersistenceErrorsRemainRetryable(t *testing.T) {
+	for _, failure := range []string{"read", "metadata", "history"} {
+		t.Run(failure, func(t *testing.T) {
+			db := newSDSStateTestDB(t)
+			require.NoError(t, mvdsmigrations.Migrate(db))
+			persistence := NewSQLitePersistence(db)
+			switch failure {
+			case "read":
+				_, err := db.Exec("ALTER TABLE sds_channel_metadata RENAME TO unavailable_metadata")
+				require.NoError(t, err)
+			case "metadata":
+				require.NoError(t, persistence.SaveChannelMeta("channel", []byte{0xff}))
+			case "history":
+				require.NoError(t, persistence.UpdateHistory("channel", sds.HistoryUpdate{
+					Append: []sds.HistoryMessage{{MessageID: "corrupt", Data: []byte{0xff}}},
+				}))
+			}
+			sender := newTestReliability(t)
+			t.Cleanup(sender.Close)
+			wrapped, _, err := sender.WrapPayloadForSDS([]byte("payload"), "channel")
+			require.NoError(t, err)
+			key, err := crypto.GenerateKey()
+			require.NoError(t, err)
+			receiver, err := NewReliability(
+				mvdsnode.NewSQLitePersistence(db), key,
+				func(string, []string, string) error { return nil },
+				zap.NewNop(), persistence,
+			)
+			require.NoError(t, err)
+			t.Cleanup(receiver.Close)
+
+			legacy := []byte("legacy payload")
+			payload, err := receiver.UnwrapPayloadFromSDS(legacy)
+			require.NoError(t, err)
+			require.Equal(t, legacy, payload)
+
+			payload, err = receiver.UnwrapPayloadFromSDS(wrapped)
+			require.Error(t, err)
+			require.Nil(t, payload, "a failed SDS envelope must not become an application payload")
+
+			if failure == "read" {
+				_, err := db.Exec("ALTER TABLE unavailable_metadata RENAME TO sds_channel_metadata")
+				require.NoError(t, err)
+			}
+			require.NoError(t, persistence.DropChannel("channel"))
+			payload, err = receiver.UnwrapPayloadFromSDS(wrapped)
+			require.NoError(t, err)
+			require.Equal(t, []byte("payload"), payload)
+		})
+	}
+}
+
 func TestSDSDuplicateIsNotReaddedAfterManagerRestart(t *testing.T) {
 	db := newSDSStateTestDB(t)
 	require.NoError(t, mvdsmigrations.Migrate(db))
