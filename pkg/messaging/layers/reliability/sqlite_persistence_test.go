@@ -4,10 +4,11 @@ import (
 	"database/sql"
 	"testing"
 
-	"github.com/status-im/status-go/internal/testutils"
-	reliabilitymigrations "github.com/status-im/status-go/pkg/messaging/layers/reliability/migrations"
 	"github.com/stretchr/testify/require"
 	"github.com/waku-org/sds-go-bindings/sds"
+
+	"github.com/status-im/status-go/internal/testutils"
+	reliabilitymigrations "github.com/status-im/status-go/pkg/messaging/layers/reliability/migrations"
 )
 
 const sdsStateMigration = "1793010000_add_sds_channel_state.up.sql"
