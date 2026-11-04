@@ -1,9 +1,11 @@
 #!/usr/bin/env groovy
 // vim: ft=groovy
-library 'status-jenkins-lib@v1.10.1'
+library 'status-jenkins-lib@v1.10.2'
+
+def result = ''
 
 pipeline {
-  agent { label "${params.AGENT_LABEL} && nix-2.33" }
+  agent { label "${params.AGENT_LABEL} && nix" }
 
   parameters {
     string(
@@ -37,9 +39,23 @@ pipeline {
       options { timeout(time: 60, unit: 'MINUTES') }
       steps {
         script {
-          nix.flake("status-go-library")
+          result = nix.flake("status-go-library")
         }
       }
+    }
+
+    stage('Nix Cache') {
+      steps { script {
+        def cache = utils.isReleaseBuild() ? 'public' : 'ci'
+        catchError(
+          buildResult: 'SUCCESS',
+          stageResult: 'UNSTABLE',
+          catchInterruptions: false,
+          message: 'Nix cache push failed',
+        ) {
+          nix.pushToAttic(derivations: [result], cache: cache)
+        }
+      } }
     }
   }
 
@@ -50,4 +66,3 @@ pipeline {
     }
   }
 }
-
