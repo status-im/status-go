@@ -6,10 +6,11 @@ import (
 
 	mvdsnode "github.com/status-im/mvds/node"
 	mvdsmigrations "github.com/status-im/mvds/persistenceutil"
-	"github.com/status-im/status-go/internal/crypto"
 	"github.com/stretchr/testify/require"
 	"github.com/waku-org/sds-go-bindings/sds"
 	"go.uber.org/zap"
+
+	"github.com/status-im/status-go/internal/crypto"
 )
 
 func TestWrapPayloadForSDSIntegrationRoundTrip(t *testing.T) {

@@ -2,6 +2,7 @@ package protocol
 
 import (
 	"crypto/ecdsa"
+	"database/sql"
 	"encoding/json"
 	"testing"
 	"time"
@@ -36,9 +37,10 @@ import (
 )
 
 type testMessengerConfig struct {
-	name       string
-	privateKey *ecdsa.PrivateKey
-	logger     *zap.Logger
+	name        string
+	privateKey  *ecdsa.PrivateKey
+	logger      *zap.Logger
+	appDatabase *sql.DB
 
 	unhandledMessagesTracker *unhandledMessagesTracker
 	messagesOrderController  *MessagesOrderController
@@ -111,14 +113,17 @@ func newTestMessenger(t *testing.T, messagingEnv *messaging.TestMessagingEnviron
 		assert.NoError(t, err)
 	})
 
-	appDb, err := testutils.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
-	if err != nil {
-		return nil, err
+	appDb := config.appDatabase
+	if appDb == nil {
+		appDb, err = testutils.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
+		if err != nil {
+			return nil, err
+		}
+		t.Cleanup(func() {
+			err = appDb.Close()
+			assert.NoError(t, err)
+		})
 	}
-	t.Cleanup(func() {
-		err = appDb.Close()
-		assert.NoError(t, err)
-	})
 
 	err = sqlite.Migrate(appDb)
 	if err != nil {
@@ -139,9 +144,11 @@ func newTestMessenger(t *testing.T, messagingEnv *messaging.TestMessagingEnviron
 		return nil, err
 	}
 
-	err = sDB.CreateSettings(*config.appSettings, *config.nodeConfig)
-	if err != nil {
-		return nil, err
+	if config.appDatabase == nil {
+		err = sDB.CreateSettings(*config.appSettings, *config.nodeConfig)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	installationID := uuid.New().String()
