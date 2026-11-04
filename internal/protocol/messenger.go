@@ -2969,6 +2969,8 @@ type ReceivedMessageState struct {
 	TargetedInstallations *stringBoolMap
 	// Map of existing messages
 	ExistingMessagesMap map[string]bool
+	// SDS messages whose application handlers succeeded in this receive batch.
+	processedSDSMessages map[string]bool
 	// EmojiReactions is a list of emoji reactions for the current batch
 	// indexed by from-message-id-emoji-type
 	EmojiReactions map[string]*EmojiReaction
@@ -3403,11 +3405,11 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[types.ChatFilte
 		controlledCommunitiesChatIDs[chatID] = flag
 	}
 
+	var processedMessages []string
 	iterator := m.retrievedMessagesIteratorFactory(chatWithMessages)
 	for iterator.HasNext() {
 		filter, messages := iterator.Next()
 
-		var processedMessages []string
 		for _, shhMessage := range messages {
 			logger := logger.With(zap.String("hash", cryptotypes.EncodeHex(shhMessage.Hash)))
 			// Indicates tha all messages in the batch have been processed correctly
@@ -3444,6 +3446,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[types.ChatFilte
 			for _, msg := range statusMessages {
 				err := m.processStatusMessage(shhMessage.Hash, messageState, msg, filter, fromArchive, logger)
 				if err != nil {
+					logger.Warn("failed to process application message", zap.Error(err))
 					allMessagesProcessed = false
 				}
 			}
@@ -3454,15 +3457,21 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[types.ChatFilte
 				processedMessages = append(processedMessages, cryptotypes.EncodeHex(shhMessage.Hash))
 			}
 		}
-
-		if len(processedMessages) != 0 {
-			if err := m.messaging.ConfirmMessagesProcessed(processedMessages, m.getTimesource().GetCurrentTime()); err != nil {
-				logger.Warn("failed to confirm processed messages", zap.Error(err))
-			}
-		}
 	}
 
-	return m.saveDataAndPrepareResponse(messageState)
+	response, err := m.saveDataAndPrepareResponse(messageState)
+	if err != nil {
+		return nil, err
+	}
+	if err := m.persistence.MarkSDSMessagesProcessed(messageState.processedSDSMessages); err != nil {
+		return nil, errors.Wrap(err, "failed to persist processed SDS messages")
+	}
+	if len(processedMessages) != 0 {
+		if err := m.messaging.ConfirmMessagesProcessed(processedMessages, m.getTimesource().GetCurrentTime()); err != nil {
+			logger.Warn("failed to confirm processed messages", zap.Error(err))
+		}
+	}
+	return response, nil
 }
 
 func (m *Messenger) processStatusMessage(
@@ -3473,6 +3482,23 @@ func (m *Messenger) processStatusMessage(
 	fromArchive bool,
 	logger *zap.Logger) error {
 	messageID := cryptotypes.EncodeHex(msg.ApplicationLayer.ID)
+
+	if msg.SDSWrapped && (len(msg.ApplicationLayer.ID) == 0 || msg.ApplicationLayer.Payload == nil) {
+		return errors.New("SDS application message could not be decoded")
+	}
+	deduplicateSDS := msg.SDSWrapped && m.shouldSkipDuplicate(msg.ApplicationLayer.Type)
+	if deduplicateSDS {
+		if messageState.processedSDSMessages[messageID] {
+			return nil
+		}
+		processed, err := m.persistence.IsSDSMessageProcessed(messageID)
+		if err != nil {
+			return errors.Wrap(err, "failed to check processed SDS message")
+		}
+		if processed {
+			return nil
+		}
+	}
 
 	logger = logger.With(zap.String("message-id", messageID))
 	ctx, span := m.tracer.Start(trace.DeriveRemoteContext([]byte(messageID)), "Messenger.process_"+msg.ApplicationLayer.Type.String(),
@@ -3549,6 +3575,12 @@ func (m *Messenger) processStatusMessage(
 			return err
 		}
 		logger.Debug("Handled parsed message")
+		if deduplicateSDS {
+			if messageState.processedSDSMessages == nil {
+				messageState.processedSDSMessages = make(map[string]bool)
+			}
+			messageState.processedSDSMessages[messageID] = true
+		}
 	} else {
 		logger.Debug("parsed message is nil")
 		span.AddEvent("app layer message payload is nil")

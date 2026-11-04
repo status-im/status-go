@@ -1,6 +1,7 @@
 package processor
 
 import (
+	"bytes"
 	"context"
 	"crypto/ecdsa"
 	"encoding/hex"
@@ -348,6 +349,7 @@ func (r *Processor) processSDSLayer(msg *messagingtypes.Message) error {
 		return err
 	}
 
+	msg.SDSWrapped = !bytes.Equal(msg.EncryptionLayer.Payload, unwrappedPayload)
 	msg.EncryptionLayer.Payload = unwrappedPayload
 	return nil
 }
