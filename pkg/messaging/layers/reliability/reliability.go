@@ -239,7 +239,7 @@ func (r *Reliability) Start(dispatch MessageDispatcher) error {
 func (r *Reliability) buildNode(duration time.Duration) error {
 	transport := datasync.NewNodeTransport()
 	node, err := mvdsnode.NewPersistentNode(
-		r.mvdsPersistence,
+		datasync.WithTracePersistence(r.mvdsPersistence),
 		transport,
 		datasyncpeer.PublicKeyToPeerID(r.identity.PublicKey),
 		mvdsnode.BATCH,
