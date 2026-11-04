@@ -539,6 +539,10 @@ func (s *ProcessorSuite) TestSDSWrappedMessages() {
 	err = s.processor.processSDSLayer(&receivedMsg)
 	s.Require().NoError(err)
 	s.Require().Equal(payload, receivedMsg.EncryptionLayer.Payload)
+	s.Require().True(receivedMsg.SDSWrapped)
+	cloned, err := receivedMsg.Clone()
+	s.Require().NoError(err)
+	s.Require().True(cloned.SDSWrapped)
 
 	anotherPayload := []byte("another-message")
 	receivedMsg2 := types.Message{
@@ -549,6 +553,7 @@ func (s *ProcessorSuite) TestSDSWrappedMessages() {
 	err = s.processor.processSDSLayer(&receivedMsg2)
 	s.Require().NoError(err)
 	s.Require().Equal(anotherPayload, receivedMsg2.EncryptionLayer.Payload)
+	s.Require().False(receivedMsg2.SDSWrapped)
 }
 
 func (s *ProcessorSuite) TestSDSMissingDependencyTriggersFetchHintsAndRecoversPayloads() {
