@@ -158,6 +158,10 @@ func (p *sqlitePersistence) SDSPersistenceStorage() sds.PersistenceCallbacks {
 	return reliability.NewSQLitePersistence(p.db)
 }
 
+func (p *sqlitePersistence) SDSEnvelopeHashesStorage() reliability.SDSRetrievalHintPersistence {
+	return reliability.NewSQLiteRetrievalHintPersistence(p.db)
+}
+
 func (p *sqlitePersistence) MessageConfirmationStorage() common.MessageConfirmationPersistence {
 	return common.NewSQLiteMessageConfirmationPersistence(p.db)
 }
