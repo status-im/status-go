@@ -1,6 +1,7 @@
 package transactions
 
 import (
+	"context"
 	"fmt"
 	"math/big"
 	"reflect"
@@ -463,4 +464,38 @@ func (s *TransactorSuite) TestStoreAndTrackPendingTx() {
 	// Empty tracker doesn't produce error
 	err := s.manager.StoreAndTrackPendingTx(&wallettypes.SendTxArgs{}, nil)
 	s.NoError(err)
+}
+
+func (s *TransactorSuite) TestEstimateTransactionGas() {
+	chainID := s.nodeConfig.NetworkID
+	from := cryptotypes.HexToAddress("0x1")
+	to := cryptotypes.HexToAddress("0x2")
+	value := (*hexutil.Big)(big.NewInt(5))
+	input := cryptotypes.HexBytes{0xab, 0xcd}
+
+	s.Run("call: from, to, value and input reach the node", func() {
+		s.txServiceMock.EXPECT().EstimateGas(gomock.Any(), gomock.Any()).DoAndReturn(
+			func(_ context.Context, args fake.CallArgs) (hexutil.Uint64, error) {
+				s.Require().Equal(common.Address(from), args.From)
+				s.Require().NotNil(args.To)
+				s.Require().Equal(common.Address(to), *args.To)
+				s.Require().Equal(big.NewInt(5), args.Value.ToInt())
+				s.Require().Equal(hexutil.Bytes{0xab, 0xcd}, args.Data)
+				return hexutil.Uint64(204600), nil
+			})
+		gas, err := s.manager.EstimateTransactionGas(chainID, wallettypes.SendTxArgs{From: from, To: &to, Value: value, Data: input})
+		s.Require().NoError(err)
+		s.Require().Equal(uint64(204600), gas)
+	})
+
+	s.Run("no to: estimated as a contract deployment", func() {
+		s.txServiceMock.EXPECT().EstimateGas(gomock.Any(), gomock.Any()).DoAndReturn(
+			func(_ context.Context, args fake.CallArgs) (hexutil.Uint64, error) {
+				s.Require().Nil(args.To)
+				return hexutil.Uint64(1_500_000), nil
+			})
+		gas, err := s.manager.EstimateTransactionGas(chainID, wallettypes.SendTxArgs{From: from, Input: input})
+		s.Require().NoError(err)
+		s.Require().Equal(uint64(1_500_000), gas)
+	})
 }
