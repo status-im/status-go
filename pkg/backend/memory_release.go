@@ -173,10 +173,19 @@ func (r *memoryReleaser) claimTrailing(gen uint64) bool {
 	return true
 }
 
-// stop cancels pending releases and the token-list watch. The watch is stopped
-// outside the lock: Stop waits for a callback that takes it.
+// stop cancels the token-list watch, then pending releases. The watch is stopped first and
+// outside the lock: Stop waits for a queued callback, which takes the lock and could arm a release.
 func (r *memoryReleaser) stop() {
 	r.mu.Lock()
+	w := r.watcher
+	r.watcher = nil
+	r.mu.Unlock()
+	if w != nil {
+		w.Stop()
+	}
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	if r.timer != nil {
 		r.timer.Stop()
 		r.timer = nil
@@ -184,11 +193,5 @@ func (r *memoryReleaser) stop() {
 	if r.trailing != nil {
 		r.trailing.Stop()
 		r.trailing = nil
-	}
-	w := r.watcher
-	r.watcher = nil
-	r.mu.Unlock()
-	if w != nil {
-		w.Stop()
 	}
 }
