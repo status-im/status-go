@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"encoding/hex"
+	"sync"
 
 	"github.com/golang/protobuf/proto"
 	"github.com/pkg/errors"
@@ -20,6 +21,7 @@ import (
 	"github.com/status-im/status-go/pkg/messaging/controller/utils"
 	encryption "github.com/status-im/status-go/pkg/messaging/layers/encryption"
 	"github.com/status-im/status-go/pkg/messaging/layers/encryption/sharedsecret"
+	"github.com/status-im/status-go/pkg/messaging/layers/reliability"
 	"github.com/status-im/status-go/pkg/messaging/layers/segmentation"
 	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
 	"github.com/status-im/status-go/pkg/pubsub"
@@ -44,6 +46,9 @@ type Processor struct {
 	logger    *zap.Logger
 
 	tracer trace.Tracer
+
+	sdsMessageValidatorMu sync.RWMutex
+	sdsMessageValidator   func([]byte, string, *ecdsa.PublicKey, messagingtypes.ContentTopic) (messagingtypes.SDSMessageDisposition, error)
 }
 
 func NewProcessor(
@@ -68,6 +73,14 @@ func NewProcessor(
 
 func (r *Processor) Publisher() *pubsub.Publisher {
 	return r.publisher
+}
+
+// SetSDSMessageValidator validates application payloads and envelope context
+// before SDS processes its causal history and acknowledgements.
+func (r *Processor) SetSDSMessageValidator(validator func([]byte, string, *ecdsa.PublicKey, messagingtypes.ContentTopic) (messagingtypes.SDSMessageDisposition, error)) {
+	r.sdsMessageValidatorMu.Lock()
+	r.sdsMessageValidator = validator
+	r.sdsMessageValidatorMu.Unlock()
 }
 
 func (r *Processor) GetEphemeralKey() (*ecdsa.PrivateKey, error) {
@@ -169,10 +182,13 @@ func (r *Processor) processMessage(m *messagingtypes.ReceivedMessage) (*processM
 
 	// A broken SDS layer yields a payload that silently fails to decode further up,
 	// so fail the whole envelope instead: it must be retried, not marked processed.
-	err = r.processSDSLayer(responseMessage)
+	processed, err := r.processSDSLayer(responseMessage)
 	if err != nil {
 		logger.Error("failed to unwrap payload for SDS", zap.Error(err))
 		return nil, err
+	}
+	if !processed {
+		return &processMessageResponse{}, nil
 	}
 
 	messages, ackedMessageIDs, err := r.processReliabilityLayer(responseMessage, logger)
@@ -339,14 +355,44 @@ func (r *Processor) processEncryptionLayer(ctx context.Context, m *messagingtype
 	return err
 }
 
-func (r *Processor) processSDSLayer(msg *messagingtypes.Message) error {
+func (r *Processor) processSDSLayer(msg *messagingtypes.Message) (bool, error) {
 	if len(msg.EncryptionLayer.Payload) <= 0 {
-		return nil
+		return true, nil
+	}
+
+	r.sdsMessageValidatorMu.RLock()
+	validator := r.sdsMessageValidator
+	r.sdsMessageValidatorMu.RUnlock()
+	if validator != nil {
+		if content, channelID, isSDS := reliability.ExtractSDSMessage(msg.EncryptionLayer.Payload); isSDS {
+			var envelopeSigner *ecdsa.PublicKey
+			var topic messagingtypes.ContentTopic
+			if msg.TransportLayer.Message != nil {
+				envelopeSigner = msg.TransportLayer.SigPubKey
+				topic = msg.TransportLayer.Message.Topic
+			}
+			disposition, err := validator(content, channelID, envelopeSigner, topic)
+			if err != nil {
+				return false, err
+			}
+			switch disposition {
+			case messagingtypes.SDSMessageDispositionReject:
+				r.logger.Warn("discarding SDS message before reliability processing")
+				return false, nil
+			case messagingtypes.SDSMessageDispositionApplicationOnly:
+				msg.EncryptionLayer.Payload = content
+				msg.SDSWrapped = false
+				return true, nil
+			case messagingtypes.SDSMessageDispositionProcess:
+			default:
+				return false, errors.Errorf("unknown SDS message disposition: %d", disposition)
+			}
+		}
 	}
 
 	unwrappedPayload, sdsMessageID, channelID, isSDS, err := r.stack.Reliability.UnwrapPayloadFromSDSWithMetadata(msg.EncryptionLayer.Payload)
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	if isSDS {
@@ -365,7 +411,7 @@ func (r *Processor) processSDSLayer(msg *messagingtypes.Message) error {
 
 	msg.SDSWrapped = !bytes.Equal(msg.EncryptionLayer.Payload, unwrappedPayload)
 	msg.EncryptionLayer.Payload = unwrappedPayload
-	return nil
+	return true, nil
 }
 
 func (r *Processor) ProcessSharedSecrets(secrets []*sharedsecret.Secret) error {

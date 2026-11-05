@@ -4,9 +4,16 @@ import (
 	"github.com/pkg/errors"
 	"github.com/waku-org/sds-go-bindings/sds"
 	"go.uber.org/zap"
+	"google.golang.org/protobuf/encoding/protowire"
 
 	"github.com/status-im/status-go/internal/crypto"
 	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
+)
+
+const (
+	sdsMessageIDField protowire.Number = 1
+	sdsChannelIDField protowire.Number = 4
+	sdsContentField   protowire.Number = 5
 )
 
 // ErrSDSManagerUnavailable means SDS could not run at all, as opposed to a
@@ -106,6 +113,65 @@ func (r *Reliability) WrapPayloadForSDS(payload []byte, channelID string) ([]byt
 func (r *Reliability) UnwrapPayloadFromSDS(wrappedPayload []byte) ([]byte, error) {
 	payload, _, _, _, err := r.UnwrapPayloadFromSDSWithMetadata(wrappedPayload)
 	return payload, err
+}
+
+// ExtractSDSContent reads the application payload from an SDS wire message
+// without passing it to SDS or changing reliability state.
+func ExtractSDSContent(wrappedPayload []byte) ([]byte, bool) {
+	content, _, ok := ExtractSDSMessage(wrappedPayload)
+	return content, ok
+}
+
+// ExtractSDSMessage reads the application payload and channel from an SDS wire
+// message without passing it to SDS or changing reliability state.
+func ExtractSDSMessage(wrappedPayload []byte) ([]byte, string, bool) {
+	var content []byte
+	var channelID string
+	var hasMessageID, hasChannelID bool
+
+	for len(wrappedPayload) > 0 {
+		number, wireType, tagSize := protowire.ConsumeTag(wrappedPayload)
+		if tagSize < 0 {
+			return nil, "", false
+		}
+		wrappedPayload = wrappedPayload[tagSize:]
+
+		switch number {
+		case sdsMessageIDField, sdsChannelIDField, sdsContentField:
+			if wireType != protowire.BytesType {
+				valueSize := protowire.ConsumeFieldValue(number, wireType, wrappedPayload)
+				if valueSize < 0 {
+					return nil, "", false
+				}
+				wrappedPayload = wrappedPayload[valueSize:]
+				continue
+			}
+			value, valueSize := protowire.ConsumeBytes(wrappedPayload)
+			if valueSize < 0 {
+				return nil, "", false
+			}
+			switch number {
+			case sdsMessageIDField:
+				hasMessageID = len(value) > 0
+			case sdsChannelIDField:
+				channelID, hasChannelID = string(value), len(value) > 0
+			case sdsContentField:
+				content = value
+			}
+			wrappedPayload = wrappedPayload[valueSize:]
+		default:
+			valueSize := protowire.ConsumeFieldValue(number, wireType, wrappedPayload)
+			if valueSize < 0 {
+				return nil, "", false
+			}
+			wrappedPayload = wrappedPayload[valueSize:]
+		}
+	}
+
+	if !hasMessageID || !hasChannelID {
+		return nil, "", false
+	}
+	return content, channelID, true
 }
 
 func (r *Reliability) UnwrapPayloadFromSDSWithMetadata(wrappedPayload []byte) (

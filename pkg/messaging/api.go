@@ -1,6 +1,7 @@
 package messaging
 
 import (
+	"crypto/ecdsa"
 	"time"
 
 	"github.com/status-im/status-go/pkg/messaging/types"
@@ -27,6 +28,12 @@ func (a *API) Stop() error {
 
 func (a *API) Publisher() *pubsub.Publisher {
 	return a.core.publisher
+}
+
+// SetSDSMessageValidator validates an SDS application payload and its envelope
+// context before SDS processes its causal history and acknowledgements.
+func (a *API) SetSDSMessageValidator(validator func([]byte, string, *ecdsa.PublicKey, types.ContentTopic) (types.SDSMessageDisposition, error)) {
+	a.core.controller.Processor().SetSDSMessageValidator(validator)
 }
 
 // GetCurrentTime satisfies the common.TimeSource interface.

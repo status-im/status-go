@@ -468,6 +468,10 @@ func NewMessenger(
 		browserDatabase:      c.browserDatabase,
 		httpServer:           c.httpServer,
 		shutdownTasks: []func() error{
+			func() error {
+				messaging.SetSDSMessageValidator(nil)
+				return nil
+			},
 			pushNotificationClient.Stop,
 			communitiesManager.Stop,
 			func() error {
@@ -482,6 +486,7 @@ func NewMessenger(
 		savedAddressesManager:            savedAddressesManager,
 		retrievedMessagesIteratorFactory: NewDefaultMessagesIterator,
 	}
+	messaging.SetSDSMessageValidator(messenger.validateSDSCommunityMessage)
 
 	if c.rpcClient != nil {
 		messenger.contractMaker = contracts.NewContractMaker(c.rpcClient)
