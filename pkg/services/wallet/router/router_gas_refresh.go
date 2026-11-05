@@ -21,27 +21,6 @@ func (r *Router) refreshGasEstimates(chainID uint64, route routes.Route, now tim
 	}
 }
 
-// RefreshStaleGasEstimates re-estimates, right before the active route is built for signing, every
-// gas estimate the build will check that is older than routes.GasEstimateMaxAge. The update loop
-// keeps estimates fresh only while it runs; it stops at the first build and after
-// feeRecalculationTimeout, so without this a retry after a cancelled password prompt, or a swap
-// signed a while after its approval was mined, would be refused.
-//
-// approvalPlaced tells whether a processor's approval was already sent; an approval-pending path
-// is checked on its approval only (see transfer.checkGasEstimatesFresh).
-//
-// Like the update loop it changes only the suggested and estimated amounts, never the gas the user
-// confirmed (TxGasAmount / ApprovalGasAmount): the build refuses that gas if it is now below the
-// estimate, so the user reviews the new fee instead of signing a tx that would run out of gas.
-func (r *Router) RefreshStaleGasEstimates(approvalPlaced func(processorName string) bool, now time.Time) {
-	r.activeRoutesMutex.Lock()
-	defer r.activeRoutesMutex.Unlock()
-	if r.activeRoutes == nil {
-		return
-	}
-	refreshStaleGasEstimates(r.activeRoutes.Route, approvalPlaced, now, r.txGasEstimator, r.approvalGasEstimator, r.logger)
-}
-
 type gasEstimatorFunc func() (gasEstimate, error)
 
 func (r *Router) txGasEstimator(path *routes.Path) gasEstimatorFunc {
@@ -52,6 +31,9 @@ func (r *Router) approvalGasEstimator(path *routes.Path) gasEstimatorFunc {
 	return func() (gasEstimate, error) { return r.estimateApprovalGasForPath(path) }
 }
 
+// refreshStaleGasEstimates re-estimates, before the build, the estimates older than
+// GasEstimateMaxAge (the update loop may have stopped). Confirmed gas is never changed; the build
+// refuses it if it is below the new estimate.
 func refreshStaleGasEstimates(route routes.Route, approvalPlaced func(processorName string) bool, now time.Time,
 	txEstimator, approvalEstimator func(*routes.Path) gasEstimatorFunc, logger *zap.Logger) {
 	for _, path := range route {
@@ -80,9 +62,7 @@ func refreshPathGasEstimates(path *routes.Path, now time.Time, estimateTx gasEst
 		if path.GasEstimateDue(true, now) {
 			refreshGasEstimate(path, true, now, estimateApproval, logger)
 		}
-		// the main tx can't be estimated before the approval is mined; swaps re-estimate it then
-		// (ReevaluateRouterPath), and the build re-estimates it if that got old
-		// (RefreshStaleGasEstimates)
+		// the main tx can't be estimated before the approval is mined
 		return
 	}
 
