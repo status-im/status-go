@@ -2,9 +2,10 @@ package waku
 
 import (
 	"context"
+	"crypto/rand"
 	"errors"
 	"fmt"
-	"math/rand/v2"
+	"math/big"
 	"strings"
 	"time"
 )
@@ -63,7 +64,11 @@ func publishWithLightpushRetry(
 		// 250–375 ms, 500–750 ms, then 1–1.5 s. The shared sender limiter
 		// also paces retries among all other data and protocol publications.
 		delay := lightpushRateLimitBaseDelay << retry
-		delay += time.Duration(rand.Int64N(int64(delay/2) + 1))
+		jitter, jitterErr := rand.Int(rand.Reader, big.NewInt(int64(delay/2)+1))
+		if jitterErr != nil {
+			return attempts, errors.Join(err, fmt.Errorf("generate lightpush retry jitter: %w", jitterErr))
+		}
+		delay += time.Duration(jitter.Int64())
 		if onRetry != nil {
 			onRetry(attempts+1, delay, err)
 		}

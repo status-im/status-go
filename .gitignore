@@ -121,10 +121,6 @@ pkg/sentry/SENTRY_PRODUCTION
 go.work
 go.work.sum
 
-# The pinned dependency snapshot includes upstream generated protobuf sources.
-!/third_party/go-waku/
-!/third_party/go-waku/**
-
 # Token deployment cache files
 test/functional/snt_addresses.json*
 

@@ -1493,6 +1493,8 @@ github.com/josharian/intern v1.0.0/go.mod h1:5DoeVV0s6jJacbCEi61lwdGj/aVlrQvzHFF
 github.com/joshdk/go-junit v1.0.0 h1:S86cUKIdwBHWwA6xCmFlf3RTLfVXYQfvanM5Uh+K6GE=
 github.com/joshdk/go-junit v1.0.0/go.mod h1:TiiV0PqkaNfFXjEiyjWM3XXrhVyCa1K4Zfga6W52ung=
 github.com/jpillora/backoff v1.0.0/go.mod h1:J/6gKK9jxlEcS3zixgDgUAsiuZ7yrSoa/FX5e0EB2j4=
+github.com/jrainville/logos-delivery-go v0.0.0-20261105183455-fafb17f5e549 h1:Hb/icXngPK4jM8r9o2Euytm32MrPb8rv6fgalAKG4ao=
+github.com/jrainville/logos-delivery-go v0.0.0-20261105183455-fafb17f5e549/go.mod h1:PDs4hlPbONeMQGsNyfArZV4R2Js1Zy5oqLBfw2VU278=
 github.com/jrick/logrotate v1.0.0/go.mod h1:LNinyqDIJnpAur+b8yyulnQw/wDuN1+BYKlTRt3OuAQ=
 github.com/json-iterator/go v1.1.6/go.mod h1:+SdeFBvtyEkXs7REEP0seUULqWtbJapLOCVDaaPEHmU=
 github.com/json-iterator/go v1.1.7/go.mod h1:KdQUCv79m/52Kvf8AW2vK1V8akMuk1QjK/uOdHXbAo4=
@@ -2500,8 +2502,6 @@ github.com/waku-org/go-libp2p-pubsub v0.13.1-gowaku h1:ovXh1m76i0yPWXt95Z9ZRyEk0
 github.com/waku-org/go-libp2p-pubsub v0.13.1-gowaku/go.mod h1:MKPU5vMI8RRFyTP0HfdsF9cLmL1nHAeJm44AxJGJx44=
 github.com/waku-org/go-libp2p-rendezvous v0.0.0-20240110193335-a67d1cc760a0 h1:R4YYx2QamhBRl/moIxkDCNW+OP7AHbyWLBygDc/xIMo=
 github.com/waku-org/go-libp2p-rendezvous v0.0.0-20240110193335-a67d1cc760a0/go.mod h1:EhZP9fee0DYjKH/IOQvoNSy1tSHp2iZadsHGphcAJgY=
-github.com/waku-org/go-waku v0.10.3 h1:6BpsnM+kwfGNCJo3KrSqe7+zLTK3Tw9xLZrxJJbfHmQ=
-github.com/waku-org/go-waku v0.10.3/go.mod h1:PDs4hlPbONeMQGsNyfArZV4R2Js1Zy5oqLBfw2VU278=
 github.com/waku-org/go-zerokit-rln v0.1.14-0.20240102145250-fa738c0bdf59 h1:jisj+OCI6QydLtFq3Pyhu49wl9ytPN7oAHjMfepHDrA=
 github.com/waku-org/go-zerokit-rln v0.1.14-0.20240102145250-fa738c0bdf59/go.mod h1:1PdBdPzyTaKt3VnpAHk3zj+r9dXPFOr3IHZP9nFle6E=
 github.com/waku-org/go-zerokit-rln-apple v0.0.0-20230916172309-ee0ee61dde2b h1:KgZVhsLkxsj5gb/FfndSCQu6VYwALrCOgYI3poR95yE=

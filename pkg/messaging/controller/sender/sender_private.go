@@ -12,14 +12,13 @@ import (
 
 	"github.com/status-im/status-go/internal/crypto"
 	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
-	"github.com/status-im/status-go/pkg/messaging/diagnostics"
 	"github.com/status-im/status-go/pkg/messaging/layers/encryption"
 	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
 	wakutypes "github.com/status-im/status-go/pkg/messaging/waku/types"
 	"github.com/status-im/status-go/pkg/pubsub"
 )
 
-func (s *Sender) SendPrivate(ctx context.Context, params messagingtypes.SendPrivateParams) (sendErr error) {
+func (s *Sender) SendPrivate(ctx context.Context, params messagingtypes.SendPrivateParams) error {
 	messageID := messagingtypes.MessageID(&params.Sender.PublicKey, params.Payload)
 
 	logger := s.logger.Named("sendPrivate").With(
@@ -45,12 +44,6 @@ func (s *Sender) SendPrivate(ctx context.Context, params messagingtypes.SendPriv
 		}
 	}
 
-	ctx, attempt := diagnostics.Begin(ctx, [][]byte{[]byte(messageID)}, crypto.PubkeyToHex(params.Recipient), "direct")
-	defer func() {
-		if sendErr != nil {
-			diagnostics.Emit(diagnostics.Event{Metadata: attempt, Stage: "attempt_failed", Error: sendErr.Error()})
-		}
-	}()
 	var spec *encryption.ProtocolMessageSpec
 	var err error
 	if len(params.HashRatchetGroupID) != 0 {
@@ -93,9 +86,6 @@ func (s *Sender) SendPrivate(ctx context.Context, params messagingtypes.SendPriv
 	logger.Debug("sent-message",
 		zap.Strings("hashes", cryptotypes.EncodeHexes(hashes)),
 	)
-	if diagnostics.Enabled() {
-		diagnostics.Emit(diagnostics.Event{Metadata: attempt, Stage: "dispatch", EnvelopeHashes: diagnostics.Hexes(hashes)})
-	}
 
 	s.stack.Transport.Track(messageID, hashes, wakuMessages)
 

@@ -11,7 +11,6 @@ import (
 	datasynctransport "github.com/status-im/mvds/transport"
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/pkg/messaging/diagnostics"
 	datasyncpeer "github.com/status-im/status-go/pkg/messaging/layers/reliability/datasync/peer"
 )
 
@@ -42,13 +41,8 @@ func (d *DataSync) Unwrap(sender *ecdsa.PublicKey, payload []byte) (*protobuf.Pa
 		return nil, errors.New("handling non-datasync message")
 	} else {
 		logger.Debug("handling datasync message")
-		if diagnostics.Enabled() {
-			diagnostics.Emit(diagnostics.Event{Metadata: PayloadTraceMetadata(datasyncpeer.PublicKeyToPeerID(*sender), &datasyncMessage), Stage: "mvds_payload_received"})
-		}
 		if d.sendingEnabled.Load() {
 			d.add(sender, &datasyncMessage)
-		} else if diagnostics.Enabled() {
-			diagnostics.Emit(diagnostics.Event{Metadata: PayloadTraceMetadata(datasyncpeer.PublicKeyToPeerID(*sender), &datasyncMessage), Stage: "mvds_packet_skipped", Error: "sending_disabled"})
 		}
 	}
 

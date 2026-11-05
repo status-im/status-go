@@ -1,3 +1,0 @@
-DROP TABLE IF EXISTS Registrations;
-
-DROP TABLE IF EXISTS Nonce;
