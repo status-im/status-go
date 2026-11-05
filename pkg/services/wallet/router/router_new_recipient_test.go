@@ -1,9 +1,11 @@
 package router
 
 import (
+	"context"
 	"errors"
 	"math/big"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
@@ -78,4 +80,54 @@ func TestNewRecipientRaisesGas(t *testing.T) {
 			require.Equal(t, tc.expected, got)
 		})
 	}
+}
+
+func TestRecipientStateCache(t *testing.T) {
+	now := time.Unix(1_000_000, 0)
+	key := recipientStateKey{chainID: 1, recipient: common.HexToAddress("0x2")}
+	other := recipientStateKey{chainID: 10, recipient: common.HexToAddress("0x2")}
+
+	var cache recipientStateCache
+	_, ok := cache.get(key, now)
+	require.False(t, ok, "the zero value is empty")
+
+	cache.set(key, true, now)
+	isNew, ok := cache.get(key, now.Add(recipientStateTTL-time.Second))
+	require.True(t, ok)
+	require.True(t, isNew)
+	_, ok = cache.get(other, now)
+	require.False(t, ok, "per chain, token and recipient")
+
+	_, ok = cache.get(key, now.Add(recipientStateTTL))
+	require.False(t, ok, "expired")
+
+	// setting drops expired entries
+	cache.set(other, false, now.Add(recipientStateTTL))
+	require.Len(t, cache.entries, 1)
+}
+
+func TestCheckRecipientIsNew(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	transfer := mockpathprocessor.NewMockPathProcessor(ctrl)
+	transfer.EXPECT().Name().Return(pathprocessorcommon.ProcessorTransferName).AnyTimes()
+	bridge := mockpathprocessor.NewMockPathProcessor(ctrl)
+	bridge.EXPECT().Name().Return(pathprocessorcommon.ProcessorRelayName).AnyTimes()
+
+	sender, recipient := common.HexToAddress("0x1"), common.HexToAddress("0x2")
+	usdc := &tokentypes.Token{Token: &types.Token{Symbol: "USDC", Address: common.HexToAddress("0xa0b8"), ChainID: 1}}
+	inputParams := pathprocessor.ProcessorInputParams{
+		FromChain: &params.Network{ChainID: 1}, FromToken: usdc, FromAddr: sender, ToAddr: recipient,
+	}
+
+	// a cached answer: no balance fetch, no RPC (the router has no clients here)
+	r := &Router{logger: logutils.ZapLogger().Named("router-test")}
+	r.newRecipients.set(recipientStateKey{chainID: 1, token: usdc.Address, recipient: recipient}, true, time.Now())
+
+	isNew, err := r.checkRecipientIsNew(context.Background(), transfer, inputParams)()
+	require.NoError(t, err)
+	require.True(t, isNew)
+
+	isNew, err = r.checkRecipientIsNew(context.Background(), bridge, inputParams)()
+	require.NoError(t, err)
+	require.False(t, isNew, "not a plain transfer: not checked")
 }
