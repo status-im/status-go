@@ -112,7 +112,8 @@ func (t *Transactor) EstimateGas(chainID uint64, from common.Address, to common.
 	return rpcWrapper.EstimateGas(ctx, msg)
 }
 
-// EstimateTransactionGas returns the node's raw gas estimate for args; no To means a deployment.
+// EstimateTransactionGas returns the node's raw gas estimate for args, fees included (a contract may
+// read tx.gasprice); no To means a deployment.
 func (t *Transactor) EstimateTransactionGas(chainID uint64, args wallettypes.SendTxArgs) (uint64, error) {
 	rpcWrapper := newRPCWrapper(t.ethClientGetter, chainID)
 
@@ -124,12 +125,19 @@ func (t *Transactor) EstimateTransactionGas(chainID uint64, args wallettypes.Sen
 		addr := common.Address(*args.To)
 		to = &addr
 	}
-	return rpcWrapper.EstimateGas(ctx, ethereum.CallMsg{
+	msg := ethereum.CallMsg{
 		From:  common.Address(args.From),
 		To:    to,
 		Value: (*big.Int)(args.Value),
 		Data:  args.GetInput(),
-	})
+	}
+	if args.IsDynamicFeeTx() {
+		msg.GasFeeCap = (*big.Int)(args.MaxFeePerGas)
+		msg.GasTipCap = (*big.Int)(args.MaxPriorityFeePerGas)
+	} else {
+		msg.GasPrice = (*big.Int)(args.GasPrice)
+	}
+	return rpcWrapper.EstimateGas(ctx, msg)
 }
 
 func (t *Transactor) SendTransactionWithChainID(chainID uint64, sendArgs wallettypes.SendTxArgs, lastUsedNonce int64, verifiedAccount *generator.Account) (hash types.Hash, nonce uint64, err error) {

@@ -488,6 +488,33 @@ func (s *TransactorSuite) TestEstimateTransactionGas() {
 		s.Require().Equal(uint64(204600), gas)
 	})
 
+	s.Run("legacy fee reaches the node", func() {
+		s.txServiceMock.EXPECT().EstimateGas(gomock.Any(), gomock.Any()).DoAndReturn(
+			func(_ context.Context, args fake.CallArgs) (hexutil.Uint64, error) {
+				s.Require().Equal(big.NewInt(1_000_000_000), args.GasPrice.ToInt())
+				s.Require().Nil(args.MaxFeePerGas)
+				s.Require().Nil(args.MaxPriorityFeePerGas)
+				return hexutil.Uint64(21000), nil
+			})
+		_, err := s.manager.EstimateTransactionGas(chainID, wallettypes.SendTxArgs{From: from, To: &to,
+			GasPrice: (*hexutil.Big)(big.NewInt(1_000_000_000))})
+		s.Require().NoError(err)
+	})
+
+	s.Run("EIP-1559 fees reach the node", func() {
+		s.txServiceMock.EXPECT().EstimateGas(gomock.Any(), gomock.Any()).DoAndReturn(
+			func(_ context.Context, args fake.CallArgs) (hexutil.Uint64, error) {
+				s.Require().Equal(big.NewInt(30_000_000_000), args.MaxFeePerGas.ToInt())
+				s.Require().Equal(big.NewInt(2_000_000_000), args.MaxPriorityFeePerGas.ToInt())
+				s.Require().Zero(args.GasPrice.ToInt().Sign())
+				return hexutil.Uint64(21000), nil
+			})
+		_, err := s.manager.EstimateTransactionGas(chainID, wallettypes.SendTxArgs{From: from, To: &to,
+			MaxFeePerGas:         (*hexutil.Big)(big.NewInt(30_000_000_000)),
+			MaxPriorityFeePerGas: (*hexutil.Big)(big.NewInt(2_000_000_000))})
+		s.Require().NoError(err)
+	})
+
 	s.Run("no to: estimated as a contract deployment", func() {
 		s.txServiceMock.EXPECT().EstimateGas(gomock.Any(), gomock.Any()).DoAndReturn(
 			func(_ context.Context, args fake.CallArgs) (hexutil.Uint64, error) {
