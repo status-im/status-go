@@ -6,6 +6,8 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/ethereum/go-ethereum/common/hexutil"
+
 	"github.com/status-im/status-go/pkg/services/wallet/router/pathprocessor"
 	"github.com/status-im/status-go/pkg/services/wallet/router/routes"
 )
@@ -99,6 +101,7 @@ func refreshGasEstimate(path *routes.Path, approval bool, now time.Time, estimat
 	path.SuggestedTxGasAmount = gas.limit
 	path.EstimatedTxGasAmount = gas.estimated
 	path.TxGasEstimatedAt = now
+	path.TxGasEstimatedValue = (*hexutil.Big)(estimationAmountIn(path))
 }
 
 func (r *Router) estimateTxGasForPath(path *routes.Path) (gasEstimate, error) {

@@ -63,6 +63,7 @@ func TestCopyPath(t *testing.T) {
 		AmountInOriginal:           (*hexutil.Big)(big.NewInt(150)),
 		TxGasEstimatedAt:           time.Unix(1000, 0),
 		ApprovalGasEstimatedAt:     time.Unix(2000, 0),
+		TxGasEstimatedValue:        (*hexutil.Big)(big.NewInt(140)),
 	}
 
 	newPath := path.Copy()
