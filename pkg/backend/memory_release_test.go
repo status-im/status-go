@@ -8,6 +8,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/event"
 
+	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/pkg/services/wallet/walletevent"
 )
 
@@ -242,4 +243,22 @@ func TestMemoryReleaserWatchesTokenListsUntilStop(t *testing.T) {
 
 	r.stop()
 	require.Equal(t, 0, feed.Send(update), "stop unsubscribes from the wallet feed")
+}
+
+// The watch holds the logged-out node's wallet feed; logout must drop it with the pending release.
+func TestLogoutStopsMemoryReleaser(t *testing.T) {
+	b := NewStatusBackend(testutils.MustCreateTestLogger())
+	b.UpdateRootDataDir(t.TempDir())
+	var feed event.Feed
+	b.memRelease.scheduleAfterLogin(time.Hour)
+	b.memRelease.watchTokenLists(&feed)
+	require.Eventually(t, func() bool { return feed.Send(tokenListsUpdated()) > 0 }, 5*time.Second, time.Millisecond)
+
+	require.NoError(t, b.Logout())
+
+	require.Equal(t, 0, feed.Send(tokenListsUpdated()), "logout unsubscribes from the wallet feed")
+	b.memRelease.mu.Lock()
+	defer b.memRelease.mu.Unlock()
+	require.Nil(t, b.memRelease.timer)
+	require.Nil(t, b.memRelease.trailing)
 }

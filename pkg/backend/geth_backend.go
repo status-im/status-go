@@ -2654,6 +2654,7 @@ func (b *StatusBackend) Logout() error {
 
 	b.logger.Debug("logging out")
 
+	b.memRelease.stop()
 	b.AccountsManager().Logout()
 	b.account = nil
 	b.clearProfileSecretCache()
