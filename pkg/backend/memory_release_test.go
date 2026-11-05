@@ -127,31 +127,106 @@ func TestMemoryReleaserReleasesGoHeapThenNativeHeap(t *testing.T) {
 	require.Equal(t, []string{"go", "native"}, order, "finalizers run by the GC free native memory before the purge")
 }
 
-func TestMemoryReleaserReleasesOnTokenListsUpdate(t *testing.T) {
-	r, calls, now, pending := newTestReleaser(t)
+type fakeTimer struct {
+	delay time.Duration
+	fire  func()
+}
+
+// newTrailingTestReleaser records every armed timer so a test can fire the one it means.
+func newTrailingTestReleaser(t *testing.T) (*memoryReleaser, *int, *time.Time, *[]*fakeTimer) {
+	r, calls, now, _ := newTestReleaser(t)
+	var timers []*fakeTimer
+	r.afterFn = func(d time.Duration, f func()) *time.Timer {
+		timers = append(timers, &fakeTimer{delay: d, fire: f})
+		return time.NewTimer(time.Hour)
+	}
+	return r, calls, now, &timers
+}
+
+func tokenListsUpdated() walletevent.Event {
+	return walletevent.Event{Type: walletevent.EventTokenListsUpdated}
+}
+
+func TestMemoryReleaserTokenListsUpdateReleasesAfterSettling(t *testing.T) {
+	r, calls, now, timers := newTrailingTestReleaser(t)
 
 	r.onWalletEvent(walletevent.Event{Type: walletevent.EventType("other")})
-	require.Equal(t, 0, *calls, "other wallet events are ignored")
+	require.Empty(t, *timers, "other wallet events are ignored")
 
-	r.onWalletEvent(walletevent.Event{Type: walletevent.EventTokenListsUpdated})
+	r.onWalletEvent(tokenListsUpdated())
+	require.Len(t, *timers, 1)
+	require.Equal(t, tokenListsReleaseDelay, (*timers)[0].delay, "the release waits for the rebuild the update triggers")
+	require.Equal(t, 0, *calls)
+
+	*now = now.Add(tokenListsReleaseDelay)
+	(*timers)[0].fire()
+	require.Equal(t, 1, *calls)
+}
+
+func TestMemoryReleaserTokenListsUpdateTrailsThrottledRelease(t *testing.T) {
+	r, calls, now, timers := newTrailingTestReleaser(t)
+
+	r.releaseNow() // the post-login release just ran
 	require.Equal(t, 1, *calls)
 
-	*now = now.Add(r.minGap / 2)
-	r.onWalletEvent(walletevent.Event{Type: walletevent.EventTokenListsUpdated})
-	require.Equal(t, 1, *calls, "token-list releases share the throttle")
+	*now = now.Add(time.Second)
+	r.onWalletEvent(tokenListsUpdated())
+	r.onWalletEvent(tokenListsUpdated())
+	r.onWalletEvent(tokenListsUpdated())
+	require.Len(t, *timers, 1, "a burst of updates collapses to one trailing release")
+	require.Equal(t, r.minGap-time.Second, (*timers)[0].delay, "it lands when the gap ends")
 
-	*now = now.Add(r.minGap)
-	r.scheduleAfterLogin(time.Minute)
-	r.onWalletEvent(walletevent.Event{Type: walletevent.EventTokenListsUpdated})
-	require.Equal(t, 1, *calls, "the pending post-login release covers an update inside the burst")
-	(*pending)()
+	*now = now.Add((*timers)[0].delay)
+	(*timers)[0].fire()
 	require.Equal(t, 2, *calls)
+
+	r.onWalletEvent(tokenListsUpdated())
+	require.Len(t, *timers, 2, "a fired trailing release can be re-armed")
+}
+
+func TestMemoryReleaserTokenListsUpdateDuringBurstIsCovered(t *testing.T) {
+	r, calls, _, timers := newTrailingTestReleaser(t)
+
+	r.scheduleAfterLogin(time.Minute)
+	r.onWalletEvent(tokenListsUpdated())
+	require.Len(t, *timers, 1, "the pending post-login release covers an update inside the burst")
+
+	(*timers)[0].fire()
+	require.Equal(t, 1, *calls)
+	require.Nil(t, r.timer)
+}
+
+func TestMemoryReleaserTrailingReleaseSkipsAfterPauseRelease(t *testing.T) {
+	r, calls, now, timers := newTrailingTestReleaser(t)
+
+	r.onWalletEvent(tokenListsUpdated())
+	*now = now.Add(time.Second)
+	r.releaseNow() // the app went to background before the trailing release
+	require.Equal(t, 1, *calls)
+
+	*now = now.Add(tokenListsReleaseDelay)
+	(*timers)[0].fire()
+	require.Equal(t, 1, *calls, "the pause release already returned the refresh's garbage")
+}
+
+func TestMemoryReleaserStopCancelsTrailingRelease(t *testing.T) {
+	r, calls, now, timers := newTrailingTestReleaser(t)
+
+	r.onWalletEvent(tokenListsUpdated())
+	require.NotNil(t, r.trailing)
+	r.stop()
+	require.Nil(t, r.trailing)
+
+	*now = now.Add(tokenListsReleaseDelay)
+	(*timers)[0].fire() // fired before stop() took the lock
+	require.Equal(t, 0, *calls)
 }
 
 func TestMemoryReleaserWatchesTokenListsUntilStop(t *testing.T) {
 	r, _, _, _ := newTestReleaser(t)
 	released := make(chan struct{}, 1)
 	r.release = func() { released <- struct{}{} }
+	r.afterFn = func(_ time.Duration, f func()) *time.Timer { return time.AfterFunc(0, f) }
 	var feed event.Feed
 	update := walletevent.Event{Type: walletevent.EventTokenListsUpdated}
 

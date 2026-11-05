@@ -29,11 +29,15 @@ type memoryReleaser struct {
 	afterFn         func(time.Duration, func()) *time.Timer
 	spawn           func(func())
 	watcher         *walletevent.Watcher
+	trailing        *time.Timer
+	trailingGen     uint64
 }
 
 const (
 	releaseAfterLoginDelay = 45 * time.Second
 	releaseMinGap          = 30 * time.Second
+	// Token-list consumers rebuild on the update; releasing mid-rebuild would only raise the heap goal.
+	tokenListsReleaseDelay = 5 * time.Second
 )
 
 func newMemoryReleaser() *memoryReleaser {
@@ -126,17 +130,60 @@ func (r *memoryReleaser) watchTokenLists(feed *event.Feed) {
 
 func (r *memoryReleaser) onWalletEvent(ev walletevent.Event) {
 	if ev.Type == walletevent.EventTokenListsUpdated {
-		r.releaseNow()
+		r.scheduleTrailing()
 	}
 }
 
-// stop cancels a pending post-login release and the token-list watch. The watch is stopped
+// scheduleTrailing arms one release after the update settles, or once the throttle gap ends, so
+// an update right after another release is not dropped. A pending post-login or trailing release
+// already covers the update.
+func (r *memoryReleaser) scheduleTrailing() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.timer != nil || r.trailing != nil {
+		return
+	}
+	now := r.now()
+	at := now.Add(tokenListsReleaseDelay)
+	if gapEnd := r.last.Add(r.minGap); gapEnd.After(at) {
+		at = gapEnd
+	}
+	r.trailingGen++
+	gen := r.trailingGen
+	r.trailing = r.afterFn(at.Sub(now), func() {
+		defer panics.LogOnPanic()
+		if r.claimTrailing(gen) {
+			r.release()
+		}
+	})
+}
+
+// claimTrailing skips the release when another one ran after the update was seen.
+func (r *memoryReleaser) claimTrailing(gen uint64) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.trailing == nil || r.trailingGen != gen {
+		return false
+	}
+	r.trailing = nil
+	if r.now().Sub(r.last) < r.minGap {
+		return false
+	}
+	r.last = r.now()
+	return true
+}
+
+// stop cancels pending releases and the token-list watch. The watch is stopped
 // outside the lock: Stop waits for a callback that takes it.
 func (r *memoryReleaser) stop() {
 	r.mu.Lock()
 	if r.timer != nil {
 		r.timer.Stop()
 		r.timer = nil
+	}
+	if r.trailing != nil {
+		r.trailing.Stop()
+		r.trailing = nil
 	}
 	w := r.watcher
 	r.watcher = nil
