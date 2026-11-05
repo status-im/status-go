@@ -5,43 +5,8 @@ repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 build_dir="$repo/build/tkl"
 action="${1:-prepare}"
 fail() { echo "libtkl: $*" >&2; exit 1; }
-lock_native() {
-  local timeout="${TKL_LOCK_TIMEOUT:-600}" deadline owner pid
-  local owners
-  [[ "$timeout" =~ ^[0-9]+$ ]] || fail "TKL_LOCK_TIMEOUT must be seconds (a non-negative integer)"
-  deadline=$((SECONDS + 10#$timeout))
-  mkdir -p "$repo/build"
-  lock="$repo/build/.tkl-lock"
-  while true; do
-    if mkdir "$lock" 2>/dev/null; then
-      # Use an owner-specific directory so stale waiters cannot delete a new
-      # owner's PID. rmdir below only removes an empty, unowned lock.
-      if mkdir "$lock/$$" 2>/dev/null; then
-        owners=("$lock"/*)
-        # An empty lock may be reclaimed before its creator publishes its PID.
-        # If another creator replaced it, only a sole claimant may proceed.
-        if [ "${#owners[@]}" -eq 1 ] && [ "${owners[0]}" = "$lock/$$" ]; then
-          trap 'rmdir "$lock/$$" "$lock" 2>/dev/null || true' EXIT
-          return
-        fi
-        rmdir "$lock/$$" 2>/dev/null || true
-      fi
-    fi
-    for owner in "$lock"/*; do
-      pid="${owner##*/}"
-      [[ "$pid" =~ ^[1-9][0-9]*$ ]] || continue
-      if ! kill -0 "$pid" 2>/dev/null; then
-        rmdir "$owner" 2>/dev/null || true
-      fi
-    done
-    if rmdir "$lock" 2>/dev/null; then continue; fi
-    [ "$SECONDS" -lt "$deadline" ] || fail "Timed out waiting for libtkl lock after ${timeout}s ($lock)"
-    sleep 1
-  done
-}
 case "$action" in
   clean)
-    lock_native
     if [ -e "$build_dir" ]; then rm -r -- "$build_dir"; fi
     exit 0 ;;
   prepare) ;;
@@ -60,21 +25,10 @@ if [ -n "${NIM_TKL_LIB_DIR:-}${NIM_TKL_INC_DIR:-}" ]; then
     fail "Supply both NIM_TKL_LIB_DIR and NIM_TKL_INC_DIR for prebuilt inputs"
   [ -f "$NIM_TKL_LIB_DIR/libtkl.a" ] && [ -f "$NIM_TKL_INC_DIR/tkl.h" ] ||
     fail "Prebuilt inputs require isolated libtkl.a and tkl.h"
-  if [ -f "$NIM_TKL_LIB_DIR/libtkl.target" ]; then
-    prebuilt_target="$(<"$NIM_TKL_LIB_DIR/libtkl.target")"
-  else
-    # Preserve native prebuilt inputs predating target metadata. Cross builds
-    # must declare their target rather than silently assuming a host archive.
-    prebuilt_target="$(go env GOHOSTOS)/$(go env GOHOSTARCH)"
-  fi
+  [ -f "$NIM_TKL_LIB_DIR/libtkl.target" ] || fail "Prebuilt inputs require libtkl.target"
+  prebuilt_target="$(<"$NIM_TKL_LIB_DIR/libtkl.target")"
   [ "$prebuilt_target" = "$archive_target" ] ||
     fail "Prebuilt libtkl target mismatch: inputs are for $prebuilt_target, requested $archive_target; unset NIM_TKL_INC_DIR and NIM_TKL_LIB_DIR to build for the target"
-  if [ "${TKL_HIDE_EXPORTS:-0}" = 1 ] && [ "$goos" = windows ]; then
-    sections="$("${OBJDUMP:-objdump}" -h "$NIM_TKL_LIB_DIR/libtkl.a")"
-    if printf '%s\n' "$sections" | grep '\.drectve' >/dev/null; then
-      fail "Prebuilt Windows archive still contains DLL export directives; remove .drectve from a private copy first"
-    fi
-  fi
   printf '%s\n' "$NIM_TKL_LIB_DIR"
   exit 0
 fi
@@ -105,21 +59,14 @@ case "$goos" in
     target="android-$arch"
     : "${ANDROID_NDK_ROOT:?Set ANDROID_NDK_ROOT to the Android NDK}"
     case "$(uname -s)" in
-      Darwin) host=darwin-x86_64 ;;
-      Linux) host=linux-x86_64 ;;
+      Darwin) host_os=darwin ;;
+      Linux) host_os=linux ;;
       *) fail "Android cross builds require Linux or macOS" ;;
     esac
-    triple=aarch64-linux-android
-    [ "$goarch" != amd64 ] || triple=x86_64-linux-android
-    cc="$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/$host/bin/$triple${ANDROID_API:-28}-clang"
     sdk_identity="$(cat "$ANDROID_NDK_ROOT/source.properties" 2>/dev/null || true)"
     ;;
   ios)
     mobile=true
-    # Clang accepts "17", but ld -platform_version requires "17.0".
-    if [[ "${IOS_TARGET:-}" =~ ^[0-9]+$ ]]; then
-      export IOS_TARGET="$IOS_TARGET.0"
-    fi
     case "${IPHONE_SDK:-iphoneos}" in
       iphoneos)
         [ "$arch" = arm64 ] || fail "iOS devices require arm64"
@@ -127,16 +74,12 @@ case "$goos" in
       iphonesimulator) target="ios-simulator-$arch" ;;
       *) fail "Unsupported IPHONE_SDK: $IPHONE_SDK" ;;
     esac
-    cc="$(xcrun --sdk "${IPHONE_SDK:-iphoneos}" --find clang)"
     sdk_identity="$(xcrun --sdk "${IPHONE_SDK:-iphoneos}" --show-sdk-path) $(xcrun --sdk "${IPHONE_SDK:-iphoneos}" --show-sdk-version)"
     ;;
   darwin)
-    target_os=Darwin
-    export TKL_ARCH="$arch"
     sdk_identity="$(xcrun --sdk macosx --show-sdk-path) $(xcrun --sdk macosx --show-sdk-version)"
     ;;
   linux)
-    target_os=Linux
     if [ "$goos/$goarch" != "$(go env GOHOSTOS)/$(go env GOHOSTARCH)" ]; then
       [ -n "${CC:-}" ] && [ -n "${TKL_LD:-}" ] && [ -n "${TKL_OBJCOPY:-}" ] && [ -n "${TKL_AR:-}" ] ||
         fail "Linux cross builds require CC, TKL_LD, TKL_OBJCOPY and TKL_AR for the target"
@@ -144,64 +87,81 @@ case "$goos" in
     ;;
   windows)
     [ "$goarch" = amd64 ] || fail "Windows requires amd64"
-    target_os=Windows
     "$cc" -dumpmachine | grep -Eq '^x86_64-.*mingw' || fail "Windows requires an x86_64 MinGW compiler"
     ;;
   *) fail "Unsupported native target: $goos/$goarch" ;;
 esac
 
-# Do not let two Make invocations publish or compile the same dependency at once.
-lock_native
 env -u MAKEFLAGS -u MFLAGS make --no-print-directory -C "$repo" nimble.paths >&2
 
-command -v "$cc" >/dev/null || fail "CC must name one compiler executable: $cc"
-case "$(basename "$cc")" in
-  *clang*) nim_cc=clang ;;
-  *gcc*|cc) nim_cc=gcc ;;
-  *) fail "Unsupported compiler executable: $cc" ;;
-esac
+# Mobile targets are spelled by nim.mk, as for libsds; desktop builds with Go's compiler.
+if ! "$mobile"; then
+  command -v "$cc" >/dev/null || fail "CC must name one compiler executable: $cc"
+  case "$(basename "$cc")" in
+    *clang*) nim_cc=clang ;;
+    *gcc*|cc) nim_cc=gcc ;;
+    *) fail "Unsupported compiler executable: $cc" ;;
+  esac
+  cc_identity="$cc $("$cc" --version)"
+fi
 out="$build_dir/$target"
 base_cgo_cflags="${TKL_BASE_CGO_CFLAGS-${CGO_CFLAGS:-}}"
-fingerprint="$(printf '%s\n' "$pin" "$goos/$goarch" "$(cat "$repo/nimble.paths")" \
-  "$cc" "$("$cc" --version)" \
+fingerprint="$(printf '%s\n' "$(cat "$repo/nimble.paths")" \
+  "${cc_identity:-}" \
   "$target" "$sdk_identity" "${ANDROID_API:-28}" "${IOS_TARGET:-}" \
-  "${EXTRA_NIMFLAGS:-}" "$base_cgo_cflags" "${MACOSX_DEPLOYMENT_TARGET:-}" \
-  "${SDKROOT:-}" "${TKL_ARCH:-}" "${TKL_MIN_OS:-}" "${TKL_SDK:-}" \
-  "${TKL_PLATFORM:-}" "${TKL_LD:-}" "${TKL_OBJCOPY:-}" "${TKL_AR:-}" \
-  "$("${tkl_sha256[@]}" "$repo/scripts/tkl_native.sh")" | "${tkl_sha256[@]}" | awk '{print $1}')"
-if [ -f "$out/link/libtkl.a" ] && [ -f "$out/fingerprint" ] && [ -f "$out/archive.sha256" ] &&
-   [ -f "$out/link/libtkl.target" ] && [ "$(<"$out/link/libtkl.target")" = "$archive_target" ] &&
-   [ "$(cat "$out/fingerprint")" = "$fingerprint" ] &&
-   [ "$(cat "$out/archive.sha256")" = "$("${tkl_sha256[@]}" "$out/link/libtkl.a" | awk '{print $1}')" ]; then
-  printf '%s\n' "$out/link"
+  "$base_cgo_cflags" "${MACOSX_DEPLOYMENT_TARGET:-}" "${TKL_LD:-}" "${TKL_OBJCOPY:-}" "${TKL_AR:-}" \
+  "${NIM_PARAMS-}" "$("${tkl_sha256[@]}" "$repo/scripts/tkl_native.sh" "$repo/nim.mk")" | "${tkl_sha256[@]}" | awk '{print $1}')"
+# Each build goes to its own directory and is published under its fingerprint,
+# so concurrent builds of one target cannot mix their outputs.
+published="$out/$fingerprint"
+complete() {
+  [ -f "$published/link/libtkl.a" ] && [ -f "$published/archive.sha256" ] &&
+    [ "$(cat "$published/archive.sha256")" = "$("${tkl_sha256[@]}" "$published/link/libtkl.a" | awk '{print $1}')" ]
+}
+if complete; then
+  printf '%s\n' "$published/link"
   exit 0
 fi
-if [ -d "$out" ]; then rm -r -- "$out"; fi
-mkdir -p "$out/link"
-build_task() {
-  env -u MAKEFLAGS -u MFLAGS make --no-print-directory -C "$repo" nim-libtkl \
-    TKL_TASK="$1" NIM_LIB_DIR="$out" >&2
-}
+mkdir -p "$out"
+build="$(mktemp -d "$out/.build.XXXXXX")"
+mkdir "$build/link"
+trap 'rm -rf -- "$build"' EXIT
 if "$mobile"; then
   case "$goos" in
-    android) ARCH="$arch" TKL_BUILD_TESTS=0 build_task libtklAndroid ;;
-    ios) ARCH="$arch" TKL_BUILD_TESTS=0 build_task libtklIOS ;;
+    android) platform=(TKL_PLATFORM=ANDROID HOST_OS="$host_os") ;;
+    ios) platform=(TKL_PLATFORM=IOS) ;;
   esac
+  env -u MAKEFLAGS -u MFLAGS make --no-print-directory -C "$repo" nim-libtkl \
+    "${platform[@]}" ARCH="$arch" NIM_LIB_DIR="$build" >&2
 else
+  # The target, spelled for Go's compiler; libtkl's own config has the rest.
   nim_os="$goos"
   [ "$goos" != darwin ] || nim_os=macosx
-  flags="${EXTRA_NIMFLAGS:-} --os:$nim_os --cpu:$goarch --cc:$nim_cc --$nim_cc.exe:$cc --$nim_cc.linkerexe:$cc"
+  flags="--os:$nim_os --cpu:$goarch --cc:$nim_cc --$nim_cc.exe:$cc --$nim_cc.linkerexe:$cc"
+  # Linked into a shared libstatus.
   [ "$goos" = windows ] || flags="$flags --passC:-fPIC"
   [ "$goos" != darwin ] || flags="$flags --passC:-arch --passC:$arch"
   for flag in $base_cgo_cflags; do flags="$flags --passC:$flag"; done
-  TKL_TARGET_OS="$target_os" EXTRA_NIMFLAGS="$flags" build_task libtkl
-  if [ "$goos" = windows ]; then
-    # Nim's dynlib declarations emit explicit dllexport directives. Linker
-    # auto-export filters alone cannot make these private inside libstatus.
-    "${TKL_OBJCOPY:-objcopy}" --remove-section .drectve "$out/link/libtkl.a"
-  fi
+  # A Linux or Windows cross build names the target's tools.
+  [ -z "${TKL_LD:-}" ] || export NIM_SEAL_LD="$TKL_LD"
+  [ -z "${TKL_OBJCOPY:-}" ] || export NIM_SEAL_OBJCOPY="$TKL_OBJCOPY"
+  [ -z "${TKL_AR:-}" ] || export NIM_SEAL_AR="$TKL_AR"
+  env -u MAKEFLAGS -u MFLAGS make --no-print-directory -C "$repo" nim-libtkl \
+    TKL_NIM_FLAGS="$flags" NIM_LIB_DIR="$build" >&2
 fi
-printf '%s\n' "$archive_target" > "$out/link/libtkl.target"
-"${tkl_sha256[@]}" "$out/link/libtkl.a" | awk '{print $1}' > "$out/archive.sha256"
-printf '%s\n' "$fingerprint" > "$out/fingerprint"
-printf '%s\n' "$out/link"
+if [ "$goos" = windows ]; then
+  # Nim's dynlib declarations emit explicit dllexport directives. Linker
+  # auto-export filters alone cannot make these private inside libstatus.
+  "${TKL_OBJCOPY:-objcopy}" --remove-section .drectve "$build/link/libtkl.a"
+fi
+printf '%s\n' "$archive_target" > "$build/link/libtkl.target"
+"${tkl_sha256[@]}" "$build/link/libtkl.a" | awk '{print $1}' > "$build/archive.sha256"
+# A concurrent build of the same inputs may have published first; keep it.
+if ! complete; then
+  if [ -d "$published" ]; then rm -r -- "$published"; fi
+  mv "$build" "$published" 2>/dev/null || complete || fail "Could not publish $published"
+fi
+for old in "$out"/*; do
+  [ "$old" = "$published" ] || rm -r -- "$old"
+done
+printf '%s\n' "$published/link"

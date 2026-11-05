@@ -29,13 +29,12 @@ For controlled builds with prebuilt artifacts, supply both `NIM_TKL_INC_DIR`
 Both must come from the recorded revision and target. Nix and managed builds
 include `libtkl.target` beside the archive, recording `GOOS/GOARCH` (plus
 `/iphoneos` or `/iphonesimulator` for iOS). Prebuilt target metadata must match
-the requested build; older archives without it are accepted only for the host
-target. Mobile Make targets discard inherited prebuilt paths and prepare their
+the requested build. Mobile Make targets discard inherited prebuilt paths and prepare their
 own target archive. The managed build supports
 Linux and macOS (amd64/arm64), Windows (amd64 with MinGW), Android (arm64/amd64)
 and iOS (arm64 device, arm64/amd64 simulator). Archives are kept separately under
-`build/tkl/<target>/link`; device and simulator archives are never reused for
-one another.
+`build/tkl/<target>/<fingerprint>/link`; device and simulator archives are never
+reused for one another.
 
 Use the existing mobile targets, for example:
 
@@ -49,7 +48,7 @@ make statusgo-ios-library ARCH=arm64 \
 Android uses NDK 27.2.12479018 and API 28 or newer; use `HOST_OS=linux` on Linux.
 iOS requires Xcode, with minimum iOS 13 for devices and Intel simulators, or 14
 for arm64 simulators. The token library uses the same SDK and minimum as the Go
-consumer. The existing SDS build remains unchanged. For Linux cross builds,
+consumer. For Linux cross builds,
 supply the target `CC`, `TKL_LD`, `TKL_OBJCOPY` and `TKL_AR`; native builds use
 the host tools. Windows builds run in a MinGW64 shell with `CC=gcc`.
 
@@ -73,9 +72,8 @@ rollback or shadow comparison. A rollback requires rebuilding an earlier version
 
 For a shared-library build, run `make statusgo-shared-library`.
 The target retains the existing libsds preparation and accepts
-the `NIM_SDS_LIB_DIR` and `NIM_SDS_INC_DIR` overrides for prebuilt inputs. Set `TKL_NIM` to
-select a compiler for token lists only, or `NIM` when sharing the compiler with
-other dependencies. The target prepares the pinned native library and
+the `NIM_SDS_LIB_DIR` and `NIM_SDS_INC_DIR` overrides for prebuilt inputs. Set `NIM` to
+select the compiler. The target prepares the pinned native library and
 reuses both its archive and libstatus when their inputs match. Native changes
 invalidate Go's cgo cache; source, build-option or output changes invalidate
 the backend cache. Shared-library builds keep `tkl_*` symbols private. On Windows,

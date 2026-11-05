@@ -10,14 +10,14 @@ srcDir = "internal/nimble/src"
 
 
 ### Dependencies
-# Any newer Nim is fine; the bindings' lock picks the one that builds libsds.
+# Any newer Nim is fine.
 requires "nim >= 2.2.6"
 
-# Pins the nim-sds revision whose C ABI the bindings match.
-requires "https://github.com/logos-messaging/sds-go-bindings#6cfd235b"
+# nim-sds, whose C ABI go.mod's sds-go-bindings must match.
+requires "https://github.com/logos-messaging/nim-sds#beed22e6fd6bdfd8abf6f2d083bdd4ed95966256"
 
 # The native token library; go.mod pins its Go wrapper at the same commit.
-requires "https://github.com/igor-sirotin/nim-token-lists#9bd67fbb0bb171eda08cb3b0e51d071c77065d34"
+requires "https://github.com/status-im/nim-token-lists#801a9ec48a0082e7efef546d76f7c842e5a55a35"
 
 # The untagged chronos commit nim-ffi needs; the libsds compile uses this tree.
 requires "chronos#0de7b335d0ad5557ad5ba71a4b7662f7b201750e"

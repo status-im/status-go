@@ -35,6 +35,9 @@ jobs:
         with:
           go-version: '1.26.5'
           cache: false
+      - uses: jiro4989/setup-nim-action@189b145833368cc92f1e7b3e166a25a3e057a693
+        with:
+          nim-version: '2.2.10'
       - uses: nim-lang/setup-nimble-action@v2
         with:
           nimble-version: '0.26.1'
@@ -73,6 +76,9 @@ jobs:
         with:
           go-version: '1.26.5'
           cache: false
+      - uses: jiro4989/setup-nim-action@189b145833368cc92f1e7b3e166a25a3e057a693
+        with:
+          nim-version: '2.2.10'
       - uses: nim-lang/setup-nimble-action@v2
         with:
           nimble-version: '0.26.1'
@@ -99,6 +105,9 @@ jobs:
         with:
           go-version: '1.26.5'
           cache: false
+      - uses: jiro4989/setup-nim-action@189b145833368cc92f1e7b3e166a25a3e057a693
+        with:
+          nim-version: '2.2.10'
       - uses: nim-lang/setup-nimble-action@v2
         with:
           nimble-version: '0.26.1'
@@ -126,6 +135,9 @@ jobs:
         with:
           go-version: '1.26.5'
           cache: false
+      - uses: jiro4989/setup-nim-action@189b145833368cc92f1e7b3e166a25a3e057a693
+        with:
+          nim-version: '2.2.10'
       - uses: nim-lang/setup-nimble-action@v2
         with:
           nimble-version: '0.26.1'

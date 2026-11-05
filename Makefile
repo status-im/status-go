@@ -115,7 +115,7 @@ IOS_TOKEN_ARCHIVE = bash scripts/tkl_bundle_archive.sh build/bin/libstatus.a
 
 # `nim-sds` variables
 #
-# Option 1 (default): Nimble builds libsds into build/. sds-go-bindings pins the revision.
+# Option 1 (default): Nimble builds libsds into build/. status_go.nimble pins the revision.
 # Option 2: Provide NIM_SDS_LIB_DIR and NIM_SDS_INC_DIR (used by Nix).
 
 ifdef NIM_SDS_LIB_DIR
@@ -325,10 +325,15 @@ USE_SYSTEM_NIM ?= 1
 
 # libsds targets
 
+# libsds.h includes generated/sds.h; both go next to the library.
+NIM_SDS_LIBRARY = $(call NIM_PKG_DIR,sds)/library
+NIM_SDS_BUILD = $(call NIM_COMPILE,$(NIM_SDS_LIBRARY)/libsds.nim,$(1),$(2),-d:ffiOutputDir=\"$(NIM_LIB_DIR)/generated\" $(3)) && \
+	cp "$(NIM_SDS_LIBRARY)/libsds.h" "$(NIM_LIB_DIR)/"
+
 $(LIBSDS): | $(NIMBLE_SETUP)
 ifeq ($(NIM_SDS_BUILD_FROM_SOURCE),true)
 	@echo "Building nim-sds: $(LIBSDS)"
-	$(NIM_TASK) libsds "$$($(NIMBLE) path sds)/libsds.nims"
+	$(call NIM_SDS_BUILD,lib,$(notdir $(LIBSDS)))
 	@test -f $(LIBSDS) || (echo "Error: libsds not found at $(LIBSDS) after build" && exit 1)
 else
 	@test -f $(LIBSDS) || (echo "Error: libsds not found at $(LIBSDS)" && exit 1)
@@ -339,14 +344,18 @@ build-libsds: $(LIBSDS)
 
 build-libsds-android build-libsds-ios $(LIBSDS): NIM_LIB_DIR = $(NIM_SDS_LIB_DIR)
 build-libsds-android: NIM_FLAGS = $(NIM_FLAGS_ANDROID)
-build-libsds-android: NIM_LIB_EXT = so
+build-libsds-android: NIM_POLICY = $(NIM_POLICY_ANDROID)
 build-libsds-ios: NIM_FLAGS = $(NIM_FLAGS_IOS)
+build-libsds-ios: NIM_POLICY = $(NIM_POLICY_IOS)
 
 build-libsds-android: | nimble.paths
-	$(NIM_TASK) libsds "$$($(NIMBLE) path sds)/libsds.nims"
+	$(call NIM_SDS_BUILD,lib,libsds.so)
 
+# Static, next to other Nim runtimes in one image: sealed.
 build-libsds-ios: | nimble.paths
-	$(NIM_TASK) libsdsStatic "$$($(NIMBLE) path sds)/libsds.nims"
+	rm -rf "$(NIM_LIB_DIR)/nimcache"
+	$(call NIM_SDS_BUILD,staticlib,libsds.a,--passC:-fvisibility=hidden --passC:-fno-common)
+	$(call NIM_SEAL,sds_,$(NIM_LIB_DIR)/libsds.a)
 
 clean-libsds:
 	@echo "Removing libsds"
@@ -621,14 +630,23 @@ clean: clean-storage clean-libtkl ##@other Cleanup
 build-libtkl: ##@build Prepare the pinned native token library
 	bash scripts/tkl_native.sh
 
-# scripts/tkl_native.sh picks the task and output for the target. libtkl sets its
-# own memory manager and flags.
-nim-libtkl: NIM_POLICY =
-nim-libtkl: NIM_FLAGS =
+# scripts/tkl_native.sh passes the output directory and the target: a mobile
+# platform (TKL_PLATFORM, spelled by this file as for libsds), or the desktop
+# flags of Go's compiler (TKL_NIM_FLAGS) with, for a cross build, the target's
+# NIM_SEAL_* tools. libtkl is linked next to libsds, so it is sealed.
+NIM_TKL_ABI = $(call NIM_PKG_DIR,tokenlists)/abi
+nim-libtkl: NIM_FLAGS = $(if $(filter ANDROID,$(TKL_PLATFORM)),$(NIM_FLAGS_ANDROID) --passC:-fPIC,$(if $(filter IOS,$(TKL_PLATFORM)),$(NIM_FLAGS_IOS),$(TKL_NIM_FLAGS)))
+nim-libtkl: NIM_SEAL_TOOLS = $(if $(filter ANDROID,$(TKL_PLATFORM)),$(NIM_SEAL_TOOLS_ANDROID))
+# Nim archives with its host's command (llvm-ar on Linux): the NDK's tools first.
+nim-libtkl: export PATH := $(if $(filter ANDROID,$(TKL_PLATFORM)),$(NIM_ANDROID_BIN):)$(PATH)
+nim-libtkl: NIM_POLICY = $(NIM_POLICY_TKL)
 nim-libtkl: | nimble.paths
-	$(NIM_TASK) $(TKL_TASK) "$$($(NIMBLE) path tokenlists)/libtkl.nims"
+	rm -rf "$(NIM_LIB_DIR)/nimcache"
+	$(call NIM_COMPILE,$(NIM_TKL_ABI)/libtkl.nim,staticlib,libtkl.a)
+	$(call NIM_SEAL,tkl_,$(NIM_LIB_DIR)/link/libtkl.a)
+	cp "$(NIM_TKL_ABI)/tkl.h" "$(NIM_LIB_DIR)/link/"
 
-clean-libtkl: ##@other Remove the managed token-library checkout and build
+clean-libtkl: ##@other Remove the token-library build
 	bash scripts/tkl_native.sh clean
 
 test-libtkl: ##@test Check native dependency reuse and public ABI
