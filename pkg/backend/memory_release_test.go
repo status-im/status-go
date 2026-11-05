@@ -210,6 +210,59 @@ func TestMemoryReleaserTrailingReleaseSkipsAfterPauseRelease(t *testing.T) {
 	require.Equal(t, 1, *calls, "the pause release already returned the refresh's garbage")
 }
 
+func TestMemoryReleaserUpdateAfterPauseReleaseArmsTrailingRelease(t *testing.T) {
+	r, calls, now, timers := newTrailingTestReleaser(t)
+
+	r.onWalletEvent(tokenListsUpdated())
+	*now = now.Add(time.Second)
+	r.releaseNow()
+	require.Equal(t, 1, *calls)
+	require.Nil(t, r.trailing, "the pause release cancels the pending trailing release")
+
+	*now = now.Add(2 * time.Second)
+	r.onWalletEvent(tokenListsUpdated())
+	require.Len(t, *timers, 2, "an update after the pause release arms a new trailing release")
+	require.Equal(t, r.minGap-2*time.Second, (*timers)[1].delay, "it lands when the gap ends")
+
+	*now = now.Add(tokenListsReleaseDelay - 2*time.Second)
+	(*timers)[0].fire()
+	require.Equal(t, 1, *calls, "the cancelled timer claims nothing")
+
+	*now = now.Add(r.minGap)
+	(*timers)[1].fire()
+	require.Equal(t, 2, *calls)
+}
+
+func TestMemoryReleaserUpdateAfterLoginReleaseArmsTrailingRelease(t *testing.T) {
+	r, calls, now, timers := newTrailingTestReleaser(t)
+
+	r.onWalletEvent(tokenListsUpdated())
+	r.scheduleAfterLogin(time.Minute)
+	(*timers)[1].fire()
+	require.Equal(t, 1, *calls)
+	require.Nil(t, r.trailing, "the post-login release cancels the pending trailing release")
+
+	*now = now.Add(time.Second)
+	r.onWalletEvent(tokenListsUpdated())
+	require.Len(t, *timers, 3)
+	*now = now.Add(r.minGap)
+	(*timers)[2].fire()
+	require.Equal(t, 2, *calls)
+}
+
+func TestMemoryReleaserTrailingReleaseSkipsInsideLoginBurst(t *testing.T) {
+	r, calls, now, timers := newTrailingTestReleaser(t)
+
+	r.onWalletEvent(tokenListsUpdated())
+	r.scheduleAfterLogin(time.Minute) // a re-login armed while the trailing release waits
+
+	*now = now.Add(tokenListsReleaseDelay)
+	(*timers)[0].fire()
+	require.Equal(t, 0, *calls, "the post-login release covers it")
+	require.Nil(t, r.trailing)
+	require.NotNil(t, r.timer)
+}
+
 func TestMemoryReleaserStopCancelsTrailingRelease(t *testing.T) {
 	r, calls, now, timers := newTrailingTestReleaser(t)
 

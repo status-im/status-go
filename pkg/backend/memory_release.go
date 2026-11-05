@@ -94,8 +94,22 @@ func (r *memoryReleaser) claimFired(gen uint64) bool {
 		return false
 	}
 	r.timer = nil
-	r.last = r.now()
+	r.recordReleaseLocked()
 	return true
+}
+
+// recordReleaseLocked marks a release as run and drops a pending trailing release it covers, so
+// a token-list update that lands after it can arm a fresh one.
+func (r *memoryReleaser) recordReleaseLocked() {
+	r.last = r.now()
+	r.stopTrailingLocked()
+}
+
+func (r *memoryReleaser) stopTrailingLocked() {
+	if r.trailing != nil {
+		r.trailing.Stop()
+		r.trailing = nil
+	}
 }
 
 // releaseNow releases unless the post-login release is still pending or a release ran within
@@ -108,7 +122,7 @@ func (r *memoryReleaser) releaseNow() {
 		r.mu.Unlock()
 		return
 	}
-	r.last = r.now()
+	r.recordReleaseLocked()
 	r.mu.Unlock()
 	r.spawn(r.release)
 }
@@ -158,7 +172,8 @@ func (r *memoryReleaser) scheduleTrailing() {
 	})
 }
 
-// claimTrailing skips the release when another one ran after the update was seen.
+// claimTrailing skips the release when another one ran after the update was seen, or when a
+// post-login release is pending: releasing inside the login burst would only raise the heap goal.
 func (r *memoryReleaser) claimTrailing(gen uint64) bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -166,7 +181,7 @@ func (r *memoryReleaser) claimTrailing(gen uint64) bool {
 		return false
 	}
 	r.trailing = nil
-	if r.now().Sub(r.last) < r.minGap {
+	if r.timer != nil || r.now().Sub(r.last) < r.minGap {
 		return false
 	}
 	r.last = r.now()
@@ -190,8 +205,5 @@ func (r *memoryReleaser) stop() {
 		r.timer.Stop()
 		r.timer = nil
 	}
-	if r.trailing != nil {
-		r.trailing.Stop()
-		r.trailing = nil
-	}
+	r.stopTrailingLocked()
 }
