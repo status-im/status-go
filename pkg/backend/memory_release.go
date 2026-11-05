@@ -11,17 +11,20 @@ import (
 // memoryReleaser returns idle heap to the OS at the two moments it matters on a phone: once the
 // login burst (key derivation, bootstrap decode, first token build) has settled, and when the
 // UI goes to background and the OS starts weighing the process. The background scavenger does the
-// same work on its own, but over minutes; each call here costs one GC cycle.
+// same work on its own, but over minutes; each call here costs one GC cycle. On Android it also
+// purges the native allocator, which keeps freed pages resident while the process stays idle.
 type memoryReleaser struct {
-	mu      sync.Mutex
-	timer   *time.Timer
-	gen     uint64
-	last    time.Time
-	minGap  time.Duration
-	release func()
-	now     func() time.Time
-	afterFn func(time.Duration, func()) *time.Timer
-	spawn   func(func())
+	mu              sync.Mutex
+	timer           *time.Timer
+	gen             uint64
+	last            time.Time
+	minGap          time.Duration
+	release         func()
+	freeOSMemory    func()
+	purgeNativeHeap func()
+	now             func() time.Time
+	afterFn         func(time.Duration, func()) *time.Timer
+	spawn           func(func())
 }
 
 const (
@@ -30,11 +33,12 @@ const (
 )
 
 func newMemoryReleaser() *memoryReleaser {
-	return &memoryReleaser{
-		minGap:  releaseMinGap,
-		release: debug.FreeOSMemory,
-		now:     time.Now,
-		afterFn: time.AfterFunc,
+	r := &memoryReleaser{
+		minGap:          releaseMinGap,
+		freeOSMemory:    debug.FreeOSMemory,
+		purgeNativeHeap: purgeNativeHeap,
+		now:             time.Now,
+		afterFn:         time.AfterFunc,
 		spawn: func(f func()) {
 			go func() {
 				defer panics.LogOnPanic()
@@ -42,6 +46,14 @@ func newMemoryReleaser() *memoryReleaser {
 			}()
 		},
 	}
+	r.release = r.releaseHeaps
+	return r
+}
+
+// releaseHeaps runs the GC first: finalizers it runs free native memory the purge then returns.
+func (r *memoryReleaser) releaseHeaps() {
+	r.freeOSMemory()
+	r.purgeNativeHeap()
 }
 
 // scheduleAfterLogin arms a one-shot release, replacing any pending one. It is never throttled:

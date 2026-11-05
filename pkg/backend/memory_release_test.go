@@ -112,3 +112,13 @@ func TestMemoryReleaserTimerCallbackRacesWithArming(t *testing.T) {
 	defer r.mu.Unlock()
 	require.Nil(t, r.timer)
 }
+
+func TestMemoryReleaserReleasesGoHeapThenNativeHeap(t *testing.T) {
+	var order []string
+	r := newMemoryReleaser()
+	r.freeOSMemory = func() { order = append(order, "go") }
+	r.purgeNativeHeap = func() { order = append(order, "native") }
+
+	r.release()
+	require.Equal(t, []string{"go", "native"}, order, "finalizers run by the GC free native memory before the purge")
+}
