@@ -16,7 +16,6 @@ import (
 	mvdsproto "github.com/status-im/mvds/protobuf"
 	mvdsstate "github.com/status-im/mvds/state"
 
-	"github.com/status-im/status-go/pkg/messaging/diagnostics"
 	"github.com/status-im/status-go/pkg/messaging/layers/reliability/datasync"
 	datasyncpeer "github.com/status-im/status-go/pkg/messaging/layers/reliability/datasync/peer"
 	"github.com/status-im/status-go/pkg/messaging/layers/reliability/protobuf"
@@ -250,7 +249,7 @@ func (r *Reliability) buildNode(duration time.Duration) error {
 		return node.CurrentEpoch(), true
 	}
 	persistence := datasync.WithPeerOnlineResetPolicy(
-		datasync.WithTracePersistence(r.mvdsPersistence, duration), duration, currentEpoch,
+		r.mvdsPersistence, duration, currentEpoch,
 	)
 	var err error
 	node, err = mvdsnode.NewPersistentNode(
@@ -430,11 +429,5 @@ func (r *Reliability) ReportPeerOnline(publicKey *ecdsa.PublicKey, eventTime uin
 	}
 	if reason == "queue_full" {
 		r.logger.Debug("mvdsStatusChangeEvent channel is full")
-	}
-	if diagnostics.Enabled() {
-		diagnostics.Emit(diagnostics.Event{Metadata: diagnostics.Metadata{
-			Reliability: "mvds", Peer: diagnostics.Hexes([][]byte{peerID[:]})[0],
-		}, Stage: "mvds_peer_online", Reason: reason, PeerEventTime: eventTime, TimestampNS: now.UnixNano(),
-			QueueDepth: len(r.mvdsStatusChangeEvent), QueueCapacity: cap(r.mvdsStatusChangeEvent)})
 	}
 }
