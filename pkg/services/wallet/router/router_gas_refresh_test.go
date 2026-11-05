@@ -260,6 +260,19 @@ func TestRefreshStaleGasEstimates(t *testing.T) {
 		require.Equal(t, 0, e.approval.calls)
 	})
 
+	t.Run("full-balance send whose value changed since the estimate is re-estimated for it", func(t *testing.T) {
+		path := newPath("Transfer", false, fresh, time.Time{})
+		path.TxGasEstimatedValue = bigHex(974_800)
+		path.AmountIn = bigHex(924_400)
+		e := estimators{tx: &gasEstimator{gas: 63000, raw: 60000}, approval: &gasEstimator{}}
+		run(routes.Route{path}, noApprovalPlaced, e)
+
+		require.Equal(t, 1, e.tx.calls)
+		require.Equal(t, uint64(60000), path.EstimatedTxGasAmount)
+		require.Equal(t, big.NewInt(924_400), path.TxGasEstimatedValue.ToInt())
+		require.True(t, path.GasEstimateFresh(false, now))
+	})
+
 	t.Run("a failed re-estimate leaves the estimate stale", func(t *testing.T) {
 		path := newPath("Transfer", false, stale, time.Time{})
 		e := estimators{tx: &gasEstimator{err: errors.New("rpc down")}, approval: &gasEstimator{}}

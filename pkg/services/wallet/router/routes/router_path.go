@@ -83,6 +83,8 @@ type Path struct {
 	// When the main / approval tx gas was last estimated; see GasEstimateFresh.
 	TxGasEstimatedAt       time.Time `json:"-"`
 	ApprovalGasEstimatedAt time.Time `json:"-"`
+	// TxGasEstimatedValue is the amount the main tx gas was estimated with.
+	TxGasEstimatedValue *hexutil.Big `json:"-"`
 
 	// used internally
 	communityParams *requests.CommunityRouteInputParams
@@ -137,6 +139,10 @@ func (p *Path) Copy() *Path {
 
 	if p.AmountInOriginal != nil {
 		newPath.AmountInOriginal = (*hexutil.Big)(big.NewInt(0).Set(p.AmountInOriginal.ToInt()))
+	}
+
+	if p.TxGasEstimatedValue != nil {
+		newPath.TxGasEstimatedValue = (*hexutil.Big)(big.NewInt(0).Set(p.TxGasEstimatedValue.ToInt()))
 	}
 
 	if p.FromChain != nil {
