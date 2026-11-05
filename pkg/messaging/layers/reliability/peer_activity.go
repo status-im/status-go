@@ -9,7 +9,7 @@ import (
 
 // Presence is broadcast every five minutes and automatic status expires after
 // another five-second receiving allowance. Authenticated MVDS traffic renews
-// this local lease too, including ACKs from otherwise quiet chat participants.
+// an already-notified local lease too, including ACKs from quiet participants.
 const peerOnlineTimeout = 5*time.Minute + 5*time.Second
 
 type peerActivity struct {
@@ -22,7 +22,10 @@ func (p *peerActivity) record(peer state.PeerID, now time.Time) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.pruneLocked(now)
-	p.lastSeen[peer] = now
+	// Traffic must not establish a lease before MVDS receives an online notification.
+	if last, exists := p.lastSeen[peer]; exists && now.Sub(last) < peerOnlineTimeout {
+		p.lastSeen[peer] = now
+	}
 }
 
 // enqueue must be nonblocking. Holding the activity lock makes the online

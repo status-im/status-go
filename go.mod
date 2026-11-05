@@ -26,9 +26,6 @@ replace github.com/mutecomm/go-sqlcipher/v4 v4.4.2 => github.com/status-im/go-sq
 
 replace github.com/libp2p/go-libp2p-pubsub v0.13.1 => github.com/waku-org/go-libp2p-pubsub v0.13.1-gowaku
 
-// Pinned source snapshot with optional Filter diagnostics; see third_party/go-waku/FILTER_TRACING.md.
-replace github.com/waku-org/go-waku v0.10.3 => ./third_party/go-waku
-
 require (
 	github.com/anacrolix/torrent v1.41.0
 	github.com/beevik/ntp v0.3.0
@@ -105,7 +102,7 @@ require (
 	github.com/schollz/peerdiscovery v1.7.0
 	github.com/status-im/extkeys v1.4.0
 	github.com/status-im/go-wallet-sdk v0.0.0-20261027195616-2b8382a7fa11
-	github.com/waku-org/go-waku v0.10.3
+	github.com/waku-org/go-waku v0.10.4-0.20261109160724-eb626e3b4a7f
 	github.com/waku-org/sds-go-bindings v0.0.0-20261029220608-07931d3221c4
 	github.com/wk8/go-ordered-map/v2 v2.1.7
 	go.uber.org/atomic v1.11.0

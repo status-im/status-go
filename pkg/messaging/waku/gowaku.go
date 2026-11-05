@@ -80,7 +80,6 @@ import (
 	"github.com/status-im/status-go/internal/panics"
 	"github.com/status-im/status-go/internal/pausable"
 	"github.com/status-im/status-go/internal/timesource"
-	"github.com/status-im/status-go/pkg/messaging/diagnostics"
 	"github.com/status-im/status-go/pkg/messaging/waku/common"
 	"github.com/status-im/status-go/pkg/messaging/waku/fleets"
 	"github.com/status-im/status-go/pkg/messaging/waku/types"
@@ -106,8 +105,8 @@ const (
 	lightpushPeerRate  = 24
 	lightpushPeerBurst = 60
 
-	// Incoming Filter pushes share a bucket per serving relay across peer traffic
-	// and copies of our own publications on negotiated topics, including MVDS ACKs.
+	// Incoming Filter pushes share a per-serving-relay bucket across data,
+	// acknowledgements, and reflected self-copies.
 	filterPushPeerRate  = 25
 	filterPushPeerBurst = 80
 )
@@ -165,8 +164,7 @@ type Waku struct {
 
 	traffic *trafficCounter
 
-	sendQueue          *publish.MessageQueue
-	diagnosticAttempts sync.Map // envelope hash -> diagnostics.Metadata; removed when publication starts
+	sendQueue *publish.MessageQueue
 
 	msgQueue chan *common.ReceivedMessage // Message queue for waku messages that havent been decoded
 
@@ -343,7 +341,6 @@ func New(nodeKey *ecdsa.PrivateKey, cfg *Config, logger *zap.Logger, ts timesour
 	if cfg.IsLightClient() {
 		opts = append(opts, node.WithWakuFilterLightNode(
 			filter.WithLightNodeRateLimiter(filterPushPeerRate, filterPushPeerBurst),
-			filter.WithLightNodeObserver(filterTraceObserver()),
 		))
 		waku.defaultShardInfo = shards[0]
 		opts = append(opts, node.WithMaxPeerConnections(cfg.DiscoveryLimit))
@@ -367,7 +364,6 @@ func New(nodeKey *ecdsa.PrivateKey, cfg *Config, logger *zap.Logger, ts timesour
 		opts = append(opts, node.WithWakuFilterFullNode(
 			filter.WithMaxSubscribers(20),
 			filter.WithFullNodeRateLimiter(15, 20),
-			filter.WithObserver(filterTraceObserver()),
 		))
 		opts = append(opts, node.WithLightPush(lightpush.WithRateLimiter(lightpushPeerRate, lightpushPeerBurst)))
 	}
@@ -851,14 +847,6 @@ func (w *Waku) ConfirmMessageDelivered(hashes []gethcommon.Hash) {
 
 // OnNewEnvelope is an interface from Waku FilterManager API that gets invoked when any new message is received by Filter.
 func (w *Waku) OnNewEnvelope(env *protocol.Envelope) error {
-	if diagnostics.Enabled() && env != nil {
-		event := diagnostics.Event{Stage: "filter_api_handoff", Source: "filter", EnvelopeHashes: []string{env.Hash().String()},
-			PubsubTopic: env.PubsubTopic(), ContentTopic: env.Message().ContentTopic}
-		if w.node != nil && w.node.Host() != nil {
-			event.LocalPeerID = w.node.Host().ID().String()
-		}
-		diagnostics.Emit(event)
-	}
 	return w.OnNewEnvelopes(env, common.RelayedMessageType, false)
 }
 
@@ -1279,9 +1267,6 @@ func (w *Waku) Stop() error {
 func (w *Waku) OnNewEnvelopes(envelope *protocol.Envelope, msgType common.MessageType, processImmediately bool) error {
 	if envelope == nil {
 		return nil
-	}
-	if diagnostics.Enabled() {
-		diagnostics.Emit(diagnostics.Event{Stage: "received", EnvelopeHashes: []string{envelope.Hash().String()}, Source: msgType})
 	}
 
 	recvMessage := common.NewReceivedMessage(envelope, msgType)
