@@ -15,8 +15,8 @@ import (
 	mvdsnode "github.com/status-im/mvds/node"
 	mvdsproto "github.com/status-im/mvds/protobuf"
 	mvdsstate "github.com/status-im/mvds/state"
-	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
 
+	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/pkg/messaging/layers/reliability/datasync"
 	datasyncpeer "github.com/status-im/status-go/pkg/messaging/layers/reliability/datasync/peer"
 	"github.com/status-im/status-go/pkg/messaging/layers/reliability/protobuf"

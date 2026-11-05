@@ -19,6 +19,7 @@ import (
 	"github.com/waku-org/sds-go-bindings/sds"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zaptest/observer"
+	"google.golang.org/protobuf/encoding/protowire"
 
 	"github.com/status-im/status-go/internal/crypto"
 	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
@@ -555,8 +556,9 @@ func (s *ProcessorSuite) TestSDSWrappedMessages() {
 		},
 	}
 
-	err = s.processor.processSDSLayer(&receivedMsg)
+	processed, err := s.processor.processSDSLayer(&receivedMsg)
 	s.Require().NoError(err)
+	s.Require().True(processed)
 	s.Require().Equal(payload, receivedMsg.EncryptionLayer.Payload)
 	s.Require().True(receivedMsg.SDSWrapped)
 	cloned, err := receivedMsg.Clone()
@@ -569,10 +571,145 @@ func (s *ProcessorSuite) TestSDSWrappedMessages() {
 			Payload: anotherPayload,
 		},
 	}
-	err = s.processor.processSDSLayer(&receivedMsg2)
+	processed, err = s.processor.processSDSLayer(&receivedMsg2)
 	s.Require().NoError(err)
+	s.Require().True(processed)
 	s.Require().Equal(anotherPayload, receivedMsg2.EncryptionLayer.Payload)
 	s.Require().False(receivedMsg2.SDSWrapped)
+}
+
+func (s *ProcessorSuite) TestUnauthorizedSDSMessageIsRejectedBeforeReliabilityProcessing() {
+	receiver := s.newStandaloneReliability()
+	const channelID = "community-channel"
+
+	_, _, err := receiver.WrapPayloadForSDS([]byte("local-message-one"), channelID)
+	s.Require().NoError(err)
+	_, localMessageID, err := receiver.WrapPayloadForSDS([]byte("local-message-two"), channelID)
+	s.Require().NoError(err)
+
+	acknowledgements := make([]string, 0)
+	receiver.SetMessageSentHandler(func(messageID string) {
+		acknowledgements = append(acknowledgements, messageID)
+	})
+	hintStore := &testSDSRetrievalHintPersistence{hints: make(map[string][][]byte)}
+	receiver.SetSDSRetrievalHintPersistence(hintStore)
+
+	localMessageIDHex := cryptotypes.EncodeHex(localMessageID)
+
+	secondLocalMessage, _, err := receiver.WrapPayloadForSDS([]byte("local-message-three"), channelID)
+	s.Require().NoError(err)
+	bloomFilter, ok := extractSDSBytesField(secondLocalMessage, 6)
+	s.Require().True(ok, "the locally generated message should have a bloom filter")
+
+	attackPayload := []byte("unauthorized application message")
+	attack := protowire.AppendTag(nil, 1, protowire.BytesType)
+	attack = protowire.AppendString(attack, "attacker-message")
+	attack = protowire.AppendTag(attack, 2, protowire.VarintType)
+	attack = protowire.AppendVarint(attack, 100)
+	attack = protowire.AppendTag(attack, 3, protowire.BytesType)
+	attack = protowire.AppendString(attack, "fake-causal-history-entry")
+	attack = protowire.AppendTag(attack, 4, protowire.BytesType)
+	attack = protowire.AppendString(attack, channelID)
+	attack = protowire.AppendTag(attack, 5, protowire.BytesType)
+	attack = protowire.AppendBytes(attack, attackPayload)
+	attack = protowire.AppendTag(attack, 6, protowire.BytesType)
+	attack = protowire.AppendBytes(attack, bloomFilter)
+	attack = protowire.AppendTag(attack, 5, protowire.VarintType)
+	attack = protowire.AppendVarint(attack, 1)
+
+	originalReliability := s.processor.stack.Reliability
+	s.processor.stack.Reliability = receiver
+	defer func() {
+		s.processor.stack.Reliability = originalReliability
+	}()
+
+	validatorCalls := 0
+	senderKey, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+	envelopeTopic := types.BytesToContentTopic([]byte{1, 2, 3, 4})
+	s.processor.SetSDSMessageValidator(func(content []byte, gotChannelID string, envelopeSigner *ecdsa.PublicKey, topic types.ContentTopic) (types.SDSMessageDisposition, error) {
+		validatorCalls++
+		s.Require().Equal(attackPayload, content)
+		s.Require().Equal(channelID, gotChannelID)
+		s.Require().True(crypto.IsPubKeyEqual(&senderKey.PublicKey, envelopeSigner))
+		s.Require().Equal(envelopeTopic, topic)
+		return types.SDSMessageDispositionReject, nil
+	})
+	defer s.processor.SetSDSMessageValidator(nil)
+	response, err := s.processor.ProcessMessage(&types.ReceivedMessage{
+		Sig:     crypto.FromECDSAPub(&senderKey.PublicKey),
+		Topic:   envelopeTopic,
+		Hash:    crypto.Keccak256(attack),
+		Payload: attack,
+	})
+
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Empty(response.Messages)
+	s.Require().Empty(response.AckedMessageIDs)
+	s.Require().Equal(1, validatorCalls)
+	s.Require().Empty(acknowledgements, "rejected bloom filter must not acknowledge an outgoing message")
+	s.Require().Empty(hintStore.hints, "rejected payload must not record SDS retrieval hints")
+
+	s.processor.SetSDSMessageValidator(func([]byte, string, *ecdsa.PublicKey, types.ContentTopic) (types.SDSMessageDisposition, error) {
+		return types.SDSMessageDispositionApplicationOnly, nil
+	})
+	applicationOnlyMessage := &types.Message{
+		TransportLayer: types.TransportLayer{
+			SigPubKey: &senderKey.PublicKey,
+			Message:   &types.ReceivedMessage{Topic: envelopeTopic},
+		},
+		EncryptionLayer: types.EncryptionLayer{Payload: attack},
+	}
+	processed, err := s.processor.processSDSLayer(applicationOnlyMessage)
+	s.Require().NoError(err)
+	s.Require().True(processed)
+	s.Require().Equal(attackPayload, applicationOnlyMessage.EncryptionLayer.Payload)
+	s.Require().False(applicationOnlyMessage.SDSWrapped)
+	s.Require().Empty(acknowledgements, "application-only messages must not process wrapper acknowledgements")
+	s.Require().Empty(hintStore.hints, "application-only messages must not record SDS retrieval hints")
+
+	_, _, _, _, err = receiver.UnwrapPayloadFromSDSWithMetadata(attack)
+	s.Require().NoError(err)
+	s.Require().Contains(acknowledgements, localMessageIDHex, "the attack bloom filter is a valid forged acknowledgement")
+
+	authorizedPayload := []byte("authorized application message")
+	authorizedSender := s.newStandaloneReliability()
+	authorizedWrapped, _, err := authorizedSender.WrapPayloadForSDS(authorizedPayload, channelID)
+	s.Require().NoError(err)
+	s.processor.SetSDSMessageValidator(func([]byte, string, *ecdsa.PublicKey, types.ContentTopic) (types.SDSMessageDisposition, error) {
+		return types.SDSMessageDispositionProcess, nil
+	})
+	authorizedMessage := types.Message{
+		EncryptionLayer: types.EncryptionLayer{Payload: authorizedWrapped},
+	}
+	processed, err = s.processor.processSDSLayer(&authorizedMessage)
+	s.Require().NoError(err)
+	s.Require().True(processed)
+	s.Require().Equal(authorizedPayload, authorizedMessage.EncryptionLayer.Payload)
+}
+
+func extractSDSBytesField(message []byte, target protowire.Number) ([]byte, bool) {
+	for len(message) > 0 {
+		number, wireType, tagSize := protowire.ConsumeTag(message)
+		if tagSize < 0 {
+			return nil, false
+		}
+		message = message[tagSize:]
+		if number == target {
+			value, valueSize := protowire.ConsumeBytes(message)
+			if wireType != protowire.BytesType || valueSize < 0 {
+				return nil, false
+			}
+			return value, true
+		}
+		valueSize := protowire.ConsumeFieldValue(number, wireType, message)
+		if valueSize < 0 {
+			return nil, false
+		}
+		message = message[valueSize:]
+	}
+	return nil, false
 }
 
 func (s *ProcessorSuite) TestProcessSDSLayerRecordsReceivedEnvelopeHashes() {
@@ -622,7 +759,9 @@ func (s *ProcessorSuite) TestProcessSDSLayerRecordsReceivedEnvelopeHashes() {
 				},
 				EncryptionLayer: types.EncryptionLayer{Payload: wrapped},
 			}
-			s.Require().NoError(s.processor.processSDSLayer(&message))
+			processed, err := s.processor.processSDSLayer(&message)
+			s.Require().NoError(err)
+			s.Require().True(processed)
 			s.Require().Equal(test.payload, message.EncryptionLayer.Payload)
 
 			messageID := cryptotypes.EncodeHex(crypto.Keccak256(test.payload))
@@ -769,8 +908,9 @@ func (s *ProcessorSuite) TestSDSMissingDependencyTriggersFetchHintsAndRecoversPa
 	newMessageFirst := types.Message{
 		EncryptionLayer: types.EncryptionLayer{Payload: wrappedNewPayload},
 	}
-	err = s.processor.processSDSLayer(&newMessageFirst)
+	processed, err := s.processor.processSDSLayer(&newMessageFirst)
 	s.Require().NoError(err)
+	s.Require().True(processed)
 
 	err = testutils.RetryWithBackOff(func() error {
 		callsMu.Lock()
@@ -800,8 +940,9 @@ func (s *ProcessorSuite) TestSDSMissingDependencyTriggersFetchHintsAndRecoversPa
 	oldMessage := types.Message{
 		EncryptionLayer: types.EncryptionLayer{Payload: wrappedOldPayload},
 	}
-	err = s.processor.processSDSLayer(&oldMessage)
+	processed, err = s.processor.processSDSLayer(&oldMessage)
 	s.Require().NoError(err)
+	s.Require().True(processed)
 	if bytes.Equal(oldMessage.EncryptionLayer.Payload, oldPayload) {
 		recovered["old"] = true
 	}
@@ -809,8 +950,9 @@ func (s *ProcessorSuite) TestSDSMissingDependencyTriggersFetchHintsAndRecoversPa
 	newMessageReplay := types.Message{
 		EncryptionLayer: types.EncryptionLayer{Payload: wrappedNewPayload},
 	}
-	err = s.processor.processSDSLayer(&newMessageReplay)
+	processed, err = s.processor.processSDSLayer(&newMessageReplay)
 	s.Require().NoError(err)
+	s.Require().True(processed)
 	if bytes.Equal(newMessageReplay.EncryptionLayer.Payload, newPayload) {
 		recovered["new"] = true
 	}
