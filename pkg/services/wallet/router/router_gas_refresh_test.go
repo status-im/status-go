@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -16,6 +17,8 @@ import (
 	"github.com/status-im/status-go/internal/logutils"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/services/wallet/requests"
+	"github.com/status-im/status-go/pkg/services/wallet/router/pathprocessor"
+	mockpathprocessor "github.com/status-im/status-go/pkg/services/wallet/router/pathprocessor/mock"
 	"github.com/status-im/status-go/pkg/services/wallet/router/routes"
 	tokentypes "github.com/status-im/status-go/pkg/services/wallet/token/types"
 )
@@ -273,4 +276,60 @@ func TestMainTxGasEstimatedAt(t *testing.T) {
 	require.Equal(t, now, mainTxGasEstimatedAt(false, 150000, now))
 	require.Equal(t, now, mainTxGasEstimatedAt(true, 150000, now), "estimated before the approval was mined")
 	require.True(t, mainTxGasEstimatedAt(true, 0, now).IsZero(), "a stand-in is no estimate")
+}
+
+// The build's route copy must carry the re-estimated gas.
+func TestGetBestRouteForBuildCarriesRefreshedEstimates(t *testing.T) {
+	now := time.Now()
+	stale := now.Add(-routes.GasEstimateMaxAge - time.Second)
+	approvalPlaced := func(string) bool { return true }
+
+	newRouter := func(t *testing.T, estimated uint64) (*Router, *routes.Path) {
+		ctrl := gomock.NewController(t)
+		processor := mockpathprocessor.NewMockPathProcessor(ctrl)
+		processor.EXPECT().EstimateGas(gomock.Any(), []byte{0xab}).Return(estimated, nil).Times(1)
+
+		// a swap re-evaluated when its approval was mined, signed more than 90 s later
+		path := &routes.Path{
+			RouterInputParamsUuid: "uuid",
+			ProcessorName:         "Paraswap",
+			FromChain:             &params.Network{ChainID: 1},
+			ToChain:               &params.Network{ChainID: 1},
+			ApprovalRequired:      true,
+			TxPackedData:          []byte{0xab},
+			SuggestedTxGasAmount:  157500,
+			EstimatedTxGasAmount:  150000,
+			TxGasAmount:           157500,
+			TxGasEstimatedAt:      stale,
+		}
+		r := &Router{
+			logger:          logutils.ZapLogger().Named("router-test"),
+			pathProcessors:  map[string]pathprocessor.PathProcessor{"Paraswap": processor},
+			activeRoutes:    &SuggestedRoutes{Uuid: "uuid", Route: routes.Route{path}},
+			lastInputParams: &requests.RouteInputParams{Uuid: "uuid", AmountIn: bigHex(1000)},
+		}
+		return r, path
+	}
+
+	t.Run("unchanged estimate: the copy is fresh and still covered by the confirmed gas", func(t *testing.T) {
+		r, active := newRouter(t, 150500)
+		route, input := r.GetBestRouteForBuild(approvalPlaced, now)
+
+		require.Equal(t, "uuid", input.Uuid)
+		require.Len(t, route, 1)
+		require.NotSame(t, active, route[0])
+		require.True(t, route[0].GasEstimateFresh(false, now))
+		require.Equal(t, uint64(150500), route[0].EstimatedTxGasAmount)
+		require.Equal(t, uint64(157500), route[0].TxGasAmount)
+		require.True(t, active.GasEstimateFresh(false, now))
+	})
+
+	t.Run("raised estimate reaches the copy, above the confirmed gas", func(t *testing.T) {
+		r, _ := newRouter(t, 160000)
+		route, _ := r.GetBestRouteForBuild(approvalPlaced, now)
+
+		require.True(t, route[0].GasEstimateFresh(false, now))
+		require.Equal(t, uint64(160000), route[0].EstimatedTxGasAmount)
+		require.Less(t, route[0].TxGasAmount, route[0].EstimatedTxGasAmount, "the build refuses it with WT-006")
+	})
 }

@@ -214,14 +214,8 @@ func buildTxForPath(path *routes.Path, pathProcessors map[string]pathprocessor.P
 	}, nil
 }
 
-// checkGasEstimatesFresh refuses a route with a gas estimate older than routes.GasEstimateMaxAge
-// for a tx this pass builds. The router re-estimates every routes.GasReestimateInterval while it
-// tracks the route, and once more right before the build (router.RefreshStaleGasEstimates); an
-// estimate that is still old means the node couldn't estimate it, and the route has to be reviewed
-// again rather than signed with gas the chain may no longer accept.
-//
-// An approval-pending path is checked on its approval only. Its main tx can't be estimated until
-// the approval is mined, and is estimated again then (swaps: ReevaluateRouterPath).
+// checkGasEstimatesFresh refuses a route whose gas estimate for a tx built now is older than
+// GasEstimateMaxAge. An approval-pending path is checked on its approval only.
 func checkGasEstimatesFresh(route routes.Route, approvalPlaced func(processorName string) bool, now time.Time) (*routes.Path, error) {
 	for _, path := range route {
 		approvalPending := path.ApprovalRequired && !approvalPlaced(path.ProcessorName)

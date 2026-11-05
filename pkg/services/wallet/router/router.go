@@ -182,6 +182,21 @@ func (r *Router) GetPathProcessors() map[string]pathprocessor.PathProcessor {
 func (r *Router) GetBestRouteAndAssociatedInputParams() (routes.Route, requests.RouteInputParams) {
 	r.activeRoutesMutex.Lock()
 	defer r.activeRoutesMutex.Unlock()
+	return r.bestRouteAndAssociatedInputParams()
+}
+
+// GetBestRouteForBuild re-estimates stale gas and returns a copy of the active route, under one lock.
+func (r *Router) GetBestRouteForBuild(approvalPlaced func(processorName string) bool, now time.Time) (routes.Route, requests.RouteInputParams) {
+	r.activeRoutesMutex.Lock()
+	defer r.activeRoutesMutex.Unlock()
+	if r.activeRoutes != nil {
+		refreshStaleGasEstimates(r.activeRoutes.Route, approvalPlaced, now, r.txGasEstimator, r.approvalGasEstimator, r.logger)
+	}
+	return r.bestRouteAndAssociatedInputParams()
+}
+
+// bestRouteAndAssociatedInputParams expects activeRoutesMutex to be held.
+func (r *Router) bestRouteAndAssociatedInputParams() (routes.Route, requests.RouteInputParams) {
 	if r.activeRoutes == nil {
 		lastUuid := ""
 		r.lastInputParamsMutex.Lock()
@@ -1175,10 +1190,7 @@ func (r *Router) estimateMainTx(input *requests.RouteInputParams, pathProcessor 
 	return txPackedData, gasLimit, estimatedGas, nil
 }
 
-// mainTxGasEstimatedAt is the estimate time to record for a path's main tx gas. A main tx that
-// could only get a stand-in while its approval is pending (estimatedGas == 0) gets none, so once
-// the approval is placed it can't be signed before it is estimated (ReevaluateRouterPath, or
-// RefreshStaleGasEstimates at build time).
+// mainTxGasEstimatedAt returns zero time for a stand-in estimate, so it is re-estimated before signing.
 func mainTxGasEstimatedAt(approvalRequired bool, estimatedGas uint64, now time.Time) time.Time {
 	if approvalRequired && estimatedGas == 0 {
 		return time.Time{}
