@@ -112,6 +112,26 @@ func (t *Transactor) EstimateGas(chainID uint64, from common.Address, to common.
 	return rpcWrapper.EstimateGas(ctx, msg)
 }
 
+// EstimateTransactionGas returns the node's raw gas estimate for args; no To means a deployment.
+func (t *Transactor) EstimateTransactionGas(chainID uint64, args wallettypes.SendTxArgs) (uint64, error) {
+	rpcWrapper := newRPCWrapper(t.ethClientGetter, chainID)
+
+	ctx, cancel := context.WithTimeout(context.Background(), t.rpcCallTimeout)
+	defer cancel()
+
+	var to *common.Address
+	if args.To != nil {
+		addr := common.Address(*args.To)
+		to = &addr
+	}
+	return rpcWrapper.EstimateGas(ctx, ethereum.CallMsg{
+		From:  common.Address(args.From),
+		To:    to,
+		Value: (*big.Int)(args.Value),
+		Data:  args.GetInput(),
+	})
+}
+
 func (t *Transactor) SendTransactionWithChainID(chainID uint64, sendArgs wallettypes.SendTxArgs, lastUsedNonce int64, verifiedAccount *generator.Account) (hash types.Hash, nonce uint64, err error) {
 	wrapper := newRPCWrapper(t.ethClientGetter, chainID)
 	hash, nonce, err = t.validateAndPropagate(wrapper, verifiedAccount, sendArgs, lastUsedNonce)

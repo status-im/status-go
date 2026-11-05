@@ -38,6 +38,8 @@ import (
 	"github.com/status-im/status-go/pkg/services/wallet/requests"
 	"github.com/status-im/status-go/pkg/services/wallet/router"
 	"github.com/status-im/status-go/pkg/services/wallet/router/fees"
+	"github.com/status-im/status-go/pkg/services/wallet/router/pathprocessor"
+	pathprocessorcommon "github.com/status-im/status-go/pkg/services/wallet/router/pathprocessor/common"
 	"github.com/status-im/status-go/pkg/services/wallet/thirdparty"
 	"github.com/status-im/status-go/pkg/services/wallet/thirdparty/efp"
 	tokentypes "github.com/status-im/status-go/pkg/services/wallet/token/types"
@@ -596,6 +598,21 @@ func (api *API) BuildTransaction(ctx context.Context, chainID uint64, sendTxArgs
 		return nil, err
 	}
 	return api.s.transactionManager.BuildTransaction(chainID, params)
+}
+
+// EstimateTransactionGas returns the buffered gas limit for a tx built outside the router (e.g. a
+// dApp request). The client signs with it as the tx gas, so the buffer is applied once.
+func (api *API) EstimateTransactionGas(ctx context.Context, chainID uint64, sendTxArgsJSON string) (hexutil.Uint64, error) {
+	logutils.ZapLogger().Debug("[WalletAPI::EstimateTransactionGas]", zap.Uint64("chainID", chainID), zap.String("sendTxArgsJSON", sendTxArgsJSON))
+	var params wallettypes.SendTxArgs
+	if err := json.Unmarshal([]byte(sendTxArgsJSON), &params); err != nil {
+		return 0, err
+	}
+	estimated, err := api.s.transactor.EstimateTransactionGas(chainID, params)
+	if err != nil {
+		return 0, err
+	}
+	return hexutil.Uint64(pathprocessor.BufferGasEstimate(estimated, pathprocessorcommon.IncreaseEstimatedGasFactor)), nil
 }
 
 func (api *API) BuildRawTransaction(ctx context.Context, chainID uint64, sendTxArgsJSON string, signature string) (response *transfer.TxResponse, err error) {
