@@ -1,8 +1,11 @@
 package routes
 
 import (
+	"math/big"
 	"testing"
 	"time"
+
+	"github.com/ethereum/go-ethereum/common/hexutil"
 
 	"github.com/stretchr/testify/require"
 )
@@ -45,4 +48,24 @@ func TestGasEstimateFreshness(t *testing.T) {
 			require.False(t, approvalPath.GasEstimateFresh(false, now))
 		})
 	}
+}
+
+func TestGasEstimateFreshForTheSignedValue(t *testing.T) {
+	now := time.Unix(1_000_000, 0)
+	value := func(v int64) *hexutil.Big { return (*hexutil.Big)(big.NewInt(v)) }
+
+	// a full-balance send's value changes when fees are rebuilt out of it
+	plain := &Path{TxGasEstimatedAt: now, AmountIn: value(974_800), TxGasEstimatedValue: value(974_800)}
+	require.True(t, plain.GasEstimateFresh(false, now))
+	plain.AmountIn = value(924_400)
+	require.False(t, plain.GasEstimateFresh(false, now))
+	require.False(t, plain.GasEstimateDue(false, now), "re-estimated at build, not every block")
+
+	// packed data encodes its own amount
+	packed := &Path{TxGasEstimatedAt: now, AmountIn: value(924_400), TxGasEstimatedValue: value(974_800), TxPackedData: []byte{0x01}}
+	require.True(t, packed.GasEstimateFresh(false, now))
+
+	// the approval doesn't carry the value
+	approval := &Path{ApprovalGasEstimatedAt: now, AmountIn: value(924_400)}
+	require.True(t, approval.GasEstimateFresh(true, now))
 }

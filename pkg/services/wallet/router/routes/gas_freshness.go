@@ -1,6 +1,10 @@
 package routes
 
-import "time"
+import (
+	"time"
+
+	"github.com/ethereum/go-ethereum/common/hexutil"
+)
 
 const (
 	// GasReestimateInterval is how often the active route's gas is re-estimated.
@@ -22,8 +26,19 @@ func (p *Path) GasEstimateDue(approval bool, now time.Time) bool {
 	return estimatedAt.IsZero() || now.Sub(estimatedAt) >= GasReestimateInterval
 }
 
-// GasEstimateFresh tells whether the main or approval tx gas is recent enough to sign.
+// GasEstimateFresh tells whether the main or approval tx gas is recent enough to sign, and was
+// estimated for the value a plain native transfer signs.
 func (p *Path) GasEstimateFresh(approval bool, now time.Time) bool {
 	estimatedAt := p.gasEstimatedAt(approval)
-	return !estimatedAt.IsZero() && now.Sub(estimatedAt) <= GasEstimateMaxAge
+	if estimatedAt.IsZero() || now.Sub(estimatedAt) > GasEstimateMaxAge {
+		return false
+	}
+	return approval || len(p.TxPackedData) > 0 || sameAmount(p.TxGasEstimatedValue, p.AmountIn)
+}
+
+func sameAmount(a, b *hexutil.Big) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	return a.ToInt().Cmp(b.ToInt()) == 0
 }

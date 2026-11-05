@@ -475,6 +475,7 @@ func (r *Router) ReevaluateRouterPath(ctx context.Context, pathTxIdentity *reque
 			path.TxGasAmount = gasLimit
 			path.TxPackedData = txPackedData
 			path.TxGasEstimatedAt = time.Now()
+			path.TxGasEstimatedValue = (*hexutil.Big)(new(big.Int).Set(processorInputParams.AmountIn))
 
 			// update the path details
 			usedNonces := make(map[uint64]uint64)
@@ -1349,6 +1350,7 @@ func (r *Router) buildPath(ctx context.Context, input *requests.RouteInputParams
 		EstimatedTxGasAmount:       estimatedGas,
 		EstimatedApprovalGasAmount: approvalGasRaw,
 		TxGasEstimatedAt:           mainTxGasEstimatedAt(approvalRequired, estimatedGas, gasEstimatedAt),
+		TxGasEstimatedValue:        (*hexutil.Big)(new(big.Int).Set(processorInputParams.AmountIn)),
 
 		UsedContractAddress: &contractAddress,
 		TxPackedData:        txPackedData,
