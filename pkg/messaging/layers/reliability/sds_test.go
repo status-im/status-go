@@ -26,7 +26,7 @@ func TestSdsFileDescriptors(t *testing.T) {
 	a := logFileDescriptors(t, "before sds setup")
 
 	logger := testutils.MustCreateTestLogger()
-	reliabilityManager, err := sds.NewReliabilityManager(logger)
+	reliabilityManager, err := sds.NewReliabilityManager(logger, nil)
 	require.NoError(t, err)
 	_ = logFileDescriptors(t, "sds setup complete")
 
@@ -49,7 +49,7 @@ func TestMultipleSdsFileDescriptors(t *testing.T) {
 	_ = logFileDescriptors(t, "before sds setup")
 
 	logger := testutils.MustCreateTestLogger()
-	rm1, err := sds.NewReliabilityManager(logger)
+	rm1, err := sds.NewReliabilityManager(logger, nil)
 	require.NoError(t, err)
 	_ = logFileDescriptors(t, "sds 1 setup complete")
 
@@ -58,7 +58,7 @@ func TestMultipleSdsFileDescriptors(t *testing.T) {
 	b := logFileDescriptors(t, "sds 1 cleanup complete")
 
 	// Create one more Reliability Manager
-	rm2, err := sds.NewReliabilityManager(logger)
+	rm2, err := sds.NewReliabilityManager(logger, nil)
 	require.NoError(t, err)
 	_ = logFileDescriptors(t, "sds 2 setup complete")
 
