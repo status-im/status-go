@@ -145,6 +145,8 @@ class BackendCacheTest(unittest.TestCase):
                 "make", "statusgo-shared-library-build", "OS=Linux", "RELEASE_TAG=test",
                 "-o", "generate", "-o", "statusgo-c-bindings", "-o", "install-git-hooks",
                 "LIBSDS=/fixture/libsds.so", "-o", "/fixture/libsds.so",
+                "LOGOS_DELIVERY_LIB_DIR=/fixture", "LOGOS_DELIVERY_INC_DIR=/fixture",
+                "-o", "/fixture/liblogosdelivery.so",
                 env=dict(env, BUILD_CONTENT=content))
             library = self.root / "build/bin/libstatus.so"
             self.assertTrue(library.is_symlink())
@@ -225,7 +227,9 @@ class BackendMakeTargetTest(unittest.TestCase):
 
     def make(self, **overrides):
         variables = dict(NIM_SDS_LIB_DIR=str(self.libs),
-                         NIM_SDS_INC_DIR=str(self.libs), LIB_EXT="so", **overrides)
+                         NIM_SDS_INC_DIR=str(self.libs),
+                         LOGOS_DELIVERY_LIB_DIR=str(self.libs),
+                         LOGOS_DELIVERY_INC_DIR=str(self.libs), LIB_EXT="so", **overrides)
         return subprocess.run(
             ["make", "--no-print-directory", "statusgo-shared-library-tkl"] +
             [f"{key}={value}" for key, value in variables.items()],
