@@ -51,6 +51,7 @@ type Reliability struct {
 	identity              *ecdsa.PrivateKey
 	mvdsPersistence       mvdsnode.Persistence
 	mvdsStatusChangeEvent chan mvdsnode.PeerStatusChangeEvent
+	peerActivity          peerActivity
 	sdsManager            *sds.ReliabilityManager
 	logger                *zap.Logger
 
@@ -239,8 +240,21 @@ func (r *Reliability) Start(dispatch MessageDispatcher) error {
 // status-change channel is reused so peer-online events keep flowing.
 func (r *Reliability) buildNode(duration time.Duration) error {
 	transport := datasync.NewNodeTransport()
-	node, err := mvdsnode.NewPersistentNode(
-		datasync.WithTracePersistence(r.mvdsPersistence, duration),
+	var node *mvdsnode.Node
+	// The getter is installed before construction, but is only available after
+	// assignment. Start launches the goroutines after that assignment completes.
+	currentEpoch := func() (int64, bool) {
+		if node == nil {
+			return 0, false
+		}
+		return node.CurrentEpoch(), true
+	}
+	persistence := datasync.WithPeerOnlineResetPolicy(
+		datasync.WithTracePersistence(r.mvdsPersistence, duration), duration, currentEpoch,
+	)
+	var err error
+	node, err = mvdsnode.NewPersistentNode(
+		persistence,
 		transport,
 		datasyncpeer.PublicKeyToPeerID(r.identity.PublicKey),
 		mvdsnode.BATCH,
@@ -390,27 +404,37 @@ func (r *Reliability) UnwrapAndAcknowledgeMessage(publicKey *ecdsa.PublicKey, me
 	if ds == nil {
 		return nil, errNotStarted
 	}
-	return ds.Unwrap(publicKey, message)
+	payload, err := ds.Unwrap(publicKey, message)
+	if err == nil {
+		r.peerActivity.record(datasyncpeer.PublicKeyToPeerID(*publicKey), time.Now())
+	}
+	return payload, err
 }
 
 // ReportPeerOnline reports to MVDS that a peer is online at a given event time.
 func (r *Reliability) ReportPeerOnline(publicKey *ecdsa.PublicKey, eventTime uint64) {
 	peerID := datasyncpeer.PublicKeyToPeerID(*publicKey)
-	reason := "queued"
-	select {
-	case r.mvdsStatusChangeEvent <- mvdsnode.PeerStatusChangeEvent{
-		PeerID:    peerID,
-		Status:    mvdsnode.OnlineStatus,
-		EventTime: eventTime,
-	}:
-	default:
-		reason = "queue_full"
+	now := time.Now()
+	reason := "stale_event"
+	if eventTime > uint64(now.Unix())-mvdsnode.FreshEventPeriod {
+		reason = r.peerActivity.reportOnline(peerID, now, func() bool {
+			select {
+			case r.mvdsStatusChangeEvent <- mvdsnode.PeerStatusChangeEvent{
+				PeerID: peerID, Status: mvdsnode.OnlineStatus, EventTime: eventTime,
+			}:
+				return true
+			default:
+				return false
+			}
+		})
+	}
+	if reason == "queue_full" {
 		r.logger.Debug("mvdsStatusChangeEvent channel is full")
 	}
 	if diagnostics.Enabled() {
 		diagnostics.Emit(diagnostics.Event{Metadata: diagnostics.Metadata{
 			Reliability: "mvds", Peer: diagnostics.Hexes([][]byte{peerID[:]})[0],
-		}, Stage: "mvds_peer_online", Reason: reason, PeerEventTime: eventTime,
+		}, Stage: "mvds_peer_online", Reason: reason, PeerEventTime: eventTime, TimestampNS: now.UnixNano(),
 			QueueDepth: len(r.mvdsStatusChangeEvent), QueueCapacity: cap(r.mvdsStatusChangeEvent)})
 	}
 }
