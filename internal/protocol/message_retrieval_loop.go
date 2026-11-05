@@ -11,6 +11,10 @@ const retrieveMessagesBatchInterval = time.Second
 // notification that arrives during process remains available to schedule the
 // next batch once that call returns. No polling runs while the receiver is idle.
 func runRetrieveMessagesLoop(matched <-chan struct{}, cancel <-chan struct{}, quit <-chan struct{}, process func()) {
+	runRetrieveMessagesLoopWithInterval(matched, cancel, quit, process, retrieveMessagesBatchInterval)
+}
+
+func runRetrieveMessagesLoopWithInterval(matched <-chan struct{}, cancel <-chan struct{}, quit <-chan struct{}, process func(), interval time.Duration) {
 	var batchTimer *time.Timer
 	var batchCh <-chan time.Time
 	defer func() {
@@ -29,10 +33,10 @@ func runRetrieveMessagesLoop(matched <-chan struct{}, cancel <-chan struct{}, qu
 				continue // Already scheduled; keep the original processing deadline.
 			}
 			if batchTimer == nil {
-				batchTimer = time.NewTimer(retrieveMessagesBatchInterval)
+				batchTimer = time.NewTimer(interval)
 			} else {
 				// The previous timer value was consumed before batchCh was cleared.
-				batchTimer.Reset(retrieveMessagesBatchInterval)
+				batchTimer.Reset(interval)
 			}
 			batchCh = batchTimer.C
 
