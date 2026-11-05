@@ -109,6 +109,8 @@ type Router struct {
 
 	clientsForUpdatesPerChains sync.Map
 
+	newRecipients recipientStateCache
+
 	logger *zap.Logger
 }
 
@@ -1309,6 +1311,8 @@ func (r *Router) buildPath(ctx context.Context, input *requests.RouteInputParams
 			zap.Uint64("approvalGasLimit", approvalGasLimit))
 	}
 
+	recipientIsNew := r.checkRecipientIsNew(ctx, pathProcessor, processorInputParams)
+
 	txPackedData, gasLimit, estimatedGas, err = r.estimateMainTx(input, pathProcessor, processorInputParams, approvalRequired)
 	if err != nil {
 		return nil, err
@@ -1361,8 +1365,7 @@ func (r *Router) buildPath(ctx context.Context, input *requests.RouteInputParams
 	if approvalRequired {
 		path.ApprovalGasEstimatedAt = gasEstimatedAt
 	}
-	path.RecipientIsNewAccount = newRecipientRaisesGas(pathProcessor, processorInputParams, estimatedGas,
-		func() (bool, error) { return r.recipientIsNew(ctx, processorInputParams) }, r.logger)
+	path.RecipientIsNewAccount = newRecipientRaisesGas(pathProcessor, processorInputParams, estimatedGas, recipientIsNew, r.logger)
 
 	if dp, ok := pathProcessor.(interface {
 		GetRouteExecutionDuration(pathprocessor.ProcessorInputParams) uint
