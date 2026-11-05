@@ -5,6 +5,10 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/ethereum/go-ethereum/event"
+
+	"github.com/status-im/status-go/pkg/services/wallet/walletevent"
 )
 
 func newTestReleaser(t *testing.T) (*memoryReleaser, *int, *time.Time, *func()) {
@@ -121,4 +125,46 @@ func TestMemoryReleaserReleasesGoHeapThenNativeHeap(t *testing.T) {
 
 	r.release()
 	require.Equal(t, []string{"go", "native"}, order, "finalizers run by the GC free native memory before the purge")
+}
+
+func TestMemoryReleaserReleasesOnTokenListsUpdate(t *testing.T) {
+	r, calls, now, pending := newTestReleaser(t)
+
+	r.onWalletEvent(walletevent.Event{Type: walletevent.EventType("other")})
+	require.Equal(t, 0, *calls, "other wallet events are ignored")
+
+	r.onWalletEvent(walletevent.Event{Type: walletevent.EventTokenListsUpdated})
+	require.Equal(t, 1, *calls)
+
+	*now = now.Add(r.minGap / 2)
+	r.onWalletEvent(walletevent.Event{Type: walletevent.EventTokenListsUpdated})
+	require.Equal(t, 1, *calls, "token-list releases share the throttle")
+
+	*now = now.Add(r.minGap)
+	r.scheduleAfterLogin(time.Minute)
+	r.onWalletEvent(walletevent.Event{Type: walletevent.EventTokenListsUpdated})
+	require.Equal(t, 1, *calls, "the pending post-login release covers an update inside the burst")
+	(*pending)()
+	require.Equal(t, 2, *calls)
+}
+
+func TestMemoryReleaserWatchesTokenListsUntilStop(t *testing.T) {
+	r, _, _, _ := newTestReleaser(t)
+	released := make(chan struct{}, 1)
+	r.release = func() { released <- struct{}{} }
+	var feed event.Feed
+	update := walletevent.Event{Type: walletevent.EventTokenListsUpdated}
+
+	r.watchTokenLists(&feed)
+	r.watchTokenLists(&feed) // a second login replaces the watch
+	require.Eventually(t, func() bool { return feed.Send(update) > 0 }, 5*time.Second, time.Millisecond)
+	require.Equal(t, 1, feed.Send(walletevent.Event{Type: walletevent.EventType("other")}), "one subscriber after re-arming")
+	select {
+	case <-released:
+	case <-time.After(5 * time.Second):
+		t.Fatal("token-list update did not release")
+	}
+
+	r.stop()
+	require.Equal(t, 0, feed.Send(update), "stop unsubscribes from the wallet feed")
 }

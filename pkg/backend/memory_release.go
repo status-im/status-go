@@ -5,7 +5,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ethereum/go-ethereum/event"
+
 	"github.com/status-im/status-go/internal/panics"
+	"github.com/status-im/status-go/pkg/services/wallet/walletevent"
 )
 
 // memoryReleaser returns idle heap to the OS at the two moments it matters on a phone: once the
@@ -25,6 +28,7 @@ type memoryReleaser struct {
 	now             func() time.Time
 	afterFn         func(time.Duration, func()) *time.Timer
 	spawn           func(func())
+	watcher         *walletevent.Watcher
 }
 
 const (
@@ -105,12 +109,39 @@ func (r *memoryReleaser) releaseNow() {
 	r.spawn(r.release)
 }
 
-// stop cancels a pending post-login release.
+// watchTokenLists releases after each token-list refresh that changed the catalogue: the refresh
+// can land after the post-login release, and its parse leaves megabytes of freed native heap.
+// It replaces any previous watch.
+func (r *memoryReleaser) watchTokenLists(feed *event.Feed) {
+	w := walletevent.NewWatcher(feed, r.onWalletEvent)
+	r.mu.Lock()
+	old := r.watcher
+	r.watcher = w
+	w.Start()
+	r.mu.Unlock()
+	if old != nil {
+		old.Stop()
+	}
+}
+
+func (r *memoryReleaser) onWalletEvent(ev walletevent.Event) {
+	if ev.Type == walletevent.EventTokenListsUpdated {
+		r.releaseNow()
+	}
+}
+
+// stop cancels a pending post-login release and the token-list watch. The watch is stopped
+// outside the lock: Stop waits for a callback that takes it.
 func (r *memoryReleaser) stop() {
 	r.mu.Lock()
-	defer r.mu.Unlock()
 	if r.timer != nil {
 		r.timer.Stop()
 		r.timer = nil
+	}
+	w := r.watcher
+	r.watcher = nil
+	r.mu.Unlock()
+	if w != nil {
+		w.Stop()
 	}
 }
