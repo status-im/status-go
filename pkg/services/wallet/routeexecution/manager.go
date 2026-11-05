@@ -81,7 +81,8 @@ func (m *Manager) BuildTransactionsFromRoute(ctx context.Context, uuid string) {
 			signal.SendWalletEvent(signal.SignRouterTransactions, response)
 		}()
 
-		route, routeInputParams := m.router.GetBestRouteAndAssociatedInputParams()
+		// the update loop is stopped, so re-estimate stale gas here
+		route, routeInputParams := m.router.GetBestRouteForBuild(m.transactionManager.ApprovalPlacedForPath, time.Now())
 		if routeInputParams.Uuid != uuid {
 			// should never be here
 			logutils.ZapLogger().Error("BuildTransactionsFromRoute: cannot resolve route id",
@@ -106,10 +107,6 @@ func (m *Manager) BuildTransactionsFromRoute(ctx context.Context, uuid string) {
 
 		// notify client that sending transactions started (has 3 steps, building txs, signing txs, sending txs)
 		signal.SendWalletEvent(signal.RouterSendingTransactionsStarted, response.SendDetails)
-
-		// the update loop stopped above (and stops on its own after a while); estimates the build
-		// would refuse as too old get one more chance here
-		m.router.RefreshStaleGasEstimates(m.transactionManager.ApprovalPlacedForPath, time.Now())
 
 		var fromChainID, toChainID uint64
 		response.SigningDetails, fromChainID, toChainID, err = m.transactionManager.BuildTransactionsFromRoute(
