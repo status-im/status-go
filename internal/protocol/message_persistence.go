@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/golang/protobuf/proto"
 	"github.com/lib/pq"
@@ -53,6 +54,9 @@ var caseSensitiveSearchCond = "(m1.text LIKE '%' || ? || '%' OR bm.content LIKE 
 var caseInsensitiveSearchCond = "(LOWER(m1.text) LIKE LOWER('%' || ? || '%') OR LOWER(bm.content) LIKE LOWER('%' || ? || '%') OR LOWER(dm.content) LIKE LOWER('%' || ? || '%'))"
 
 type Thread struct {
+	MuteRevision             uint64             `json:"muteRevision,omitempty"`
+	Muted                    bool               `json:"muted"`
+	MuteTill                 time.Time          `json:"muteTill"`
 	ThreadID                 string             `json:"threadId"`
 	ChatID                   string             `json:"chatId"`
 	ParentMessageID          string             `json:"parentMessageId"`
@@ -1329,6 +1333,8 @@ const threadMetadataSelect = `
 			threads.parent_message_id,
 			threads.name,
 			threads.creator_id,
+			threads.muted,
+			threads.muted_till,
 			threads.creator_pending,
 			threads.read_messages_at_clock_value,
 			(SELECT COUNT(1) FROM user_messages WHERE local_chat_id = threads.chat_id AND thread_id = threads.thread_id AND seen = 0 AND NOT(hide) AND NOT(deleted) AND NOT(deleted_for_me)),
@@ -1337,19 +1343,26 @@ const threadMetadataSelect = `
 		LEFT JOIN chats ON chats.id = threads.chat_id
 		`
 
-// threadMetadataScanTargets must stay in sync with threadMetadataSelect.
-func threadMetadataScanTargets(thread *Thread) []interface{} {
-	return []interface{}{
+// scanThreadMetadata must stay in sync with threadMetadataSelect.
+func scanThreadMetadata(row scanner, thread *Thread) error {
+	var muteTill sql.NullTime
+	err := row.Scan(
 		&thread.ThreadID,
 		&thread.ChatID,
 		&thread.ParentMessageID,
 		&thread.Name,
 		&thread.CreatorID,
+		&thread.Muted,
+		&muteTill,
 		&thread.CreatorPending,
 		&thread.ReadMessagesAtClockValue,
 		&thread.UnviewedMessagesCount,
 		&thread.UnviewedMentionsCount,
+	)
+	if err == nil && muteTill.Valid {
+		thread.MuteTill = muteTill.Time
 	}
+	return err
 }
 
 func (db sqlitePersistence) threadsWithSummariesByIDs(identities []threadIdentity) ([]*Thread, error) {
@@ -1388,7 +1401,7 @@ func (db sqlitePersistence) threadsByIDs(queryer threadSummaryQuerier, identitie
 	byID := make(map[threadIdentity]*Thread, len(identities))
 	for rows.Next() {
 		thread := &Thread{}
-		if err := rows.Scan(threadMetadataScanTargets(thread)...); err != nil {
+		if err := scanThreadMetadata(rows, thread); err != nil {
 			return nil, err
 		}
 		byID[threadIdentity{chatID: thread.ChatID, threadID: thread.ThreadID}] = thread
@@ -1414,8 +1427,9 @@ func (db sqlitePersistence) ThreadByID(chatID string, threadID string) (*Thread,
 
 func (db sqlitePersistence) threadByID(queryer threadSummaryQuerier, chatID, threadID string) (*Thread, error) {
 	var thread Thread
-	err := queryer.QueryRowContext(context.Background(), threadMetadataSelect+`
-		WHERE thread_id = ? AND chat_id = ?`, ChatTypeOneToOne, threadID, chatID).Scan(threadMetadataScanTargets(&thread)...)
+	row := queryer.QueryRowContext(context.Background(), threadMetadataSelect+`
+        WHERE thread_id = ? AND chat_id = ?`, ChatTypeOneToOne, threadID, chatID)
+	err := scanThreadMetadata(row, &thread)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, common.ErrRecordNotFound
 	}
@@ -1449,6 +1463,8 @@ func (db sqlitePersistence) ThreadsByChatID(chatID string) ([]*Thread, error) {
 			t.parent_message_id,
 			t.name,
 			t.creator_id,
+			t.muted,
+			t.muted_till,
 			t.read_messages_at_clock_value,
 			COUNT(CASE WHEN um.seen = 0 AND NOT(um.hide) AND NOT(um.deleted) AND NOT(um.deleted_for_me) THEN 1 END),
 			COUNT(CASE WHEN um.seen = 0 AND NOT(um.hide) AND NOT(um.deleted) AND NOT(um.deleted_for_me) AND (um.mentioned OR um.replied OR chats.type = ?) THEN 1 END)
@@ -1471,7 +1487,11 @@ func (db sqlitePersistence) ThreadsByChatID(chatID string) ([]*Thread, error) {
 	threads := make([]*Thread, 0)
 	for rows.Next() {
 		thread := &Thread{}
-		err = rows.Scan(&thread.ThreadID, &thread.ChatID, &thread.ParentMessageID, &thread.Name, &thread.CreatorID, &thread.ReadMessagesAtClockValue, &thread.UnviewedMessagesCount, &thread.UnviewedMentionsCount)
+		var muteTill sql.NullTime
+		err = rows.Scan(&thread.ThreadID, &thread.ChatID, &thread.ParentMessageID, &thread.Name, &thread.CreatorID, &thread.Muted, &muteTill, &thread.ReadMessagesAtClockValue, &thread.UnviewedMessagesCount, &thread.UnviewedMentionsCount)
+		if muteTill.Valid {
+			thread.MuteTill = muteTill.Time
+		}
 		if err != nil {
 			return nil, err
 		}
@@ -1528,7 +1548,7 @@ func (db sqlitePersistence) ThreadsByChatIDs(chatIDs []string) ([]*Thread, error
 
 		for rows.Next() {
 			thread := &Thread{}
-			err = rows.Scan(threadMetadataScanTargets(thread)...)
+			err = scanThreadMetadata(rows, thread)
 			if err != nil {
 				rows.Close()
 				return nil, err
@@ -1589,6 +1609,8 @@ func (db sqlitePersistence) threadsByParentMessageIDs(queryer threadSummaryQueri
 			threads.parent_message_id,
 			threads.name,
 			threads.creator_id,
+			threads.muted,
+			threads.muted_till,
 			(SELECT COUNT(1) FROM user_messages WHERE local_chat_id = threads.chat_id AND thread_id = threads.thread_id AND seen = 0 AND NOT(hide) AND NOT(deleted) AND NOT(deleted_for_me)),
 			(SELECT COUNT(1) FROM user_messages WHERE local_chat_id = threads.chat_id AND thread_id = threads.thread_id AND seen = 0 AND NOT(hide) AND NOT(deleted) AND NOT(deleted_for_me) AND (mentioned OR replied OR chats.type = ?))
 		FROM threads
@@ -1601,9 +1623,13 @@ func (db sqlitePersistence) threadsByParentMessageIDs(queryer threadSummaryQueri
 	}
 	for rows.Next() {
 		thread := &Thread{}
-		if err := rows.Scan(&thread.ThreadID, &thread.ChatID, &thread.ParentMessageID, &thread.Name, &thread.CreatorID, &thread.UnviewedMessagesCount, &thread.UnviewedMentionsCount); err != nil {
+		var muteTill sql.NullTime
+		if err := rows.Scan(&thread.ThreadID, &thread.ChatID, &thread.ParentMessageID, &thread.Name, &thread.CreatorID, &thread.Muted, &muteTill, &thread.UnviewedMessagesCount, &thread.UnviewedMentionsCount); err != nil {
 			_ = rows.Close()
 			return nil, err
+		}
+		if muteTill.Valid {
+			thread.MuteTill = muteTill.Time
 		}
 		threads = append(threads, thread)
 	}
