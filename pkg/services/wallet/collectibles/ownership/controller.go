@@ -125,21 +125,24 @@ func (c *Controller) Start() {
 	}
 
 	c.stopCh = make(chan struct{})
+	// Capture stopCh once so watcher goroutines always observe the closed
+	// channel even after Stop nils c.stopCh.
+	stopCh := c.stopCh
 
 	// Setup periodical collectibles refresh
 	c.checkPeriodicalLoaders()
 
 	// Setup collectibles fetch when a new account gets added
-	c.startAccountsWatcher()
+	c.startAccountsWatcher(stopCh)
 
 	// Setup collectibles fetch when active networks change
-	c.startNetworkEventsWatcher()
+	c.startNetworkEventsWatcher(stopCh)
 
 	// Start balance change watcher
-	c.startBalanceChangeWatcher()
+	c.startBalanceChangeWatcher(stopCh)
 
 	// Start transfer detection watcher
-	c.startTransferDetectionWatcher()
+	c.startTransferDetectionWatcher(stopCh)
 }
 
 func (c *Controller) Stop() {
@@ -235,7 +238,7 @@ func (c *Controller) stopPeriodicalLoaderForAccountAndChainID(address common.Add
 	}
 }
 
-func (c *Controller) startAccountsWatcher() {
+func (c *Controller) startAccountsWatcher(stopCh <-chan struct{}) {
 	if c.accountsPublisher == nil {
 		return
 	}
@@ -248,7 +251,7 @@ func (c *Controller) startAccountsWatcher() {
 		defer unsubFnRemoved()
 		for {
 			select {
-			case <-c.stopCh:
+			case <-stopCh:
 				return
 			case _, ok := <-chAdded:
 				if !ok {
@@ -265,7 +268,7 @@ func (c *Controller) startAccountsWatcher() {
 	}()
 }
 
-func (c *Controller) startNetworkEventsWatcher() {
+func (c *Controller) startNetworkEventsWatcher(stopCh <-chan struct{}) {
 	if c.networksProvider == nil {
 		return
 	}
@@ -276,7 +279,7 @@ func (c *Controller) startNetworkEventsWatcher() {
 		defer unsub()
 		for {
 			select {
-			case <-c.stopCh:
+			case <-stopCh:
 				return
 			case _, ok := <-ch:
 				if !ok {
@@ -288,7 +291,7 @@ func (c *Controller) startNetworkEventsWatcher() {
 	}()
 }
 
-func (c *Controller) startBalanceChangeWatcher() {
+func (c *Controller) startBalanceChangeWatcher(stopCh <-chan struct{}) {
 	if c.multistandardBalancePublisher == nil {
 		return
 	}
@@ -299,7 +302,7 @@ func (c *Controller) startBalanceChangeWatcher() {
 		defer unsub()
 		for {
 			select {
-			case <-c.stopCh:
+			case <-stopCh:
 				return
 			case event, ok := <-ch:
 				if !ok {
@@ -316,7 +319,7 @@ func (c *Controller) startBalanceChangeWatcher() {
 	}()
 }
 
-func (c *Controller) startTransferDetectionWatcher() {
+func (c *Controller) startTransferDetectionWatcher(stopCh <-chan struct{}) {
 	if c.transferDetectorPublisher == nil {
 		return
 	}
@@ -327,7 +330,7 @@ func (c *Controller) startTransferDetectionWatcher() {
 		defer unsub()
 		for {
 			select {
-			case <-c.stopCh:
+			case <-stopCh:
 				return
 			case msg, ok := <-ch:
 				if !ok {
