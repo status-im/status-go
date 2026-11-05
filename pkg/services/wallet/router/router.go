@@ -1361,6 +1361,8 @@ func (r *Router) buildPath(ctx context.Context, input *requests.RouteInputParams
 	if approvalRequired {
 		path.ApprovalGasEstimatedAt = gasEstimatedAt
 	}
+	path.RecipientIsNewAccount = newRecipientRaisesGas(pathProcessor, processorInputParams, estimatedGas,
+		func() (bool, error) { return r.recipientIsNew(ctx, processorInputParams) }, r.logger)
 
 	if dp, ok := pathProcessor.(interface {
 		GetRouteExecutionDuration(pathprocessor.ProcessorInputParams) uint
