@@ -255,7 +255,7 @@ func TestLiFiEstimateGas(t *testing.T) {
 		require.Equal(t, uint64(80000), estimation)
 	})
 
-	t.Run("erc20 estimation error falls back to the quoted gas limit", func(t *testing.T) {
+	t.Run("erc20 estimation error is propagated, the quote is only a stand-in before approval", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
@@ -267,7 +267,6 @@ func TestLiFiEstimateGas(t *testing.T) {
 		processor := NewLiFiProcessor(mockRPCClient, nil, nil, security.SensitiveString{}, lifi.IntegratorDev)
 		processor.lifiClient = client
 
-		// Non-native from token: estimation reverts before approval, the quote's gas limit is used.
 		fromToken := tokentypes.Token{Token: &types.Token{
 			Symbol:  walletCommon.UsdcSymbol,
 			Address: common.HexToAddress("0x465"),
@@ -293,10 +292,13 @@ func TestLiFiEstimateGas(t *testing.T) {
 		mockEthClient.EXPECT().EstimateGas(gomock.Any(), gomock.Any()).
 			Return(uint64(0), errors.New("execution reverted: ERC20: transfer amount exceeds allowance"))
 
-		estimation, err := processor.EstimateGas(testInputParams, []byte{})
-		require.NoError(t, err)
-		// GasLimit 0x3e8 = 1000
-		require.Equal(t, uint64(1000), estimation)
+		_, err := processor.EstimateGas(testInputParams, []byte{})
+		require.Error(t, err)
+
+		gas, ok := processor.GasBeforeApproval(testInputParams)
+		require.True(t, ok)
+		// GasLimit 0x3e8 = 1000, buffered
+		require.Equal(t, BufferGasEstimate(1000, processor.GasBufferFactor(testInputParams)), gas)
 	})
 
 	t.Run("native estimation error is propagated", func(t *testing.T) {
