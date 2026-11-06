@@ -13,7 +13,7 @@ import (
 // Keep both runtimes live, destroy SDS, then check the catalogue still works.
 // This test uses the consumer's existing SDS build; it never builds or changes SDS.
 func TestNimRuntimesCoexist(t *testing.T) {
-	manager, err := sds.NewReliabilityManager(zap.NewNop())
+	manager, err := sds.NewReliabilityManager(zap.NewNop(), nil)
 	if err != nil {
 		t.Fatal(err)
 	}

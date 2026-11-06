@@ -8,12 +8,15 @@ import (
 	bindata "github.com/status-im/migrate/v4/source/go_bindata"
 	mvdsnode "github.com/status-im/mvds/node"
 	mvdsmigrations "github.com/status-im/mvds/persistenceutil"
+	"github.com/waku-org/sds-go-bindings/sds"
 
 	"github.com/status-im/status-go/internal/db/sqlite"
 	"github.com/status-im/status-go/pkg/messaging/common"
 	messagesendermigrations "github.com/status-im/status-go/pkg/messaging/common/migrations"
 	"github.com/status-im/status-go/pkg/messaging/layers/encryption"
 	encryptionmigrations "github.com/status-im/status-go/pkg/messaging/layers/encryption/migrations"
+	"github.com/status-im/status-go/pkg/messaging/layers/reliability"
+	reliabilitymigrations "github.com/status-im/status-go/pkg/messaging/layers/reliability/migrations"
 	"github.com/status-im/status-go/pkg/messaging/layers/segmentation"
 	segmentationmigrations "github.com/status-im/status-go/pkg/messaging/layers/segmentation/migrations"
 	transport "github.com/status-im/status-go/pkg/messaging/layers/transport"
@@ -54,6 +57,13 @@ var migrations = []migrationsMetadata{
 			AssetFunc: encryptionmigrations.Asset,
 		},
 		MigrationTableName: "status_schema_migrations_encryption",
+	},
+	{
+		AssetSource: &bindata.AssetSource{
+			Names:     reliabilitymigrations.AssetNames(),
+			AssetFunc: reliabilitymigrations.Asset,
+		},
+		MigrationTableName: "status_schema_migrations_reliability",
 	},
 	{
 		AssetSource: &bindata.AssetSource{
@@ -142,6 +152,10 @@ func (p *sqlitePersistence) MVDSStorage() mvdsnode.Persistence {
 
 func (p *sqlitePersistence) EncryptionStorage() encryption.Persistence {
 	return encryption.NewSQLitePersistence(p.db)
+}
+
+func (p *sqlitePersistence) SDSPersistenceStorage() sds.PersistenceCallbacks {
+	return reliability.NewSQLitePersistence(p.db)
 }
 
 func (p *sqlitePersistence) MessageConfirmationStorage() common.MessageConfirmationPersistence {
