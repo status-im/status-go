@@ -646,6 +646,46 @@ nim-libtkl: | nimble.paths
 	$(call NIM_SEAL,tkl_,$(NIM_LIB_DIR)/link/libtkl.a)
 	cp "$(NIM_TKL_ABI)/tkl.h" "$(NIM_LIB_DIR)/link/"
 
+.PHONY: build-liblogosdelivery build-liblogosdelivery-android build-liblogosdelivery-ios
+# liblogosdelivery, built here and not linked yet: on the app's policy, without
+# RLN, and sealed like libtkl, with Leopard-RS's archive from the nimcache, for
+# an image it will share with the other Nim runtimes. Leopard-RS is built by
+# CMake during the compile: portable, position-independent and, for a cross
+# build, with the target's tools. The sealed archive needs the C++ runtime.
+NIM_DELIVERY_LIBRARY = $(call NIM_PKG_DIR,logos_delivery)/library
+NIM_DELIVERY_DIR = $(CURDIR)/build/delivery
+NIM_DELIVERY_LEOPARD = -DCMAKE_BUILD_TYPE=Release -DENABLE_OPENMP=off -DCOMPILER_SUPPORTS_MARCH_NATIVE=FALSE -DCMAKE_POSITION_INDEPENDENT_CODE=ON
+# $(call NIM_DELIVERY_BUILD,<extra Leopard-RS CMake flags>,<extra flags>)
+NIM_DELIVERY_BUILD = rm -rf "$(NIM_LIB_DIR)/nimcache" && \
+	$(call NIM_COMPILE,$(NIM_DELIVERY_LIBRARY)/liblogosdelivery.nim,staticlib,liblogosdelivery.a,-d:disable_rln \
+	-d:ffiOutputDir=\"$(NIM_LIB_DIR)/link/generated\" --passC:-fvisibility=hidden --passC:-fno-common \
+	-d:LeopardCmakeFlags=\"$(NIM_DELIVERY_LEOPARD) $(1)\" $(2)) && \
+	$(call NIM_SEAL,logosdelivery_,$(NIM_LIB_DIR)/link/liblogosdelivery.a) && \
+	cp "$(NIM_DELIVERY_LIBRARY)/liblogosdelivery.h" "$(NIM_LIB_DIR)/link/"
+
+build-liblogosdelivery build-liblogosdelivery-android build-liblogosdelivery-ios: NIM_POLICY = $(NIM_POLICY_TKL)
+build-liblogosdelivery: NIM_LIB_DIR = $(NIM_DELIVERY_DIR)/desktop
+build-liblogosdelivery-android: NIM_LIB_DIR = $(NIM_DELIVERY_DIR)/android-$(NIM_ANDROID_CPU)
+build-liblogosdelivery-ios: NIM_LIB_DIR = $(NIM_DELIVERY_DIR)/$(NIM_IOS_SDK)-$(NIM_IOS_ARCH)
+build-liblogosdelivery-android: NIM_FLAGS = $(NIM_FLAGS_ANDROID) --passC:-fPIC
+build-liblogosdelivery-android: NIM_SEAL_TOOLS = $(NIM_SEAL_TOOLS_ANDROID)
+# Nim archives with its host's command (llvm-ar on Linux): the NDK's tools first.
+build-liblogosdelivery-android: export PATH := $(NIM_ANDROID_BIN):$(PATH)
+build-liblogosdelivery-ios: NIM_FLAGS = $(NIM_FLAGS_IOS)
+
+build-liblogosdelivery: | nimble.paths ##@build Build the sealed liblogosdelivery
+	$(call NIM_DELIVERY_BUILD,,$(if $(filter Windows,$(detected_OS)),,--passC:-fPIC))
+
+build-liblogosdelivery-android: | nimble.paths
+	$(call NIM_DELIVERY_BUILD,-DCMAKE_SYSTEM_NAME=Linux -DCMAKE_C_COMPILER=$(NIM_ANDROID_CC) \
+		-DCMAKE_CXX_COMPILER=$(NIM_ANDROID_CC)++ -DCMAKE_CXX_FLAGS=-DANDROID \
+		-DCMAKE_AR=$(NIM_ANDROID_BIN)/llvm-ar -DCMAKE_RANLIB=$(NIM_ANDROID_BIN)/llvm-ranlib,\
+		-d:LeopardExtraCompilerFlags=-fno-openmp -d:LeopardExtraLinkerFlags=-fno-openmp)
+
+build-liblogosdelivery-ios: | nimble.paths
+	$(call NIM_DELIVERY_BUILD,-DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_SYSROOT=$$(xcrun --sdk $(NIM_IOS_SDK) --show-sdk-path) \
+		-DCMAKE_OSX_ARCHITECTURES=$(NIM_IOS_ARCH) -DCMAKE_OSX_DEPLOYMENT_TARGET=$(or $(IOS_TARGET),13.0))
+
 clean-libtkl: ##@other Remove the token-library build
 	bash scripts/tkl_native.sh clean
 
