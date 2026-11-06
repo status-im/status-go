@@ -138,6 +138,7 @@ func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
 		EnsUsernameDetails               []*ensservice.UsernameDetail            `json:"ensUsernameDetails,omitempty"`
 		UpdatedProfileShowcaseContactIDs []string                                `json:"updatedProfileShowcaseContactIDs,omitempty"`
 		SeenAndUnseenMessages            []*SeenUnseenMessages                   `json:"seenAndUnseenMessages,omitempty"`
+		SectionUnreadCountsChanged       bool                                    `json:"sectionUnreadCountsChanged,omitempty"`
 	}{
 		Contacts:                r.Contacts,
 		Installations:           r.Installations(),
@@ -179,10 +180,26 @@ func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
 		EnsUsernameDetails:               r.EnsUsernameDetails(),
 		UpdatedProfileShowcaseContactIDs: r.GetUpdatedProfileShowcaseContactIDs(),
 		SeenAndUnseenMessages:            r.GetSeenAndUnseenMessages(),
+		SectionUnreadCountsChanged:       r.HasSectionUnreadCountsChanges(),
 	}
 
 	responseItem.TrustStatus = r.TrustStatus()
 	return json.Marshal(responseItem)
+}
+
+// HasSectionUnreadCountsChanges is an invalidation, not a count delta. Clients
+// should coalesce these updates and fetch a fresh sectionUnreadCounts snapshot.
+func (r *MessengerResponse) HasSectionUnreadCountsChanges() bool {
+	return len(r.chats) > 0 ||
+		len(r.threads) > 0 ||
+		len(r.messages) > 0 ||
+		len(r.removedChats) > 0 ||
+		len(r.removedMessages) > 0 ||
+		len(r.deletedMessages) > 0 ||
+		len(r.clearedHistories) > 0 ||
+		len(r.communities) > 0 ||
+		len(r.CommunityChanges) > 0 ||
+		len(r.seenAndUnseenMessages) > 0
 }
 
 func (r *MessengerResponse) Chats() []*Chat {
