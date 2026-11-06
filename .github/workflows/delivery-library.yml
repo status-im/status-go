@@ -1,0 +1,57 @@
+name: Delivery library build
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/delivery-library.yml'
+      - 'Makefile'
+      - 'nim.mk'
+      - 'status_go.nimble'
+      - 'scripts/seal_nim_lib.sh'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: delivery-library-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  # Builds the sealed liblogosdelivery each platform links, and checks that
+  # only its C API (logosdelivery_*) stays global.
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: linux, runs-on: ubuntu-24.04, target: build-liblogosdelivery, dir: desktop }
+          - { name: android, runs-on: ubuntu-24.04, target: build-liblogosdelivery-android ARCH=arm64 HOST_OS=linux, dir: android-arm64 }
+          - { name: ios-device, runs-on: macos-14, target: build-liblogosdelivery-ios IPHONE_SDK=iphoneos ARCH=arm64, dir: iphoneos-arm64 }
+          - { name: ios-simulator, runs-on: macos-14, target: build-liblogosdelivery-ios IPHONE_SDK=iphonesimulator ARCH=arm64 IOS_TARGET=14.0, dir: iphonesimulator-arm64 }
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.runs-on }}
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: jiro4989/setup-nim-action@189b145833368cc92f1e7b3e166a25a3e057a693
+        with:
+          nim-version: '2.2.10'
+      - uses: nim-lang/setup-nimble-action@v2
+        with:
+          nimble-version: '0.26.2'
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install NDK
+        if: matrix.name == 'android'
+        run: |
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'ndk;27.2.12479018' < <(yes)
+          echo "ANDROID_NDK_ROOT=$ANDROID_HOME/ndk/27.2.12479018" >> "$GITHUB_ENV"
+      - name: Build
+        run: make ${{ matrix.target }}
+      - name: Only the C API is global
+        run: |
+          archive="build/delivery/${{ matrix.dir }}/link/liblogosdelivery.a"
+          nm=nm
+          [ "${{ matrix.name }}" != android ] || nm="$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-nm"
+          globals="$("$nm" -g --defined-only "$archive" | awk 'NF == 3 {print $3}' | sed 's/^_//')"
+          api="$(grep -c '^logosdelivery_' <<< "$globals" || true)"
+          others="$(grep -v '^logosdelivery_' <<< "$globals" || true)"
+          echo "logosdelivery_* globals: $api"
+          [ "$api" -gt 0 ] || { echo "no logosdelivery_* symbols in $archive" >&2; exit 1; }
+          [ -z "$others" ] || { printf 'globals outside the C API:\n%s\n' "$others" >&2; exit 1; }
