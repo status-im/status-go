@@ -813,7 +813,11 @@ func (m *Messenger) HandleSyncThreadMessagesRead(ctx context.Context, state *Rec
 
 	thread, err := m.persistence.ThreadByID(message.ChatId, message.ThreadId)
 	if errors.Is(err, common.ErrRecordNotFound) {
-		err = m.persistence.UpsertPendingCreatorThread(message.ThreadId, message.ChatId, message.ThreadId, "")
+		var syncedAt uint64
+		if state.CurrentMessageState != nil {
+			syncedAt = state.CurrentMessageState.WhisperTimestamp
+		}
+		err = m.persistence.UpsertPendingCreatorThreadAt(message.ThreadId, message.ChatId, message.ThreadId, "", syncedAt)
 		if err != nil {
 			return err
 		}
@@ -1932,7 +1936,7 @@ func (m *Messenger) HandleThreadMetadata(ctx context.Context, state *ReceivedMes
 		}
 		switch {
 		case err != nil:
-			if err := m.persistence.UpsertThread(metadata.ThreadId, chat.ID, metadata.ThreadId, metadata.Name); err != nil {
+			if err := m.persistence.UpsertThreadAt(metadata.ThreadId, chat.ID, metadata.ThreadId, metadata.Name, state.CurrentMessageState.WhisperTimestamp); err != nil {
 				return err
 			}
 			if err := m.persistence.SetThreadCreator(metadata.ThreadId, chat.ID, senderID); err != nil {
