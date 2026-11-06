@@ -16,6 +16,7 @@ import (
 	mvdsproto "github.com/status-im/mvds/protobuf"
 	mvdsstate "github.com/status-im/mvds/state"
 
+	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/pkg/messaging/layers/reliability/datasync"
 	datasyncpeer "github.com/status-im/status-go/pkg/messaging/layers/reliability/datasync/peer"
 	"github.com/status-im/status-go/pkg/messaging/layers/reliability/protobuf"
@@ -50,6 +51,7 @@ type Reliability struct {
 	identity              *ecdsa.PrivateKey
 	mvdsPersistence       mvdsnode.Persistence
 	sdsPersistence        sds.PersistenceCallbacks
+	retrievalHintStore    SDSRetrievalHintPersistence
 	mvdsStatusChangeEvent chan mvdsnode.PeerStatusChangeEvent
 	sdsManager            *sds.ReliabilityManager
 	logger                *zap.Logger
@@ -69,6 +71,10 @@ type Reliability struct {
 	retrievalHintProviderMu sync.RWMutex
 	retrievalHintProvider   RetrievalHintProvider
 
+	retrievalHintPersistenceMu sync.RWMutex
+	sdsChannelMu               sync.RWMutex
+	activeSDSChannelID         string
+
 	messageSentHandlerMu sync.RWMutex
 	messageSentHandler   MessageSentHandler
 
@@ -78,6 +84,45 @@ type Reliability struct {
 	// hold RLock for the full native call; Close holds Lock before Cleanup so
 	// Cleanup cannot race with in-flight SDS manager usage.
 	sdsOpsMu sync.RWMutex
+}
+
+// SetSDSRetrievalHintPersistence configures durable storage for SDS envelope hashes.
+func (r *Reliability) SetSDSRetrievalHintPersistence(store SDSRetrievalHintPersistence) {
+	r.retrievalHintPersistenceMu.Lock()
+	defer r.retrievalHintPersistenceMu.Unlock()
+	r.retrievalHintStore = store
+}
+
+// RecordSDSRetrievalHints associates envelope hashes with one channel's SDS message.
+func (r *Reliability) RecordSDSRetrievalHints(channelID string, messageID []byte, envelopeHashes [][]byte) error {
+	r.retrievalHintPersistenceMu.RLock()
+	store := r.retrievalHintStore
+	r.retrievalHintPersistenceMu.RUnlock()
+	if store == nil {
+		return nil
+	}
+	if len(messageID) == 0 {
+		return errors.New("record SDS retrieval hints: empty message ID")
+	}
+	return store.SaveSDSRetrievalHints(channelID, cryptotypes.EncodeHex(messageID), envelopeHashes)
+}
+
+// SDSEnvelopeHashes loads the envelope hashes for a message in one channel.
+func (r *Reliability) SDSEnvelopeHashes(channelID, messageID string) ([][]byte, error) {
+	r.retrievalHintPersistenceMu.RLock()
+	store := r.retrievalHintStore
+	r.retrievalHintPersistenceMu.RUnlock()
+	if store == nil {
+		return nil, errors.New("SDS retrieval hint persistence is not configured")
+	}
+	return store.LoadSDSRetrievalHints(channelID, messageID)
+}
+
+// CurrentSDSChannelID returns the channel currently being wrapped.
+func (r *Reliability) CurrentSDSChannelID() string {
+	r.sdsChannelMu.RLock()
+	defer r.sdsChannelMu.RUnlock()
+	return r.activeSDSChannelID
 }
 
 func NewReliability(datasyncPersistence mvdsnode.Persistence, identity *ecdsa.PrivateKey, missingDepsHandler MissingDependenciesHandler, logger *zap.Logger, persistence ...sds.PersistenceCallbacks) (*Reliability, error) {

@@ -6,6 +6,7 @@ import (
 
 	"github.com/status-im/status-go/pkg/messaging/common"
 	"github.com/status-im/status-go/pkg/messaging/layers/encryption"
+	"github.com/status-im/status-go/pkg/messaging/layers/reliability"
 	"github.com/status-im/status-go/pkg/messaging/layers/segmentation"
 	"github.com/status-im/status-go/pkg/messaging/layers/transport"
 )
@@ -16,6 +17,7 @@ type Persistence interface {
 	MVDSStorage() mvdsnode.Persistence
 	EncryptionStorage() encryption.Persistence
 	SDSPersistenceStorage() sds.PersistenceCallbacks
+	SDSEnvelopeHashesStorage() reliability.SDSRetrievalHintPersistence
 
 	MessageConfirmationStorage() common.MessageConfirmationPersistence
 	HashRatchetStorage() common.HashRatchetPersistence
