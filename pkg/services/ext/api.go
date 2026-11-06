@@ -602,6 +602,11 @@ func (api *PublicAPI) ChatThreadSummariesByParentMessageIDs(chatID string, paren
 	return &ApplicationThreadsResponse{Threads: threads}, nil
 }
 
+// SectionUnreadCounts returns a complete snapshot, including zero-count sections.
+func (api *PublicAPI) SectionUnreadCounts(ctx context.Context, request *requests.SectionUnreadCounts) (*protocol.SectionUnreadCountsResponse, error) {
+	return api.service.messenger.SectionUnreadCounts(ctx, request != nil && request.IncludeThreads)
+}
+
 func (api *PublicAPI) ChatThreads(chatID string) (*ApplicationThreadsResponse, error) {
 	threads, err := api.service.messenger.ThreadsByChatID(chatID)
 	if err != nil {
