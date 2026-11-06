@@ -33,7 +33,6 @@ func (s *Sender) SendPrivateReliability(recipient *ecdsa.PublicKey, wrappedPaylo
 	for _, msgPayload := range messages {
 		messageIDs = append(messageIDs, messagingtypes.MessageID(&s.identity.PublicKey, msgPayload))
 	}
-
 	logger := s.logger.Named("sendPrivateReliability").With(
 		zap.Stringers("messageIDs", messageIDs),
 		zap.String("recipient", crypto.PubkeyToHex(recipient)),
