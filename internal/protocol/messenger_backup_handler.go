@@ -48,6 +48,9 @@ func (m *Messenger) handleLocalBackup(ctx context.Context, state *ReceivedMessag
 		if threadErr != nil {
 			errors = append(errors, threadErr)
 		}
+		if err == nil || threadErr == nil {
+			defer signal.SendSectionUnreadCountsChanged()
+		}
 
 		if err == nil && threadErr == nil {
 			signal.LocalMessageBackupDone()

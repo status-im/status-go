@@ -1266,11 +1266,11 @@ func (m *Messenger) SetMuted(request *requests.MuteCommunity) error {
 		return err
 	}
 
-	if request.MutedType == Unmuted {
-		return m.communitiesManager.SetMuted(request.CommunityID, false)
+	if err := m.communitiesManager.SetMuted(request.CommunityID, request.MutedType != Unmuted); err != nil {
+		return err
 	}
-
-	return m.communitiesManager.SetMuted(request.CommunityID, true)
+	signal.SendSectionUnreadCountsChanged()
+	return nil
 }
 
 func (m *Messenger) MuteCommunityTill(communityID []byte, muteTill time.Time) error {

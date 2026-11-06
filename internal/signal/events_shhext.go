@@ -27,6 +27,10 @@ const (
 	// EventNewMessages is triggered when we receive new messages
 	EventNewMessages = "messages.new"
 
+	// EventSectionUnreadCountsChanged invalidates section counts after mutations
+	// that do not necessarily return a messenger response.
+	EventSectionUnreadCountsChanged = "section.unread_counts.changed"
+
 	// EventLocalMessageBackupDone is triggered when a local message backup is completed
 	EventLocalMessageBackupDone = "local.message.backup.done"
 
@@ -147,6 +151,10 @@ func SendMailServerRequestExpired(hash cryptotypes.Hash) {
 
 func SendNewMessages(obj json.Marshaler) {
 	send(EventNewMessages, obj)
+}
+
+func SendSectionUnreadCountsChanged() {
+	send(EventSectionUnreadCountsChanged, nil)
 }
 
 func LocalMessageBackupDone() {

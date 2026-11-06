@@ -9,6 +9,7 @@ import (
 	"github.com/status-im/status-go/internal/protocol/contacts"
 	"github.com/status-im/status-go/internal/protocol/protobuf"
 	"github.com/status-im/status-go/internal/protocol/requests"
+	"github.com/status-im/status-go/internal/signal"
 	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
 )
 
@@ -315,6 +316,7 @@ func (m *Messenger) deleteChat(chatID string) error {
 	if err != nil {
 		return err
 	}
+	defer signal.SendSectionUnreadCountsChanged()
 
 	// We clean the cache to be able to receive the messages again later
 	err = m.messaging.ClearProcessedMessageIDsCache()
@@ -333,7 +335,11 @@ func (m *Messenger) deleteChat(chatID string) error {
 }
 
 func (m *Messenger) SaveChat(chat *Chat) error {
-	return m.saveChat(chat)
+	if err := m.saveChat(chat); err != nil {
+		return err
+	}
+	signal.SendSectionUnreadCountsChanged()
+	return nil
 }
 
 func (m *Messenger) DeactivateChat(request *requests.DeactivateChat) (*MessengerResponse, error) {
