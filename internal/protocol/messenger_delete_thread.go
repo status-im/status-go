@@ -9,6 +9,7 @@ import (
 	"github.com/status-im/status-go/internal/protocol/contacts"
 	"github.com/status-im/status-go/internal/protocol/protobuf"
 	"github.com/status-im/status-go/internal/protocol/requests"
+	"github.com/status-im/status-go/internal/signal"
 )
 
 var ErrThreadDeleted = errors.New("thread is deleted")
@@ -58,6 +59,7 @@ func (m *Messenger) DeleteThread(ctx context.Context, request *requests.DeleteTh
 	if err != nil {
 		return nil, err
 	}
+	defer signal.SendSectionUnreadCountsChanged()
 	thread, err = m.persistence.ThreadWithSummaryByID(chat.ID, thread.ThreadID)
 	if err != nil {
 		return nil, err
