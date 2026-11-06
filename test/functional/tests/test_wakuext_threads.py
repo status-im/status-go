@@ -339,6 +339,25 @@ class TestWakuextThreadRename:
         assert _thread(receiver.wakuext_service.chat_threads(receiver_chat_id), parent_id)["name"] == renamed
         assert receiver.wakuext_service.message_by_message_id(parent_id).get("text") == parent_text
 
+    async def test_thread_follow_state(self, sender, receiver):
+        sender_chat, receiver_chat, parent_id, _ = await _one_to_one_thread(sender, receiver, f"parent-{uuid4()}", f"reply-{uuid4()}")
+        assert _thread(sender.wakuext_service.chat_threads(sender_chat), parent_id)["followed"] is True
+        assert _thread(receiver.wakuext_service.chat_threads(receiver_chat), parent_id)["followed"] is False
+
+        assert _thread(receiver.wakuext_service.follow_thread(receiver_chat, parent_id), parent_id)["followed"] is True
+        assert _thread(receiver.wakuext_service.chat_threads(receiver_chat), parent_id)["followed"] is True
+        assert _thread(receiver.wakuext_service.unfollow_thread(receiver_chat, parent_id), parent_id)["followed"] is False
+        assert _thread(receiver.wakuext_service.chat_threads(receiver_chat), parent_id)["followed"] is False
+
+        assert _thread(sender.wakuext_service.unfollow_thread(sender_chat, parent_id), parent_id)["followed"] is False
+        receiver_reply = f"receiver-reply-{uuid4()}"
+        reply_response = receiver.wakuext_service.send_chat_message(receiver_chat, receiver_reply, thread_id=parent_id)
+        reply_id = _message_by_text(reply_response, receiver_reply)["id"]
+        assert _thread(receiver.wakuext_service.chat_threads(receiver_chat), parent_id)["followed"] is True
+
+        await sender.wait_for_signal(SignalType.MESSAGES_NEW, pattern=reply_id, timeout=60, check_buffer=True)
+        assert _thread(sender.wakuext_service.chat_threads(sender_chat), parent_id)["followed"] is False
+
 
 @pytest.mark.rpc
 @pytest.mark.asyncio
