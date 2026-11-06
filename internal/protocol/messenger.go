@@ -117,6 +117,7 @@ type Messenger struct {
 	outputCSV bool
 	csvFile   *os.File
 
+	threadMuteMutex            sync.Mutex
 	featureFlags               common.FeatureFlags
 	shutdownTasks              []func() error
 	shouldPublishContactCode   bool
@@ -1419,7 +1420,7 @@ func (m *Messenger) watchConnectionChange() {
 	go subscribedConnectionStatus(subscription)
 }
 
-// watchChatsToUnmute checks every minute to identify and unmute chats that should no longer be muted.
+// watchChatsToUnmute checks every minute to unmute expired chats and threads.
 func (m *Messenger) watchChatsToUnmute() {
 	m.logger.Debug("Checking for chats to unmute every minute")
 	m.shutdownWaitGroup.Add(1)
@@ -1454,6 +1455,12 @@ func (m *Messenger) watchChatsToUnmute() {
 				}
 				return true
 			})
+
+			if m.featureFlags.Threads {
+				if err := m.unmuteExpiredThreads(currTime, response); err != nil {
+					m.logger.Warn("watchChatsToUnmute error", zap.Error(err))
+				}
+			}
 
 			if !response.IsEmpty() {
 				signal.SendNewMessages(response)
@@ -3035,7 +3042,11 @@ func (r *ReceivedMessageState) addNewMessageNotification(messenger *Messenger, s
 		}
 	}
 
-	if !chat.Muted {
+	threadMuted, err := messenger.isThreadMuted(msg.LocalChatID, msg.GetThreadId())
+	if err != nil {
+		return err
+	}
+	if !chat.Muted && !threadMuted {
 		if showMessageNotification(settings, publicKey, msg, chat, responseTo) {
 			messagePreview := messagePreviewNameAndMessage
 			if settings != nil {
@@ -3124,6 +3135,13 @@ func (r *ReceivedMessageState) addNewActivityCenterNotification(publicKey ecdsa.
 		return fmt.Errorf("chat ID '%s' not present", logutils.TruncateWithDot(message.LocalChatID))
 	}
 
+	threadMuted, err := m.isThreadMuted(message.LocalChatID, message.GetThreadId())
+	if err != nil {
+		return err
+	}
+	if threadMuted {
+		return nil
+	}
 	isNotification, notificationType := showMentionOrReplyActivityCenterNotification(publicKey, message, chat, responseTo)
 	if !isNotification {
 		return nil
@@ -4512,9 +4530,34 @@ func (m *Messenger) MarkAllReadInCommunity(ctx context.Context, communityID stri
 	return response, err
 }
 
+func muteDeadline(variation requests.MutingVariation) time.Time {
+	var MuteTill time.Time
+
+	switch variation {
+	case MuteTill1Min:
+		MuteTill = time.Now().Add(MuteFor1MinDuration)
+	case MuteFor15Min:
+		MuteTill = time.Now().Add(MuteFor15MinsDuration)
+	case MuteFor1Hr:
+		MuteTill = time.Now().Add(MuteFor1HrsDuration)
+	case MuteFor8Hr:
+		MuteTill = time.Now().Add(MuteFor8HrsDuration)
+	case MuteFor24Hr:
+		MuteTill = time.Now().Add(MuteFor24HrsDuration)
+	case MuteFor1Week:
+		MuteTill = time.Now().Add(MuteFor1WeekDuration)
+	default:
+		MuteTill = time.Time{}
+	}
+	return MuteTill.Truncate(time.Second)
+}
+
 // MuteChat signals to the messenger that we don't want to be notified
 // on new messages from this chat
 func (m *Messenger) MuteChat(request *requests.MuteChat) (time.Time, error) {
+	if request != nil && request.ThreadID != "" {
+		return m.muteThread(request)
+	}
 	chat, ok := m.allChats.Load(request.ChatID)
 	if !ok {
 		// Only one to one chan be muted when it's not in the database
@@ -4541,24 +4584,7 @@ func (m *Messenger) MuteChat(request *requests.MuteChat) (time.Time, error) {
 		contact, _ = m.allContacts.Load(request.ChatID)
 	}
 
-	var MuteTill time.Time
-
-	switch request.MutedType {
-	case MuteTill1Min:
-		MuteTill = time.Now().Add(MuteFor1MinDuration)
-	case MuteFor15Min:
-		MuteTill = time.Now().Add(MuteFor15MinsDuration)
-	case MuteFor1Hr:
-		MuteTill = time.Now().Add(MuteFor1HrsDuration)
-	case MuteFor8Hr:
-		MuteTill = time.Now().Add(MuteFor8HrsDuration)
-	case MuteFor24Hr:
-		MuteTill = time.Now().Add(MuteFor24HrsDuration)
-	case MuteFor1Week:
-		MuteTill = time.Now().Add(MuteFor1WeekDuration)
-	default:
-		MuteTill = time.Time{}
-	}
+	MuteTill := muteDeadline(request.MutedType)
 	err := m.saveChat(chat)
 	if err != nil {
 		return time.Time{}, err
