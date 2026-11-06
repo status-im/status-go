@@ -99,5 +99,6 @@ message ApplicationMetadataMessage {
     BACKED_UP_MESSAGE_BATCH = 91;
     SYNC_THREAD_MESSAGES_READ = 92;
     THREAD_METADATA = 93;
+    DELETE_THREAD = 94;
   }
 }
