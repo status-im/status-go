@@ -161,6 +161,11 @@ func (n *StatusNode) ServiceRegistry() *ServiceRegistry {
 	return n.serviceRegistry
 }
 
+// WalletFeed returns the feed wallet services publish their events on.
+func (n *StatusNode) WalletFeed() *event.Feed {
+	return &n.walletFeed
+}
+
 // New makes new instance of StatusNode.
 func New(transactor *transactions.Transactor, gethAccountsManager *accsmanagement.AccountsManager, logger *zap.Logger) *StatusNode {
 	logger = logger.Named("StatusNode")

@@ -1145,6 +1145,7 @@ func (b *StatusBackend) LoggedIn(keyUID string, err error) error {
 	// Armed before the signal: a client may pause synchronously from its LoggedIn handler.
 	if platform.IsMobilePlatform() {
 		b.memRelease.scheduleAfterLogin(releaseAfterLoginDelay)
+		b.memRelease.watchTokenLists(b.statusNode.WalletFeed())
 	}
 	signal.SendLoggedIn(acc, s, ensUsernamesJSON, nil)
 	b.statusNode.StartTokenManager()
@@ -2653,6 +2654,7 @@ func (b *StatusBackend) Logout() error {
 
 	b.logger.Debug("logging out")
 
+	b.memRelease.stop()
 	b.AccountsManager().Logout()
 	b.account = nil
 	b.clearProfileSecretCache()
