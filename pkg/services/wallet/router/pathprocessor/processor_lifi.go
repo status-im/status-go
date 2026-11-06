@@ -219,25 +219,33 @@ func (s *LiFiProcessor) EstimateGas(params ProcessorInputParams, input []byte) (
 
 	estimation, err := ethClient.EstimateGas(context.Background(), msg)
 	if err != nil {
-		// ERC20 estimation reverts before approval; fall back to the quote's gas limit.
-		if isNative {
-			return 0, createLiFiErrorResponse(err)
-		}
-		quotedGas, decErr := hexutil.DecodeUint64(quote.TransactionRequest.GasLimit)
-		if decErr != nil || quotedGas == 0 {
-			return 0, createLiFiErrorResponse(err)
-		}
-		estimation = quotedGas
+		// an ERC20 step reverts until its approval is mined; the router asks GasBeforeApproval then
+		return 0, createLiFiErrorResponse(err)
 	}
 
-	gasFactor := pathProcessorCommon.IncreaseEstimatedGasFactor
+	return estimation, nil
+}
+
+// GasBeforeApproval implements ApprovalPendingGasEstimator: the quote's gas, as a fee preview.
+func (s *LiFiProcessor) GasBeforeApproval(params ProcessorInputParams) (uint64, bool) {
+	quote, err := s.getOrFetchQuote(params)
+	if err != nil {
+		return 0, false
+	}
+	quotedGas, err := hexutil.DecodeUint64(quote.TransactionRequest.GasLimit)
+	if err != nil || quotedGas == 0 {
+		return 0, false
+	}
+	// a stand-in, so already buffered
+	return BufferGasEstimate(quotedGas, s.GasBufferFactor(params)), true
+}
+
+// GasBufferFactor implements GasBufferFactorProvider.
+func (s *LiFiProcessor) GasBufferFactor(params ProcessorInputParams) float64 {
 	if isLiFiBridge(params) {
-		gasFactor = pathProcessorCommon.IncreaseEstimatedGasFactorForBridge
+		return pathProcessorCommon.IncreaseEstimatedGasFactorForBridge
 	}
-
-	increasedEstimation := float64(estimation) * gasFactor
-
-	return uint64(increasedEstimation), nil
+	return pathProcessorCommon.IncreaseEstimatedGasFactor
 }
 
 func (s *LiFiProcessor) fetchAndStoreQuoteFromSendTxArgs(sendArgs *wallettypes.SendTxArgs) (*lifi.Quote, error) {
@@ -272,6 +280,7 @@ func (s *LiFiProcessor) BuildTransactionV2(sendArgs *wallettypes.SendTxArgs, las
 	if err != nil {
 		return nil, 0, createLiFiErrorResponse(err)
 	}
+	gas = gasForQuotedTx(sendArgs.Gas, gas)
 
 	gasPrice, err := hexutil.DecodeBig(txReq.GasPrice)
 	if err != nil {

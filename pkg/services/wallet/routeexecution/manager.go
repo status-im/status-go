@@ -3,6 +3,7 @@ package routeexecution
 import (
 	"context"
 	"database/sql"
+	"time"
 
 	"go.uber.org/zap"
 
@@ -70,14 +71,18 @@ func (m *Manager) BuildTransactionsFromRoute(ctx context.Context, uuid string) {
 
 		defer func() {
 			if err != nil {
-				m.ClearLocalRouteData()
+				// nothing was built; keep e.g. a placed approval so it isn't sent twice
+				if !transfer.RouteNeedsReview(err) {
+					m.ClearLocalRouteData()
+				}
 				err = statusErrors.CreateErrorResponseFromError(err)
 				response.SendDetails.ErrorResponse = err.(*statusErrors.ErrorResponse)
 			}
 			signal.SendWalletEvent(signal.SignRouterTransactions, response)
 		}()
 
-		route, routeInputParams := m.router.GetBestRouteAndAssociatedInputParams()
+		// the update loop is stopped, so re-estimate stale gas here
+		route, routeInputParams := m.router.GetBestRouteForBuild(m.transactionManager.ApprovalPlacedForPath, time.Now())
 		if routeInputParams.Uuid != uuid {
 			// should never be here
 			logutils.ZapLogger().Error("BuildTransactionsFromRoute: cannot resolve route id",

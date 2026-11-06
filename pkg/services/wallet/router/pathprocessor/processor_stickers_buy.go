@@ -112,9 +112,7 @@ func (s *StickersBuyProcessor) EstimateGas(params ProcessorInputParams, input []
 		return 0, createStickersBuyErrorResponse(err)
 	}
 
-	increasedEstimation := float64(estimation) * pathProcessorCommon.IncreaseEstimatedGasFactor
-
-	return uint64(increasedEstimation), nil
+	return estimation, nil
 }
 
 func (s *StickersBuyProcessor) BuildTransactionV2(sendArgs *wallettypes.SendTxArgs, lastUsedNonce int64) (*ethTypes.Transaction, uint64, error) {

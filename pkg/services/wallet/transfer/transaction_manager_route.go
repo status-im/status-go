@@ -5,6 +5,9 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math/big"
+	"time"
+
+	"go.uber.org/zap"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -13,6 +16,7 @@ import (
 	"github.com/status-im/status-go/internal/crypto"
 	"github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/errors"
+	"github.com/status-im/status-go/internal/logutils"
 	"github.com/status-im/status-go/internal/transactions"
 	walletCommon "github.com/status-im/status-go/pkg/services/wallet/common"
 	"github.com/status-im/status-go/pkg/services/wallet/requests"
@@ -210,10 +214,58 @@ func buildTxForPath(path *routes.Path, pathProcessors map[string]pathprocessor.P
 	}, nil
 }
 
+// checkGasEstimatesFresh refuses a route whose gas estimate for a tx built now is older than
+// GasEstimateMaxAge. An approval-pending path is checked on its approval only.
+func checkGasEstimatesFresh(route routes.Route, approvalPlaced func(processorName string) bool, now time.Time) (*routes.Path, error) {
+	for _, path := range route {
+		approvalPending := path.ApprovalRequired && !approvalPlaced(path.ProcessorName)
+		if !path.GasEstimateFresh(approvalPending, now) {
+			return path, ErrRouteGasEstimateExpired
+		}
+	}
+	return nil, nil
+}
+
+// checkGasCoversEstimates refuses a route that would sign a tx with less gas than the current
+// estimate; an out-of-gas tx still burns its fee.
+func checkGasCoversEstimates(route routes.Route, approvalPlaced func(processorName string) bool) (*routes.Path, error) {
+	for _, path := range route {
+		approvalPending := path.ApprovalRequired && !approvalPlaced(path.ProcessorName)
+		if approvalPending && path.ApprovalGasAmount < path.EstimatedApprovalGasAmount {
+			return path, ErrGasBelowEstimate
+		}
+		// a swap's main tx is built only once its approval is placed
+		mainTxBuilt := !approvalPending || !walletCommon.IsProcessorSwap(path.ProcessorName)
+		if mainTxBuilt && path.TxGasAmount < path.EstimatedTxGasAmount {
+			return path, ErrGasBelowEstimate
+		}
+	}
+	return nil, nil
+}
+
 func (tm *TransactionManager) BuildTransactionsFromRoute(route routes.Route, pathProcessors map[string]pathprocessor.PathProcessor,
 	processorInputParams *pathprocessor.ProcessorInputParams) (*responses.SigningDetails, uint64, uint64, error) {
 	if len(route) == 0 {
 		return nil, 0, 0, ErrNoRoute
+	}
+
+	if stalePath, err := checkGasEstimatesFresh(route, tm.ApprovalPlacedForPath, time.Now()); err != nil {
+		logutils.ZapLogger().Warn("BuildTransactionsFromRoute: gas estimate out of date",
+			zap.String("processor", stalePath.ProcessorName),
+			zap.Uint64("fromChain", stalePath.FromChain.ChainID),
+			zap.Time("txGasEstimatedAt", stalePath.TxGasEstimatedAt),
+			zap.Time("approvalGasEstimatedAt", stalePath.ApprovalGasEstimatedAt))
+		return nil, stalePath.FromChain.ChainID, stalePath.ToChain.ChainID, err
+	}
+	if lowPath, err := checkGasCoversEstimates(route, tm.ApprovalPlacedForPath); err != nil {
+		logutils.ZapLogger().Warn("BuildTransactionsFromRoute: gas limit below the current estimate",
+			zap.String("processor", lowPath.ProcessorName),
+			zap.Uint64("fromChain", lowPath.FromChain.ChainID),
+			zap.Uint64("txGas", lowPath.TxGasAmount),
+			zap.Uint64("txGasEstimated", lowPath.EstimatedTxGasAmount),
+			zap.Uint64("approvalGas", lowPath.ApprovalGasAmount),
+			zap.Uint64("approvalGasEstimated", lowPath.EstimatedApprovalGasAmount))
+		return nil, lowPath.FromChain.ChainID, lowPath.ToChain.ChainID, err
 	}
 
 	accFrom, err := tm.accountsDB.GetAccountByAddress(types.Address(processorInputParams.FromAddr))

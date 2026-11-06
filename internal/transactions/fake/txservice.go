@@ -30,6 +30,9 @@ type CallArgs struct {
 	GasPrice hexutil.Big     `json:"gasPrice"`
 	Value    hexutil.Big     `json:"value"`
 	Data     hexutil.Bytes   `json:"data"`
+
+	MaxFeePerGas         *hexutil.Big `json:"maxFeePerGas"`
+	MaxPriorityFeePerGas *hexutil.Big `json:"maxPriorityFeePerGas"`
 }
 
 // PublicTransactionPoolAPI used to generate mock by mockgen util.

@@ -89,8 +89,7 @@ func (s *ERC1155Processor) EstimateGas(params ProcessorInputParams, input []byte
 	if err != nil {
 		return 0, createERC1155ErrorResponse(err)
 	}
-	increasedEstimation := float64(estimation) * pathProcessorCommon.IncreaseEstimatedGasFactor
-	return uint64(increasedEstimation), nil
+	return estimation, nil
 }
 
 func (s *ERC1155Processor) BuildTransactionV2(sendArgs *wallettypes.SendTxArgs, lastUsedNonce int64) (*ethTypes.Transaction, uint64, error) {

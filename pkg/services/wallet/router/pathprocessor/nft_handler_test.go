@@ -17,7 +17,6 @@ import (
 	mock_rpcclient "github.com/status-im/status-go/internal/rpc/mock/client"
 	mock_transactor "github.com/status-im/status-go/internal/transactions/mock"
 	walletCommon "github.com/status-im/status-go/pkg/services/wallet/common"
-	pathProcessorCommon "github.com/status-im/status-go/pkg/services/wallet/router/pathprocessor/common"
 	"github.com/status-im/status-go/pkg/services/wallet/wallettypes"
 )
 
@@ -52,7 +51,7 @@ func TestBaseNFTHandler_Comprehensive(t *testing.T) {
 	mockEthClient.EXPECT().EstimateGas(gomock.Any(), gomock.Any()).Return(uint64(21000), nil)
 	estimation, err := handler.EstimateGas(params, []byte{}, "TestHandler")
 	require.NoError(t, err)
-	assert.Equal(t, uint64(float64(21000)*pathProcessorCommon.IncreaseEstimatedGasFactor), estimation)
+	assert.Equal(t, uint64(21000), estimation)
 
 	// Test EstimateGas propagating an estimation error
 	mockRPCClient.EXPECT().EthClient(walletCommon.EthereumMainnet).Return(mockEthClient, nil)

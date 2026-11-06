@@ -91,10 +91,9 @@ func (s *CommunityDeployCollectiblesProcessor) EstimateGas(params ProcessorInput
 		return 0, createCommunityDeployCollectiblesErrorResponse(err)
 	}
 
-	increasedEstimation := float64(estimation) * pathProcessorCommon.IncreaseEstimatedGasFactor
-	logutils.ZapLogger().Debug("CommunityDeployCollectiblesProcessor estimation", zap.Uint64("gas", uint64(increasedEstimation)))
+	logutils.ZapLogger().Debug("CommunityDeployCollectiblesProcessor estimation", zap.Uint64("gas", estimation))
 
-	return uint64(increasedEstimation), nil
+	return estimation, nil
 }
 
 func (s *CommunityDeployCollectiblesProcessor) BuildTransactionV2(sendArgs *wallettypes.SendTxArgs, lastUsedNonce int64) (*ethTypes.Transaction, uint64, error) {

@@ -80,10 +80,9 @@ func (s *CommunitySetSignerPubKeyProcessor) EstimateGas(params ProcessorInputPar
 		return 0, createCommunitySetSignerPubKeyErrorResponse(err)
 	}
 
-	increasedEstimation := float64(estimation) * pathProcessorCommon.IncreaseEstimatedGasFactor
-	logutils.ZapLogger().Debug("CommunitySetSignerPubKeyProcessor estimation", zap.Uint64("gas", uint64(increasedEstimation)))
+	logutils.ZapLogger().Debug("CommunitySetSignerPubKeyProcessor estimation", zap.Uint64("gas", estimation))
 
-	return uint64(increasedEstimation), nil
+	return estimation, nil
 }
 
 func (s *CommunitySetSignerPubKeyProcessor) BuildTransactionV2(sendArgs *wallettypes.SendTxArgs, lastUsedNonce int64) (*ethTypes.Transaction, uint64, error) {

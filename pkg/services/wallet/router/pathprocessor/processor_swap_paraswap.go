@@ -280,9 +280,7 @@ func (s *SwapParaswapProcessor) EstimateGas(params ProcessorInputParams, input [
 		return 0, createSwapParaswapErrorResponse(err)
 	}
 
-	increasedEstimation := float64(estimation) * pathProcessorCommon.IncreaseEstimatedGasFactor
-
-	return uint64(increasedEstimation), nil
+	return estimation, nil
 }
 
 func (s *SwapParaswapProcessor) BuildTransactionV2(sendArgs *wallettypes.SendTxArgs, lastUsedNonce int64) (*ethTypes.Transaction, uint64, error) {
@@ -303,6 +301,7 @@ func (s *SwapParaswapProcessor) BuildTransactionV2(sendArgs *wallettypes.SendTxA
 	if err != nil {
 		return nil, 0, createSwapParaswapErrorResponse(err)
 	}
+	gas = gasForQuotedTx(sendArgs.Gas, gas)
 
 	gasPrice, ok := new(big.Int).SetString(tx.GasPrice, 10)
 	if !ok {

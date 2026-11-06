@@ -1,6 +1,8 @@
 package transfer
 
 import (
+	stderrors "errors"
+
 	"github.com/status-im/status-go/internal/errors"
 )
 
@@ -9,4 +11,11 @@ var (
 	ErrNoRoute                   = &errors.ErrorResponse{Code: errors.ErrorCode("WT-001"), Details: "no generated route"}
 	ErrNoTrsansactionsBeingBuilt = &errors.ErrorResponse{Code: errors.ErrorCode("WT-002"), Details: "no transactions being built"}
 	ErrMissingSignatureForTx     = &errors.ErrorResponse{Code: errors.ErrorCode("WT-003"), Details: "missing signature for transaction %s"}
+	// WT-004 is ErrInvalidSignatureDetails in pkg/services/wallet/requests
+	ErrRouteGasEstimateExpired = &errors.ErrorResponse{Code: errors.ErrorCode("WT-005"), Details: "the route's gas estimate is out of date, request the route again"}
+	ErrGasBelowEstimate        = &errors.ErrorResponse{Code: errors.ErrorCode("WT-006"), Details: "the transaction's gas limit is below the current gas estimate, review the transaction again"}
 )
+
+func RouteNeedsReview(err error) bool {
+	return stderrors.Is(err, ErrRouteGasEstimateExpired) || stderrors.Is(err, ErrGasBelowEstimate)
+}

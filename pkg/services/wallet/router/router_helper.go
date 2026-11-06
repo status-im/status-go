@@ -98,6 +98,7 @@ func (r *Router) requireApproval(ctx context.Context, sendType sendtype.SendType
 	return true, params.AmountIn, nil
 }
 
+// estimateGasForApproval returns the raw node estimate; see bufferApprovalGas.
 func (r *Router) estimateGasForApproval(params pathprocessor.ProcessorInputParams, input []byte) (uint64, error) {
 	ethClient, err := r.rpcClient.EthClient(params.FromChain.ChainID)
 	if err != nil {
@@ -126,6 +127,11 @@ func (r *Router) estimateGasForApproval(params pathprocessor.ProcessorInputParam
 		zap.String("token", params.FromToken.Symbol),
 		zap.Uint64("gas", gas))
 	return gas, nil
+}
+
+// bufferApprovalGas applies the default buffer, like for the main tx.
+func bufferApprovalGas(estimation uint64) uint64 {
+	return pathprocessor.BufferGasEstimate(estimation, pathProcessorCommon.IncreaseEstimatedGasFactor)
 }
 
 func (r *Router) calculateL1Fee(chainID uint64, data []byte) (*big.Int, error) {
@@ -622,7 +628,12 @@ func (r *Router) evaluateAndUpdatePathDetails(ctx context.Context, path *routes.
 	requiredTokenBalance := big.NewInt(0)
 
 	if path.FromToken.IsNative() {
-		requiredNativeBalance.Add(requiredNativeBalance, path.AmountIn.ToInt())
+		if path.SubtractFees && path.AmountInOriginal != nil {
+			// fees come out of the amount, so the whole original amount is needed
+			requiredNativeBalance.Add(requiredNativeBalance, path.AmountInOriginal.ToInt())
+		} else {
+			requiredNativeBalance.Add(requiredNativeBalance, path.AmountIn.ToInt())
+		}
 		if !path.SubtractFees {
 			requiredNativeBalance.Add(requiredNativeBalance, ethTotalFees)
 		}

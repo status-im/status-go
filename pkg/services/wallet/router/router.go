@@ -6,6 +6,7 @@ import (
 	"math/big"
 	"strings"
 	"sync"
+	"time"
 
 	"go.uber.org/zap"
 
@@ -21,6 +22,7 @@ import (
 	"github.com/status-im/status-go/internal/transactions"
 
 	"github.com/status-im/status-go/internal/signal"
+	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/security"
 	"github.com/status-im/status-go/pkg/services/wallet/async"
 	"github.com/status-im/status-go/pkg/services/wallet/collectibles"
@@ -107,6 +109,8 @@ type Router struct {
 
 	clientsForUpdatesPerChains sync.Map
 
+	newRecipients recipientStateCache
+
 	logger *zap.Logger
 }
 
@@ -180,6 +184,21 @@ func (r *Router) GetPathProcessors() map[string]pathprocessor.PathProcessor {
 func (r *Router) GetBestRouteAndAssociatedInputParams() (routes.Route, requests.RouteInputParams) {
 	r.activeRoutesMutex.Lock()
 	defer r.activeRoutesMutex.Unlock()
+	return r.bestRouteAndAssociatedInputParams()
+}
+
+// GetBestRouteForBuild re-estimates stale gas and returns a copy of the active route, under one lock.
+func (r *Router) GetBestRouteForBuild(approvalPlaced func(processorName string) bool, now time.Time) (routes.Route, requests.RouteInputParams) {
+	r.activeRoutesMutex.Lock()
+	defer r.activeRoutesMutex.Unlock()
+	if r.activeRoutes != nil {
+		refreshStaleGasEstimates(r.activeRoutes.Route, approvalPlaced, now, r.txGasEstimator, r.approvalGasEstimator, r.logger)
+	}
+	return r.bestRouteAndAssociatedInputParams()
+}
+
+// bestRouteAndAssociatedInputParams expects activeRoutesMutex to be held.
+func (r *Router) bestRouteAndAssociatedInputParams() (routes.Route, requests.RouteInputParams) {
 	if r.activeRoutes == nil {
 		lastUuid := ""
 		r.lastInputParamsMutex.Lock()
@@ -300,10 +319,10 @@ func (r *Router) setCustomTxDetails(ctx context.Context, pathTxIdentity *request
 				zap.Error(err))
 			return err
 		}
-		err = r.checkBalancesForTheBestRoute(r.activeRoutes.Route)
+		err = r.checkBalancesForRouteAndAdjustAmountIn(r.activeRoutes.Route)
 		// inform the client about the changes
 		if err != nil {
-			r.logger.Error("setCustomTxDetails: checkBalancesForTheBestRoute returned an error",
+			r.logger.Error("setCustomTxDetails: balance check returned an error",
 				zap.String("uuid", pathTxIdentity.RouterInputParamsUuid),
 				zap.Error(err))
 		}
@@ -437,7 +456,7 @@ func (r *Router) ReevaluateRouterPath(ctx context.Context, pathTxIdentity *reque
 				return err
 			}
 
-			gasLimit, err := pProcessor.EstimateGas(processorInputParams, txPackedData)
+			estimatedGas, err := pProcessor.EstimateGas(processorInputParams, txPackedData)
 			if err != nil {
 				r.logger.Error("ReevaluateRouterPath: EstimateGas failed",
 					zap.String("uuid", pathTxIdentity.RouterInputParamsUuid),
@@ -448,11 +467,15 @@ func (r *Router) ReevaluateRouterPath(ctx context.Context, pathTxIdentity *reque
 			r.logger.Debug("ReevaluateRouterPath: gas estimated",
 				zap.String("uuid", pathTxIdentity.RouterInputParamsUuid),
 				zap.String("processor", pProcessor.Name()),
-				zap.Uint64("gasLimit", gasLimit))
+				zap.Uint64("estimatedGas", estimatedGas))
 
+			gasLimit := pathprocessor.BufferedGasEstimate(pProcessor, processorInputParams, estimatedGas)
 			path.SuggestedTxGasAmount = gasLimit
+			path.EstimatedTxGasAmount = estimatedGas
 			path.TxGasAmount = gasLimit
 			path.TxPackedData = txPackedData
+			path.TxGasEstimatedAt = time.Now()
+			path.TxGasEstimatedValue = (*hexutil.Big)(new(big.Int).Set(processorInputParams.AmountIn))
 
 			// update the path details
 			usedNonces := make(map[uint64]uint64)
@@ -859,22 +882,9 @@ func (r *Router) prepareBalanceMapForTokenOnChain(ctx context.Context, input *re
 	return
 }
 
-func (r *Router) CreateProcessorInputParams(input *requests.RouteInputParams, fromToken *tokentypes.Token, toToken *tokentypes.Token,
-	useCommunityTokenTransferDetailsAtIndex int) (pathprocessor.ProcessorInputParams, error) {
-	var err error
-
-	fromChain := r.rpcClient.GetNetworkManager().Find(input.FromChainID)
-	if fromChain == nil {
-		// should never be here, input.Validate() ensures that the chain is supported
-		panic(fmt.Errorf("from chain %d not found", input.FromChainID))
-	}
-
-	toChain := r.rpcClient.GetNetworkManager().Find(input.ToChainID)
-	if toChain == nil {
-		// should never be here, input.Validate() ensures that the chain is supported
-		panic(fmt.Errorf("to chain %d not found", input.ToChainID))
-	}
-
+// newProcessorInputParams fills the processor params from the route input, except community params.
+func newProcessorInputParams(input *requests.RouteInputParams, fromChain *params.Network, toChain *params.Network,
+	fromToken *tokentypes.Token, toToken *tokentypes.Token) pathprocessor.ProcessorInputParams {
 	processorInputParams := pathprocessor.ProcessorInputParams{
 		FromChain:          fromChain,
 		ToChain:            toChain,
@@ -898,6 +908,27 @@ func (r *Router) CreateProcessorInputParams(input *requests.RouteInputParams, fr
 	if input.PackID != nil {
 		processorInputParams.PackID = input.PackID.ToInt()
 	}
+
+	return processorInputParams
+}
+
+func (r *Router) CreateProcessorInputParams(input *requests.RouteInputParams, fromToken *tokentypes.Token, toToken *tokentypes.Token,
+	useCommunityTokenTransferDetailsAtIndex int) (pathprocessor.ProcessorInputParams, error) {
+	var err error
+
+	fromChain := r.rpcClient.GetNetworkManager().Find(input.FromChainID)
+	if fromChain == nil {
+		// should never be here, input.Validate() ensures that the chain is supported
+		panic(fmt.Errorf("from chain %d not found", input.FromChainID))
+	}
+
+	toChain := r.rpcClient.GetNetworkManager().Find(input.ToChainID)
+	if toChain == nil {
+		// should never be here, input.Validate() ensures that the chain is supported
+		panic(fmt.Errorf("to chain %d not found", input.ToChainID))
+	}
+
+	processorInputParams := newProcessorInputParams(input, fromChain, toChain, fromToken, toToken)
 
 	if input.SendType.IsCommunityRelatedTransfer() {
 		processorInputParams.CommunityParams = input.CommunityRouteInputParams
@@ -1108,26 +1139,26 @@ func (r *Router) resolveRoute(ctx context.Context, input *requests.RouteInputPar
 }
 
 func (r *Router) estimateMainTx(input *requests.RouteInputParams, pathProcessor pathprocessor.PathProcessor,
-	processorInputParams pathprocessor.ProcessorInputParams, approvalRequired bool) ([]byte, uint64, error) {
+	processorInputParams pathprocessor.ProcessorInputParams, approvalRequired bool) (txPackedData []byte, gasLimit uint64, estimatedGas uint64, err error) {
 	tolerateFailure := walletCommon.IsProcessorSwap(pathProcessor.Name()) && approvalRequired
 
-	txPackedData, err := pathProcessor.PackTxInputData(processorInputParams)
+	txPackedData, err = pathProcessor.PackTxInputData(processorInputParams)
 	if err != nil {
 		if tolerateFailure {
 			r.logger.Debug("buildPath: PackTxInputData failed, fee unknown until the approval is mined",
 				zap.String("uuid", input.Uuid),
 				zap.String("processor", pathProcessor.Name()),
 				zap.Error(err))
-			return nil, 0, nil
+			return nil, 0, 0, nil
 		}
 		r.logger.Error("buildPath: PackTxInputData failed",
 			zap.String("uuid", input.Uuid),
 			zap.String("processor", pathProcessor.Name()),
 			zap.Error(err))
-		return nil, 0, err
+		return nil, 0, 0, err
 	}
 
-	gasLimit, err := pathProcessor.EstimateGas(processorInputParams, txPackedData)
+	estimatedGas, err = pathProcessor.EstimateGas(processorInputParams, txPackedData)
 	if err != nil {
 		if tolerateFailure {
 			if estimator, ok := pathProcessor.(pathprocessor.ApprovalPendingGasEstimator); ok {
@@ -1137,27 +1168,37 @@ func (r *Router) estimateMainTx(input *requests.RouteInputParams, pathProcessor 
 						zap.String("processor", pathProcessor.Name()),
 						zap.Uint64("gasLimit", gas),
 						zap.Error(err))
-					return txPackedData, gas, nil
+					return txPackedData, gas, 0, nil
 				}
 			}
 			r.logger.Debug("buildPath: EstimateGas failed, fee unknown until the approval is mined",
 				zap.String("uuid", input.Uuid),
 				zap.String("processor", pathProcessor.Name()),
 				zap.Error(err))
-			return txPackedData, 0, nil
+			return txPackedData, 0, 0, nil
 		}
 		r.logger.Error("buildPath: EstimateGas failed",
 			zap.String("uuid", input.Uuid),
 			zap.String("processor", pathProcessor.Name()),
 			zap.Error(err))
-		return nil, 0, err
+		return nil, 0, 0, err
 	}
 
+	gasLimit = pathprocessor.BufferedGasEstimate(pathProcessor, processorInputParams, estimatedGas)
 	r.logger.Debug("buildPath: tx gas estimated",
 		zap.String("uuid", input.Uuid),
 		zap.String("processor", pathProcessor.Name()),
+		zap.Uint64("estimatedGas", estimatedGas),
 		zap.Uint64("gasLimit", gasLimit))
-	return txPackedData, gasLimit, nil
+	return txPackedData, gasLimit, estimatedGas, nil
+}
+
+// mainTxGasEstimatedAt returns zero time for a stand-in estimate, so it is re-estimated before signing.
+func mainTxGasEstimatedAt(approvalRequired bool, estimatedGas uint64, now time.Time) time.Time {
+	if approvalRequired && estimatedGas == 0 {
+		return time.Time{}
+	}
+	return now
 }
 
 func (r *Router) buildPath(ctx context.Context, input *requests.RouteInputParams, fromToken *tokentypes.Token,
@@ -1241,6 +1282,8 @@ func (r *Router) buildPath(ctx context.Context, input *requests.RouteInputParams
 
 	var (
 		approvalGasLimit   uint64
+		approvalGasRaw     uint64
+		estimatedGas       uint64
 		approvalPackedData []byte
 		gasLimit           uint64
 		txPackedData       []byte
@@ -1254,7 +1297,7 @@ func (r *Router) buildPath(ctx context.Context, input *requests.RouteInputParams
 				zap.Error(err))
 			return nil, err
 		}
-		approvalGasLimit, err = r.estimateGasForApproval(processorInputParams, approvalPackedData)
+		approvalGasRaw, err = r.estimateGasForApproval(processorInputParams, approvalPackedData)
 		if err != nil {
 			r.logger.Error("buildPath: estimateGasForApproval failed",
 				zap.String("uuid", input.Uuid),
@@ -1262,16 +1305,20 @@ func (r *Router) buildPath(ctx context.Context, input *requests.RouteInputParams
 				zap.Error(err))
 			return nil, err
 		}
+		approvalGasLimit = bufferApprovalGas(approvalGasRaw)
 		r.logger.Debug("buildPath: approval gas estimated",
 			zap.String("uuid", input.Uuid),
 			zap.String("processor", pathProcessor.Name()),
 			zap.Uint64("approvalGasLimit", approvalGasLimit))
 	}
 
-	txPackedData, gasLimit, err = r.estimateMainTx(input, pathProcessor, processorInputParams, approvalRequired)
+	recipientIsNew := r.checkRecipientIsNew(ctx, pathProcessor, processorInputParams)
+
+	txPackedData, gasLimit, estimatedGas, err = r.estimateMainTx(input, pathProcessor, processorInputParams, approvalRequired)
 	if err != nil {
 		return nil, err
 	}
+	gasEstimatedAt := time.Now()
 
 	amountOut, err := pathProcessor.CalculateAmountOut(processorInputParams)
 	if err != nil {
@@ -1295,10 +1342,15 @@ func (r *Router) buildPath(ctx context.Context, input *requests.RouteInputParams
 		ToToken:               toToken,
 		AmountIn:              (*hexutil.Big)(processorInputParams.AmountIn),
 		AmountOut:             (*hexutil.Big)(amountOut),
+		AmountInOriginal:      (*hexutil.Big)(new(big.Int).Set(processorInputParams.AmountIn)),
 
 		// set params that we don't want to be recalculated with every new block creation
 		SuggestedTxGasAmount:       gasLimit,
 		SuggestedApprovalGasAmount: approvalGasLimit,
+		EstimatedTxGasAmount:       estimatedGas,
+		EstimatedApprovalGasAmount: approvalGasRaw,
+		TxGasEstimatedAt:           mainTxGasEstimatedAt(approvalRequired, estimatedGas, gasEstimatedAt),
+		TxGasEstimatedValue:        (*hexutil.Big)(new(big.Int).Set(processorInputParams.AmountIn)),
 
 		UsedContractAddress: &contractAddress,
 		TxPackedData:        txPackedData,
@@ -1312,6 +1364,10 @@ func (r *Router) buildPath(ctx context.Context, input *requests.RouteInputParams
 		ApprovalPackedData:      approvalPackedData,
 		ApprovalGasAmount:       approvalGasLimit,
 	}
+	if approvalRequired {
+		path.ApprovalGasEstimatedAt = gasEstimatedAt
+	}
+	path.RecipientIsNewAccount = newRecipientRaisesGas(pathProcessor, processorInputParams, estimatedGas, recipientIsNew, r.logger)
 
 	if dp, ok := pathProcessor.(interface {
 		GetRouteExecutionDuration(pathprocessor.ProcessorInputParams) uint
@@ -1531,16 +1587,22 @@ func (r *Router) checkBalancesForRouteAndAdjustAmountIn(route routes.Route) (err
 				zap.Stringer("txFee", path.TxFee.ToInt()),
 				zap.Stringer("txL1Fee", path.TxL1Fee.ToInt()),
 				zap.Bool("approvalRequired", path.ApprovalRequired))
-			path.AmountIn.ToInt().Sub(path.AmountIn.ToInt(), path.TxFee.ToInt())
-			if path.TxL1Fee.ToInt().Cmp(walletCommon.ZeroBigIntValue()) > 0 {
-				path.AmountIn.ToInt().Sub(path.AmountIn.ToInt(), path.TxL1Fee.ToInt())
-			}
-			if path.ApprovalRequired {
-				path.AmountIn.ToInt().Sub(path.AmountIn.ToInt(), path.ApprovalFee.ToInt())
-				if path.ApprovalL1Fee.ToInt().Cmp(walletCommon.ZeroBigIntValue()) > 0 {
-					path.AmountIn.ToInt().Sub(path.AmountIn.ToInt(), path.ApprovalL1Fee.ToInt())
+			amountIn := amountInAfterFees(path)
+			if amountIn.Sign() <= 0 {
+				r.logger.Error("checkBalancesForRouteAndAdjustAmountIn: fees exceed the full-balance amount",
+					zap.String("processor", path.ProcessorName),
+					zap.Uint64("fromChain", path.FromChain.ChainID),
+					zap.Stringer("amountInOriginal", path.AmountInOriginal.ToInt()),
+					zap.Stringer("txTotalFee", path.TxTotalFee.ToInt()))
+				err = &errors.ErrorResponse{
+					Code:    ErrNotEnoughNativeBalance.Code,
+					Details: fmt.Sprintf(ErrNotEnoughNativeBalance.Details, path.FromChain.NativeCurrencySymbol, path.FromChain.ChainID),
 				}
+				return
 			}
+			// new value: AmountIn may share its big.Int with the input params
+			path.AmountIn = (*hexutil.Big)(amountIn)
+			r.setInputAmountIn(path.RouterInputParamsUuid, amountIn)
 			r.logger.Debug("checkBalancesForRouteAndAdjustAmountIn: amountIn adjusted",
 				zap.String("processor", path.ProcessorName),
 				zap.Stringer("amountInAfter", path.AmountIn.ToInt()))
@@ -1548,4 +1610,35 @@ func (r *Router) checkBalancesForRouteAndAdjustAmountIn(route routes.Route) (err
 	}
 
 	return
+}
+
+// setInputAmountIn syncs the input amount with what a full-balance send transfers, as send
+// details report it.
+func (r *Router) setInputAmountIn(uuid string, amountIn *big.Int) {
+	r.lastInputParamsMutex.Lock()
+	defer r.lastInputParamsMutex.Unlock()
+	if r.lastInputParams != nil && r.lastInputParams.Uuid == uuid {
+		r.lastInputParams.AmountIn = (*hexutil.Big)(new(big.Int).Set(amountIn))
+	}
+}
+
+// amountInAfterFees returns AmountInOriginal minus current fees, so repeated refreshes subtract
+// fees once.
+func amountInAfterFees(path *routes.Path) *big.Int {
+	original := path.AmountIn
+	if path.AmountInOriginal != nil {
+		original = path.AmountInOriginal
+	}
+	amountIn := new(big.Int).Set(original.ToInt())
+	amountIn.Sub(amountIn, path.TxFee.ToInt())
+	if path.TxL1Fee.ToInt().Cmp(walletCommon.ZeroBigIntValue()) > 0 {
+		amountIn.Sub(amountIn, path.TxL1Fee.ToInt())
+	}
+	if path.ApprovalRequired {
+		amountIn.Sub(amountIn, path.ApprovalFee.ToInt())
+		if path.ApprovalL1Fee.ToInt().Cmp(walletCommon.ZeroBigIntValue()) > 0 {
+			amountIn.Sub(amountIn, path.ApprovalL1Fee.ToInt())
+		}
+	}
+	return amountIn
 }

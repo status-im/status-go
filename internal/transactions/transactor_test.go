@@ -1,6 +1,7 @@
 package transactions
 
 import (
+	"context"
 	"fmt"
 	"math/big"
 	"reflect"
@@ -463,4 +464,65 @@ func (s *TransactorSuite) TestStoreAndTrackPendingTx() {
 	// Empty tracker doesn't produce error
 	err := s.manager.StoreAndTrackPendingTx(&wallettypes.SendTxArgs{}, nil)
 	s.NoError(err)
+}
+
+func (s *TransactorSuite) TestEstimateTransactionGas() {
+	chainID := s.nodeConfig.NetworkID
+	from := cryptotypes.HexToAddress("0x1")
+	to := cryptotypes.HexToAddress("0x2")
+	value := (*hexutil.Big)(big.NewInt(5))
+	input := cryptotypes.HexBytes{0xab, 0xcd}
+
+	s.Run("call: from, to, value and input reach the node", func() {
+		s.txServiceMock.EXPECT().EstimateGas(gomock.Any(), gomock.Any()).DoAndReturn(
+			func(_ context.Context, args fake.CallArgs) (hexutil.Uint64, error) {
+				s.Require().Equal(common.Address(from), args.From)
+				s.Require().NotNil(args.To)
+				s.Require().Equal(common.Address(to), *args.To)
+				s.Require().Equal(big.NewInt(5), args.Value.ToInt())
+				s.Require().Equal(hexutil.Bytes{0xab, 0xcd}, args.Data)
+				return hexutil.Uint64(204600), nil
+			})
+		gas, err := s.manager.EstimateTransactionGas(chainID, wallettypes.SendTxArgs{From: from, To: &to, Value: value, Data: input})
+		s.Require().NoError(err)
+		s.Require().Equal(uint64(204600), gas)
+	})
+
+	s.Run("legacy fee reaches the node", func() {
+		s.txServiceMock.EXPECT().EstimateGas(gomock.Any(), gomock.Any()).DoAndReturn(
+			func(_ context.Context, args fake.CallArgs) (hexutil.Uint64, error) {
+				s.Require().Equal(big.NewInt(1_000_000_000), args.GasPrice.ToInt())
+				s.Require().Nil(args.MaxFeePerGas)
+				s.Require().Nil(args.MaxPriorityFeePerGas)
+				return hexutil.Uint64(21000), nil
+			})
+		_, err := s.manager.EstimateTransactionGas(chainID, wallettypes.SendTxArgs{From: from, To: &to,
+			GasPrice: (*hexutil.Big)(big.NewInt(1_000_000_000))})
+		s.Require().NoError(err)
+	})
+
+	s.Run("EIP-1559 fees reach the node", func() {
+		s.txServiceMock.EXPECT().EstimateGas(gomock.Any(), gomock.Any()).DoAndReturn(
+			func(_ context.Context, args fake.CallArgs) (hexutil.Uint64, error) {
+				s.Require().Equal(big.NewInt(30_000_000_000), args.MaxFeePerGas.ToInt())
+				s.Require().Equal(big.NewInt(2_000_000_000), args.MaxPriorityFeePerGas.ToInt())
+				s.Require().Zero(args.GasPrice.ToInt().Sign())
+				return hexutil.Uint64(21000), nil
+			})
+		_, err := s.manager.EstimateTransactionGas(chainID, wallettypes.SendTxArgs{From: from, To: &to,
+			MaxFeePerGas:         (*hexutil.Big)(big.NewInt(30_000_000_000)),
+			MaxPriorityFeePerGas: (*hexutil.Big)(big.NewInt(2_000_000_000))})
+		s.Require().NoError(err)
+	})
+
+	s.Run("no to: estimated as a contract deployment", func() {
+		s.txServiceMock.EXPECT().EstimateGas(gomock.Any(), gomock.Any()).DoAndReturn(
+			func(_ context.Context, args fake.CallArgs) (hexutil.Uint64, error) {
+				s.Require().Nil(args.To)
+				return hexutil.Uint64(1_500_000), nil
+			})
+		gas, err := s.manager.EstimateTransactionGas(chainID, wallettypes.SendTxArgs{From: from, Input: input})
+		s.Require().NoError(err)
+		s.Require().Equal(uint64(1_500_000), gas)
+	})
 }

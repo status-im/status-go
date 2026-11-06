@@ -3,6 +3,7 @@ package routes
 import (
 	"fmt"
 	"math/big"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -32,6 +33,9 @@ type Path struct {
 	SuggestedTxGasAmount            uint64               // Suggested gas amount for the transaction
 	SuggestedApprovalTxNonce        *hexutil.Uint64      // Suggested nonce for the approval transaction
 	SuggestedApprovalGasAmount      uint64               // Suggested gas amount for the approval transaction
+	EstimatedTxGasAmount            uint64               // Raw node estimate behind SuggestedTxGasAmount; 0 for a stand-in
+	EstimatedApprovalGasAmount      uint64               // Raw node estimate behind SuggestedApprovalGasAmount
+	RecipientIsNewAccount           bool                 // The new recipient makes the transfer cost more gas
 	CurrentBaseFee                  *hexutil.Big         // Current network base fee (in base unit of the chain eg. WEI for ETH or BNB)
 	UsedContractAddress             *common.Address      // Address of the contract that will be used for the transaction
 
@@ -74,6 +78,14 @@ type Path struct {
 	RequiredNativeBalance *big.Int // (in base unit of the chain eg. WEI for ETH or BNB)
 	SubtractFees          bool
 
+	// AmountInOriginal is the built-for amount; with SubtractFees, AmountIn is recomputed from it.
+	AmountInOriginal *hexutil.Big `json:"-"`
+	// When the main / approval tx gas was last estimated; see GasEstimateFresh.
+	TxGasEstimatedAt       time.Time `json:"-"`
+	ApprovalGasEstimatedAt time.Time `json:"-"`
+	// TxGasEstimatedValue is the amount the main tx gas was estimated with.
+	TxGasEstimatedValue *hexutil.Big `json:"-"`
+
 	// used internally
 	communityParams *requests.CommunityRouteInputParams
 }
@@ -109,6 +121,9 @@ func (p *Path) Copy() *Path {
 		Tool:                       p.Tool,
 		SuggestedTxGasAmount:       p.SuggestedTxGasAmount,
 		SuggestedApprovalGasAmount: p.SuggestedApprovalGasAmount,
+		EstimatedTxGasAmount:       p.EstimatedTxGasAmount,
+		EstimatedApprovalGasAmount: p.EstimatedApprovalGasAmount,
+		RecipientIsNewAccount:      p.RecipientIsNewAccount,
 		TxGasFeeMode:               p.TxGasFeeMode,
 		TxGasAmount:                p.TxGasAmount,
 		TxEstimatedTime:            p.TxEstimatedTime,
@@ -118,6 +133,16 @@ func (p *Path) Copy() *Path {
 		ApprovalGasAmount:          p.ApprovalGasAmount,
 		ApprovalEstimatedTime:      p.ApprovalEstimatedTime,
 		SubtractFees:               p.SubtractFees,
+		TxGasEstimatedAt:           p.TxGasEstimatedAt,
+		ApprovalGasEstimatedAt:     p.ApprovalGasEstimatedAt,
+	}
+
+	if p.AmountInOriginal != nil {
+		newPath.AmountInOriginal = (*hexutil.Big)(big.NewInt(0).Set(p.AmountInOriginal.ToInt()))
+	}
+
+	if p.TxGasEstimatedValue != nil {
+		newPath.TxGasEstimatedValue = (*hexutil.Big)(big.NewInt(0).Set(p.TxGasEstimatedValue.ToInt()))
 	}
 
 	if p.FromChain != nil {
