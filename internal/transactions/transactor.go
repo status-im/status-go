@@ -113,7 +113,7 @@ func (t *Transactor) EstimateGas(chainID uint64, from common.Address, to common.
 }
 
 // EstimateTransactionGas returns the node's raw gas estimate for args, fees included (a contract may
-// read tx.gasprice); no To means a deployment.
+// read tx.gasprice); no To means a deployment. args.Gas is left out, so it can't cap the estimate.
 func (t *Transactor) EstimateTransactionGas(chainID uint64, args wallettypes.SendTxArgs) (uint64, error) {
 	rpcWrapper := newRPCWrapper(t.ethClientGetter, chainID)
 
