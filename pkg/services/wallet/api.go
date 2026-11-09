@@ -600,19 +600,30 @@ func (api *API) BuildTransaction(ctx context.Context, chainID uint64, sendTxArgs
 	return api.s.transactionManager.BuildTransaction(chainID, params)
 }
 
-// EstimateTransactionGas returns the buffered gas limit for a tx built outside the router (e.g. a
-// dApp request). The client signs with it as the tx gas, so the buffer is applied once.
+// EstimateTransactionGas returns the gas limit for a tx built outside the router (e.g. a dApp
+// request): the node estimate buffered once, and never below the tx's own gas. The client signs with
+// it as the tx gas.
 func (api *API) EstimateTransactionGas(ctx context.Context, chainID uint64, sendTxArgsJSON string) (hexutil.Uint64, error) {
 	logutils.ZapLogger().Debug("[WalletAPI::EstimateTransactionGas]", zap.Uint64("chainID", chainID), zap.String("sendTxArgsJSON", sendTxArgsJSON))
+	return estimateTransactionGas(api.s.transactor.EstimateTransactionGas, chainID, sendTxArgsJSON)
+}
+
+func estimateTransactionGas(estimate func(chainID uint64, args wallettypes.SendTxArgs) (uint64, error),
+	chainID uint64, sendTxArgsJSON string) (hexutil.Uint64, error) {
 	var params wallettypes.SendTxArgs
 	if err := json.Unmarshal([]byte(sendTxArgsJSON), &params); err != nil {
 		return 0, err
 	}
-	estimated, err := api.s.transactor.EstimateTransactionGas(chainID, params)
+	estimated, err := estimate(chainID, params)
 	if err != nil {
 		return 0, err
 	}
-	return hexutil.Uint64(pathprocessor.BufferGasEstimate(estimated, pathprocessorcommon.IncreaseEstimatedGasFactor)), nil
+	limit := pathprocessor.BufferGasEstimate(estimated, pathprocessorcommon.IncreaseEstimatedGasFactor)
+	// a dApp may ask for more on purpose, e.g. for gas-dependent branches the estimate misses
+	if params.Gas != nil && uint64(*params.Gas) > limit {
+		limit = uint64(*params.Gas)
+	}
+	return hexutil.Uint64(limit), nil
 }
 
 func (api *API) BuildRawTransaction(ctx context.Context, chainID uint64, sendTxArgsJSON string, signature string) (response *transfer.TxResponse, err error) {
