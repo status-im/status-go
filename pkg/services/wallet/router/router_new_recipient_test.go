@@ -11,6 +11,8 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
+	gethrpc "github.com/ethereum/go-ethereum/rpc"
 
 	"github.com/status-im/status-go/internal/logutils"
 	"github.com/status-im/status-go/params"
@@ -130,4 +132,78 @@ func TestCheckRecipientIsNew(t *testing.T) {
 	isNew, err = r.checkRecipientIsNew(context.Background(), bridge, inputParams)()
 	require.NoError(t, err)
 	require.False(t, isNew, "not a plain transfer: not checked")
+}
+
+// fakeBatchCaller answers eth_getTransactionCount and eth_getCode.
+type fakeBatchCaller struct {
+	nonce   hexutil.Uint64
+	code    hexutil.Bytes
+	elemErr error
+	calls   int
+}
+
+func (f *fakeBatchCaller) BatchCallContext(_ context.Context, batch []gethrpc.BatchElem) error {
+	f.calls++
+	for i := range batch {
+		switch result := batch[i].Result.(type) {
+		case *hexutil.Uint64:
+			*result = f.nonce
+		case *hexutil.Bytes:
+			*result = f.code
+		}
+		batch[i].Error = f.elemErr
+	}
+	return nil
+}
+
+func TestFetchRecipientIsNew(t *testing.T) {
+	recipient := common.HexToAddress("0x2")
+	usdc := &tokentypes.Token{Token: &types.Token{Symbol: "USDC", Address: common.HexToAddress("0xa0b8"), ChainID: 1}}
+	eth := &tokentypes.Token{Token: &types.Token{Symbol: "ETH", Address: common.Address{}, ChainID: 1}}
+
+	for _, tc := range []struct {
+		name        string
+		token       *tokentypes.Token
+		balance     int64
+		balanceErr  error
+		nonce       hexutil.Uint64
+		code        hexutil.Bytes
+		elemErr     error
+		expected    bool
+		wantErr     bool
+		wantRPCCall bool
+	}{
+		{"funded recipient", eth, 1, nil, 0, nil, nil, false, false, false},
+		{"ERC-20 first-time holder: no nonce/code lookup", usdc, 0, nil, 0, nil, nil, true, false, false},
+		{"ERC-20 holder", usdc, 5, nil, 0, nil, nil, false, false, false},
+		{"empty EOA", eth, 0, nil, 0, nil, nil, true, false, true},
+		{"zero-balance EOA with nonce", eth, 0, nil, 3, nil, nil, false, false, true},
+		{"zero-balance contract", eth, 0, nil, 0, hexutil.Bytes{0x60}, nil, false, false, true},
+		{"batch element error", eth, 0, nil, 0, nil, errors.New("boom"), false, true, true},
+		{"balance unknown", eth, 0, errors.New("rpc down"), 0, nil, nil, false, true, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			client := &fakeBatchCaller{nonce: tc.nonce, code: tc.code, elemErr: tc.elemErr}
+			getBalance := func(_ context.Context, chainID uint64, token *tokentypes.Token, account common.Address) (*big.Int, error) {
+				require.Equal(t, uint64(1), chainID)
+				require.Equal(t, tc.token, token)
+				require.Equal(t, recipient, account)
+				return big.NewInt(tc.balance), tc.balanceErr
+			}
+			inputParams := pathprocessor.ProcessorInputParams{
+				FromChain: &params.Network{ChainID: 1}, FromToken: tc.token, FromAddr: common.HexToAddress("0x1"), ToAddr: recipient,
+			}
+
+			isNew, err := fetchRecipientIsNew(context.Background(), inputParams, getBalance,
+				func(uint64) (batchCaller, error) { return client, nil })
+
+			if tc.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+			require.Equal(t, tc.expected, isNew)
+			require.Equal(t, tc.wantRPCCall, client.calls == 1)
+		})
+	}
 }
