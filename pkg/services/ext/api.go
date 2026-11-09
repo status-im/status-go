@@ -572,6 +572,10 @@ func (api *PublicAPI) CreateThread(chatID string, parentMessageID string) (*prot
 	return api.service.messenger.CreateThread(chatID, parentMessageID)
 }
 
+func (api *PublicAPI) UnmuteThread(ctx context.Context, chatID, threadID string) error {
+	return api.service.messenger.UnmuteThread(chatID, threadID)
+}
+
 func (api *PublicAPI) EditThread(ctx context.Context, request *requests.EditThread) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.EditThread(ctx, request)
 }

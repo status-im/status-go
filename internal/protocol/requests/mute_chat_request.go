@@ -9,6 +9,7 @@ var ErrInvalidMuteChatParams = errors.New("mute-chat: invalid params")
 type MutingVariation int
 
 type MuteChat struct {
+	ThreadID  string `json:"threadId,omitempty"`
 	ChatID    string
 	MutedType MutingVariation
 }
