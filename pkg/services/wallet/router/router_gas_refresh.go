@@ -12,18 +12,36 @@ import (
 	"github.com/status-im/status-go/pkg/services/wallet/router/routes"
 )
 
-// refreshGasEstimates re-estimates the gas of paths on chainID, once per GasReestimateInterval.
-// Only suggestions change; evaluateAndUpdatePathDetails applies them unless gas is custom.
-func (r *Router) refreshGasEstimates(chainID uint64, route routes.Route, now time.Time) {
-	for _, path := range route {
-		if path.FromChain == nil || path.FromChain.ChainID != chainID {
-			continue
-		}
-		refreshPathGasEstimates(path, now, r.txGasEstimator(path), r.approvalGasEstimator(path), r.logger)
+// refreshActiveRouteGas re-estimates the gas collect picks from the active route. The estimates
+// (RPC, and HTTP for some providers) run without activeRoutesMutex, on copies of the paths; the
+// results are applied only if the active route wasn't replaced meanwhile.
+func (r *Router) refreshActiveRouteGas(now time.Time, collect func(routes.Route) []*gasRefresh) {
+	r.activeRoutesMutex.Lock()
+	active := r.activeRoutes
+	var refreshes []*gasRefresh
+	if active != nil {
+		refreshes = collect(active.Route)
 	}
+	r.activeRoutesMutex.Unlock()
+	if len(refreshes) == 0 {
+		return
+	}
+
+	runGasRefreshes(refreshes, r.logger)
+
+	r.activeRoutesMutex.Lock()
+	defer r.activeRoutesMutex.Unlock()
+	if r.activeRoutes != active {
+		// a new route has estimates of its own
+		return
+	}
+	applyGasRefreshes(active.Route, refreshes, now)
 }
 
 type gasEstimatorFunc func() (gasEstimate, error)
+
+// gasEstimatorFactory makes the estimator for a path.
+type gasEstimatorFactory func(*routes.Path) gasEstimatorFunc
 
 func (r *Router) txGasEstimator(path *routes.Path) gasEstimatorFunc {
 	return func() (gasEstimate, error) { return r.estimateTxGasForPath(path) }
@@ -33,75 +51,107 @@ func (r *Router) approvalGasEstimator(path *routes.Path) gasEstimatorFunc {
 	return func() (gasEstimate, error) { return r.estimateApprovalGasForPath(path) }
 }
 
-// refreshStaleGasEstimates re-estimates, before the build, the estimates older than
-// GasEstimateMaxAge (the update loop may have stopped). Confirmed gas is never changed; the build
-// refuses it if it is below the new estimate.
-func refreshStaleGasEstimates(route routes.Route, approvalPlaced func(processorName string) bool, now time.Time,
-	txEstimator, approvalEstimator func(*routes.Path) gasEstimatorFunc, logger *zap.Logger) {
-	for _, path := range route {
-		approval := path.ApprovalRequired && !approvalPlaced(path.ProcessorName)
-		if path.GasEstimateFresh(approval, now) {
-			continue
-		}
-		estimator := txEstimator(path)
-		if approval {
-			estimator = approvalEstimator(path)
-		}
-		refreshGasEstimate(path, approval, now, estimator, logger)
-	}
-}
-
 // gasEstimate is a raw node estimate and its buffered limit.
 type gasEstimate struct {
 	estimated uint64
 	limit     uint64
 }
 
-// refreshPathGasEstimates re-estimates the path's due gas; a failure keeps the old estimate and time.
-func refreshPathGasEstimates(path *routes.Path, now time.Time, estimateTx gasEstimatorFunc,
-	estimateApproval gasEstimatorFunc, logger *zap.Logger) {
-	if path.ApprovalRequired {
-		if path.GasEstimateDue(true, now) {
-			refreshGasEstimate(path, true, now, estimateApproval, logger)
+// gasRefresh is one re-estimate of a route's path, made on a copy of it.
+type gasRefresh struct {
+	index    int
+	approval bool
+	path     *routes.Path
+	estimate gasEstimatorFunc
+	gas      gasEstimate
+	err      error
+}
+
+func newGasRefresh(index int, path *routes.Path, approval bool, txEstimator, approvalEstimator gasEstimatorFactory) *gasRefresh {
+	refresh := &gasRefresh{index: index, approval: approval, path: path.Copy()}
+	if approval {
+		refresh.estimate = approvalEstimator(refresh.path)
+	} else {
+		refresh.estimate = txEstimator(refresh.path)
+	}
+	return refresh
+}
+
+// dueGasRefreshes picks the update loop's re-estimates: paths on chainID, once per
+// GasReestimateInterval. Only suggestions change; evaluateAndUpdatePathDetails applies them unless
+// gas is custom.
+func dueGasRefreshes(route routes.Route, chainID uint64, now time.Time, txEstimator, approvalEstimator gasEstimatorFactory) []*gasRefresh {
+	var refreshes []*gasRefresh
+	for i, path := range route {
+		if path.FromChain == nil || path.FromChain.ChainID != chainID {
+			continue
 		}
 		// the main tx can't be estimated before the approval is mined
-		return
+		approval := path.ApprovalRequired
+		if path.GasEstimateDue(approval, now) {
+			refreshes = append(refreshes, newGasRefresh(i, path, approval, txEstimator, approvalEstimator))
+		}
 	}
+	return refreshes
+}
 
-	if path.GasEstimateDue(false, now) {
-		refreshGasEstimate(path, false, now, estimateTx, logger)
+// staleGasRefreshes picks the build's re-estimates: estimates older than GasEstimateMaxAge (the
+// update loop may have stopped). Confirmed gas is never changed; the build refuses it if it is below
+// the new estimate.
+func staleGasRefreshes(route routes.Route, approvalPlaced func(processorName string) bool, now time.Time,
+	txEstimator, approvalEstimator gasEstimatorFactory) []*gasRefresh {
+	var refreshes []*gasRefresh
+	for i, path := range route {
+		approval := path.ApprovalRequired && !approvalPlaced(path.ProcessorName)
+		if !path.GasEstimateFresh(approval, now) {
+			refreshes = append(refreshes, newGasRefresh(i, path, approval, txEstimator, approvalEstimator))
+		}
+	}
+	return refreshes
+}
+
+func runGasRefreshes(refreshes []*gasRefresh, logger *zap.Logger) {
+	for _, refresh := range refreshes {
+		refresh.gas, refresh.err = refresh.estimate()
+		if refresh.err != nil {
+			logger.Warn("runGasRefreshes: gas re-estimation failed, keeping the previous estimate",
+				zap.String("processor", refresh.path.ProcessorName),
+				zap.Uint64("fromChain", refresh.path.FromChain.ChainID),
+				zap.Bool("approval", refresh.approval),
+				zap.Time("txGasEstimatedAt", refresh.path.TxGasEstimatedAt),
+				zap.Time("approvalGasEstimatedAt", refresh.path.ApprovalGasEstimatedAt),
+				zap.Error(refresh.err))
+			continue
+		}
+		logger.Debug("runGasRefreshes: gas re-estimated",
+			zap.String("processor", refresh.path.ProcessorName),
+			zap.Uint64("fromChain", refresh.path.FromChain.ChainID),
+			zap.Bool("approval", refresh.approval),
+			zap.Uint64("estimatedGas", refresh.gas.estimated),
+			zap.Uint64("gas", refresh.gas.limit))
 	}
 }
 
-// refreshGasEstimate stores a new approval or main tx estimate; a failure changes nothing.
-func refreshGasEstimate(path *routes.Path, approval bool, now time.Time, estimate gasEstimatorFunc, logger *zap.Logger) {
-	gas, err := estimate()
-	if err != nil {
-		logger.Warn("refreshGasEstimate: gas re-estimation failed, keeping the previous estimate",
-			zap.String("processor", path.ProcessorName),
-			zap.Uint64("fromChain", path.FromChain.ChainID),
-			zap.Bool("approval", approval),
-			zap.Time("txGasEstimatedAt", path.TxGasEstimatedAt),
-			zap.Time("approvalGasEstimatedAt", path.ApprovalGasEstimatedAt),
-			zap.Error(err))
-		return
+// applyGasRefreshes stores the new estimates in the route they were collected from; a failed one
+// keeps the old estimate and time. A main tx estimate keeps the value it was made for, so a value
+// changed meanwhile makes it stale.
+func applyGasRefreshes(route routes.Route, refreshes []*gasRefresh, now time.Time) {
+	for _, refresh := range refreshes {
+		if refresh.err != nil || refresh.index >= len(route) {
+			continue
+		}
+		path := route[refresh.index]
+		if refresh.approval {
+			path.SuggestedApprovalGasAmount = refresh.gas.limit
+			path.EstimatedApprovalGasAmount = refresh.gas.estimated
+			path.ApprovalGasEstimatedAt = now
+			continue
+		}
+		path.SuggestedTxGasAmount = refresh.gas.limit
+		path.EstimatedTxGasAmount = refresh.gas.estimated
+		path.TxGasEstimatedAt = now
+		path.TxGasEstimatedValue = (*hexutil.Big)(estimationAmountIn(refresh.path))
 	}
-	logger.Debug("refreshGasEstimate: gas re-estimated",
-		zap.String("processor", path.ProcessorName),
-		zap.Uint64("fromChain", path.FromChain.ChainID),
-		zap.Bool("approval", approval),
-		zap.Uint64("estimatedGas", gas.estimated),
-		zap.Uint64("gas", gas.limit))
-	if approval {
-		path.SuggestedApprovalGasAmount = gas.limit
-		path.EstimatedApprovalGasAmount = gas.estimated
-		path.ApprovalGasEstimatedAt = now
-		return
-	}
-	path.SuggestedTxGasAmount = gas.limit
-	path.EstimatedTxGasAmount = gas.estimated
-	path.TxGasEstimatedAt = now
-	path.TxGasEstimatedValue = (*hexutil.Big)(estimationAmountIn(path))
 }
 
 func (r *Router) estimateTxGasForPath(path *routes.Path) (gasEstimate, error) {
