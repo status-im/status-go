@@ -48,17 +48,17 @@
         "nixpkgs": "nixpkgs_2"
       },
       "locked": {
-        "lastModified": 1793950756,
-        "narHash": "sha256-u1sYr1EQKrgBM/qArmAqmzNG5Jg1yQ78YhEIK0Pudcg=",
+        "lastModified": 1794224455,
+        "narHash": "sha256-HeNZ8eaFrwDkX7ac1KiH3S2hNPZgYCGTocw9Qi3wDAE=",
         "ref": "refs/heads/master",
-        "rev": "beed22e6fd6bdfd8abf6f2d083bdd4ed95966256",
-        "revCount": 125,
+        "rev": "8f7fee08f0256c1788089e756182c8be0a621930",
+        "revCount": 116,
         "submodules": true,
         "type": "git",
         "url": "https://github.com/logos-messaging/nim-sds"
       },
       "original": {
-        "rev": "beed22e6fd6bdfd8abf6f2d083bdd4ed95966256",
+        "rev": "8f7fee08f0256c1788089e756182c8be0a621930",
         "submodules": true,
         "type": "git",
         "url": "https://github.com/logos-messaging/nim-sds"
@@ -67,17 +67,17 @@
     "nim-token-lists": {
       "flake": false,
       "locked": {
-        "lastModified": 1793871292,
-        "narHash": "sha256-pl9c6fqUVEpehT+qap73gqbcJRPIi68RXT07MHqnDik=",
+        "lastModified": 1794224197,
+        "narHash": "sha256-0MNS6pemTirK0qeSVM6exnWoM+olVejbdoCHjodyC0I=",
         "ref": "refs/heads/main",
-        "rev": "801a9ec48a0082e7efef546d76f7c842e5a55a35",
-        "revCount": 39,
+        "rev": "4df3308a32b0f3da18ef0d37d26fa9f1195f8b9e",
+        "revCount": 38,
         "submodules": true,
         "type": "git",
         "url": "https://github.com/status-im/nim-token-lists"
       },
       "original": {
-        "rev": "801a9ec48a0082e7efef546d76f7c842e5a55a35",
+        "rev": "4df3308a32b0f3da18ef0d37d26fa9f1195f8b9e",
         "submodules": true,
         "type": "git",
         "url": "https://github.com/status-im/nim-token-lists"
