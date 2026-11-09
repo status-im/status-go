@@ -3046,7 +3046,8 @@ func (r *ReceivedMessageState) addNewMessageNotification(messenger *Messenger, s
 	if err != nil {
 		return err
 	}
-	if !chat.Muted && !threadMuted {
+	isMentionOrReply := msg.Mentioned || (responseTo != nil && responseTo.From == crypto.PubkeyToHex(&publicKey))
+	if !chat.Muted && (!threadMuted || isMentionOrReply) {
 		if showMessageNotification(settings, publicKey, msg, chat, responseTo) {
 			messagePreview := messagePreviewNameAndMessage
 			if settings != nil {
@@ -3135,13 +3136,7 @@ func (r *ReceivedMessageState) addNewActivityCenterNotification(publicKey ecdsa.
 		return fmt.Errorf("chat ID '%s' not present", logutils.TruncateWithDot(message.LocalChatID))
 	}
 
-	threadMuted, err := m.isThreadMuted(message.LocalChatID, message.GetThreadId())
-	if err != nil {
-		return err
-	}
-	if threadMuted {
-		return nil
-	}
+	// Thread muting preserves mentions and replies in the activity center.
 	isNotification, notificationType := showMentionOrReplyActivityCenterNotification(publicKey, message, chat, responseTo)
 	if !isNotification {
 		return nil

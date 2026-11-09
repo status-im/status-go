@@ -1338,7 +1338,7 @@ const threadMetadataSelect = `
 			threads.creator_pending,
 			threads.read_messages_at_clock_value,
 			(SELECT COUNT(1) FROM user_messages WHERE local_chat_id = threads.chat_id AND thread_id = threads.thread_id AND seen = 0 AND NOT(hide) AND NOT(deleted) AND NOT(deleted_for_me)),
-			(SELECT COUNT(1) FROM user_messages WHERE local_chat_id = threads.chat_id AND thread_id = threads.thread_id AND seen = 0 AND NOT(hide) AND NOT(deleted) AND NOT(deleted_for_me) AND (mentioned OR replied OR chats.type = ?))
+			(SELECT COUNT(1) FROM user_messages WHERE local_chat_id = threads.chat_id AND thread_id = threads.thread_id AND seen = 0 AND NOT(hide) AND NOT(deleted) AND NOT(deleted_for_me) AND (mentioned OR replied OR (chats.type = ? AND NOT(threads.muted))))
 		FROM threads
 		LEFT JOIN chats ON chats.id = threads.chat_id
 		`
@@ -1467,7 +1467,7 @@ func (db sqlitePersistence) ThreadsByChatID(chatID string) ([]*Thread, error) {
 			t.muted_till,
 			t.read_messages_at_clock_value,
 			COUNT(CASE WHEN um.seen = 0 AND NOT(um.hide) AND NOT(um.deleted) AND NOT(um.deleted_for_me) THEN 1 END),
-			COUNT(CASE WHEN um.seen = 0 AND NOT(um.hide) AND NOT(um.deleted) AND NOT(um.deleted_for_me) AND (um.mentioned OR um.replied OR chats.type = ?) THEN 1 END)
+			COUNT(CASE WHEN um.seen = 0 AND NOT(um.hide) AND NOT(um.deleted) AND NOT(um.deleted_for_me) AND (um.mentioned OR um.replied OR (chats.type = ? AND NOT(t.muted))) THEN 1 END)
 		FROM threads t
 		LEFT JOIN user_messages parent
 			ON parent.id = t.parent_message_id
@@ -1612,7 +1612,7 @@ func (db sqlitePersistence) threadsByParentMessageIDs(queryer threadSummaryQueri
 			threads.muted,
 			threads.muted_till,
 			(SELECT COUNT(1) FROM user_messages WHERE local_chat_id = threads.chat_id AND thread_id = threads.thread_id AND seen = 0 AND NOT(hide) AND NOT(deleted) AND NOT(deleted_for_me)),
-			(SELECT COUNT(1) FROM user_messages WHERE local_chat_id = threads.chat_id AND thread_id = threads.thread_id AND seen = 0 AND NOT(hide) AND NOT(deleted) AND NOT(deleted_for_me) AND (mentioned OR replied OR chats.type = ?))
+			(SELECT COUNT(1) FROM user_messages WHERE local_chat_id = threads.chat_id AND thread_id = threads.thread_id AND seen = 0 AND NOT(hide) AND NOT(deleted) AND NOT(deleted_for_me) AND (mentioned OR replied OR (chats.type = ? AND NOT(threads.muted))))
 		FROM threads
 		LEFT JOIN chats ON chats.id = threads.chat_id
 		WHERE threads.chat_id = ? AND threads.parent_message_id IN (%s)`, strings.Repeat(",?", len(parentMessageIDs))[1:])

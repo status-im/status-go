@@ -3,6 +3,7 @@ package protocol
 import (
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -57,6 +58,24 @@ func TestThreadSummaryUnreadCounts(t *testing.T) {
 				require.NoError(t, err)
 				require.Equal(t, reference.UnviewedMessagesCount, thread.UnviewedMessagesCount)
 				require.Equal(t, reference.UnviewedMentionsCount, thread.UnviewedMentionsCount)
+				// Muted threads count only explicit mentions and replies, including in 1:1 chats.
+				require.NoError(t, p.MuteThread(testPK, thread.ThreadID, time.Time{}))
+				muted, err := p.ThreadByID(testPK, thread.ThreadID)
+				require.NoError(t, err)
+				require.Equal(t, uint(2), muted.UnviewedMentionsCount)
+				listed, err := p.ThreadsByChatID(testPK)
+				require.NoError(t, err)
+				for _, entry := range listed {
+					if entry.ThreadID == thread.ThreadID {
+						require.Equal(t, uint(2), entry.UnviewedMentionsCount)
+					}
+				}
+				cached, err := p.ThreadsWithSummariesByParentMessageIDs(testPK, []string{thread.ParentMessageID}, 0)
+				require.NoError(t, err)
+				require.Len(t, cached, 1)
+				require.Equal(t, uint(2), cached[0].UnviewedMentionsCount)
+				require.NoError(t, p.UnmuteThread(testPK, thread.ThreadID))
+
 			}
 		})
 	}
