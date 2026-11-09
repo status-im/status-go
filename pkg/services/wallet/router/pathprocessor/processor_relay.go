@@ -417,7 +417,7 @@ func (s *RelayProcessor) GasBeforeApproval(params ProcessorInputParams) (uint64,
 		zap.Uint64("gasLimit", gas),
 		zap.String("source", source))
 	// a stand-in, so already buffered
-	return uint64(float64(gas) * s.GasBufferFactor(params)), true
+	return BufferGasEstimate(gas, s.GasBufferFactor(params)), true
 }
 
 func (s *RelayProcessor) fetchAndStoreQuoteFromSendTxArgs(sendArgs *wallettypes.SendTxArgs) (*relay.Quote, error) {
