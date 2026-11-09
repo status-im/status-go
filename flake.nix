@@ -35,9 +35,13 @@
     nim-sds.url = "git+https://github.com/logos-messaging/nim-sds?submodules=1&rev=fc932e5785cdd6913b7e792adbad8ad6bf24289a";
     # nimble 0.20.1 in the nixpkgs above cannot resolve nim-sds through the bindings.
     nixpkgs-nimble.url = "github:NixOS/nixpkgs/34ab99075ac4f7e40cf037eef32cb1c360bb85e9";
+    logos-delivery = {
+      url = "git+https://github.com/logos-messaging/logos-delivery?submodules=1&rev=08c2992c30d3522775858b5117d3b1a96d3cc24f";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
-  outputs = { self, nixpkgs, logos-storage-nim, nim-sds, nim-token-lists, nixpkgs-nimble }:
+  outputs = { self, nixpkgs, logos-storage-nim, nim-sds, nim-token-lists, nixpkgs-nimble, logos-delivery }:
   let
     stableSystems = [
       "x86_64-linux" "aarch64-linux"
@@ -74,6 +78,18 @@
                 fetchSubmodules = true;
               };
             });
+            # No libpq dlopen, and no bundled librln.so shadowing go-waku's rln.
+            liblogosdelivery = let
+              full = logos-delivery.packages.${system}.liblogosdelivery.override {
+                enablePostgres = false;
+              };
+            in final.runCommand full.name {
+              propagatedBuildInputs = full.propagatedBuildInputs;
+            } ''
+              mkdir -p $out/lib
+              ln -s ${full}/include $out/include
+              ln -s ${full}/lib/liblogosdelivery.* $out/lib/
+            '';
           })
         ];
       }
