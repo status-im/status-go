@@ -187,13 +187,13 @@ func (r *Router) GetBestRouteAndAssociatedInputParams() (routes.Route, requests.
 	return r.bestRouteAndAssociatedInputParams()
 }
 
-// GetBestRouteForBuild re-estimates stale gas and returns a copy of the active route, under one lock.
+// GetBestRouteForBuild re-estimates stale gas and returns a copy of the active route.
 func (r *Router) GetBestRouteForBuild(approvalPlaced func(processorName string) bool, now time.Time) (routes.Route, requests.RouteInputParams) {
+	r.refreshActiveRouteGas(now, func(route routes.Route) []*gasRefresh {
+		return staleGasRefreshes(route, approvalPlaced, now, r.txGasEstimator, r.approvalGasEstimator)
+	})
 	r.activeRoutesMutex.Lock()
 	defer r.activeRoutesMutex.Unlock()
-	if r.activeRoutes != nil {
-		refreshStaleGasEstimates(r.activeRoutes.Route, approvalPlaced, now, r.txGasEstimator, r.approvalGasEstimator, r.logger)
-	}
 	return r.bestRouteAndAssociatedInputParams()
 }
 

@@ -11,6 +11,7 @@ import (
 	"github.com/status-im/status-go/internal/panics"
 	"github.com/status-im/status-go/internal/rpc/chain/ethclient"
 	walletCommon "github.com/status-im/status-go/pkg/services/wallet/common"
+	"github.com/status-im/status-go/pkg/services/wallet/router/routes"
 )
 
 var (
@@ -173,12 +174,16 @@ func (r *Router) subscribeForUdates(chainID uint64, address common.Address) erro
 						continue
 					}
 
+					now := time.Now()
+					r.refreshActiveRouteGas(now, func(route routes.Route) []*gasRefresh {
+						return dueGasRefreshes(route, chainID, now, r.txGasEstimator, r.approvalGasEstimator)
+					})
+
 					r.activeRoutesMutex.Lock()
 					if r.activeRoutes != nil && r.activeRoutes.Route != nil && len(r.activeRoutes.Route) > 0 {
 						r.logger.Debug("subscribeForUdates: re-evaluating active route paths",
 							zap.Uint64("chainId", chainID),
 							zap.Int("paths", len(r.activeRoutes.Route)))
-						r.refreshGasEstimates(chainID, r.activeRoutes.Route, time.Now())
 
 						usedNonces := make(map[uint64]uint64)
 						for _, path := range r.activeRoutes.Route {

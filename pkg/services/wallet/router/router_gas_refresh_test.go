@@ -37,9 +37,22 @@ func (e *gasEstimator) estimate() (gasEstimate, error) {
 	return gasEstimate{estimated: e.raw, limit: e.gas}, e.err
 }
 
-func TestRefreshPathGasEstimates(t *testing.T) {
-	logger := logutils.ZapLogger().Named("router-test")
+func estimatorOf(e *gasEstimator) gasEstimatorFactory {
+	return func(*routes.Path) gasEstimatorFunc { return e.estimate }
+}
+
+// refreshNow runs and applies the refreshes collected from route, as refreshActiveRouteGas does.
+func refreshNow(route routes.Route, refreshes []*gasRefresh, now time.Time) {
+	runGasRefreshes(refreshes, logutils.ZapLogger().Named("router-test"))
+	applyGasRefreshes(route, refreshes, now)
+}
+
+func TestDueGasRefreshes(t *testing.T) {
 	now := time.Unix(1_000_000, 0)
+	refresh := func(path *routes.Path, tx, approval *gasEstimator) {
+		route := routes.Route{path}
+		refreshNow(route, dueGasRefreshes(route, 1, now, estimatorOf(tx), estimatorOf(approval)), now)
+	}
 	due := now.Add(-routes.GasReestimateInterval)
 	recent := now.Add(-time.Second)
 
@@ -60,7 +73,7 @@ func TestRefreshPathGasEstimates(t *testing.T) {
 	t.Run("successful re-estimate updates the suggestion and its timestamp only", func(t *testing.T) {
 		path := newPath(false, due, time.Time{})
 		tx, approval := &gasEstimator{gas: 217760, raw: 207391}, &gasEstimator{}
-		refreshPathGasEstimates(path, now, tx.estimate, approval.estimate, logger)
+		refresh(path, tx, approval)
 
 		require.Equal(t, 1, tx.calls)
 		require.Equal(t, 0, approval.calls)
@@ -74,7 +87,7 @@ func TestRefreshPathGasEstimates(t *testing.T) {
 	t.Run("not due yet: no estimate call", func(t *testing.T) {
 		path := newPath(false, recent, time.Time{})
 		tx := &gasEstimator{gas: 217760}
-		refreshPathGasEstimates(path, now, tx.estimate, (&gasEstimator{}).estimate, logger)
+		refresh(path, tx, &gasEstimator{})
 
 		require.Equal(t, 0, tx.calls)
 		require.Equal(t, uint64(22050), path.SuggestedTxGasAmount)
@@ -84,7 +97,7 @@ func TestRefreshPathGasEstimates(t *testing.T) {
 	t.Run("failed re-estimate keeps the previous estimate and its timestamp", func(t *testing.T) {
 		path := newPath(false, due, time.Time{})
 		tx := &gasEstimator{err: errors.New("execution reverted")}
-		refreshPathGasEstimates(path, now, tx.estimate, (&gasEstimator{}).estimate, logger)
+		refresh(path, tx, &gasEstimator{})
 
 		require.Equal(t, 1, tx.calls)
 		require.Equal(t, uint64(22050), path.SuggestedTxGasAmount)
@@ -94,7 +107,7 @@ func TestRefreshPathGasEstimates(t *testing.T) {
 	t.Run("approval-pending path re-estimates the approval, never the main tx", func(t *testing.T) {
 		path := newPath(true, time.Time{}, due)
 		tx, approval := &gasEstimator{gas: 999999}, &gasEstimator{gas: 150213, raw: 143060}
-		refreshPathGasEstimates(path, now, tx.estimate, approval.estimate, logger)
+		refresh(path, tx, approval)
 
 		require.Equal(t, 0, tx.calls)
 		require.Equal(t, 1, approval.calls)
@@ -108,7 +121,7 @@ func TestRefreshPathGasEstimates(t *testing.T) {
 	t.Run("failed approval re-estimate keeps the previous estimate", func(t *testing.T) {
 		path := newPath(true, time.Time{}, due)
 		approval := &gasEstimator{err: errors.New("rpc down")}
-		refreshPathGasEstimates(path, now, (&gasEstimator{}).estimate, approval.estimate, logger)
+		refresh(path, &gasEstimator{}, approval)
 
 		require.Equal(t, uint64(48300), path.SuggestedApprovalGasAmount)
 		require.Equal(t, due, path.ApprovalGasEstimatedAt)
@@ -192,8 +205,7 @@ func TestFullBalanceSendSubtractsFeesOnce(t *testing.T) {
 	require.Equal(t, big.NewInt(balance-21_000), path.AmountIn.ToInt())
 }
 
-func TestRefreshStaleGasEstimates(t *testing.T) {
-	logger := logutils.ZapLogger().Named("router-test")
+func TestStaleGasRefreshes(t *testing.T) {
 	now := time.Unix(1_000_000, 0)
 	stale := now.Add(-routes.GasEstimateMaxAge - time.Second)
 	fresh := now.Add(-time.Second)
@@ -218,10 +230,7 @@ func TestRefreshStaleGasEstimates(t *testing.T) {
 
 	type estimators struct{ tx, approval *gasEstimator }
 	run := func(route routes.Route, placed func(string) bool, e estimators) {
-		refreshStaleGasEstimates(route, placed, now,
-			func(*routes.Path) gasEstimatorFunc { return e.tx.estimate },
-			func(*routes.Path) gasEstimatorFunc { return e.approval.estimate },
-			logger)
+		refreshNow(route, staleGasRefreshes(route, placed, now, estimatorOf(e.tx), estimatorOf(e.approval)), now)
 	}
 
 	t.Run("swap signed a while after its approval was mined: the main tx is re-estimated", func(t *testing.T) {
@@ -345,4 +354,71 @@ func TestGetBestRouteForBuildCarriesRefreshedEstimates(t *testing.T) {
 		require.Equal(t, uint64(160000), route[0].EstimatedTxGasAmount)
 		require.Less(t, route[0].TxGasAmount, route[0].EstimatedTxGasAmount, "the build refuses it with WT-006")
 	})
+}
+
+// Gas is estimated without activeRoutesMutex, and its result is dropped if the route was replaced.
+func TestRefreshActiveRouteGasRunsWithoutTheLock(t *testing.T) {
+	now := time.Now()
+	stale := now.Add(-routes.GasEstimateMaxAge - time.Second)
+
+	ctrl := gomock.NewController(t)
+	processor := mockpathprocessor.NewMockPathProcessor(ctrl)
+	newPath := func(uuid string) *routes.Path {
+		return &routes.Path{
+			RouterInputParamsUuid: uuid,
+			ProcessorName:         "Paraswap",
+			FromChain:             &params.Network{ChainID: 1},
+			ToChain:               &params.Network{ChainID: 1},
+			TxPackedData:          []byte{0xab},
+			EstimatedTxGasAmount:  150000,
+			TxGasAmount:           157500,
+			TxGasEstimatedAt:      stale,
+		}
+	}
+	old, replacement := newPath("uuid"), newPath("new")
+	r := &Router{
+		logger:          logutils.ZapLogger().Named("router-test"),
+		pathProcessors:  map[string]pathprocessor.PathProcessor{"Paraswap": processor},
+		activeRoutes:    &SuggestedRoutes{Uuid: "uuid", Route: routes.Route{old}},
+		lastInputParams: &requests.RouteInputParams{Uuid: "uuid", AmountIn: bigHex(1000)},
+	}
+	// a new route arrives while the estimate is in flight; with the lock held this would deadlock
+	processor.EXPECT().EstimateGas(gomock.Any(), []byte{0xab}).DoAndReturn(
+		func(pathprocessor.ProcessorInputParams, []byte) (uint64, error) {
+			r.activeRoutesMutex.Lock()
+			r.activeRoutes = &SuggestedRoutes{Uuid: "new", Route: routes.Route{replacement}}
+			r.activeRoutesMutex.Unlock()
+			return 160000, nil
+		}).Times(1)
+
+	r.refreshActiveRouteGas(now, func(route routes.Route) []*gasRefresh {
+		return staleGasRefreshes(route, func(string) bool { return true }, now, r.txGasEstimator, r.approvalGasEstimator)
+	})
+
+	require.Equal(t, uint64(150000), old.EstimatedTxGasAmount, "the estimate ran on a copy")
+	require.Equal(t, uint64(150000), replacement.EstimatedTxGasAmount, "the replacement keeps its own estimate")
+	require.Equal(t, stale, replacement.TxGasEstimatedAt)
+}
+
+// An estimate keeps the value it was made for: a value changed meanwhile leaves it stale.
+func TestApplyGasRefreshesKeepsTheEstimatedValue(t *testing.T) {
+	now := time.Unix(1_000_000, 0)
+	path := &routes.Path{
+		ProcessorName: "Transfer",
+		FromChain:     &params.Network{ChainID: 1},
+		AmountIn:      bigHex(974_800),
+	}
+	route := routes.Route{path}
+	refreshes := staleGasRefreshes(route, func(string) bool { return false }, now,
+		estimatorOf(&gasEstimator{gas: 22050, raw: 21000}), estimatorOf(&gasEstimator{}))
+	require.Len(t, refreshes, 1)
+
+	runGasRefreshes(refreshes, logutils.ZapLogger().Named("router-test"))
+	// e.g. a send-all rebuilt for higher fees while the estimate ran
+	path.AmountIn = bigHex(924_400)
+	applyGasRefreshes(route, refreshes, now)
+
+	require.Equal(t, uint64(21000), path.EstimatedTxGasAmount)
+	require.Equal(t, big.NewInt(974_800), path.TxGasEstimatedValue.ToInt())
+	require.False(t, path.GasEstimateFresh(false, now), "re-estimated for the new value")
 }
