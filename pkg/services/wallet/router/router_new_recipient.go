@@ -2,6 +2,7 @@ package router
 
 import (
 	"context"
+	"math/big"
 	"sync"
 	"time"
 
@@ -14,6 +15,7 @@ import (
 	"github.com/status-im/status-go/internal/panics"
 	"github.com/status-im/status-go/pkg/services/wallet/router/pathprocessor"
 	pathprocessorcommon "github.com/status-im/status-go/pkg/services/wallet/router/pathprocessor/common"
+	tokentypes "github.com/status-im/status-go/pkg/services/wallet/token/types"
 )
 
 // newRecipientCheckApplies tells whether the path is a plain transfer to another address.
@@ -86,7 +88,9 @@ func (r *Router) recipientIsNew(ctx context.Context, params pathprocessor.Proces
 	if isNew, ok := r.newRecipients.get(key, time.Now()); ok {
 		return isNew, nil
 	}
-	isNew, err := r.fetchRecipientIsNew(ctx, params)
+	isNew, err := fetchRecipientIsNew(ctx, params, r.getBalance, func(chainID uint64) (batchCaller, error) {
+		return r.rpcClient.EthClient(chainID)
+	})
 	if err != nil {
 		return false, err
 	}
@@ -94,9 +98,16 @@ func (r *Router) recipientIsNew(ctx context.Context, params pathprocessor.Proces
 	return isNew, nil
 }
 
-func (r *Router) fetchRecipientIsNew(ctx context.Context, params pathprocessor.ProcessorInputParams) (bool, error) {
+type batchCaller interface {
+	BatchCallContext(ctx context.Context, b []gethrpc.BatchElem) error
+}
+
+type balanceGetter func(ctx context.Context, chainID uint64, token *tokentypes.Token, account common.Address) (*big.Int, error)
+
+func fetchRecipientIsNew(ctx context.Context, params pathprocessor.ProcessorInputParams, getBalance balanceGetter,
+	ethClientFor func(chainID uint64) (batchCaller, error)) (bool, error) {
 	chainID := params.FromChain.ChainID
-	balance, err := r.getBalance(ctx, chainID, params.FromToken, params.ToAddr)
+	balance, err := getBalance(ctx, chainID, params.FromToken, params.ToAddr)
 	if err != nil {
 		return false, err
 	}
@@ -107,7 +118,7 @@ func (r *Router) fetchRecipientIsNew(ctx context.Context, params pathprocessor.P
 		return true, nil
 	}
 
-	ethClient, err := r.rpcClient.EthClient(chainID)
+	ethClient, err := ethClientFor(chainID)
 	if err != nil {
 		return false, err
 	}
