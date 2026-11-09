@@ -455,7 +455,7 @@ require (
 	github.com/spf13/viper v1.21.0 // indirect
 	github.com/ssgreg/nlreturn/v2 v2.2.1 // indirect
 	github.com/status-im/goroutine-defer-guard v0.3.1 // indirect
-	github.com/status-im/nim-token-lists/go/tkl v0.0.0-20261105093452-801a9ec48a00
+	github.com/status-im/nim-token-lists/go/tkl v0.0.0-20261109113637-4df3308a32b0
 	github.com/stbenjam/no-sprintf-host-port v0.3.1 // indirect
 	github.com/stretchr/objx v0.5.3 // indirect
 	github.com/subosito/gotenv v1.6.0 // indirect
