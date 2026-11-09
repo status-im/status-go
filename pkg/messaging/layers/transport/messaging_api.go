@@ -44,5 +44,14 @@ type MessagingAPI interface {
 	Unsubscribe(ctx context.Context, pubsubTopic string, contentTopics []types.TopicType) error
 }
 
+// ContentTopicOnly is implemented by a MessagingAPI that subscribes and
+// delivers by content topic alone. The transport then counts wire
+// subscriptions per content topic, passes no pubsub topic to Subscribe and
+// Unsubscribe, and routes received messages that carry no pubsub topic to the
+// filters on any of them.
+type ContentTopicOnly interface {
+	ContentTopicOnly()
+}
+
 // Compile-time assertion: the waku adapter satisfies MessagingAPI.
 var _ MessagingAPI = (*waku.Waku)(nil)
