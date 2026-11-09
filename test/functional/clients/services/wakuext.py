@@ -712,6 +712,13 @@ class WakuextService(Service):
         response = self.rpc_request("muteChatV2", params)
         return response
 
+    def mute_thread(self, chat_id: str, thread_id: str, muted_type: int):
+        params = [{"ChatId": chat_id, "threadId": thread_id, "MutedType": muted_type}]
+        return self.rpc_request("muteChatV2", params)
+
+    def unmute_thread(self, chat_id: str, thread_id: str):
+        return self.rpc_request("unmuteThread", [chat_id, thread_id])
+
     def unmute_chat(self, chat_id: str):
         params = [chat_id]
         response = self.rpc_request("unmuteChat", params)

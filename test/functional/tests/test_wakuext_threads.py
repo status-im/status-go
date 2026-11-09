@@ -6,6 +6,7 @@ import pytest
 from clients.api import ApiResponseError
 from clients.services.wakuext import ActivityCenterNotificationType
 from clients.signals import SignalType
+from resources.enums import MuteType
 from steps import async_messenger
 from waku_params import parametrize_waku_light_client, parametrize_waku_light_client_non_lc
 
@@ -55,10 +56,42 @@ def _thread(response: dict, thread_id: str) -> dict:
 
 
 def _notification_by_message_id(response: dict, message_id: str) -> dict:
+    found = _find_notification(response, message_id)
+    if found is None:
+        raise AssertionError(f"notification for message {message_id} not found in {response}")
+    return found
+
+
+def _find_notification(response: dict, message_id: str) -> dict | None:
     for notification in (response or {}).get("notifications") or []:
         if (notification.get("message") or {}).get("id") == message_id:
             return notification
-    raise AssertionError(f"notification for message {message_id} not found in {response}")
+    return None
+
+
+def _mention(public_key: str) -> str:
+    return f"Hello @{public_key} {uuid4()}"
+
+
+def _activity_notifications(backend, activity_type: ActivityCenterNotificationType) -> dict:
+    return backend.wakuext_service.get_activity_center_notifications(activity_types=[activity_type])
+
+
+def _mention_ac(backend, message_id: str) -> dict:
+    return _notification_by_message_id(
+        _activity_notifications(backend, ActivityCenterNotificationType.NOTIFICATION_TYPE_MENTION),
+        message_id,
+    )
+
+
+async def _post_thread_mention(sender, receiver, chat_id: str, parent_id: str, receiver_pubkey: str) -> tuple[str, str]:
+    text = _mention(receiver_pubkey)
+    message_id = _message_by_text(
+        sender.wakuext_service.send_chat_message(chat_id, text, thread_id=parent_id),
+        text,
+    )["id"]
+    await receiver.wait_for_signal(SignalType.MESSAGES_NEW, pattern=message_id, timeout=60, check_buffer=True)
+    return text, message_id
 
 
 @pytest.mark.rpc
@@ -357,20 +390,13 @@ class TestWakuextThreadActivityCenter:
         reply_id = _message_by_text(reply_response, reply_text)["id"]
         await receiver.wait_for_signal(SignalType.MESSAGES_NEW, pattern=reply_id, timeout=60, check_buffer=True)
 
-        mention = _notification_by_message_id(
-            receiver.wakuext_service.get_activity_center_notifications(
-                activity_types=[ActivityCenterNotificationType.NOTIFICATION_TYPE_MENTION],
-            ),
-            mention_id,
-        )
+        mention = _mention_ac(receiver, mention_id)
         assert mention["type"] == ActivityCenterNotificationType.NOTIFICATION_TYPE_MENTION.value
         assert mention["message"]["threadId"] == parent_id
         assert mention["threadName"] == expected_name
 
         reply = _notification_by_message_id(
-            receiver.wakuext_service.get_activity_center_notifications(
-                activity_types=[ActivityCenterNotificationType.NOTIFICATION_TYPE_REPLY],
-            ),
+            _activity_notifications(receiver, ActivityCenterNotificationType.NOTIFICATION_TYPE_REPLY),
             reply_id,
         )
         assert reply["type"] == ActivityCenterNotificationType.NOTIFICATION_TYPE_REPLY.value
@@ -379,10 +405,70 @@ class TestWakuextThreadActivityCenter:
 
         sender.wakuext_service.edit_thread(sender_chat_id, parent_id, renamed)
         await receiver.wait_for_signal(SignalType.MESSAGES_NEW, pattern=renamed, timeout=60, check_buffer=True)
-        renamed_mention = _notification_by_message_id(
-            receiver.wakuext_service.get_activity_center_notifications(
-                activity_types=[ActivityCenterNotificationType.NOTIFICATION_TYPE_MENTION],
-            ),
-            mention_id,
+        assert _mention_ac(receiver, mention_id)["threadName"] == renamed
+
+
+@pytest.mark.rpc
+@pytest.mark.asyncio
+@parametrize_waku_light_client_non_lc
+class TestWakuextThreadMute:
+
+    @pytest.fixture
+    async def sender(self, async_backend_new_profile, waku_light_client):
+        return await async_backend_new_profile("sender", waku_light_client=waku_light_client)
+
+    @pytest.fixture
+    async def receiver(self, async_backend_new_profile, waku_light_client):
+        return await async_backend_new_profile("receiver", waku_light_client=waku_light_client)
+
+    async def test_muted_thread_skips_notifications_until_unmuted(self, sender, receiver):
+        sender_chat_id, receiver_chat_id, _ = await _open_shared_chat(sender, receiver, ChatKind.PRIVATE_GROUP)
+        parent_text = f"parent-{uuid4()}"
+        parent_response = receiver.wakuext_service.send_chat_message(receiver_chat_id, parent_text)
+        parent_id = _message_by_text(parent_response, parent_text)["id"]
+        await sender.wait_for_signal(SignalType.MESSAGES_NEW, pattern=parent_id, timeout=60, check_buffer=True)
+
+        sender.wakuext_service.create_thread(sender_chat_id, parent_id)
+        _, audible_id = await _post_thread_mention(sender, receiver, sender_chat_id, parent_id, receiver.public_key)
+        assert _mention_ac(receiver, audible_id)["message"]["threadId"] == parent_id
+
+        assert (
+            receiver.wakuext_service.mute_thread(
+                receiver_chat_id,
+                parent_id,
+                MuteType.MUTE_TILL_UNMUTED.value,
+            )
+            == "0001-01-01T00:00:00Z"
         )
-        assert renamed_mention["threadName"] == renamed
+        muted_thread = _thread(receiver.wakuext_service.chat_threads(receiver_chat_id), parent_id)
+        assert muted_thread["muted"] is True
+        assert receiver.wakuext_service.chat(receiver_chat_id).get("muted", False) is False
+        unread_before_muted_reply = muted_thread["unviewedMessagesCount"]
+
+        silenced_text, silenced_id = await _post_thread_mention(
+            sender,
+            receiver,
+            sender_chat_id,
+            parent_id,
+            receiver.public_key,
+        )
+        assert silenced_text in _texts(
+            receiver.wakuext_service.chat_messages_in_thread(receiver_chat_id, parent_id, limit=20),
+        )
+        assert _thread(receiver.wakuext_service.chat_threads(receiver_chat_id), parent_id)["unviewedMessagesCount"] == (unread_before_muted_reply + 1)
+        assert receiver.wakuext_service.chat(receiver_chat_id).get("unviewedMessagesCount") == 0
+        assert _find_notification(receiver.wakuext_service.get_activity_center_notifications(), silenced_id) is None
+
+        channel_text = _mention(receiver.public_key)
+        channel_id = _message_by_text(
+            sender.wakuext_service.send_chat_message(sender_chat_id, channel_text),
+            channel_text,
+        )["id"]
+        await receiver.wait_for_signal(SignalType.MESSAGES_NEW, pattern=channel_id, timeout=60, check_buffer=True)
+        assert not _mention_ac(receiver, channel_id)["message"].get("threadId")
+
+        receiver.wakuext_service.unmute_thread(receiver_chat_id, parent_id)
+        assert _thread(receiver.wakuext_service.chat_threads(receiver_chat_id), parent_id)["muted"] is False
+
+        _, restored_id = await _post_thread_mention(sender, receiver, sender_chat_id, parent_id, receiver.public_key)
+        assert _mention_ac(receiver, restored_id)["message"]["threadId"] == parent_id
