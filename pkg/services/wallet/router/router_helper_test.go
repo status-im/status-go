@@ -11,6 +11,7 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/ethereum/go-ethereum"
+	"github.com/ethereum/go-ethereum/common"
 
 	mock_client "github.com/status-im/status-go/internal/rpc/chain/mock/client"
 	walletCommon "github.com/status-im/status-go/pkg/services/wallet/common"
@@ -76,6 +77,27 @@ func (s *CalculateFeesTestSuite) TestCalculateApprovalL1Fee_ZeroFeeOnContractCal
 	// Assertions
 	require.NotNil(s.T(), err)
 	require.Nil(s.T(), fee)
+}
+
+func (s *CalculateFeesTestSuite) TestCalculateL1Fee_CallsTheOracleOfTheChain() {
+	cases := map[uint64]common.Address{
+		walletCommon.UnichainMainnet: common.HexToAddress("0x420000000000000000000000000000000000000F"),
+		walletCommon.ScrollMainnet:   common.HexToAddress("0x5300000000000000000000000000000000000002"),
+	}
+	for chainID, oracle := range cases {
+		expectedFee := big.NewInt(int64(chainID))
+		s.ethClient.EXPECT().
+			CallContract(gomock.Any(), gomock.Any(), gomock.Nil()).
+			DoAndReturn(func(ctx context.Context, call ethereum.CallMsg, blockNumber *big.Int) ([]byte, error) {
+				require.Equal(s.T(), oracle, *call.To)
+				return expectedFee.FillBytes(make([]byte, 32)), nil
+			})
+
+		fee, err := router.CalculateL1Fee(chainID, []byte("0x123456"), s.ethClient)
+
+		require.NoError(s.T(), err)
+		require.Equal(s.T(), expectedFee, fee)
+	}
 }
 
 func TestCalculateFeesTestSuite(t *testing.T) {

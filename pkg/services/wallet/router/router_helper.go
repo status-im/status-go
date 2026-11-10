@@ -134,6 +134,17 @@ func bufferApprovalGas(estimation uint64) uint64 {
 	return pathprocessor.BufferGasEstimate(estimation, pathProcessorCommon.IncreaseEstimatedGasFactor)
 }
 
+// lastRecipient returns the recipient of the route being calculated.
+func (r *Router) lastRecipient() common.Address {
+	r.lastInputParamsMutex.Lock()
+	defer r.lastInputParamsMutex.Unlock()
+
+	if r.lastInputParams == nil {
+		return common.Address{}
+	}
+	return r.lastInputParams.AddrTo
+}
+
 func (r *Router) calculateL1Fee(chainID uint64, data []byte) (*big.Int, error) {
 	ethClient, err := r.rpcClient.EthClient(chainID)
 	if err != nil {
@@ -554,29 +565,6 @@ func (r *Router) evaluateAndUpdatePathDetails(ctx context.Context, path *routes.
 
 	r.updatePathFields(path, fetchedFees, noBaseFee, noPriorityFee)
 
-	l1TxFeeWei := big.NewInt(0)
-	l1ApprovalFeeWei := big.NewInt(0)
-
-	needL1Fee := path.FromChain.ChainID == walletCommon.OptimismMainnet ||
-		path.FromChain.ChainID == walletCommon.OptimismSepolia ||
-		path.FromChain.ChainID == walletCommon.BaseMainnet ||
-		path.FromChain.ChainID == walletCommon.BaseSepolia
-
-	if path.ApprovalRequired && needL1Fee {
-		l1ApprovalFeeWei, err = r.calculateL1Fee(path.FromChain.ChainID, path.ApprovalPackedData)
-		if err != nil {
-			r.logger.Error("evaluateAndUpdatePathDetails: calculateL1Fee for approval failed",
-				zap.String("processor", path.ProcessorName),
-				zap.Uint64("fromChain", path.FromChain.ChainID),
-				zap.Error(err))
-			return err
-		}
-		r.logger.Debug("evaluateAndUpdatePathDetails: approval L1 fee calculated",
-			zap.String("processor", path.ProcessorName),
-			zap.Uint64("fromChain", path.FromChain.ChainID),
-			zap.Stringer("l1ApprovalFeeWei", l1ApprovalFeeWei))
-	}
-
 	err = r.applyCustomFields(ctx, path, fetchedFees, usedNonces)
 	if err != nil {
 		r.logger.Error("evaluateAndUpdatePathDetails: applyCustomFields failed",
@@ -586,20 +574,20 @@ func (r *Router) evaluateAndUpdatePathDetails(ctx context.Context, path *routes.
 		return
 	}
 
-	if needL1Fee {
-		l1TxFeeWei, err = r.calculateL1Fee(path.FromChain.ChainID, path.TxPackedData)
-		if err != nil {
-			r.logger.Error("evaluateAndUpdatePathDetails: calculateL1Fee for tx failed",
-				zap.String("processor", path.ProcessorName),
-				zap.Uint64("fromChain", path.FromChain.ChainID),
-				zap.Error(err))
-			return err
-		}
-		r.logger.Debug("evaluateAndUpdatePathDetails: tx L1 fee calculated",
+	// the nonces and the fees set above are part of what the L1 fee oracle prices
+	l1TxFeeWei, l1ApprovalFeeWei, err := pathL1Fees(path, r.lastRecipient(), r.calculateL1Fee)
+	if err != nil {
+		r.logger.Error("evaluateAndUpdatePathDetails: pathL1Fees failed",
 			zap.String("processor", path.ProcessorName),
 			zap.Uint64("fromChain", path.FromChain.ChainID),
-			zap.Stringer("l1TxFeeWei", l1TxFeeWei))
+			zap.Error(err))
+		return err
 	}
+	r.logger.Debug("evaluateAndUpdatePathDetails: L1 fees calculated",
+		zap.String("processor", path.ProcessorName),
+		zap.Uint64("fromChain", path.FromChain.ChainID),
+		zap.Stringer("l1TxFeeWei", l1TxFeeWei),
+		zap.Stringer("l1ApprovalFeeWei", l1ApprovalFeeWei))
 
 	// calculate ETH fees
 	ethTotalFees := big.NewInt(0)
