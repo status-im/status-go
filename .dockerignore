@@ -8,3 +8,5 @@ wnode-data
 _assets/ci
 Dockerfile
 **/*.test
+nimble.paths
+nimbledeps
