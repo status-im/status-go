@@ -557,10 +557,7 @@ func (r *Router) evaluateAndUpdatePathDetails(ctx context.Context, path *routes.
 	l1TxFeeWei := big.NewInt(0)
 	l1ApprovalFeeWei := big.NewInt(0)
 
-	needL1Fee := path.FromChain.ChainID == walletCommon.OptimismMainnet ||
-		path.FromChain.ChainID == walletCommon.OptimismSepolia ||
-		path.FromChain.ChainID == walletCommon.BaseMainnet ||
-		path.FromChain.ChainID == walletCommon.BaseSepolia
+	needL1Fee := gaspriceproxy.ChargesL1Fee(path.FromChain.ChainID)
 
 	if path.ApprovalRequired && needL1Fee {
 		l1ApprovalFeeWei, err = r.calculateL1Fee(path.FromChain.ChainID, path.ApprovalPackedData)
