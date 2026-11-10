@@ -20,6 +20,33 @@ import (
 	"github.com/status-im/status-go/internal/protocol/protobuf"
 )
 
+func (db sqlitePersistence) IsSDSMessageProcessed(messageID string) (bool, error) {
+	var processed bool
+	err := db.db.QueryRow(
+		`SELECT EXISTS(SELECT 1 FROM processed_sds_messages WHERE message_id = ?)`,
+		messageID,
+	).Scan(&processed)
+	return processed, err
+}
+
+func (db sqlitePersistence) MarkSDSMessagesProcessed(messageIDs map[string]bool) error {
+	if len(messageIDs) == 0 {
+		return nil
+	}
+	tx, err := db.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+	for id := range messageIDs {
+		if _, err := tx.Exec(`INSERT INTO processed_sds_messages (message_id) VALUES (?)
+			ON CONFLICT(message_id) DO NOTHING`, id); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
 var basicMessagesSelectQuery = `
 SELECT    %s %s
 FROM      user_messages m1
