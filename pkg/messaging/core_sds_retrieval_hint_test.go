@@ -69,6 +69,18 @@ type sdsRetrievalHintPersistenceStub struct {
 	hashes map[string][][]byte
 }
 
+func (*sdsRetrievalHintPersistenceStub) SaveSDSMessageReceived(string, string) error {
+	return nil
+}
+
+func (*sdsRetrievalHintPersistenceStub) IsSDSMessageReceived(string, string) (bool, error) {
+	return false, nil
+}
+
+func (*sdsRetrievalHintPersistenceStub) DeleteExpiredSDSReceivedMessages() error {
+	return nil
+}
+
 func (s *sdsRetrievalHintPersistenceStub) SaveSDSRetrievalHints(channelID, messageID string, hashes [][]byte) error {
 	key := channelID + ":" + messageID
 	s.hashes[key] = append(s.hashes[key], hashes...)

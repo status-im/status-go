@@ -73,6 +73,18 @@ func (*failingSentSDSHintStore) LoadSDSRetrievalHints(string, string) ([][]byte,
 	return nil, nil
 }
 
+func (*failingSentSDSHintStore) SaveSDSMessageReceived(string, string) error {
+	return nil
+}
+
+func (*failingSentSDSHintStore) IsSDSMessageReceived(string, string) (bool, error) {
+	return false, nil
+}
+
+func (*failingSentSDSHintStore) DeleteExpiredSDSReceivedMessages() error {
+	return nil
+}
+
 func TestSendPublicSDSHintSaveFailurePreservesSendCompletion(t *testing.T) {
 	db, err := testutils.SetupTestMemorySQLDB(testutils.NewTestDBInitializer([]*bindata.AssetSource{
 		{Names: transportmigrations.AssetNames(), AssetFunc: transportmigrations.Asset},
@@ -97,7 +109,7 @@ func TestSendPublicSDSHintSaveFailurePreservesSendCompletion(t *testing.T) {
 	t.Cleanup(func() { require.NoError(t, tr.Stop()) })
 	reliabilityLayer, err := reliability.NewReliability(
 		mvdsnode.NewSQLitePersistence(db), identity,
-		func(string, []string, string) error { return nil }, logger,
+		func(string, []reliability.MissingDependency, string) error { return nil }, logger,
 	)
 	require.NoError(t, err)
 	t.Cleanup(reliabilityLayer.Close)

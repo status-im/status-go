@@ -3,8 +3,11 @@ package reliability
 import (
 	"database/sql"
 	"fmt"
+	"time"
 
 	"github.com/waku-org/sds-go-bindings/sds"
+
+	"github.com/status-im/status-go/pkg/messaging/types"
 )
 
 type SQLitePersistence struct {
@@ -153,14 +156,53 @@ func (p *SQLitePersistence) DropChannel(channelID string) error {
 }
 
 type sqliteSDSRetrievalHintPersistence struct {
-	db *sql.DB
+	db  *sql.DB
+	now func() time.Time
 }
 
 var _ SDSRetrievalHintPersistence = (*sqliteSDSRetrievalHintPersistence)(nil)
 
 // NewSQLiteRetrievalHintPersistence creates durable SDS retrieval-hint storage.
 func NewSQLiteRetrievalHintPersistence(db *sql.DB) SDSRetrievalHintPersistence {
-	return &sqliteSDSRetrievalHintPersistence{db: db}
+	return &sqliteSDSRetrievalHintPersistence{db: db, now: time.Now}
+}
+
+func (p *sqliteSDSRetrievalHintPersistence) SaveSDSMessageReceived(channelID, messageID string) error {
+	if channelID == "" || messageID == "" {
+		return fmt.Errorf("save received SDS message: empty channel or message ID")
+	}
+	_, err := p.db.Exec(
+		`INSERT OR IGNORE INTO sds_received_messages (channel_id, message_id, received_at) VALUES (?, ?, ?)`,
+		channelID, messageID, p.now().Unix(),
+	)
+	if err != nil {
+		return fmt.Errorf("save received SDS message: %w", err)
+	}
+	return nil
+}
+
+func (p *sqliteSDSRetrievalHintPersistence) IsSDSMessageReceived(channelID, messageID string) (bool, error) {
+	var received bool
+	err := p.db.QueryRow(
+		`SELECT EXISTS(SELECT 1 FROM sds_received_messages
+		 WHERE channel_id = ? AND message_id = ? AND received_at > ?)`,
+		channelID, messageID, p.now().Add(-types.StoreMessageRetention).Unix(),
+	).Scan(&received)
+	if err != nil {
+		return false, fmt.Errorf("check received SDS message: %w", err)
+	}
+	return received, nil
+}
+
+func (p *sqliteSDSRetrievalHintPersistence) DeleteExpiredSDSReceivedMessages() error {
+	_, err := p.db.Exec(
+		`DELETE FROM sds_received_messages WHERE received_at <= ?`,
+		p.now().Add(-types.StoreMessageRetention).Unix(),
+	)
+	if err != nil {
+		return fmt.Errorf("delete expired received SDS messages: %w", err)
+	}
+	return nil
 }
 
 func (p *sqliteSDSRetrievalHintPersistence) SaveSDSRetrievalHints(channelID, messageID string, envelopeHashes [][]byte) error {

@@ -15,6 +15,20 @@ var ErrSDSManagerUnavailable = errors.New("sds reliability manager unavailable")
 
 type sdsManagerFactoryFunc func(*zap.Logger, sds.PersistenceCallbacks) (*sds.ReliabilityManager, error)
 
+// MarkDependenciesMet must be called outside SDS callbacks, on the recovery worker.
+func (r *Reliability) MarkDependenciesMet(messageIDs []string, channelID string) error {
+	r.sdsOpsMu.RLock()
+	defer r.sdsOpsMu.RUnlock()
+	if r.sdsManager == nil {
+		return ErrSDSManagerUnavailable
+	}
+	ids := make([]sds.MessageID, len(messageIDs))
+	for i, id := range messageIDs {
+		ids[i] = sds.MessageID(id)
+	}
+	return r.sdsManager.MarkDependenciesMet(ids, channelID)
+}
+
 func newSdsReliabilityManager(
 	sdsManagerFactory sdsManagerFactoryFunc,
 	logger *zap.Logger,

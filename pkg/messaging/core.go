@@ -119,9 +119,13 @@ func newCore(waku wakutypes.Waku, params CoreParams, config *config) (*Core, err
 		config.tracer,
 	)
 
-	missingDepsHandler := func(messageID string, missingDeps []string, channelID string) error {
+	missingDepsHandler := func(messageID string, missingDeps []reliability.MissingDependency, channelID string) error {
 		if config.missingDepsObserver != nil {
-			config.missingDepsObserver(messageID, missingDeps, channelID)
+			var hashes []string
+			for _, dep := range missingDeps {
+				hashes = append(hashes, dep.EnvelopeHashes...)
+			}
+			config.missingDepsObserver(messageID, hashes, channelID)
 		}
 		return core.fetchMissingDependenciesAsync(messageID, missingDeps, channelID)
 	}
@@ -173,6 +177,7 @@ func newCore(waku wakutypes.Waku, params CoreParams, config *config) (*Core, err
 		stack.Transport,
 		newRequestedHashes(requestedHashesTTL, requestedHashesMaxSize),
 	)
+	core.missingDeps.reconciler = stack.Reliability
 
 	stack.Reliability.SetRetrievalHintProvider(core.resolveSDSRetrievalHint)
 	stack.Reliability.SetSDSRetrievalHintPersistence(config.persistence.SDSEnvelopeHashesStorage())
@@ -366,14 +371,14 @@ func (c *Core) stop() error {
 	return nil
 }
 
-func (c *Core) fetchMissingDependenciesAsync(messageID string, missingDeps []string, channelID string) error {
+func (c *Core) fetchMissingDependenciesAsync(messageID string, missingDeps []reliability.MissingDependency, channelID string) error {
 	if len(missingDeps) == 0 {
 		return nil
 	}
 
-	_, dropped := c.missingDeps.enqueue(missingDeps)
+	_, dropped := c.missingDeps.enqueueDependencies(channelID, missingDeps)
 	if dropped > 0 {
-		c.logger.Warn("missing dependencies fetch queue full, dropping hashes",
+		c.logger.Warn("missing dependencies fetch queue full, dropping dependencies",
 			zap.String("messageID", messageID),
 			zap.String("channelID", channelID),
 			zap.Int("dropped", dropped),
