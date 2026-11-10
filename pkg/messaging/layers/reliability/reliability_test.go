@@ -34,7 +34,7 @@ func newTestReliability(t *testing.T) *Reliability {
 	t.Helper()
 	key, err := crypto.GenerateKey()
 	require.NoError(t, err)
-	r, err := NewReliability(newTestPersistence(t), key, func(string, []string, string) error { return nil }, zap.NewNop())
+	r, err := NewReliability(newTestPersistence(t), key, func(string, []MissingDependency, string) error { return nil }, zap.NewNop())
 	require.NoError(t, err)
 	return r
 }
@@ -42,8 +42,8 @@ func newTestReliability(t *testing.T) *Reliability {
 func TestHandleMissingDependenciesDecodesAllHashes(t *testing.T) {
 	r := newTestReliability(t)
 
-	var captured []string
-	r.SetMissingDependenciesHandler(func(_ string, missingDeps []string, _ string) error {
+	var captured []MissingDependency
+	r.SetMissingDependenciesHandler(func(_ string, missingDeps []MissingDependency, _ string) error {
 		captured = append(captured, missingDeps...)
 		return nil
 	})
@@ -66,7 +66,10 @@ func TestHandleMissingDependenciesDecodesAllHashes(t *testing.T) {
 		"channel-id",
 	)
 
-	require.Equal(t, []string{"0x01", "0x02", "0x03"}, captured)
+	require.Equal(t, []MissingDependency{
+		{MessageID: "dep-1", EnvelopeHashes: []string{"0x01", "0x02"}},
+		{MessageID: "dep-2", EnvelopeHashes: []string{"0x03"}},
+	}, captured)
 }
 
 func TestHandleSDSMessageSentForwardsMessageID(t *testing.T) {
@@ -81,16 +84,15 @@ func TestHandleSDSMessageSentForwardsMessageID(t *testing.T) {
 	require.Equal(t, "0x1234", received)
 }
 
-func TestHandleMissingDependenciesSkipsInvalidHint(t *testing.T) {
+func TestHandleMissingDependenciesPreservesIDWithoutValidHint(t *testing.T) {
 	r := newTestReliability(t)
 
-	called := false
-	r.SetMissingDependenciesHandler(func(_ string, _ []string, _ string) error {
-		called = true
+	var captured []MissingDependency
+	r.SetMissingDependenciesHandler(func(_ string, deps []MissingDependency, _ string) error {
+		captured = deps
 		return nil
 	})
 
-	// Non-protobuf bytes must not reach the handler.
 	r.handleMissingDependencies(
 		sds.MessageID("message-id"),
 		[]sds.HistoryEntry{
@@ -99,7 +101,29 @@ func TestHandleMissingDependenciesSkipsInvalidHint(t *testing.T) {
 		"channel-id",
 	)
 
-	require.False(t, called)
+	require.Equal(t, []MissingDependency{{MessageID: "dep-1"}}, captured)
+}
+
+func TestHandleMissingDependenciesRejectsPartialHints(t *testing.T) {
+	r := newTestReliability(t)
+	t.Cleanup(r.Close)
+	valid, err := proto.Marshal(&protobuf.RetrievalHint{EnvelopeHashes: [][]byte{[]byte("hash")}})
+	require.NoError(t, err)
+	withEmpty, err := proto.Marshal(&protobuf.RetrievalHint{EnvelopeHashes: [][]byte{[]byte("hash"), nil}})
+	require.NoError(t, err)
+	var captured []MissingDependency
+	r.SetMissingDependenciesHandler(func(_ string, deps []MissingDependency, _ string) error {
+		captured = deps
+		return nil
+	})
+	r.handleMissingDependencies("waiting", []sds.HistoryEntry{
+		{MessageID: "truncated", RetrievalHint: append(valid, 0xff)},
+		{MessageID: "empty-hash", RetrievalHint: withEmpty},
+		{MessageID: "no-hint"},
+	}, "channel")
+	require.Equal(t, []MissingDependency{
+		{MessageID: "truncated"}, {MessageID: "empty-hash"}, {MessageID: "no-hint"},
+	}, captured)
 }
 
 func TestNewReliabilityRequiresMissingDepsHandler(t *testing.T) {
@@ -111,6 +135,12 @@ func TestNewReliabilityRequiresMissingDepsHandler(t *testing.T) {
 	require.Nil(t, r)
 }
 
+func TestMarkDependenciesMetAfterClose(t *testing.T) {
+	r := newTestReliability(t)
+	r.Close()
+	require.ErrorIs(t, r.MarkDependenciesMet([]string{"dependency"}, "channel"), ErrSDSManagerUnavailable)
+}
+
 func TestNewReliabilityFailsWhenSDSManagerInitFails(t *testing.T) {
 	key, err := crypto.GenerateKey()
 	require.NoError(t, err)
@@ -118,7 +148,7 @@ func TestNewReliabilityFailsWhenSDSManagerInitFails(t *testing.T) {
 	r, err := newReliabilityWithSDSFactory(
 		newTestPersistence(t),
 		key,
-		func(string, []string, string) error { return nil },
+		func(string, []MissingDependency, string) error { return nil },
 		zap.NewNop(),
 		nil,
 		func(*zap.Logger, sds.PersistenceCallbacks) (*sds.ReliabilityManager, error) {
@@ -301,7 +331,7 @@ func TestReliabilityBuildNodeFailureLeavesNoZombie(t *testing.T) {
 	// Fail the 2nd NewPersistentNode (the recreate in SetPaused); the 1st (Start)
 	// succeeds.
 	persistence := &epochFailsOnNthBuild{Persistence: newTestPersistence(t), n: 2}
-	r, err := NewReliability(persistence, key, func(string, []string, string) error { return nil }, zap.NewNop())
+	r, err := NewReliability(persistence, key, func(string, []MissingDependency, string) error { return nil }, zap.NewNop())
 	require.NoError(t, err)
 	t.Cleanup(r.Stop)
 
