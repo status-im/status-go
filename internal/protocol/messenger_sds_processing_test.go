@@ -15,7 +15,10 @@ import (
 	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/protocol/common"
 	"github.com/status-im/status-go/internal/protocol/protobuf"
+	"github.com/status-im/status-go/internal/protocol/requests"
 	v1protocol "github.com/status-im/status-go/internal/protocol/v1"
+	"github.com/status-im/status-go/pkg/messaging"
+	"github.com/status-im/status-go/pkg/messaging/layers/transport"
 	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
 )
 
@@ -27,27 +30,361 @@ type MessengerSDSProcessingSuite struct {
 	MessengerBaseTestSuite
 }
 
+func (s *MessengerSDSProcessingSuite) TestSDSCommunityMessagesRequirePostingPermission() {
+	response, err := s.m.CreateCommunity(&requests.CreateCommunity{
+		Name:        "SDS permission test",
+		Description: "Community for SDS permission tests",
+		Color:       "#ffffff",
+		Membership:  protobuf.CommunityPermissions_AUTO_ACCEPT,
+	}, true)
+	s.Require().NoError(err)
+	s.Require().Len(response.Chats(), 1)
+	chat := response.Chats()[0]
+	community, err := s.m.communitiesManager.GetByIDString(chat.CommunityID)
+	s.Require().NoError(err)
+	channelID := chat.CommunityID + ":" + community.UniversalChatID()
+	envelopeTopic := messagingtypes.BytesToContentTopic(messaging.ToContentTopic(community.UniversalChatID()))
+
+	unauthorizedKey, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+	for _, test := range []struct {
+		name        string
+		messageType protobuf.ApplicationMetadataMessage_Type
+		payload     proto.Message
+	}{
+		{
+			name:        "chat message",
+			messageType: protobuf.ApplicationMetadataMessage_CHAT_MESSAGE,
+			payload: &protobuf.ChatMessage{
+				ChatId:      chat.ID,
+				MessageType: protobuf.MessageType_COMMUNITY_CHAT,
+			},
+		},
+		{
+			name:        "emoji reaction",
+			messageType: protobuf.ApplicationMetadataMessage_EMOJI_REACTION,
+			payload: &protobuf.EmojiReaction{
+				ChatId:      chat.ID,
+				MessageType: protobuf.MessageType_COMMUNITY_CHAT,
+			},
+		},
+		{
+			name:        "pin message",
+			messageType: protobuf.ApplicationMetadataMessage_PIN_MESSAGE,
+			payload: &protobuf.PinMessage{
+				ChatId:      chat.ID,
+				MessageType: protobuf.MessageType_COMMUNITY_CHAT,
+			},
+		},
+		{
+			name:        "thread metadata",
+			messageType: protobuf.ApplicationMetadataMessage_THREAD_METADATA,
+			payload: &protobuf.ThreadMetadata{
+				ChatId:      chat.ID,
+				MessageType: protobuf.MessageType_COMMUNITY_CHAT,
+			},
+		},
+		{
+			name:        "edit message",
+			messageType: protobuf.ApplicationMetadataMessage_EDIT_MESSAGE,
+			payload: &protobuf.EditMessage{
+				ChatId:      chat.ID,
+				MessageType: protobuf.MessageType_COMMUNITY_CHAT,
+			},
+		},
+		{
+			name:        "delete message",
+			messageType: protobuf.ApplicationMetadataMessage_DELETE_MESSAGE,
+			payload: &protobuf.DeleteMessage{
+				ChatId:      chat.ID,
+				MessageType: protobuf.MessageType_COMMUNITY_CHAT,
+			},
+		},
+	} {
+		s.Run(test.name, func() {
+			body, err := proto.Marshal(test.payload)
+			s.Require().NoError(err)
+
+			unauthorizedMessage, err := v1protocol.WrapIntoAppLayerMessage(body, test.messageType, unauthorizedKey)
+			s.Require().NoError(err)
+			disposition, err := s.m.validateSDSCommunityMessage(unauthorizedMessage, channelID, &unauthorizedKey.PublicKey, envelopeTopic)
+			s.Require().NoError(err)
+			s.Require().Equal(messagingtypes.SDSMessageDispositionReject, disposition, "non-members must be rejected before SDS processing")
+
+			authorizedMessage, err := v1protocol.WrapIntoAppLayerMessage(body, test.messageType, s.m.identity)
+			s.Require().NoError(err)
+			disposition, err = s.m.validateSDSCommunityMessage(authorizedMessage, channelID, &s.m.identity.PublicKey, envelopeTopic)
+			s.Require().NoError(err)
+			s.Require().Equal(messagingtypes.SDSMessageDispositionProcess, disposition, "community owner messages should continue through SDS")
+		})
+	}
+
+	s.Run("member signature cannot be copied into an outsider envelope", func() {
+		body, err := proto.Marshal(&protobuf.ChatMessage{
+			ChatId:      chat.ID,
+			MessageType: protobuf.MessageType_COMMUNITY_CHAT,
+		})
+		s.Require().NoError(err)
+		application, err := v1protocol.WrapIntoAppLayerMessage(body, protobuf.ApplicationMetadataMessage_CHAT_MESSAGE, s.m.identity)
+		s.Require().NoError(err)
+		disposition, err := s.m.validateSDSCommunityMessage(application, channelID, &unauthorizedKey.PublicKey, envelopeTopic)
+		s.Require().NoError(err)
+		s.Require().Equal(messagingtypes.SDSMessageDispositionReject, disposition)
+	})
+
+	s.Run("non-community claimed type cannot bypass community target authorization", func() {
+		body, err := proto.Marshal(&protobuf.ChatMessage{
+			ChatId:      chat.ID,
+			MessageType: protobuf.MessageType_ONE_TO_ONE,
+		})
+		s.Require().NoError(err)
+		application, err := v1protocol.WrapIntoAppLayerMessage(body, protobuf.ApplicationMetadataMessage_CHAT_MESSAGE, unauthorizedKey)
+		s.Require().NoError(err)
+		disposition, err := s.m.validateSDSCommunityMessage(application, channelID, &unauthorizedKey.PublicKey, envelopeTopic)
+		s.Require().NoError(err)
+		s.Require().Equal(messagingtypes.SDSMessageDispositionReject, disposition)
+	})
+
+	s.Run("unsupported application type cannot bypass community target authorization", func() {
+		application, err := v1protocol.WrapIntoAppLayerMessage(
+			[]byte("unknown"),
+			protobuf.ApplicationMetadataMessage_Type(200),
+			unauthorizedKey,
+		)
+		s.Require().NoError(err)
+		disposition, err := s.m.validateSDSCommunityMessage(application, channelID, &unauthorizedKey.PublicKey, envelopeTopic)
+		s.Require().NoError(err)
+		s.Require().Equal(messagingtypes.SDSMessageDispositionReject, disposition)
+	})
+
+	s.Run("non-community channel cannot bypass validation on a community topic", func() {
+		application, err := v1protocol.WrapIntoAppLayerMessage(
+			[]byte("unknown"),
+			protobuf.ApplicationMetadataMessage_Type(200),
+			unauthorizedKey,
+		)
+		s.Require().NoError(err)
+		disposition, err := s.m.validateSDSCommunityMessage(application, "unrelated-channel", &unauthorizedKey.PublicKey, envelopeTopic)
+		s.Require().NoError(err)
+		s.Require().Equal(messagingtypes.SDSMessageDispositionReject, disposition)
+	})
+
+	s.Run("public chat SDS messages retain normal reliability processing", func() {
+		body, err := proto.Marshal(&protobuf.ChatMessage{
+			ChatId:      "public-chat",
+			MessageType: protobuf.MessageType_PUBLIC_GROUP,
+		})
+		s.Require().NoError(err)
+		application, err := v1protocol.WrapIntoAppLayerMessage(
+			body,
+			protobuf.ApplicationMetadataMessage_CHAT_MESSAGE,
+			unauthorizedKey,
+		)
+		s.Require().NoError(err)
+		publicTopic := messagingtypes.BytesToContentTopic(messaging.ToContentTopic("public-chat"))
+		disposition, err := s.m.validateSDSCommunityMessage(
+			application,
+			"public-chat",
+			&unauthorizedKey.PublicKey,
+			publicTopic,
+		)
+		s.Require().NoError(err)
+		s.Require().Equal(messagingtypes.SDSMessageDispositionProcess, disposition)
+	})
+
+	s.Run("bare community channel routes targeted control requests around SDS", func() {
+		communityIDBytes, err := cryptotypes.DecodeHex(chat.CommunityID)
+		s.Require().NoError(err)
+		controlTopic := messagingtypes.BytesToContentTopic(
+			messaging.ToContentTopic(transport.PubkeyToHex(community.PublicKey())[2:]),
+		)
+		body, err := proto.Marshal(&protobuf.CommunityRequestToJoin{CommunityId: communityIDBytes})
+		s.Require().NoError(err)
+		application, err := v1protocol.WrapIntoAppLayerMessage(
+			body,
+			protobuf.ApplicationMetadataMessage_COMMUNITY_REQUEST_TO_JOIN,
+			unauthorizedKey,
+		)
+		s.Require().NoError(err)
+		disposition, err := s.m.validateSDSCommunityMessage(application, chat.CommunityID, &unauthorizedKey.PublicKey, controlTopic)
+		s.Require().NoError(err)
+		s.Require().Equal(messagingtypes.SDSMessageDispositionApplicationOnly, disposition,
+			"public join requests must reach application validation without processing SDS metadata")
+
+		otherCommunity, err := crypto.GenerateKey()
+		s.Require().NoError(err)
+		mismatchedBody, err := proto.Marshal(&protobuf.CommunityRequestToJoin{
+			CommunityId: crypto.CompressPubkey(&otherCommunity.PublicKey),
+		})
+		s.Require().NoError(err)
+		mismatchedApplication, err := v1protocol.WrapIntoAppLayerMessage(
+			mismatchedBody,
+			protobuf.ApplicationMetadataMessage_COMMUNITY_REQUEST_TO_JOIN,
+			s.m.identity,
+		)
+		s.Require().NoError(err)
+		disposition, err = s.m.validateSDSCommunityMessage(
+			mismatchedApplication,
+			chat.CommunityID,
+			&s.m.identity.PublicKey,
+			controlTopic,
+		)
+		s.Require().NoError(err)
+		s.Require().Equal(messagingtypes.SDSMessageDispositionReject, disposition)
+
+		disposition, err = s.m.validateSDSCommunityMessage(application, chat.CommunityID, &unauthorizedKey.PublicKey, envelopeTopic)
+		s.Require().NoError(err)
+		s.Require().Equal(messagingtypes.SDSMessageDispositionReject, disposition, "control requests must use their bare-channel topic")
+
+		unsupportedControl, err := v1protocol.WrapIntoAppLayerMessage(
+			[]byte("unknown"),
+			protobuf.ApplicationMetadataMessage_Type(200),
+			s.m.identity,
+		)
+		s.Require().NoError(err)
+		disposition, err = s.m.validateSDSCommunityMessage(
+			unsupportedControl,
+			chat.CommunityID,
+			&s.m.identity.PublicKey,
+			controlTopic,
+		)
+		s.Require().NoError(err)
+		s.Require().Equal(messagingtypes.SDSMessageDispositionReject, disposition)
+	})
+
+	s.Run("mismatched target and topic are rejected", func() {
+		body, err := proto.Marshal(&protobuf.ChatMessage{
+			ChatId:      chat.ID,
+			MessageType: protobuf.MessageType_COMMUNITY_CHAT,
+		})
+		s.Require().NoError(err)
+		application, err := v1protocol.WrapIntoAppLayerMessage(body, protobuf.ApplicationMetadataMessage_CHAT_MESSAGE, s.m.identity)
+		s.Require().NoError(err)
+		disposition, err := s.m.validateSDSCommunityMessage(application, channelID+":other-topic", &s.m.identity.PublicKey, envelopeTopic)
+		s.Require().NoError(err)
+		s.Require().Equal(messagingtypes.SDSMessageDispositionReject, disposition)
+		disposition, err = s.m.validateSDSCommunityMessage(application, channelID, &s.m.identity.PublicKey, messagingtypes.ContentTopic{})
+		s.Require().NoError(err)
+		s.Require().Equal(messagingtypes.SDSMessageDispositionReject, disposition)
+	})
+
+	s.Run("malformed application content remains retryable", func() {
+		disposition, err := s.m.validateSDSCommunityMessage([]byte{0xff}, channelID, &s.m.identity.PublicKey, envelopeTopic)
+		s.Require().Error(err)
+		s.Require().Equal(messagingtypes.SDSMessageDispositionReject, disposition)
+		disposition, err = s.m.validateSDSCommunityMessage(nil, channelID, &s.m.identity.PublicKey, envelopeTopic)
+		s.Require().Error(err)
+		s.Require().Equal(messagingtypes.SDSMessageDispositionReject, disposition)
+	})
+
+	s.Run("community events reach handler authorization without SDS processing", func() {
+		communityIDBytes, err := cryptotypes.DecodeHex(chat.CommunityID)
+		s.Require().NoError(err)
+		body, err := proto.Marshal(&protobuf.CommunityEventsMessage{CommunityId: communityIDBytes})
+		s.Require().NoError(err)
+		application, err := v1protocol.WrapIntoAppLayerMessage(
+			body,
+			protobuf.ApplicationMetadataMessage_COMMUNITY_EVENTS_MESSAGE,
+			unauthorizedKey,
+		)
+		s.Require().NoError(err)
+		communityTopic := messagingtypes.BytesToContentTopic(messaging.ToContentTopic(chat.CommunityID))
+		disposition, err := s.m.validateSDSCommunityMessage(
+			application,
+			chat.CommunityID+":"+chat.CommunityID,
+			&unauthorizedKey.PublicKey,
+			communityTopic,
+		)
+		s.Require().NoError(err)
+		s.Require().Equal(messagingtypes.SDSMessageDispositionApplicationOnly, disposition,
+			"event sender authorization belongs to the application handler, not SDS")
+
+		description, err := community.MarshaledDescription()
+		s.Require().NoError(err)
+		application, err = v1protocol.WrapIntoAppLayerMessage(
+			description,
+			protobuf.ApplicationMetadataMessage_COMMUNITY_DESCRIPTION,
+			unauthorizedKey,
+		)
+		s.Require().NoError(err)
+		disposition, err = s.m.validateSDSCommunityMessage(
+			application,
+			chat.CommunityID+":"+chat.CommunityID,
+			&unauthorizedKey.PublicKey,
+			communityTopic,
+		)
+		s.Require().NoError(err)
+		s.Require().Equal(messagingtypes.SDSMessageDispositionApplicationOnly, disposition,
+			"description sender authorization belongs to the application handler, not SDS")
+
+		body, err = proto.Marshal(&protobuf.CommunityEncryptionKeysRequest{CommunityId: communityIDBytes})
+		s.Require().NoError(err)
+		controlTopic := messagingtypes.BytesToContentTopic(
+			messaging.ToContentTopic(transport.PubkeyToHex(community.PublicKey())[2:]),
+		)
+		application, err = v1protocol.WrapIntoAppLayerMessage(
+			body,
+			protobuf.ApplicationMetadataMessage_COMMUNITY_ENCRYPTION_KEYS_REQUEST,
+			unauthorizedKey,
+		)
+		s.Require().NoError(err)
+		disposition, err = s.m.validateSDSCommunityMessage(
+			application,
+			chat.CommunityID,
+			&unauthorizedKey.PublicKey,
+			controlTopic,
+		)
+		s.Require().NoError(err)
+		s.Require().Equal(messagingtypes.SDSMessageDispositionApplicationOnly, disposition,
+			"restricted control messages must reach their own authorization handlers without SDS metadata")
+	})
+}
+
 func (s *MessengerSDSProcessingSuite) TestNonChatReplayAfterRestart() {
+	communityResponse, err := s.m.CreateCommunity(&requests.CreateCommunity{
+		Name:        "SDS replay test",
+		Description: "Community for SDS replay tests",
+		Color:       "#ffffff",
+		Membership:  protobuf.CommunityPermissions_AUTO_ACCEPT,
+	}, true)
+	s.Require().NoError(err)
+	s.Require().Len(communityResponse.Chats(), 1)
+	chat := communityResponse.Chats()[0]
+	community, err := s.m.communitiesManager.GetByIDString(chat.CommunityID)
+	s.Require().NoError(err)
+	authorizedMember, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+	_, err = community.AddMember(&authorizedMember.PublicKey, nil, community.Clock())
+	s.Require().NoError(err)
+	s.Require().NoError(s.m.communitiesManager.SaveCommunity(community))
+	channelID := chat.CommunityID + ":" + community.UniversalChatID()
+	envelopeTopic := messagingtypes.BytesToContentTopic(messaging.ToContentTopic(community.UniversalChatID()))
+
 	for _, failure := range []string{"none", "handler", "save", "marker", "legacy", "batch"} {
 		s.Run(failure, func() {
-			chatID := "sds-processing-" + failure
-			chat := CreatePublicChat(chatID, s.m.getTimesource())
-			s.Require().NoError(s.m.SaveChat(chat))
-			key, err := crypto.GenerateKey()
-			s.Require().NoError(err)
+			chatID := chat.ID
 			body, err := proto.Marshal(&protobuf.EmojiReaction{
 				Clock:     s.m.getTimesource().GetCurrentTime(),
-				MessageId: "referenced-message", ChatId: chatID,
+				MessageId: "referenced-message-" + failure, ChatId: chatID,
 				Type:        protobuf.EmojiReaction_SAD,
-				MessageType: protobuf.MessageType_PUBLIC_GROUP,
+				MessageType: protobuf.MessageType_COMMUNITY_CHAT,
 			})
 			s.Require().NoError(err)
-			application, err := v1protocol.WrapIntoAppLayerMessage(body, protobuf.ApplicationMetadataMessage_EMOJI_REACTION, key)
+			application, err := v1protocol.WrapIntoAppLayerMessage(body, protobuf.ApplicationMetadataMessage_EMOJI_REACTION, authorizedMember)
 			s.Require().NoError(err)
-			id := messagingtypes.MessageID(&key.PublicKey, application).String()
+			disposition, err := s.m.validateSDSCommunityMessage(
+				application,
+				channelID,
+				&authorizedMember.PublicKey,
+				envelopeTopic,
+			)
+			s.Require().NoError(err)
+			s.Require().Equal(messagingtypes.SDSMessageDispositionProcess, disposition,
+				"replay fixture must pass community authorization before SDS processing")
+			id := messagingtypes.MessageID(&authorizedMember.PublicKey, application).String()
 			sender, err := sds.NewReliabilityManager(zap.NewNop(), nil)
 			s.Require().NoError(err)
-			wrapped, err := sender.WrapOutgoingMessage(application, sds.MessageID(cryptotypes.EncodeHex(crypto.Keccak256(application))), chatID)
+			wrapped, err := sender.WrapOutgoingMessage(application, sds.MessageID(cryptotypes.EncodeHex(crypto.Keccak256(application))), channelID)
 			s.Require().NoError(err)
 			s.Require().NoError(sender.Cleanup())
 			if failure == "legacy" {
@@ -75,14 +412,16 @@ func (s *MessengerSDSProcessingSuite) TestNonChatReplayAfterRestart() {
 					hashSequence = 1
 				}
 				envelopes := []*messagingtypes.ReceivedMessage{{
-					Sig:     crypto.FromECDSAPub(&key.PublicKey),
+					Sig:     crypto.FromECDSAPub(&authorizedMember.PublicKey),
 					Hash:    crypto.Keccak256([]byte(fmt.Sprintf("%s-%d", chatID, hashSequence))),
+					Topic:   envelopeTopic,
 					Payload: wrapped,
 				}}
 				if failure == "batch" {
 					envelopes = append(envelopes, &messagingtypes.ReceivedMessage{
-						Sig:     crypto.FromECDSAPub(&key.PublicKey),
+						Sig:     crypto.FromECDSAPub(&authorizedMember.PublicKey),
 						Hash:    crypto.Keccak256([]byte(fmt.Sprintf("%s-%d-duplicate", chatID, attempt))),
+						Topic:   envelopeTopic,
 						Payload: wrapped,
 					})
 				}
@@ -208,6 +547,6 @@ func (s *MessengerSDSProcessingSuite) TestInvalidApplicationMessageRemainsRetrya
 		s.Require().NoError(err)
 		s.Require().Empty(response.Messages())
 	}
-	s.Require().Equal(2, logs.FilterMessage("failed to process application message").Len(),
+	s.Require().Equal(2, logs.FilterMessage("failed to decode messages").Len(),
 		"the malformed envelope must not be transport-confirmed after its first delivery")
 }
