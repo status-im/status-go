@@ -19,7 +19,7 @@ import (
 
 //go:generate go tool mockgen -package=mock -source=network.go -destination=mock/network.go
 
-const MaxActiveNetworks = 5
+const MaxActiveNetworks = 20
 
 type ManagerInterface interface {
 	GetterInterface

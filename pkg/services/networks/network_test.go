@@ -2,6 +2,7 @@ package networks_test
 
 import (
 	"database/sql"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -333,12 +334,38 @@ func (s *NetworkManagerTestSuite) TestSetActiveNotDeactivatable() {
 	s.True(n.IsActive)
 }
 
+func (s *NetworkManagerTestSuite) TestSetActiveAllowsEveryEmbeddedMainnetAtOnce() {
+	var mainnets []params.Network
+	for _, n := range networks.BuildDefaultNetworks(&params.WalletConfig{}, false) {
+		if !n.IsTest {
+			n.IsActive = false
+			mainnets = append(mainnets, n)
+		}
+	}
+	s.Require().NoError(db.NewNetworksPersistence(s.db).SetNetworks(mainnets))
+
+	for _, n := range mainnets {
+		s.Require().NoError(s.manager.SetActive(n.ChainID, true), n.ChainName)
+	}
+
+	activeNetworks, err := s.manager.GetActiveNetworks()
+	s.Require().NoError(err)
+	s.Require().Len(activeNetworks, len(mainnets))
+}
+
 func (s *NetworkManagerTestSuite) TestSetActiveMaxNumberOfActiveNetworks() {
 	var err error
 	var n *params.Network
 
-	// Check that we're at the limit of active networks
+	// Fill the active set up to the limit
 	activeNetworks, err := s.manager.GetActiveNetworks()
+	s.Require().NoError(err)
+	persistence := db.NewNetworksPersistence(s.db)
+	for i := len(activeNetworks); i < networks.MaxActiveNetworks; i++ {
+		filler := testutil.CreateNetwork(uint64(900000+i), fmt.Sprintf("Filler %d", i), nil)
+		s.Require().NoError(persistence.UpsertNetwork(filler))
+	}
+	activeNetworks, err = s.manager.GetActiveNetworks()
 	s.Require().NoError(err)
 	s.Require().Len(activeNetworks, networks.MaxActiveNetworks)
 
