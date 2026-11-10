@@ -49,6 +49,11 @@ func newSdsReliabilityManager(
 				onMessageSent(messageId, channelId)
 			}
 		},
+		OnMessageExpired: func(messageId sds.MessageID, channelId string) {
+			logger.Debug("unacknowledged sds message expired",
+				zap.String("messageId", string(messageId)),
+				zap.String("channelId", channelId))
+		},
 		OnMissingDependencies: func(messageId sds.MessageID, missingDeps []sds.HistoryEntry, channelId string) {
 			logger.Debug("missing dependencies",
 				zap.String("messageId", string(messageId)),
