@@ -20,7 +20,6 @@ import (
 	"github.com/status-im/status-go/internal/db/multiaccounts/settings"
 	walletsettings "github.com/status-im/status-go/internal/db/multiaccounts/settings_wallet"
 	"github.com/status-im/status-go/internal/protocol/contacts"
-	"github.com/status-im/status-go/internal/signal"
 	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
 	"github.com/status-im/status-go/pkg/pubsub"
 	"github.com/status-im/status-go/pkg/services/accounts/accountsevent"
@@ -1529,7 +1528,7 @@ func (m *Messenger) HandleCommunityCancelRequestToJoin(ctx context.Context, stat
 		response := &MessengerResponse{}
 		response.AddActivityCenterNotification(notification)
 
-		signal.SendNewMessages(response)
+		m.signalSession.SendNewMessages(response)
 	}
 
 	return nil

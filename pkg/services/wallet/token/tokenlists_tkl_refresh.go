@@ -55,7 +55,7 @@ func newTKLRefreshManager(mng *Manager, chains []uint64, lastSuccess time.Time, 
 		},
 		OnSuccess: mng.settings.SaveLastTokensUpdate,
 		OnChange: func(tkl.Change) {
-			signal.SendWalletEvent(signal.TokenListsUpdated, nil)
+			mng.signalSession.SendWalletEvent(signal.TokenListsUpdated, nil)
 			if mng.walletFeed != nil {
 				go func() {
 					defer panics.LogOnPanic()

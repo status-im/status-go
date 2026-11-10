@@ -11,7 +11,6 @@ import (
 	"github.com/status-im/status-go/internal/protocol/communities"
 	"github.com/status-im/status-go/internal/protocol/contacts"
 	"github.com/status-im/status-go/internal/protocol/protobuf"
-	"github.com/status-im/status-go/internal/signal"
 )
 
 const (
@@ -342,7 +341,7 @@ func (m *Messenger) ImportBackup(data []byte) error {
 			errs = append(errs, threadErr)
 		}
 		// Send response even if there were errors as some data might have been saved successfully
-		signal.SendNewMessages(response)
+		m.signalSession.SendNewMessages(response)
 	}
 	if err != nil {
 		errs = append(errs, err)

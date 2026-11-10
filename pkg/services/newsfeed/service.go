@@ -33,6 +33,8 @@ func isNil(data interface{}) bool {
 
 type Service struct {
 	pausable.PauseBroadcaster
+	// The backend session the service runs in; its signals are sent in it.
+	signalSession   signal.Session
 	logger          *zap.Logger
 	storage         Persistence
 	ac              ActivityCenter
@@ -42,9 +44,10 @@ type Service struct {
 
 func NewService(logger *zap.Logger, storage Persistence, ac ActivityCenter) *Service {
 	service := &Service{
-		logger:  logger,
-		storage: storage,
-		started: false,
+		signalSession: signal.CurrentSession(),
+		logger:        logger,
+		storage:       storage,
+		started:       false,
 	}
 	service.SetActivityCenter(ac)
 	return service
@@ -204,7 +207,7 @@ func (s *Service) HandleFeedItemAndSend(feedItem *gofeed.Item) error {
 	if err != nil {
 		s.logger.Error("HandleFeedItemAndSend: failed to handle feed item", zap.Error(err))
 	}
-	signal.SendNewMessages(response)
+	s.signalSession.SendNewMessages(response)
 	return nil
 }
 

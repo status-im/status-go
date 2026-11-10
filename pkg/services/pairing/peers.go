@@ -15,9 +15,11 @@ import (
 )
 
 type PeerNotifier struct {
-	logger     *zap.Logger
-	stop       chan struct{}
-	terminator sync.Once
+	// The backend session the notifier was started in; its events are sent in it.
+	signalSession signal.Session
+	logger        *zap.Logger
+	stop          chan struct{}
+	terminator    sync.Once
 }
 
 func NewPeerNotifier() *PeerNotifier {
@@ -25,8 +27,9 @@ func NewPeerNotifier() *PeerNotifier {
 	stop := make(chan struct{})
 
 	return &PeerNotifier{
-		logger: logger,
-		stop:   stop,
+		signalSession: signal.CurrentSession(),
+		logger:        logger,
+		stop:          stop,
 	}
 }
 
@@ -38,7 +41,7 @@ func (p *PeerNotifier) terminateIn(d time.Duration) {
 }
 
 func (p *PeerNotifier) handler(hello *peers.LocalPairingPeerHello) {
-	signal.SendLocalPairingEvent(Event{Type: EventPeerDiscovered, Action: ActionPeerDiscovery, Data: hello})
+	p.signalSession.SendLocalPairingEvent(Event{Type: EventPeerDiscovered, Action: ActionPeerDiscovery, Data: hello})
 	p.logger.Debug("received peers.LocalPairingPeerHello message", zap.Any("hello message", hello))
 	p.terminateIn(5 * time.Second)
 }

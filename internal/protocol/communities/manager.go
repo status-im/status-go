@@ -91,6 +91,8 @@ type MessageSigner interface {
 }
 
 type Manager struct {
+	// The backend session the manager runs in; its signals are sent in it.
+	signalSession            signal.Session
 	persistence              *Persistence
 	ensSubscription          chan []*ens.VerificationRecord
 	subscriptions            []chan *Subscription
@@ -325,6 +327,7 @@ func NewManager(
 	}
 
 	manager := &Manager{
+		signalSession:          signal.CurrentSession(),
 		logger:                 logger,
 		identity:               identity,
 		installationID:         installationID,
@@ -1523,13 +1526,13 @@ func (m *Manager) DeleteCommunityTokenPermission(request *requests.DeleteCommuni
 
 func (m *Manager) reevaluateCommunityMembersPermissions(communityID cryptotypes.HexBytes) error {
 	// Publish when the reevluation started since it can take a while
-	signal.SendCommunityMemberReevaluationStarted(cryptotypes.EncodeHex(communityID))
+	m.signalSession.SendCommunityMemberReevaluationStarted(cryptotypes.EncodeHex(communityID))
 
 	community, newPrivilegedMembers, err := m.reevaluateMembers(communityID)
 
 	// Publish the reevaluation ending, even if it errored
 	// A possible improvement would be to pass the error here
-	signal.SendCommunityMemberReevaluationEnded(cryptotypes.EncodeHex(communityID))
+	m.signalSession.SendCommunityMemberReevaluationEnded(cryptotypes.EncodeHex(communityID))
 
 	if err != nil {
 		return err

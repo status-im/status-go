@@ -6,5 +6,10 @@ const (
 
 // SendLocalNotifications sends event with a local notification.
 func SendLocalNotifications(event interface{}) {
-	send(notificationEvent, event)
+	CurrentSession().SendLocalNotifications(event)
+}
+
+// SendLocalNotifications sends in the session s.
+func (s Session) SendLocalNotifications(event interface{}) {
+	s.send(notificationEvent, event)
 }

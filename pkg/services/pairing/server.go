@@ -15,6 +15,7 @@ import (
 
 	"github.com/status-im/status-go/internal/httpserver"
 	logutils "github.com/status-im/status-go/internal/logutils"
+	"github.com/status-im/status-go/internal/signal"
 	"github.com/status-im/status-go/internal/timesource"
 	"github.com/status-im/status-go/pkg/backend"
 )
@@ -31,6 +32,9 @@ import (
 type BaseServer struct {
 	*httpserver.Server
 	challengeGiver *ChallengeGiver
+	// The backend session the server was started in. It keeps serving after the
+	// call that started it returns, so its events are sent in that session.
+	signalSession signal.Session
 
 	config ServerConfig
 }
@@ -56,6 +60,7 @@ func NewBaseServer(logger *zap.Logger, e *PayloadEncryptor, config *ServerConfig
 			},
 		),
 		challengeGiver: cg,
+		signalSession:  signal.CurrentSession(),
 		config:         *config,
 	}
 	bs.SetTimeout(config.Timeout)
@@ -156,13 +161,13 @@ func (s *SenderServer) startSendingData() error {
 	}
 	s.SetHandlers(httpserver.HandlerPatternMap{
 		pairingChallenge:      handlePairingChallenge(s.challengeGiver),
-		pairingSendAccount:    middlewareChallenge(s.challengeGiver, handleSendAccount(logger, s.accountMounter, beforeSending)),
-		pairingSendSyncDevice: middlewareChallenge(s.challengeGiver, handlePairingSyncDeviceSend(logger, s.rawMessageMounter, beforeSending)),
+		pairingSendAccount:    middlewareChallenge(s.challengeGiver, handleSendAccount(logger, s.signalSession, s.accountMounter, beforeSending)),
+		pairingSendSyncDevice: middlewareChallenge(s.challengeGiver, handlePairingSyncDeviceSend(logger, s.signalSession, s.rawMessageMounter, beforeSending)),
 		// TODO implement refactor of installation data exchange to follow the send/receive pattern of
 		//  the other handlers.
 		//  https://github.com/status-im/status-go/issues/3304
 		// receive installation data from receiver
-		pairingReceiveInstallation: middlewareChallenge(s.challengeGiver, handleReceiveInstallation(s.GetLogger(), s.installationMounter)),
+		pairingReceiveInstallation: middlewareChallenge(s.challengeGiver, handleReceiveInstallation(s.GetLogger(), s.signalSession, s.installationMounter)),
 	})
 	return s.Start()
 }
@@ -268,13 +273,13 @@ func (s *ReceiverServer) startReceivingData() error {
 	}
 	s.SetHandlers(httpserver.HandlerPatternMap{
 		pairingChallenge:         handlePairingChallenge(s.challengeGiver),
-		pairingReceiveAccount:    handleReceiveAccount(logger, s.accountReceiver),
-		pairingReceiveSyncDevice: handleParingSyncDeviceReceive(logger, s.rawMessageReceiver),
+		pairingReceiveAccount:    handleReceiveAccount(logger, s.signalSession, s.accountReceiver),
+		pairingReceiveSyncDevice: handleParingSyncDeviceReceive(logger, s.signalSession, s.rawMessageReceiver),
 		// TODO implement refactor of installation data exchange to follow the send/receive pattern of
 		//  the other handlers.
 		//  https://github.com/status-im/status-go/issues/3304
 		// send installation data back to sender
-		pairingSendInstallation: middlewareChallenge(s.challengeGiver, handleSendInstallation(logger, s.installationReceiver, beforeSending)),
+		pairingSendInstallation: middlewareChallenge(s.challengeGiver, handleSendInstallation(logger, s.signalSession, s.installationReceiver, beforeSending)),
 	})
 	return s.Start()
 }
@@ -380,7 +385,7 @@ func (s *KeystoreFilesSenderServer) startSendingData() error {
 	}
 	s.SetHandlers(httpserver.HandlerPatternMap{
 		pairingChallenge:   handlePairingChallenge(s.challengeGiver),
-		pairingSendAccount: middlewareChallenge(s.challengeGiver, handleSendAccount(logger, s.keystoreFilesMounter, beforeSending)),
+		pairingSendAccount: middlewareChallenge(s.challengeGiver, handleSendAccount(logger, s.signalSession, s.keystoreFilesMounter, beforeSending)),
 	})
 	return s.Start()
 }

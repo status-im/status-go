@@ -102,10 +102,12 @@ func NewAccountPayloadReceiver(e *PayloadEncryptor, p *AccountPayload, config *R
 		return nil, err
 	}
 
+	// The account arrives later, through a server serving after this call returned.
+	session := signal.CurrentSession()
 	return NewBasePayloadReceiver(e, NewPairingPayloadMarshaller(p, l), aps,
 		func() {
 			data := AccountData{Account: p.multiaccount, Password: p.password, ChatKey: p.chatKey}
-			signal.SendLocalPairingEvent(Event{Type: EventReceivedAccount, Action: ActionPairingAccount, Data: data})
+			session.SendLocalPairingEvent(Event{Type: EventReceivedAccount, Action: ActionPairingAccount, Data: data})
 		},
 	), nil
 }
@@ -353,6 +355,8 @@ func NewInstallationPayloadReceiver(e *PayloadEncryptor, backend *backend.Status
 }
 
 type InstallationPayloadStorer struct {
+	// The backend session the storer was created in; its events are sent in it.
+	signalSession         signal.Session
 	payload               *RawMessagesPayload
 	syncRawMessageHandler *SyncRawMessageHandler
 	deviceType            string
@@ -361,6 +365,7 @@ type InstallationPayloadStorer struct {
 
 func NewInstallationPayloadStorer(backend *backend.StatusBackend, payload *RawMessagesPayload, deviceType string) *InstallationPayloadStorer {
 	return &InstallationPayloadStorer{
+		signalSession:         signal.CurrentSession(),
 		payload:               payload,
 		syncRawMessageHandler: NewSyncRawMessageHandler(backend),
 		deviceType:            deviceType,
@@ -387,7 +392,7 @@ func (r *InstallationPayloadStorer) Store() error {
 	}
 
 	if newInstallation := FindNewInstallations(messenger, installations); newInstallation != nil {
-		signal.SendLocalPairingEvent(Event{
+		r.signalSession.SendLocalPairingEvent(Event{
 			Type:   EventReceivedInstallation,
 			Action: ActionPairingInstallation,
 			Data:   newInstallation})
@@ -438,10 +443,11 @@ func NewKeystoreFilesPayloadReceiver(backend *backend.StatusBackend, e *PayloadE
 		return nil, err
 	}
 
+	session := signal.CurrentSession()
 	return NewBasePayloadReceiver(e, NewPairingPayloadMarshaller(p, l), kfps,
 		func() {
 			data := config.KeypairsToImport
-			signal.SendLocalPairingEvent(Event{Type: EventReceivedKeystoreFiles, Action: ActionKeystoreFilesTransfer, Data: data})
+			session.SendLocalPairingEvent(Event{Type: EventReceivedKeystoreFiles, Action: ActionKeystoreFilesTransfer, Data: data})
 		},
 	), nil
 }

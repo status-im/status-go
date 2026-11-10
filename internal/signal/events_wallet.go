@@ -15,5 +15,10 @@ const (
 
 // SendWalletEvent sends event from services/wallet/events.
 func SendWalletEvent(signalType SignalType, event interface{}) {
-	send(string(signalType), event)
+	CurrentSession().SendWalletEvent(signalType, event)
+}
+
+// SendWalletEvent sends in the session s.
+func (s Session) SendWalletEvent(signalType SignalType, event interface{}) {
+	s.send(string(signalType), event)
 }

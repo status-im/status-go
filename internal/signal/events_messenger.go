@@ -39,23 +39,48 @@ type CommunityInfoFoundSignal struct {
 
 // SendMessageDelivered notifies about delivered message
 func SendMessageDelivered(chatID string, messageID string) {
-	send(EventMesssageDelivered, MessageDeliveredSignal{ChatID: chatID, MessageID: messageID})
+	CurrentSession().SendMessageDelivered(chatID, messageID)
+}
+
+// SendMessageDelivered sends in the session s.
+func (s Session) SendMessageDelivered(chatID string, messageID string) {
+	s.send(EventMesssageDelivered, MessageDeliveredSignal{ChatID: chatID, MessageID: messageID})
 }
 
 // SendMediaServerStarted notifies about restarts of the media server
 func SendMediaServerStarted(port int) {
-	send(EventMediaServerStarted, MediaServerStarted{Port: port})
+	CurrentSession().SendMediaServerStarted(port)
+}
+
+// SendMediaServerStarted sends in the session s.
+func (s Session) SendMediaServerStarted(port int) {
+	s.send(EventMediaServerStarted, MediaServerStarted{Port: port})
 }
 
 // SendMessageDelivered notifies about delivered message
 func SendCommunityInfoFound(community interface{}) {
-	send(EventCommunityInfoFound, community)
+	CurrentSession().SendCommunityInfoFound(community)
+}
+
+// SendCommunityInfoFound sends in the session s.
+func (s Session) SendCommunityInfoFound(community interface{}) {
+	s.send(EventCommunityInfoFound, community)
 }
 
 func SendStatusUpdatesTimedOut(statusUpdates interface{}) {
-	send(EventStatusUpdatesTimedOut, statusUpdates)
+	CurrentSession().SendStatusUpdatesTimedOut(statusUpdates)
+}
+
+// SendStatusUpdatesTimedOut sends in the session s.
+func (s Session) SendStatusUpdatesTimedOut(statusUpdates interface{}) {
+	s.send(EventStatusUpdatesTimedOut, statusUpdates)
 }
 
 func SendCuratedCommunitiesUpdate(curatedCommunitiesUpdate interface{}) {
-	send(EventCuratedCommunitiesUpdate, curatedCommunitiesUpdate)
+	CurrentSession().SendCuratedCommunitiesUpdate(curatedCommunitiesUpdate)
+}
+
+// SendCuratedCommunitiesUpdate sends in the session s.
+func (s Session) SendCuratedCommunitiesUpdate(curatedCommunitiesUpdate interface{}) {
+	s.send(EventCuratedCommunitiesUpdate, curatedCommunitiesUpdate)
 }
