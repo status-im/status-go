@@ -1759,3 +1759,38 @@ func (s *MessengerThreadsSuite) TestPendingThreadRenamesForUnknownThreadsAreBoun
 	s.Require().Len(pending, 1)
 	s.Require().Equal("Updated", pending[0].Name)
 }
+
+func (s *MessengerThreadsSuite) TestMutedThreadPreservesMentionAndReplyActivity() {
+	chat := &Chat{ID: "muted-thread-group", ChatType: ChatTypePrivateGroupChat, Active: true}
+	s.Require().NoError(s.m.SaveChat(chat))
+	s.Require().NoError(s.m.persistence.UpsertThread("thread", chat.ID, "parent", "Thread"))
+	_, err := s.m.MuteChat(&requests.MuteChat{ChatID: chat.ID, ThreadID: "thread", MutedType: MuteTillUnmuted})
+	s.Require().NoError(err)
+	threadID := "thread"
+	for i, kind := range []string{"ordinary", "mention", "reply", "reply-to-other"} {
+		message := buildTestMessage(*chat)
+		message.ID = fmt.Sprintf("0x%064x", i+1)
+		message.New = true
+		message.Mentioned = kind == "mention"
+		message.ChatMessage.ThreadId = &threadID
+		var responseTo *common.Message
+		if kind == "reply" || kind == "reply-to-other" {
+			responseTo = &common.Message{From: "other"}
+			if kind == "reply" {
+				responseTo.From = crypto.PubkeyToHex(&s.m.identity.PublicKey)
+			}
+		}
+		state := &ReceivedMessageState{AllChats: s.m.allChats, Response: &MessengerResponse{}}
+		s.Require().NoError(state.addNewActivityCenterNotification(s.m.identity.PublicKey, s.m, message, responseTo))
+		if kind == "mention" || kind == "reply" {
+			s.Require().Len(state.Response.ActivityCenterNotifications(), 1, kind)
+			expected := ActivityCenterNotificationTypeMention
+			if kind == "reply" {
+				expected = ActivityCenterNotificationTypeReply
+			}
+			s.Require().Equal(expected, state.Response.ActivityCenterNotifications()[0].Type)
+		} else {
+			s.Require().Empty(state.Response.ActivityCenterNotifications(), kind)
+		}
+	}
+}

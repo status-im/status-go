@@ -139,7 +139,7 @@ func TestThreadMuteValidation(t *testing.T) {
 	require.ErrorIs(t, m.UnmuteThread(testPublicChatID, "thread"), ErrThreadFeatureDisabled)
 }
 
-func TestThreadMuteSuppressesOnlyThreadActivity(t *testing.T) {
+func TestThreadMuteSuppressesOnlyOrdinaryThreadActivity(t *testing.T) {
 	m := threadMuteMessenger(t)
 	request := &requests.MuteChat{ChatID: testPublicChatID, ThreadID: "thread", MutedType: MuteTillUnmuted}
 	_, err := m.MuteChat(request)
@@ -152,7 +152,7 @@ func TestThreadMuteSuppressesOnlyThreadActivity(t *testing.T) {
 	message, err := m.persistence.MessageByID("reply")
 	require.NoError(t, err)
 	message.New = true
-	message.Mentioned = true
+	message.Mentioned = false
 	state := &ReceivedMessageState{AllChats: m.allChats, Response: &MessengerResponse{}}
 	require.NoError(t, state.addNewActivityCenterNotification(ecdsa.PublicKey{}, m, message, nil))
 	require.Empty(t, state.Response.ActivityCenterNotifications())
