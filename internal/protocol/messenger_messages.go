@@ -8,6 +8,7 @@ import (
 	"github.com/golang/protobuf/proto"
 
 	"github.com/status-im/status-go/internal/crypto"
+	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/logutils"
 	"github.com/status-im/status-go/internal/protocol/common"
 	"github.com/status-im/status-go/internal/protocol/contacts"
@@ -543,40 +544,27 @@ func (m *Messenger) SendGroupChatMessage(request *requests.SendGroupChatMessage)
 }
 
 func (m *Messenger) deleteCommunityMemberMessages(member string, communityID string, deleteMessages []*protobuf.DeleteCommunityMemberMessage) (*MessengerResponse, error) {
-	messagesToDelete := deleteMessages
-	var err error
-	if len(deleteMessages) == 0 {
-		messagesToDelete, err = m.persistence.GetCommunityMemberMessagesToDelete(member, communityID)
-		if err != nil {
-			return nil, err
-		}
+	request := &requests.DeleteCommunityMemberMessages{
+		CommunityID:  cryptotypes.FromHex(communityID),
+		MemberPubKey: member,
+		Messages:     deleteMessages,
+		DeleteAll:    len(deleteMessages) == 0,
 	}
-
-	response := &MessengerResponse{}
-
-	if len(messagesToDelete) == 0 {
-		return response, nil
+	if err := request.Validate(); err != nil {
+		return nil, err
 	}
-
-	for _, messageToDelete := range messagesToDelete {
-		updatedMessages, err := m.persistence.MessagesByResponseTo(messageToDelete.Id)
-		if err != nil {
-			return nil, err
-		}
-		response.AddMessages(updatedMessages)
+	memberPubKey, err := crypto.HexToPubkey(member)
+	if err != nil {
+		return nil, err
 	}
-
-	response.AddDeletedMessages(messagesToDelete)
-
-	messageIDs := make([]string, 0, len(messagesToDelete))
-
-	for _, rm := range messagesToDelete {
-		messageIDs = append(messageIDs, rm.Id)
-	}
-
-	if err = m.persistence.DeleteMessages(messageIDs); err != nil {
+	member = cryptotypes.EncodeHex(crypto.FromECDSAPub(memberPubKey))
+	messagesToDelete, updatedMessages, err := m.persistence.deleteCommunityMemberMessages(member, communityID, deleteMessages)
+	if err != nil {
 		return nil, err
 	}
 
+	response := &MessengerResponse{}
+	response.AddMessages(updatedMessages)
+	response.AddDeletedMessages(messagesToDelete)
 	return response, nil
 }

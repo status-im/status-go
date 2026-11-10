@@ -3380,6 +3380,107 @@ func (db sqlitePersistence) DeleteMessages(ids []string) (err error) {
 	return err
 }
 
+var ErrCommunityMessageScopeMismatch = errors.New("message does not belong to the requested community, chat and member")
+
+// deleteCommunityMemberMessages rejects existing out-of-scope targets atomically.
+// Missing IDs are idempotent no-ops; an empty list selects all messages by the member.
+func (db sqlitePersistence) deleteCommunityMemberMessages(member, communityID string, requested []*protobuf.DeleteCommunityMemberMessage) (deleted []*protobuf.DeleteCommunityMemberMessage, replies []*common.Message, err error) {
+	tx, err := db.db.BeginTx(context.Background(), nil)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+		} else {
+			err = errors.Join(err, tx.Rollback())
+		}
+		if err != nil {
+			deleted, replies = nil, nil
+		}
+	}()
+
+	if len(requested) == 0 {
+		rows, queryErr := tx.Query(`SELECT m.id, m.chat_id FROM user_messages m
+			INNER JOIN chats ch ON ch.id = m.local_chat_id
+			WHERE ch.community_id = ? AND m.source = ? AND m.chat_id = ch.id`, communityID, member)
+		if queryErr != nil {
+			return nil, nil, queryErr
+		}
+		for rows.Next() {
+			message := &protobuf.DeleteCommunityMemberMessage{}
+			if err = rows.Scan(&message.Id, &message.ChatId); err != nil {
+				rows.Close()
+				return nil, nil, err
+			}
+			deleted = append(deleted, message)
+		}
+		err = errors.Join(rows.Err(), rows.Close())
+		if err != nil {
+			return nil, nil, err
+		}
+	} else {
+		seen := make(map[string]string, len(requested))
+		for _, target := range requested {
+			if chatID, ok := seen[target.Id]; ok {
+				if chatID != target.ChatId {
+					return nil, nil, ErrCommunityMessageScopeMismatch
+				}
+				continue
+			}
+			seen[target.Id] = target.ChatId
+			var chatID, localChatID, author string
+			var storedCommunity sql.NullString
+			err = tx.QueryRow(`SELECT m.chat_id, m.local_chat_id, m.source, ch.community_id
+				FROM user_messages m LEFT JOIN chats ch ON ch.id = m.local_chat_id
+				WHERE m.id = ?`, target.Id).Scan(&chatID, &localChatID, &author, &storedCommunity)
+			if errors.Is(err, sql.ErrNoRows) {
+				err = nil
+				continue
+			}
+			if err != nil {
+				return nil, nil, err
+			}
+			if !storedCommunity.Valid || storedCommunity.String != communityID || chatID != localChatID || chatID != target.ChatId || author != member {
+				return nil, nil, ErrCommunityMessageScopeMismatch
+			}
+			deleted = append(deleted, &protobuf.DeleteCommunityMemberMessage{Id: target.Id, ChatId: chatID})
+		}
+	}
+
+	for _, target := range deleted {
+		rows, queryErr := tx.Query(db.buildMessagesQuery("WHERE m1.response_to = ?"), target.Id)
+		if queryErr != nil {
+			return nil, nil, queryErr
+		}
+		updated, scanErr := getMessagesFromScanRows(db, rows, false)
+		err = errors.Join(scanErr, rows.Err(), rows.Close())
+		if err != nil {
+			return nil, nil, err
+		}
+		replies = append(replies, updated...)
+	}
+
+	for _, target := range deleted {
+		// Pin removal uses the same scoped message selection before deleting the message.
+		_, err = tx.Exec(`DELETE FROM pin_messages WHERE message_id IN (
+			SELECT m.id FROM user_messages m INNER JOIN chats ch ON ch.id = m.local_chat_id
+			WHERE m.id = ? AND m.chat_id = ? AND m.local_chat_id = ? AND m.source = ? AND ch.community_id = ?
+		)`, target.Id, target.ChatId, target.ChatId, member, communityID)
+		if err != nil {
+			return nil, nil, err
+		}
+		_, err = tx.Exec(`DELETE FROM user_messages
+			WHERE id = ? AND chat_id = ? AND local_chat_id = ? AND source = ?
+			AND EXISTS (SELECT 1 FROM chats WHERE chats.id = user_messages.local_chat_id AND chats.community_id = ?)`,
+			target.Id, target.ChatId, target.ChatId, member, communityID)
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+	return deleted, replies, nil
+}
+
 func (db sqlitePersistence) HideMessage(id string) error {
 	_, err := db.db.Exec(`UPDATE user_messages SET hide = 1, seen = 1 WHERE id = ?`, id)
 	return err

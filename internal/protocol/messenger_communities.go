@@ -4956,8 +4956,27 @@ func (m *Messenger) HandleDeleteCommunityMemberMessages(ctx context.Context, sta
 		return communities.ErrOrgNotFound
 	}
 
-	if !community.ControlNode().Equal(state.CurrentMessageState.PublicKey) && !community.IsPrivilegedMember(state.CurrentMessageState.PublicKey) {
+	isControlNode := community.ControlNode().Equal(state.CurrentMessageState.PublicKey)
+	if !isControlNode && !community.IsPrivilegedMember(state.CurrentMessageState.PublicKey) {
 		return communities.ErrNotAuthorized
+	}
+
+	deleteRequest := &requests.DeleteCommunityMemberMessages{
+		CommunityID:  request.CommunityId,
+		MemberPubKey: request.MemberId,
+		Messages:     request.Messages,
+		DeleteAll:    len(request.Messages) == 0,
+	}
+	if err := deleteRequest.Validate(); err != nil {
+		return err
+	}
+
+	memberPubKey, err := crypto.HexToPubkey(request.MemberId)
+	if err != nil {
+		return err
+	}
+	if community.IsMemberOwner(memberPubKey) && !isControlNode && !state.CurrentMessageState.PublicKey.Equal(memberPubKey) {
+		return communities.ErrNotOwner
 	}
 
 	deleteMessagesResponse, err := m.deleteCommunityMemberMessages(request.MemberId, community.IDString(), request.Messages)
