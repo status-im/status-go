@@ -6,9 +6,12 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
+	"github.com/status-im/status-go/internal/crypto"
 	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
 	"github.com/status-im/status-go/internal/db/multiaccounts/settings"
 	"github.com/status-im/status-go/internal/images"
+	"github.com/status-im/status-go/internal/protocol/contacts"
+	"github.com/status-im/status-go/internal/protocol/protobuf"
 	"github.com/status-im/status-go/internal/testutils/fake"
 )
 
@@ -18,6 +21,28 @@ func TestMessengerContacts(t *testing.T) {
 
 type MessengerContactsTestSuite struct {
 	MessengerBaseTestSuite
+}
+
+func (s *MessengerContactsTestSuite) TestContactWithImagesRestoresStoredPhoto() {
+	peer, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+	contact, err := contacts.BuildContactFromPublicKey(&peer.PublicKey)
+	s.Require().NoError(err)
+	s.Require().NoError(s.m.persistence.SaveContact(contact, nil))
+	photo := fake.IdentityImages()[0]
+	_, _, err = s.m.persistence.UpdateContactChatIdentity(contact.ID, &protobuf.ChatIdentity{
+		Clock: 1, Images: map[string]*protobuf.IdentityImage{photo.Name: {Payload: photo.Payload}},
+	})
+	s.Require().NoError(err)
+	contact.Images = map[string]images.IdentityImage{photo.Name: {Name: photo.Name, LocalURL: "https://localhost/photo"}}
+	s.m.allContacts.Store(contact.ID, contact)
+
+	loaded := s.m.GetContactByIDWithImages(contact.ID)
+	s.Require().NotNil(loaded)
+	s.Require().Equal(photo.Payload, loaded.Images[photo.Name].Payload)
+	s.Require().Empty(s.m.GetContactByID(contact.ID).Images[photo.Name].Payload)
+	s.Require().Same(s.m.GetSelfContact(), s.m.GetContactByIDWithImages(s.m.IdentityPublicKeyString()))
+	s.Require().Nil(s.m.GetContactByIDWithImages("missing"))
 }
 
 func (s *MessengerContactsTestSuite) Test_SelfContact() {
