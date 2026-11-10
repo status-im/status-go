@@ -84,6 +84,22 @@ func TestHandleSDSMessageSentForwardsMessageID(t *testing.T) {
 	require.Equal(t, "0x1234", received)
 }
 
+func TestSDSExpiryDoesNotConfirmDelivery(t *testing.T) {
+	r := newTestReliability(t)
+	t.Cleanup(r.Close)
+
+	var confirmed []string
+	r.SetMessageSentHandler(func(messageID string) {
+		confirmed = append(confirmed, messageID)
+	})
+
+	r.sdsManager.OnEvent(`{"eventType":"message_expired","messageId":"0x1234","channelId":"community-chat"}`)
+	require.Empty(t, confirmed)
+
+	r.sdsManager.OnEvent(`{"eventType":"message_sent","messageId":"0x1234","channelId":"community-chat"}`)
+	require.Equal(t, []string{"0x1234"}, confirmed)
+}
+
 func TestHandleMissingDependenciesPreservesIDWithoutValidHint(t *testing.T) {
 	r := newTestReliability(t)
 
