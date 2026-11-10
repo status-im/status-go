@@ -14,6 +14,7 @@ class MobileBuildTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             shutil.copy(repo / "Makefile", root)
+            shutil.copy(repo / "nim.mk", root)
             (root / "scripts").mkdir()
             # Exercise Make's actual environment handoff, without SDK downloads
             # or native compilation. A leaked host path must fail the recipe.

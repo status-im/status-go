@@ -20,7 +20,7 @@
 
   inputs = {
     nim-token-lists = {
-      url = "git+https://github.com/status-im/nim-token-lists?submodules=1&rev=9be9a427df5b0e53a1396a025f8bc9e4c2ab8ded";
+      url = "git+https://github.com/status-im/nim-token-lists?submodules=1&rev=4df3308a32b0f3da18ef0d37d26fa9f1195f8b9e";
       flake = false;
     };
     # We are pinning the commit because ultimately we want to use same commit across different projects.
@@ -32,7 +32,7 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
     # We cannot do follows since the nim-unwrapped-2_0 doesn't exist in this nixpkgs version above
-    nim-sds.url = "git+https://github.com/logos-messaging/nim-sds?submodules=1&rev=fc932e5785cdd6913b7e792adbad8ad6bf24289a";
+    nim-sds.url = "git+https://github.com/logos-messaging/nim-sds?submodules=1&rev=8f7fee08f0256c1788089e756182c8be0a621930";
     # nimble 0.20.1 in the nixpkgs above cannot resolve nim-sds through the bindings.
     nixpkgs-nimble.url = "github:NixOS/nixpkgs/34ab99075ac4f7e40cf037eef32cb1c360bb85e9";
   };
