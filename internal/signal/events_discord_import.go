@@ -75,7 +75,12 @@ type DiscordChannelImportCancelledSignal struct {
 }
 
 func SendDiscordCategoriesAndChannelsExtracted(categories []*discord.Category, channels []*discord.Channel, oldestMessageTimestamp int64, errors map[string]*discord.ImportError) {
-	send(EventDiscordCategoriesAndChannelsExtracted, DiscordCategoriesAndChannelsExtractedSignal{
+	CurrentSession().SendDiscordCategoriesAndChannelsExtracted(categories, channels, oldestMessageTimestamp, errors)
+}
+
+// SendDiscordCategoriesAndChannelsExtracted sends in the session s.
+func (s Session) SendDiscordCategoriesAndChannelsExtracted(categories []*discord.Category, channels []*discord.Channel, oldestMessageTimestamp int64, errors map[string]*discord.ImportError) {
+	s.send(EventDiscordCategoriesAndChannelsExtracted, DiscordCategoriesAndChannelsExtractedSignal{
 		Categories:             categories,
 		Channels:               channels,
 		OldestMessageTimestamp: oldestMessageTimestamp,
@@ -84,44 +89,79 @@ func SendDiscordCategoriesAndChannelsExtracted(categories []*discord.Category, c
 }
 
 func SendDiscordCommunityImportProgress(importProgress *discord.ImportProgress) {
-	send(EventDiscordCommunityImportProgress, DiscordCommunityImportProgressSignal{
+	CurrentSession().SendDiscordCommunityImportProgress(importProgress)
+}
+
+// SendDiscordCommunityImportProgress sends in the session s.
+func (s Session) SendDiscordCommunityImportProgress(importProgress *discord.ImportProgress) {
+	s.send(EventDiscordCommunityImportProgress, DiscordCommunityImportProgressSignal{
 		ImportProgress: importProgress,
 	})
 }
 
 func SendDiscordChannelImportProgress(importProgress *discord.ImportProgress) {
-	send(EventDiscordChannelImportProgress, DiscordChannelImportProgressSignal{
+	CurrentSession().SendDiscordChannelImportProgress(importProgress)
+}
+
+// SendDiscordChannelImportProgress sends in the session s.
+func (s Session) SendDiscordChannelImportProgress(importProgress *discord.ImportProgress) {
+	s.send(EventDiscordChannelImportProgress, DiscordChannelImportProgressSignal{
 		ImportProgress: importProgress,
 	})
 }
 
 func SendDiscordCommunityImportFinished(communityID string) {
-	send(EventDiscordCommunityImportFinished, DiscordCommunityImportFinishedSignal{
+	CurrentSession().SendDiscordCommunityImportFinished(communityID)
+}
+
+// SendDiscordCommunityImportFinished sends in the session s.
+func (s Session) SendDiscordCommunityImportFinished(communityID string) {
+	s.send(EventDiscordCommunityImportFinished, DiscordCommunityImportFinishedSignal{
 		CommunityID: communityID,
 	})
 }
 
 func SendDiscordChannelImportFinished(communityID string, channelID string) {
-	send(EventDiscordChannelImportFinished, DiscordChannelImportFinishedSignal{
+	CurrentSession().SendDiscordChannelImportFinished(communityID, channelID)
+}
+
+// SendDiscordChannelImportFinished sends in the session s.
+func (s Session) SendDiscordChannelImportFinished(communityID string, channelID string) {
+	s.send(EventDiscordChannelImportFinished, DiscordChannelImportFinishedSignal{
 		CommunityID: communityID,
 		ChannelID:   channelID,
 	})
 }
 
 func SendDiscordCommunityImportCancelled(communityID string) {
-	send(EventDiscordCommunityImportCancelled, DiscordCommunityImportCancelledSignal{
+	CurrentSession().SendDiscordCommunityImportCancelled(communityID)
+}
+
+// SendDiscordCommunityImportCancelled sends in the session s.
+func (s Session) SendDiscordCommunityImportCancelled(communityID string) {
+	s.send(EventDiscordCommunityImportCancelled, DiscordCommunityImportCancelledSignal{
 		CommunityID: communityID,
 	})
 }
 
 func SendDiscordCommunityImportCleanedUp(communityID string) {
-	send(EventDiscordCommunityImportCleanedUp, DiscordCommunityImportCleanedUpSignal{
+	CurrentSession().SendDiscordCommunityImportCleanedUp(communityID)
+}
+
+// SendDiscordCommunityImportCleanedUp sends in the session s.
+func (s Session) SendDiscordCommunityImportCleanedUp(communityID string) {
+	s.send(EventDiscordCommunityImportCleanedUp, DiscordCommunityImportCleanedUpSignal{
 		CommunityID: communityID,
 	})
 }
 
 func SendDiscordChannelImportCancelled(channelID string) {
-	send(EventDiscordChannelImportCancelled, DiscordChannelImportCancelledSignal{
+	CurrentSession().SendDiscordChannelImportCancelled(channelID)
+}
+
+// SendDiscordChannelImportCancelled sends in the session s.
+func (s Session) SendDiscordChannelImportCancelled(channelID string) {
+	s.send(EventDiscordChannelImportCancelled, DiscordChannelImportCancelledSignal{
 		ChannelID: channelID,
 	})
 }

@@ -8,13 +8,16 @@ import (
 
 type SignalsTransmitter struct {
 	publisher *pubsub.Publisher
+	// The backend session the transmitter runs in; its signals are sent in it.
+	signalSession signal.Session
 
 	quit chan struct{}
 }
 
 func NewSignalsTransmitter(publisher *pubsub.Publisher) *SignalsTransmitter {
 	return &SignalsTransmitter{
-		publisher: publisher,
+		publisher:     publisher,
+		signalSession: signal.CurrentSession(),
 	}
 }
 
@@ -37,7 +40,7 @@ func (tmr *SignalsTransmitter) Start() error {
 				if !ok {
 					return
 				}
-				signal.SendNetworksBlockchainHealthChanged(event.FullStatus)
+				tmr.signalSession.SendNetworksBlockchainHealthChanged(event.FullStatus)
 			}
 		}
 	}()

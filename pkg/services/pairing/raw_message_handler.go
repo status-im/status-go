@@ -19,10 +19,12 @@ import (
 
 type SyncRawMessageHandler struct {
 	backend *backend.StatusBackend
+	// The backend session the handler was created in; its events are sent in it.
+	signalSession signal.Session
 }
 
 func NewSyncRawMessageHandler(backend *backend.StatusBackend) *SyncRawMessageHandler {
-	return &SyncRawMessageHandler{backend: backend}
+	return &SyncRawMessageHandler{backend: backend, signalSession: signal.CurrentSession()}
 }
 
 func (s *SyncRawMessageHandler) CollectInstallationData(rawMessageCollector *RawMessageCollector, deviceType string) error {
@@ -121,7 +123,7 @@ func (s *SyncRawMessageHandler) HandleRawMessage(
 	}
 
 	if newInstallation := FindNewInstallations(messenger, installations); newInstallation != nil {
-		signal.SendLocalPairingEvent(Event{
+		s.signalSession.SendLocalPairingEvent(Event{
 			Type:   EventReceivedInstallation,
 			Action: ActionPairingInstallation,
 			Data:   newInstallation})

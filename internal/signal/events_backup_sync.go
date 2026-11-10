@@ -13,13 +13,28 @@ const (
 )
 
 func SendBackedUpProfile(obj json.Marshaler) {
-	send(EventBackedUpProfile, obj)
+	CurrentSession().SendBackedUpProfile(obj)
+}
+
+// SendBackedUpProfile sends in the session s.
+func (s Session) SendBackedUpProfile(obj json.Marshaler) {
+	s.send(EventBackedUpProfile, obj)
 }
 
 func SendBackedUpSettings(obj json.Marshaler) {
-	send(EventBackedUpSettings, obj)
+	CurrentSession().SendBackedUpSettings(obj)
+}
+
+// SendBackedUpSettings sends in the session s.
+func (s Session) SendBackedUpSettings(obj json.Marshaler) {
+	s.send(EventBackedUpSettings, obj)
 }
 
 func SendLocalBackUpCompleted(obj json.Marshaler) {
-	send(EventLocalBackUpCompleted, obj)
+	CurrentSession().SendLocalBackUpCompleted(obj)
+}
+
+// SendLocalBackUpCompleted sends in the session s.
+func (s Session) SendLocalBackUpCompleted(obj json.Marshaler) {
+	s.send(EventLocalBackUpCompleted, obj)
 }

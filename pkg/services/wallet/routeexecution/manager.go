@@ -29,6 +29,9 @@ const (
 )
 
 type Manager struct {
+	// The backend session the manager runs in; transaction results are sent in it,
+	// also when the work finishes after a logout.
+	signalSession      signal.Session
 	router             *router.Router
 	tokenManager       *token.Manager
 	transactionManager *transfer.TransactionManager
@@ -38,6 +41,7 @@ type Manager struct {
 
 func NewManager(walletDB *sql.DB, eventFeed *event.Feed, router *router.Router, tokenManager *token.Manager, transactionManager *transfer.TransactionManager) *Manager {
 	return &Manager{
+		signalSession:      signal.CurrentSession(),
 		router:             router,
 		tokenManager:       tokenManager,
 		transactionManager: transactionManager,
@@ -78,7 +82,7 @@ func (m *Manager) BuildTransactionsFromRoute(ctx context.Context, uuid string) {
 				err = statusErrors.CreateErrorResponseFromError(err)
 				response.SendDetails.ErrorResponse = err.(*statusErrors.ErrorResponse)
 			}
-			signal.SendWalletEvent(signal.SignRouterTransactions, response)
+			m.signalSession.SendWalletEvent(signal.SignRouterTransactions, response)
 		}()
 
 		// the update loop is stopped, so re-estimate stale gas here
@@ -106,7 +110,7 @@ func (m *Manager) BuildTransactionsFromRoute(ctx context.Context, uuid string) {
 		response.SendDetails.UpdateFields(routeInputParams, routeInputParams.FromChainID, routeInputParams.ToChainID)
 
 		// notify client that sending transactions started (has 3 steps, building txs, signing txs, sending txs)
-		signal.SendWalletEvent(signal.RouterSendingTransactionsStarted, response.SendDetails)
+		m.signalSession.SendWalletEvent(signal.RouterSendingTransactionsStarted, response.SendDetails)
 
 		var fromChainID, toChainID uint64
 		response.SigningDetails, fromChainID, toChainID, err = m.transactionManager.BuildTransactionsFromRoute(
@@ -154,7 +158,7 @@ func (m *Manager) SendRouterTransactionsWithSignatures(ctx context.Context, send
 				err = statusErrors.CreateErrorResponseFromError(err)
 				response.SendDetails.ErrorResponse = err.(*statusErrors.ErrorResponse)
 			}
-			signal.SendWalletEvent(signal.RouterTransactionsSent, response)
+			m.signalSession.SendWalletEvent(signal.RouterTransactionsSent, response)
 
 			event := walletevent.Event{
 				Type:        EventRouteExecutionTransactionSent,

@@ -9,153 +9,153 @@ import (
 	"github.com/status-im/status-go/internal/signal"
 )
 
-// EnvelopeSignalHandler sends signals when envelope is sent or expired.
-type EnvelopeSignalHandler struct{}
+// EnvelopeSignalHandler sends signals when envelope is sent or expired, in the backend
+// session it was created in.
+type EnvelopeSignalHandler struct {
+	session signal.Session
+}
 
 // EnvelopeSent triggered when envelope delivered at least to 1 peer.
 func (h EnvelopeSignalHandler) EnvelopeSent(identifiers [][]byte) {
-	signal.SendEnvelopeSent(identifiers)
+	h.session.SendEnvelopeSent(identifiers)
 }
 
 // EnvelopeExpired triggered when envelope is expired but wasn't delivered to any peer.
 func (h EnvelopeSignalHandler) EnvelopeExpired(identifiers [][]byte, err error) {
-	signal.SendEnvelopeExpired(identifiers, err)
+	h.session.SendEnvelopeExpired(identifiers, err)
 }
 
 // MailServerRequestCompleted triggered when the mailserver sends a message to notify that the request has been completed
 func (h EnvelopeSignalHandler) MailServerRequestCompleted(requestID types.Hash, lastEnvelopeHash types.Hash, cursor []byte, err error) {
-	signal.SendMailServerRequestCompleted(requestID, lastEnvelopeHash, cursor, err)
+	h.session.SendMailServerRequestCompleted(requestID, lastEnvelopeHash, cursor, err)
 }
 
 // MailServerRequestExpired triggered when the mailserver request expires
 func (h EnvelopeSignalHandler) MailServerRequestExpired(hash types.Hash) {
-	signal.SendMailServerRequestExpired(hash)
+	h.session.SendMailServerRequestExpired(hash)
 }
 
-// PublisherSignalHandler sends signals on protocol events
-type PublisherSignalHandler struct{}
-
-func (h PublisherSignalHandler) NewMessages(response *protocol.MessengerResponse) {
-	signal.SendNewMessages(response)
+// MessengerSignalsHandler sends signals on messenger events, in the backend session it
+// was created in: messenger work still running after a logout must not reach the client
+// as the next session's.
+type MessengerSignalsHandler struct {
+	session signal.Session
 }
-
-// MessengerSignalsHandler sends signals on messenger events
-type MessengerSignalsHandler struct{}
 
 // MessageDelivered passes information that message was delivered
 func (m *MessengerSignalsHandler) MessageDelivered(chatID string, messageID string) {
-	signal.SendMessageDelivered(chatID, messageID)
+	m.session.SendMessageDelivered(chatID, messageID)
 }
 
 // CommunityInfoFound passes info about community that was requested before
 func (m *MessengerSignalsHandler) CommunityInfoFound(community *communities.Community) {
-	signal.SendCommunityInfoFound(community)
+	m.session.SendCommunityInfoFound(community)
 }
 
 func (m *MessengerSignalsHandler) MessengerResponse(response *protocol.MessengerResponse) {
-	PublisherSignalHandler{}.NewMessages(response)
+	m.session.SendNewMessages(response)
 }
 
 func (m *MessengerSignalsHandler) HistoryRequestStarted(numBatches int) {
-	signal.SendHistoricMessagesRequestStarted(numBatches)
+	m.session.SendHistoricMessagesRequestStarted(numBatches)
 }
 
 func (m *MessengerSignalsHandler) HistoryRequestCompleted() {
-	signal.SendHistoricMessagesRequestCompleted()
+	m.session.SendHistoricMessagesRequestCompleted()
 }
 
 func (m *MessengerSignalsHandler) HistoryArchivesProtocolEnabled() {
-	signal.SendHistoryArchivesProtocolEnabled()
+	m.session.SendHistoryArchivesProtocolEnabled()
 }
 
 func (m *MessengerSignalsHandler) HistoryArchivesProtocolDisabled() {
-	signal.SendHistoryArchivesProtocolDisabled()
+	m.session.SendHistoryArchivesProtocolDisabled()
 }
 
 func (m *MessengerSignalsHandler) CreatingHistoryArchives(communityID string) {
-	signal.SendCreatingHistoryArchives(communityID)
+	m.session.SendCreatingHistoryArchives(communityID)
 }
 
 func (m *MessengerSignalsHandler) NoHistoryArchivesCreated(communityID string, from int, to int) {
-	signal.SendNoHistoryArchivesCreated(communityID, from, to)
+	m.session.SendNoHistoryArchivesCreated(communityID, from, to)
 }
 
 func (m *MessengerSignalsHandler) HistoryArchivesCreated(communityID string, from int, to int) {
-	signal.SendHistoryArchivesCreated(communityID, from, to)
+	m.session.SendHistoryArchivesCreated(communityID, from, to)
 }
 
 func (m *MessengerSignalsHandler) HistoryArchivesSeeding(communityID string) {
-	signal.SendHistoryArchivesSeeding(communityID)
+	m.session.SendHistoryArchivesSeeding(communityID)
 }
 
 func (m *MessengerSignalsHandler) HistoryArchivesUnseeded(communityID string) {
-	signal.SendHistoryArchivesUnseeded(communityID)
+	m.session.SendHistoryArchivesUnseeded(communityID)
 }
 
 func (m *MessengerSignalsHandler) HistoryArchiveDownloaded(communityID string, from int, to int) {
-	signal.SendHistoryArchiveDownloaded(communityID, from, to)
+	m.session.SendHistoryArchiveDownloaded(communityID, from, to)
 }
 
 func (m *MessengerSignalsHandler) IndexDownloadCompleted(communityID string, indexCid string) {
-	signal.SendIndexDownloadCompleted(communityID, indexCid)
+	m.session.SendIndexDownloadCompleted(communityID, indexCid)
 }
 
 func (m *MessengerSignalsHandler) DownloadingHistoryArchivesStarted(communityID string) {
-	signal.SendDownloadingHistoryArchivesStarted(communityID)
+	m.session.SendDownloadingHistoryArchivesStarted(communityID)
 }
 
 func (m *MessengerSignalsHandler) ImportingHistoryArchiveMessages(communityID string) {
-	signal.SendImportingHistoryArchiveMessages(communityID)
+	m.session.SendImportingHistoryArchiveMessages(communityID)
 }
 
 func (m *MessengerSignalsHandler) DownloadingHistoryArchivesFinished(communityID string) {
-	signal.SendDownloadingHistoryArchivesFinished(communityID)
+	m.session.SendDownloadingHistoryArchivesFinished(communityID)
 }
 
 func (m *MessengerSignalsHandler) StatusUpdatesTimedOut(statusUpdates *[]protocol.UserStatus) {
-	signal.SendStatusUpdatesTimedOut(statusUpdates)
+	m.session.SendStatusUpdatesTimedOut(statusUpdates)
 }
 
 func (m *MessengerSignalsHandler) DiscordCategoriesAndChannelsExtracted(categories []*discord.Category, channels []*discord.Channel, oldestMessageTimestamp int64, errors map[string]*discord.ImportError) {
-	signal.SendDiscordCategoriesAndChannelsExtracted(categories, channels, oldestMessageTimestamp, errors)
+	m.session.SendDiscordCategoriesAndChannelsExtracted(categories, channels, oldestMessageTimestamp, errors)
 }
 
 func (m *MessengerSignalsHandler) DiscordCommunityImportProgress(importProgress *discord.ImportProgress) {
-	signal.SendDiscordCommunityImportProgress(importProgress)
+	m.session.SendDiscordCommunityImportProgress(importProgress)
 }
 
 func (m *MessengerSignalsHandler) DiscordChannelImportProgress(importProgress *discord.ImportProgress) {
-	signal.SendDiscordChannelImportProgress(importProgress)
+	m.session.SendDiscordChannelImportProgress(importProgress)
 }
 
 func (m *MessengerSignalsHandler) DiscordCommunityImportFinished(id string) {
-	signal.SendDiscordCommunityImportFinished(id)
+	m.session.SendDiscordCommunityImportFinished(id)
 }
 
 func (m *MessengerSignalsHandler) DiscordChannelImportFinished(communityID string, channelID string) {
-	signal.SendDiscordChannelImportFinished(communityID, channelID)
+	m.session.SendDiscordChannelImportFinished(communityID, channelID)
 }
 
 func (m *MessengerSignalsHandler) DiscordCommunityImportCancelled(id string) {
-	signal.SendDiscordCommunityImportCancelled(id)
+	m.session.SendDiscordCommunityImportCancelled(id)
 }
 
 func (m *MessengerSignalsHandler) DiscordCommunityImportCleanedUp(id string) {
-	signal.SendDiscordCommunityImportCleanedUp(id)
+	m.session.SendDiscordCommunityImportCleanedUp(id)
 }
 
 func (m *MessengerSignalsHandler) DiscordChannelImportCancelled(id string) {
-	signal.SendDiscordChannelImportCancelled(id)
+	m.session.SendDiscordChannelImportCancelled(id)
 }
 
 func (m *MessengerSignalsHandler) SendBackedUpProfile(response *backupsync.BackedUpDataResponse) {
-	signal.SendBackedUpProfile(response)
+	m.session.SendBackedUpProfile(response)
 }
 
 func (m *MessengerSignalsHandler) SendBackedUpSettings(response *backupsync.BackedUpDataResponse) {
-	signal.SendBackedUpSettings(response)
+	m.session.SendBackedUpSettings(response)
 }
 
 func (m *MessengerSignalsHandler) SendCuratedCommunitiesUpdate(response *communities.KnownCommunitiesResponse) {
-	signal.SendCuratedCommunitiesUpdate(response)
+	m.session.SendCuratedCommunitiesUpdate(response)
 }

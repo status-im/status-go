@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/status-im/status-go/internal/protocol/requests"
-	"github.com/status-im/status-go/internal/signal"
 )
 
 // Revisions outlive individual Messenger instances within the embedded backend.
@@ -34,7 +33,7 @@ func (m *Messenger) muteThread(request *requests.MuteChat) (time.Time, error) {
 	if err != nil {
 		return time.Time{}, err
 	}
-	signal.SendNewMessages(response)
+	m.signalSession.SendNewMessages(response)
 	return deadline, nil
 }
 
@@ -46,7 +45,7 @@ func (m *Messenger) UnmuteThread(chatID, threadID string) error {
 	if err != nil {
 		return err
 	}
-	signal.SendNewMessages(response)
+	m.signalSession.SendNewMessages(response)
 	return nil
 }
 

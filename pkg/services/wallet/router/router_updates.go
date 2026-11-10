@@ -238,7 +238,7 @@ func (r *Router) sendUpdatesError(err error) {
 	r.activeRoutesMutex.Lock()
 	defer r.activeRoutesMutex.Unlock()
 
-	sendRouterResult(uuid, r.activeRoutes, err)
+	r.sendRouterResult(uuid, r.activeRoutes, err)
 }
 
 func (r *Router) startTimeoutForUpdates(closeCh chan struct{}, timeout time.Duration) {

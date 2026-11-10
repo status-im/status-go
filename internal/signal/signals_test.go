@@ -65,3 +65,37 @@ func TestAdvanceEpochStampsLaterSignals(t *testing.T) {
 	require.NoError(t, json.Unmarshal(emitted, &second))
 	require.Equal(t, advanced, second.Epoch)
 }
+
+// Work started in a session that sends after a logout keeps that session's epoch, so
+// the client can tell it from the next session's signals.
+func TestSessionKeepsItsEpochAfterAdvance(t *testing.T) {
+	var emitted []byte
+	SetHandler(func(data []byte) { emitted = data })
+	defer ResetHandler()
+
+	session := CurrentSession()
+	ended := Epoch()
+	AdvanceEpoch()
+
+	session.SendNewMessages(json.RawMessage(`{}`))
+	var late Envelope
+	require.NoError(t, json.Unmarshal(emitted, &late))
+	require.Equal(t, ended, late.Epoch)
+
+	SendNewMessages(json.RawMessage(`{}`))
+	var current Envelope
+	require.NoError(t, json.Unmarshal(emitted, &current))
+	require.Equal(t, Epoch(), current.Epoch)
+}
+
+func TestZeroSessionSendsInTheCurrentSession(t *testing.T) {
+	var emitted []byte
+	SetHandler(func(data []byte) { emitted = data })
+	defer ResetHandler()
+
+	AdvanceEpoch()
+	Session{}.SendNewMessages(json.RawMessage(`{}`))
+	var envelope Envelope
+	require.NoError(t, json.Unmarshal(emitted, &envelope))
+	require.Equal(t, Epoch(), envelope.Epoch)
+}

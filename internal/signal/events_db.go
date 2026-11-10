@@ -9,10 +9,20 @@ const (
 
 // Send db.reencryption.started signal.
 func SendReEncryptionStarted() {
-	send(ReEncryptionStarted, nil)
+	CurrentSession().SendReEncryptionStarted()
+}
+
+// SendReEncryptionStarted sends in the session s.
+func (s Session) SendReEncryptionStarted() {
+	s.send(ReEncryptionStarted, nil)
 }
 
 // Send db.reencryption.finished signal.
 func SendReEncryptionFinished() {
-	send(ReEncryptionFinished, nil)
+	CurrentSession().SendReEncryptionFinished()
+}
+
+// SendReEncryptionFinished sends in the session s.
+func (s Session) SendReEncryptionFinished() {
+	s.send(ReEncryptionFinished, nil)
 }
