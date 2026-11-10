@@ -30,6 +30,8 @@ pipeline {
   environment {
     /* fixes nim cache collision */
     XDG_CACHE_HOME = "${env.WORKSPACE_TMP}/.cache"
+    /* build from source when a binary cache is unreachable instead of failing */
+    NIX_CONFIG = 'fallback = true'
   }
 
   stages {

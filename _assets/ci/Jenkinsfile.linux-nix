@@ -26,6 +26,11 @@ pipeline {
     ))
   }
 
+  environment {
+    /* build from source when a binary cache is unreachable instead of failing */
+    NIX_CONFIG = 'fallback = true'
+  }
+
   stages {
     stage('Build library') {
       options { timeout(time: 60, unit: 'MINUTES') }
