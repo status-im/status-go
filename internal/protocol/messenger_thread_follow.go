@@ -9,6 +9,7 @@ import (
 	"github.com/status-im/status-go/internal/protocol/common"
 	"github.com/status-im/status-go/internal/protocol/protobuf"
 	"github.com/status-im/status-go/internal/protocol/requests"
+	"github.com/status-im/status-go/internal/signal"
 )
 
 // FollowThread shows the thread in the chat list. Archived threads can be followed.
@@ -52,6 +53,7 @@ func (m *Messenger) setThreadFollowed(ctx context.Context, chatID, threadID stri
 	if _, err := m.persistence.SetThreadFollowed(chatID, threadID, followed, clock); err != nil {
 		return nil, err
 	}
+	defer signal.SendSectionUnreadCountsChanged()
 	if err := m.syncThreadFollow(ctx, chatID, threadID, followed, clock, m.dispatchMessage); err != nil {
 		return nil, err
 	}
