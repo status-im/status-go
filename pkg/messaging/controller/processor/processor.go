@@ -350,6 +350,13 @@ func (r *Processor) processSDSLayer(msg *messagingtypes.Message) error {
 	}
 
 	if isSDS {
+		if err := r.stack.Reliability.RecordSDSMessageReceived(channelID, sdsMessageID); err != nil {
+			r.logger.Error("failed to persist received SDS message",
+				zap.String("channelID", channelID),
+				zap.String("messageID", types.EncodeHex(sdsMessageID)),
+				zap.Error(err),
+			)
+		}
 		envelopeHashes := [][]byte{msg.TransportLayer.Hash}
 		if msg.SegmentationLayer.Segmented {
 			envelopeHashes = msg.SegmentationLayer.Hashes

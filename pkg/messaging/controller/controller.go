@@ -79,6 +79,7 @@ func (c *Controller) Start() error {
 	c.runSubscriptionsLoop()
 	c.runSegmentsCleanupLoop()
 	c.runHashRatchetCleanupLoop()
+	c.cleanupLoop(c.logger.Named("sdsReceivedMessagesCleanupLoop"), c.stack.Reliability.DeleteExpiredSDSReceivedMessages)
 
 	return nil
 }

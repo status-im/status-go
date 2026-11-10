@@ -27,7 +27,7 @@ const (
 	tolerance uint32 = 60
 
 	oneDayDuration   = 24 * time.Hour
-	oneMonthDuration = 31 * oneDayDuration
+	oneMonthDuration = messagingtypes.StoreMessageRetention
 
 	// historicSyncMinInterval is the minimum spacing between two historic
 	// syncs. The historic-sync worker enforces it by delaying the pending sync,

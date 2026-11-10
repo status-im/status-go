@@ -8,10 +8,19 @@ import (
 	"testing"
 	"time"
 
+	"github.com/golang/protobuf/proto"
+	mvdsnode "github.com/status-im/mvds/node"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zaptest/observer"
 
+	"github.com/status-im/status-go/internal/crypto"
+	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/panics"
+	"github.com/status-im/status-go/internal/testutils"
+	"github.com/status-im/status-go/pkg/messaging/layers/reliability"
+	reliabilitypb "github.com/status-im/status-go/pkg/messaging/layers/reliability/protobuf"
+	"github.com/status-im/status-go/pkg/messaging/types"
 	"github.com/status-im/status-go/pkg/messaging/waku"
 )
 
@@ -23,7 +32,8 @@ type fakeMissingDependencyFetcher struct {
 	// fetchErrs[i] is returned by the i-th fetch; fetches beyond it succeed.
 	fetchErrs []error
 	// onFetch, if set, runs on every fetch (e.g. to mark hashes as processed).
-	onFetch func(attempt int)
+	onFetch  func(attempt int)
+	cacheErr error
 }
 
 func (f *fakeMissingDependencyFetcher) AlreadyProcessed(hashes []string) (map[string]bool, error) {
@@ -35,7 +45,344 @@ func (f *fakeMissingDependencyFetcher) AlreadyProcessed(hashes []string) (map[st
 			hits[h] = true
 		}
 	}
-	return hits, nil
+	return hits, f.cacheErr
+}
+
+type fakeSDSDependencyReconciler struct {
+	received     map[dependencyKey]bool
+	marked       map[string][]string
+	checkErr     error
+	markErr      error
+	markAttempts int
+	onMark       func()
+	lookup       func(channelID, messageID string) (bool, error)
+}
+
+func (r *fakeSDSDependencyReconciler) IsSDSMessageReceived(channelID, messageID string) (bool, error) {
+	if r.lookup != nil {
+		return r.lookup(channelID, messageID)
+	}
+	return r.received[dependencyKey{channelID: channelID, messageID: messageID}], r.checkErr
+}
+
+func TestMissingDepsFetcher_ExpiredReceiptUsesNormalRecovery(t *testing.T) {
+	db, err := testutils.SetupTestMemorySQLDB(testutils.NewTestDBInitializer(nil))
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, db.Close()) })
+	require.NoError(t, SQLiteMigrate(db, 0))
+	store := reliability.NewSQLiteRetrievalHintPersistence(db)
+	require.NoError(t, store.SaveSDSMessageReceived("channel", "expired"))
+	_, err = db.Exec("UPDATE sds_received_messages SET received_at = ?",
+		time.Now().Add(-types.StoreMessageRetention).Unix())
+	require.NoError(t, err)
+	f := &fakeMissingDependencyFetcher{}
+	m, clock := newTestMissingDepsFetcher(f)
+	r := &fakeSDSDependencyReconciler{lookup: store.IsSDSMessageReceived}
+	m.reconciler = r
+	m.enqueueDependencies("channel", []reliability.MissingDependency{
+		{MessageID: "expired", EnvelopeHashes: []string{"missing-envelope"}},
+	})
+	clock.advance(missingDepsBatchDelay)
+	m.reconcile()
+	require.Empty(t, r.marked)
+	clock.advance(missingDepsBatchDelay)
+	m.reconcile()
+	require.True(t, step(t, m))
+	require.Equal(t, [][]string{{"missing-envelope"}}, f.fetches)
+}
+
+func (r *fakeSDSDependencyReconciler) MarkDependenciesMet(ids []string, channelID string) error {
+	r.markAttempts++
+	if r.markErr != nil {
+		return r.markErr
+	}
+	if r.marked == nil {
+		r.marked = make(map[string][]string)
+	}
+	r.marked[channelID] = append(r.marked[channelID], ids...)
+	if r.onMark != nil {
+		r.onMark()
+	}
+	return nil
+}
+
+func TestMissingDepsFetcher_WorkerReconcilesWithoutHashFetches(t *testing.T) {
+	f := &fakeMissingDependencyFetcher{}
+	m := newMissingDepsFetcher(zap.NewNop(), f, newRequestedHashes(time.Hour, 100))
+	m.batchDelay = time.Millisecond
+	marked := make(chan struct{}, 1)
+	r := &fakeSDSDependencyReconciler{
+		received: map[dependencyKey]bool{{channelID: "channel", messageID: "local"}: true},
+		onMark:   func() { marked <- struct{}{} },
+	}
+	m.reconciler = r
+	ctx, cancel := context.WithCancel(context.Background())
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer panics.LogOnPanic()
+		defer wg.Done()
+		m.run(ctx)
+	}()
+	defer func() {
+		cancel()
+		wg.Wait()
+	}()
+	m.enqueueDependencies("channel", []reliability.MissingDependency{{MessageID: "local"}})
+	select {
+	case <-marked:
+	case <-time.After(5 * time.Second):
+		t.Fatal("worker did not reconcile a dependency with no fetchable hashes")
+	}
+	cancel()
+	wg.Wait()
+	require.Empty(t, f.fetches)
+	require.Empty(t, m.dependencies)
+	require.Equal(t, []string{"local"}, r.marked["channel"])
+}
+
+func TestMissingDepsFetcher_ReconcilesWholeDependencies(t *testing.T) {
+	f := &fakeMissingDependencyFetcher{processed: map[string]bool{
+		"local": true, "segment-1": true, "segment-2": true, "partial-1": true,
+	}}
+	m, clock := newTestMissingDepsFetcher(f)
+	r := &fakeSDSDependencyReconciler{}
+	m.reconciler = r
+	queued, dropped := m.enqueueDependencies("channel", []reliability.MissingDependency{
+		{MessageID: "local-id", EnvelopeHashes: []string{"local"}},
+		{MessageID: "segmented-id", EnvelopeHashes: []string{"segment-1", "segment-2"}},
+		{MessageID: "partial-id", EnvelopeHashes: []string{"partial-1", "partial-2"}},
+		{MessageID: "missing-id", EnvelopeHashes: []string{"missing"}},
+	})
+	require.Equal(t, 4, queued)
+	require.Zero(t, dropped)
+	clock.advance(missingDepsBatchDelay)
+	m.reconcile()
+	require.ElementsMatch(t, []string{"local-id", "segmented-id"}, r.marked["channel"])
+	require.Empty(t, f.fetches)
+
+	clock.advance(missingDepsBatchDelay)
+	m.reconcile()
+	require.True(t, step(t, m))
+	require.Len(t, f.fetches, 1)
+	require.ElementsMatch(t, []string{"partial-2", "missing"}, f.fetches[0])
+	require.Len(t, m.dependencies, 2)
+}
+
+func TestMissingDepsFetcher_ReceivedEvidenceIsChannelScoped(t *testing.T) {
+	f := &fakeMissingDependencyFetcher{}
+	m, clock := newTestMissingDepsFetcher(f)
+	r := &fakeSDSDependencyReconciler{received: map[dependencyKey]bool{
+		{channelID: "a", messageID: "same-id"}: true,
+	}}
+	m.reconciler = r
+	dep := []reliability.MissingDependency{{MessageID: "same-id", EnvelopeHashes: []string{"one", "two"}}}
+	m.enqueueDependencies("a", dep)
+	m.enqueueDependencies("b", dep)
+	clock.advance(missingDepsBatchDelay)
+	m.reconcile()
+	require.Equal(t, []string{"same-id"}, r.marked["a"])
+	require.Empty(t, r.marked["b"])
+	require.Empty(t, f.fetches)
+	require.Len(t, m.dependencies, 1)
+	clock.advance(missingDepsBatchDelay)
+	m.reconcile()
+	require.True(t, step(t, m))
+	require.ElementsMatch(t, []string{"one", "two"}, f.fetches[0])
+}
+
+func TestMissingDepsFetcher_SeenIsNotReceived(t *testing.T) {
+	f := &fakeMissingDependencyFetcher{seen: map[string]bool{"seen": true}}
+	m, clock := newTestMissingDepsFetcher(f)
+	r := &fakeSDSDependencyReconciler{}
+	m.reconciler = r
+	m.enqueueDependencies("channel", []reliability.MissingDependency{
+		{MessageID: "seen-id", EnvelopeHashes: []string{"seen"}},
+		{MessageID: "no-hint"},
+	})
+	clock.advance(missingDepsBatchDelay)
+	m.reconcile()
+	require.Empty(t, r.marked)
+	require.Empty(t, f.fetches)
+	require.Zero(t, m.pendingCount())
+	require.Len(t, m.dependencies, 2, "keep checking envelopes still in processing")
+}
+
+func TestMissingDepsFetcher_RechecksBeforeFetching(t *testing.T) {
+	f := &fakeMissingDependencyFetcher{}
+	m, clock := newTestMissingDepsFetcher(f)
+	r := &fakeSDSDependencyReconciler{received: make(map[dependencyKey]bool)}
+	m.reconciler = r
+	m.enqueueDependencies("channel", []reliability.MissingDependency{
+		{MessageID: "segmented", EnvelopeHashes: []string{"one", "two"}},
+	})
+	clock.advance(missingDepsBatchDelay)
+	m.reconcile()
+	require.Equal(t, 2, m.pendingCount())
+	// Complete reconstruction need not mark every constituent envelope processed.
+	r.received[dependencyKey{channelID: "channel", messageID: "segmented"}] = true
+	clock.advance(missingDepsBatchDelay)
+	m.reconcile()
+	require.False(t, step(t, m))
+	require.Empty(t, f.fetches)
+	require.Equal(t, []string{"segmented"}, r.marked["channel"])
+}
+
+func TestMissingDepsFetcher_RetriesMarkFailureWithoutFetching(t *testing.T) {
+	f := &fakeMissingDependencyFetcher{processed: map[string]bool{"local": true}}
+	m, clock := newTestMissingDepsFetcher(f)
+	r := &fakeSDSDependencyReconciler{markErr: errors.New("injected mark failure")}
+	m.reconciler = r
+	m.enqueueDependencies("channel", []reliability.MissingDependency{
+		{MessageID: "local-id", EnvelopeHashes: []string{"local"}},
+	})
+	clock.advance(missingDepsBatchDelay)
+	m.reconcile()
+	require.Equal(t, 1, r.markAttempts)
+	require.Len(t, m.dependencies, 1)
+	require.Empty(t, f.fetches)
+	r.markErr = nil
+	clock.advance(missingDepsRetryDelays[0])
+	m.reconcile()
+	require.Equal(t, []string{"local-id"}, r.marked["channel"])
+	require.Empty(t, m.dependencies)
+	require.Zero(t, m.pendingCount())
+}
+
+func TestMissingDepsFetcher_DoesNotTrustFailedAvailabilityChecks(t *testing.T) {
+	f := &fakeMissingDependencyFetcher{
+		processed: map[string]bool{"hash": true}, cacheErr: errors.New("cache failure"),
+	}
+	m, clock := newTestMissingDepsFetcher(f)
+	r := &fakeSDSDependencyReconciler{
+		received: map[dependencyKey]bool{{channelID: "channel", messageID: "id"}: true},
+		checkErr: errors.New("received-message lookup failure"),
+	}
+	m.reconciler = r
+	m.enqueueDependencies("channel", []reliability.MissingDependency{
+		{MessageID: "id", EnvelopeHashes: []string{"hash"}},
+	})
+	clock.advance(missingDepsBatchDelay)
+	m.reconcile()
+	require.Empty(t, r.marked)
+	require.Equal(t, 1, m.pendingCount())
+}
+
+func TestMissingDepsFetcher_DependencyQueueBoundedAndDeduplicated(t *testing.T) {
+	m, _ := newTestMissingDepsFetcher(&fakeMissingDependencyFetcher{})
+	m.maxQueue = 1
+	dep := []reliability.MissingDependency{{MessageID: "id"}}
+	queued, dropped := m.enqueueDependencies("channel", dep)
+	require.Equal(t, 1, queued)
+	require.Zero(t, dropped)
+	queued, dropped = m.enqueueDependencies("channel", dep)
+	require.Zero(t, queued)
+	require.Zero(t, dropped)
+	queued, dropped = m.enqueueDependencies("another-channel", dep)
+	require.Zero(t, queued)
+	require.Equal(t, 1, dropped)
+	require.Len(t, m.dependencies, 1)
+}
+
+func TestMissingDepsFetcher_FreshSDSManagerWithLocalHistory(t *testing.T) {
+	for _, mixed := range []bool{false, true} {
+		t.Run(fmt.Sprintf("mixed=%t", mixed), func(t *testing.T) {
+			db, err := testutils.SetupTestMemorySQLDB(testutils.NewTestDBInitializer(nil))
+			require.NoError(t, err)
+			t.Cleanup(func() { require.NoError(t, db.Close()) })
+			require.NoError(t, SQLiteMigrate(db, 0))
+			key, err := crypto.GenerateKey()
+			require.NoError(t, err)
+			newReliability := func(logger *zap.Logger) *reliability.Reliability {
+				r, err := reliability.NewReliability(
+					mvdsnode.NewSQLitePersistence(db), key,
+					func(string, []reliability.MissingDependency, string) error { return nil }, logger,
+				)
+				require.NoError(t, err)
+				r.SetSDSRetrievalHintPersistence(reliability.NewSQLiteRetrievalHintPersistence(db))
+				t.Cleanup(r.Close)
+				return r
+			}
+			const channelID = "existing-status-history"
+			sender := newReliability(zap.NewNop())
+			sender.SetRetrievalHintProvider(func(id string) []byte {
+				hint, err := proto.Marshal(&reliabilitypb.RetrievalHint{EnvelopeHashes: [][]byte{[]byte(id)}})
+				require.NoError(t, err)
+				return hint
+			})
+			localWrapped, localID, err := sender.WrapPayloadForSDS([]byte("already received"), channelID)
+			require.NoError(t, err)
+			previous := newReliability(zap.NewNop())
+			_, err = previous.UnwrapPayloadFromSDS(localWrapped)
+			require.NoError(t, err)
+			require.NoError(t, previous.RecordSDSMessageReceived(channelID, localID))
+			previous.Close()
+
+			var missingWrapped, missingID []byte
+			if mixed {
+				missingWrapped, missingID, err = sender.WrapPayloadForSDS([]byte("not received"), channelID)
+				require.NoError(t, err)
+			}
+			waitingWrapped, waitingID, err := sender.WrapPayloadForSDS([]byte("waiting message"), channelID)
+			require.NoError(t, err)
+			logger, logs := observer.New(zap.DebugLevel)
+			receiver := newReliability(zap.New(logger))
+			f := &fakeMissingDependencyFetcher{}
+			m, clock := newTestMissingDepsFetcher(f)
+			m.reconciler = receiver
+			callback := make(chan []reliability.MissingDependency, 4)
+			receiver.SetMissingDependenciesHandler(func(_ string, deps []reliability.MissingDependency, channelID string) error {
+				m.enqueueDependencies(channelID, deps)
+				callback <- deps
+				return nil
+			})
+			_, err = receiver.UnwrapPayloadFromSDS(waitingWrapped)
+			require.NoError(t, err)
+			select {
+			case deps := <-callback:
+				require.Contains(t, deps, reliability.MissingDependency{
+					MessageID: cryptotypes.EncodeHex(localID), EnvelopeHashes: []string{cryptotypes.EncodeHex(localID)},
+				})
+			case <-time.After(5 * time.Second):
+				t.Fatal("SDS did not report the locally available dependency")
+			}
+			isReady := func() bool {
+				for _, entry := range logs.FilterMessage("message ready").All() {
+					fields := entry.ContextMap()
+					if fields["messageId"] == cryptotypes.EncodeHex(waitingID) && fields["channelId"] == channelID {
+						return true
+					}
+				}
+				return false
+			}
+			require.False(t, isReady(), "payload bytes alone do not prove SDS readiness")
+			clock.advance(missingDepsBatchDelay)
+			m.reconcile()
+			if mixed {
+				require.False(t, isReady(), "the genuinely missing dependency must still block SDS")
+				f.onFetch = func(int) {
+					_, err := receiver.UnwrapPayloadFromSDS(missingWrapped)
+					require.NoError(t, err)
+				}
+				clock.advance(missingDepsBatchDelay)
+				m.reconcile()
+				require.True(t, step(t, m))
+				require.Equal(t, [][]string{{cryptotypes.EncodeHex(missingID)}}, f.fetches)
+			} else {
+				require.Empty(t, f.fetches)
+				require.Zero(t, m.pendingCount())
+			}
+			require.Eventually(t, func() bool {
+				select {
+				case <-callback:
+					clock.advance(missingDepsBatchDelay)
+					m.reconcile()
+				default:
+				}
+				return isReady()
+			}, 5*time.Second, time.Millisecond)
+		})
+	}
 }
 
 func (f *fakeMissingDependencyFetcher) EnvelopesSeen(hashes []string) map[string]bool {
