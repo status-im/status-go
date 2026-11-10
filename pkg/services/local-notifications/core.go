@@ -143,15 +143,13 @@ func (n *Notification) MarshalJSON() ([]byte, error) {
 	return json.Marshal(alias)
 }
 
-func PushMessages(ns []*Notification) {
+// PushMessages sends the notifications in the backend session `session`: the one of
+// the work that produced them, also when it finishes after a logout.
+func PushMessages(session signal.Session, ns []*Notification) {
 	for _, n := range ns {
-		pushMessage(n)
+		logutils.ZapLogger().Debug("Pushing a new push notification")
+		session.SendLocalNotifications(n)
 	}
-}
-
-func pushMessage(notification *Notification) {
-	logutils.ZapLogger().Debug("Pushing a new push notification")
-	signal.SendLocalNotifications(notification)
 }
 
 // Start Worker which processes all incoming messages

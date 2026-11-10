@@ -96,6 +96,8 @@ var messageCacheIntervalMs uint64 = 1000 * 60 * 60 * 48
 // Similarly, it needs to expose an interface to manage
 // mailservers because they can also be managed by the user.
 type Messenger struct {
+	// The backend session the messenger runs in; its signals are sent in it.
+	signalSession             signal.Session
 	config                    *config
 	identity                  *ecdsa.PrivateKey
 	signer                    communities.MessageSigner
@@ -421,6 +423,7 @@ func NewMessenger(
 
 	ctx, cancel := context.WithCancel(context.Background())
 	messenger = &Messenger{
+		signalSession:              signal.CurrentSession(),
 		config:                     &c,
 		identity:                   identity,
 		messaging:                  messaging,
@@ -1400,7 +1403,7 @@ func (m *Messenger) watchConnectionChange() {
 			case status := <-subscription.C():
 				if status.State != lastConnState {
 					lastConnState = status.State
-					signal.SendConnectionStatusChange(status)
+					m.signalSession.SendConnectionStatusChange(status)
 				}
 				processNewState(status.IsOnline)
 			case <-ticker.C:
@@ -1470,7 +1473,7 @@ func (m *Messenger) watchChatsToUnmute() {
 			}
 
 			if !response.IsEmpty() {
-				signal.SendNewMessages(response)
+				m.signalSession.SendNewMessages(response)
 			}
 
 			// Calculate the time until the next whole minute
@@ -1498,7 +1501,7 @@ func (m *Messenger) watchCommunitiesToUnmute() {
 		if err != nil {
 			logger.Warn("couldn't check communities to unmute", zap.Error(err))
 		} else if !response.IsEmpty() {
-			signal.SendNewMessages(response)
+			m.signalSession.SendNewMessages(response)
 		}
 	}
 
@@ -2328,7 +2331,7 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 			}
 			setThreadNotificationMetadata(outgoingNotif, chat, message, threadName, messagePreview)
 		}
-		localnotifications.PushMessages([]*localnotifications.Notification{outgoingNotif})
+		localnotifications.PushMessages(m.signalSession, []*localnotifications.Notification{outgoingNotif})
 	}
 
 	return &response, m.saveChat(chat)
@@ -2917,8 +2920,8 @@ func (m *Messenger) PublishMessengerResponse(response *MessengerResponse) {
 	notifications := response.Notifications()
 	// Clear notifications as not used for now
 	response.ClearNotifications()
-	signal.SendNewMessages(response)
-	localnotifications.PushMessages(notifications)
+	m.signalSession.SendNewMessages(response)
+	localnotifications.PushMessages(m.signalSession, notifications)
 }
 
 // contactRequestNotificationPreview returns whether a contact-request-type local

@@ -75,6 +75,8 @@ type SuggestedRoutes struct {
 }
 
 type Router struct {
+	// The backend session the router runs in; route results are sent in it.
+	signalSession        signal.Session
 	rpcClient            *rpc.Client
 	contractMaker        contracts.ContractMakerIface
 	transactor           *transactions.Transactor
@@ -127,6 +129,7 @@ func NewRouter(
 
 	logger := logutils.ZapLogger().Named("router")
 	return &Router{
+		signalSession:        signal.CurrentSession(),
 		rpcClient:            rpcClient,
 		contractMaker:        contracts.NewContractMaker(rpcClient),
 		transactor:           transactor,
@@ -329,7 +332,7 @@ func (r *Router) setCustomTxDetails(ctx context.Context, pathTxIdentity *request
 		r.logger.Info("setCustomTxDetails: path updated, sending result",
 			zap.String("uuid", pathTxIdentity.RouterInputParamsUuid),
 			zap.String("processor", path.ProcessorName))
-		sendRouterResult(pathTxIdentity.RouterInputParamsUuid, r.activeRoutes, err)
+		r.sendRouterResult(pathTxIdentity.RouterInputParamsUuid, r.activeRoutes, err)
 
 		return nil
 	}
@@ -497,7 +500,7 @@ func (r *Router) ReevaluateRouterPath(ctx context.Context, pathTxIdentity *reque
 			r.logger.Info("ReevaluateRouterPath: path reevaluated, sending result",
 				zap.String("uuid", pathTxIdentity.RouterInputParamsUuid),
 				zap.String("processor", pProcessor.Name()))
-			sendRouterResult(pathTxIdentity.RouterInputParamsUuid, r.activeRoutes, err)
+			r.sendRouterResult(pathTxIdentity.RouterInputParamsUuid, r.activeRoutes, err)
 
 			return nil
 		}
@@ -514,7 +517,7 @@ func (r *Router) ReevaluateRouterPath(ctx context.Context, pathTxIdentity *reque
 	return ErrCannotFindPathForProvidedIdentity
 }
 
-func sendRouterResult(uuid string, result interface{}, err error) {
+func (r *Router) sendRouterResult(uuid string, result interface{}, err error) {
 	logger := logutils.ZapLogger().Named("router")
 	routesResponse := responses.RouterSuggestedRoutes{
 		Uuid: uuid,
@@ -543,7 +546,7 @@ func sendRouterResult(uuid string, result interface{}, err error) {
 		zap.String("uuid", uuid),
 		zap.Int("paths", pathCount),
 		zap.Bool("hasError", err != nil))
-	signal.SendWalletEvent(signal.SuggestedRoutes, routesResponse)
+	r.signalSession.SendWalletEvent(signal.SuggestedRoutes, routesResponse)
 }
 
 func (r *Router) SuggestedRoutesAsync(input *requests.RouteInputParams) {
@@ -572,7 +575,7 @@ func (r *Router) SuggestedRoutesAsync(input *requests.RouteInputParams) {
 			r.logger.Info("SuggestedRoutesAsync: route calculation finished with empty result",
 				zap.String("uuid", input.Uuid))
 		}
-		sendRouterResult(input.Uuid, result, err)
+		r.sendRouterResult(input.Uuid, result, err)
 	})
 }
 

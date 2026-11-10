@@ -89,18 +89,28 @@ type Filter struct {
 
 // SendEnvelopeSent triggered when envelope delivered at least to 1 peer.
 func SendEnvelopeSent(identifiers [][]byte) {
+	CurrentSession().SendEnvelopeSent(identifiers)
+}
+
+// SendEnvelopeSent sends in the session s.
+func (s Session) SendEnvelopeSent(identifiers [][]byte) {
 	var hexIdentifiers []hexutil.Bytes
 	for _, i := range identifiers {
 		hexIdentifiers = append(hexIdentifiers, i)
 	}
 
-	send(EventEnvelopeSent, EnvelopeSignal{
+	s.send(EventEnvelopeSent, EnvelopeSignal{
 		IDs: hexIdentifiers,
 	})
 }
 
 // SendEnvelopeExpired triggered when envelope delivered at least to 1 peer.
 func SendEnvelopeExpired(identifiers [][]byte, err error) {
+	CurrentSession().SendEnvelopeExpired(identifiers, err)
+}
+
+// SendEnvelopeExpired sends in the session s.
+func (s Session) SendEnvelopeExpired(identifiers [][]byte, err error) {
 	var message string
 	if err != nil {
 		message = err.Error()
@@ -110,23 +120,43 @@ func SendEnvelopeExpired(identifiers [][]byte, err error) {
 		hexIdentifiers = append(hexIdentifiers, i)
 	}
 
-	send(EventEnvelopeExpired, EnvelopeSignal{IDs: hexIdentifiers, Message: message})
+	s.send(EventEnvelopeExpired, EnvelopeSignal{IDs: hexIdentifiers, Message: message})
 }
 
 func SendHistoricMessagesRequestStarted(numBatches int) {
-	send(EventHistoryRequestStarted, HistoryMessagesSignal{NumBatches: numBatches})
+	CurrentSession().SendHistoricMessagesRequestStarted(numBatches)
+}
+
+// SendHistoricMessagesRequestStarted sends in the session s.
+func (s Session) SendHistoricMessagesRequestStarted(numBatches int) {
+	s.send(EventHistoryRequestStarted, HistoryMessagesSignal{NumBatches: numBatches})
 }
 
 func SendHistoricMessagesRequestCompleted() {
-	send(EventHistoryRequestCompleted, HistoryMessagesSignal{})
+	CurrentSession().SendHistoricMessagesRequestCompleted()
+}
+
+// SendHistoricMessagesRequestCompleted sends in the session s.
+func (s Session) SendHistoricMessagesRequestCompleted() {
+	s.send(EventHistoryRequestCompleted, HistoryMessagesSignal{})
 }
 
 func SendUpdateAvailable(available bool, latestVersion string, url string) {
-	send(EventUpdateAvailable, UpdateAvailableSignal{Available: available, Version: latestVersion, URL: url})
+	CurrentSession().SendUpdateAvailable(available, latestVersion, url)
+}
+
+// SendUpdateAvailable sends in the session s.
+func (s Session) SendUpdateAvailable(available bool, latestVersion string, url string) {
+	s.send(EventUpdateAvailable, UpdateAvailableSignal{Available: available, Version: latestVersion, URL: url})
 }
 
 // SendMailServerRequestCompleted triggered when mail server response has been received
 func SendMailServerRequestCompleted(requestID cryptotypes.Hash, lastEnvelopeHash cryptotypes.Hash, cursor []byte, err error) {
+	CurrentSession().SendMailServerRequestCompleted(requestID, lastEnvelopeHash, cursor, err)
+}
+
+// SendMailServerRequestCompleted sends in the session s.
+func (s Session) SendMailServerRequestCompleted(requestID cryptotypes.Hash, lastEnvelopeHash cryptotypes.Hash, cursor []byte, err error) {
 	errorMsg := ""
 	if err != nil {
 		errorMsg = err.Error()
@@ -137,16 +167,26 @@ func SendMailServerRequestCompleted(requestID cryptotypes.Hash, lastEnvelopeHash
 		Cursor:           hex.EncodeToString(cursor),
 		ErrorMsg:         errorMsg,
 	}
-	send(EventMailServerRequestCompleted, sig)
+	s.send(EventMailServerRequestCompleted, sig)
 }
 
 // SendMailServerRequestExpired triggered when mail server request expires
 func SendMailServerRequestExpired(hash cryptotypes.Hash) {
-	send(EventMailServerRequestExpired, EnvelopeSignal{Hash: hash})
+	CurrentSession().SendMailServerRequestExpired(hash)
+}
+
+// SendMailServerRequestExpired sends in the session s.
+func (s Session) SendMailServerRequestExpired(hash cryptotypes.Hash) {
+	s.send(EventMailServerRequestExpired, EnvelopeSignal{Hash: hash})
 }
 
 func SendNewMessages(obj json.Marshaler) {
-	send(EventNewMessages, obj)
+	CurrentSession().SendNewMessages(obj)
+}
+
+// SendNewMessages sends in the session s.
+func (s Session) SendNewMessages(obj json.Marshaler) {
+	s.send(EventNewMessages, obj)
 }
 
 func LocalMessageBackupDone() {

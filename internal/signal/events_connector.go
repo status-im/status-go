@@ -26,7 +26,12 @@ type WCSessionProposalSignal struct {
 }
 
 func SendWCSessionProposal(requestID, uri, proposalJSON string) {
-	send(EventWCSessionProposal, WCSessionProposalSignal{
+	CurrentSession().SendWCSessionProposal(requestID, uri, proposalJSON)
+}
+
+// SendWCSessionProposal sends in the session s.
+func (s Session) SendWCSessionProposal(requestID, uri, proposalJSON string) {
+	s.send(EventWCSessionProposal, WCSessionProposalSignal{
 		RequestID: requestID,
 		URI:       uri,
 		Proposal:  proposalJSON,
@@ -40,7 +45,12 @@ type WCSessionRequestSignal struct {
 }
 
 func SendWCSessionRequest(topic string, requestID int64, requestJSON string) {
-	send(EventWCSessionRequest, WCSessionRequestSignal{
+	CurrentSession().SendWCSessionRequest(topic, requestID, requestJSON)
+}
+
+// SendWCSessionRequest sends in the session s.
+func (s Session) SendWCSessionRequest(topic string, requestID int64, requestJSON string) {
+	s.send(EventWCSessionRequest, WCSessionRequestSignal{
 		Topic:       topic,
 		RequestID:   requestID,
 		RequestJSON: requestJSON,
@@ -53,7 +63,12 @@ type WCSessionDeleteSignal struct {
 }
 
 func SendWCSessionDelete(topic, dappURL string) {
-	send(EventWCSessionDelete, WCSessionDeleteSignal{
+	CurrentSession().SendWCSessionDelete(topic, dappURL)
+}
+
+// SendWCSessionDelete sends in the session s.
+func (s Session) SendWCSessionDelete(topic, dappURL string) {
+	s.send(EventWCSessionDelete, WCSessionDeleteSignal{
 		Topic:   topic,
 		DAppURL: dappURL,
 	})
@@ -107,14 +122,24 @@ type ConnectorAccountChangedSignal struct {
 }
 
 func SendConnectorSendRequestAccounts(dApp ConnectorDApp, requestID string) {
-	send(EventConnectorSendRequestAccounts, ConnectorSendRequestAccountsSignal{
+	CurrentSession().SendConnectorSendRequestAccounts(dApp, requestID)
+}
+
+// SendConnectorSendRequestAccounts sends in the session s.
+func (s Session) SendConnectorSendRequestAccounts(dApp ConnectorDApp, requestID string) {
+	s.send(EventConnectorSendRequestAccounts, ConnectorSendRequestAccountsSignal{
 		ConnectorDApp: dApp,
 		RequestID:     requestID,
 	})
 }
 
 func SendConnectorSendTransaction(dApp ConnectorDApp, chainID uint64, txArgs string, requestID string) {
-	send(EventConnectorSendTransaction, ConnectorSendTransactionSignal{
+	CurrentSession().SendConnectorSendTransaction(dApp, chainID, txArgs, requestID)
+}
+
+// SendConnectorSendTransaction sends in the session s.
+func (s Session) SendConnectorSendTransaction(dApp ConnectorDApp, chainID uint64, txArgs string, requestID string) {
+	s.send(EventConnectorSendTransaction, ConnectorSendTransactionSignal{
 		ConnectorDApp: dApp,
 		RequestID:     requestID,
 		ChainID:       chainID,
@@ -123,7 +148,12 @@ func SendConnectorSendTransaction(dApp ConnectorDApp, chainID uint64, txArgs str
 }
 
 func SendConnectorSign(dApp ConnectorDApp, requestID, challenge, address string, method string) {
-	send(EventConnectorSign, ConnectorSignSignal{
+	CurrentSession().SendConnectorSign(dApp, requestID, challenge, address, method)
+}
+
+// SendConnectorSign sends in the session s.
+func (s Session) SendConnectorSign(dApp ConnectorDApp, requestID, challenge, address string, method string) {
+	s.send(EventConnectorSign, ConnectorSignSignal{
 		ConnectorDApp: dApp,
 		RequestID:     requestID,
 		Challenge:     challenge,
@@ -133,7 +163,12 @@ func SendConnectorSign(dApp ConnectorDApp, requestID, challenge, address string,
 }
 
 func SendConnectorDAppPermissionGranted(dApp ConnectorDApp, account types.Address, chains []uint64) {
-	send(EventConnectorDAppPermissionGranted, ConnectorSendDappPermissionGrantedSignal{
+	CurrentSession().SendConnectorDAppPermissionGranted(dApp, account, chains)
+}
+
+// SendConnectorDAppPermissionGranted sends in the session s.
+func (s Session) SendConnectorDAppPermissionGranted(dApp ConnectorDApp, account types.Address, chains []uint64) {
+	s.send(EventConnectorDAppPermissionGranted, ConnectorSendDappPermissionGrantedSignal{
 		ConnectorDApp: dApp,
 		Chains:        chains,
 		SharedAccount: account,
@@ -141,15 +176,30 @@ func SendConnectorDAppPermissionGranted(dApp ConnectorDApp, account types.Addres
 }
 
 func SendConnectorDAppPermissionRevoked(dApp ConnectorDApp) {
-	send(EventConnectorDAppPermissionRevoked, dApp)
+	CurrentSession().SendConnectorDAppPermissionRevoked(dApp)
+}
+
+// SendConnectorDAppPermissionRevoked sends in the session s.
+func (s Session) SendConnectorDAppPermissionRevoked(dApp ConnectorDApp) {
+	s.send(EventConnectorDAppPermissionRevoked, dApp)
 }
 
 func SendConnectorDAppChainIdSwitched(payload ConnectorDAppChainIdSwitchedSignal) {
-	send(EventConnectorDAppChainIdSwitched, payload)
+	CurrentSession().SendConnectorDAppChainIdSwitched(payload)
+}
+
+// SendConnectorDAppChainIdSwitched sends in the session s.
+func (s Session) SendConnectorDAppChainIdSwitched(payload ConnectorDAppChainIdSwitchedSignal) {
+	s.send(EventConnectorDAppChainIdSwitched, payload)
 }
 
 func SendConnectorAccountChanged(url string, clientID string, account types.Address) {
-	send(EventConnectorAccountChanged, ConnectorAccountChangedSignal{
+	CurrentSession().SendConnectorAccountChanged(url, clientID, account)
+}
+
+// SendConnectorAccountChanged sends in the session s.
+func (s Session) SendConnectorAccountChanged(url string, clientID string, account types.Address) {
+	s.send(EventConnectorAccountChanged, ConnectorAccountChangedSignal{
 		URL:           url,
 		ClientID:      clientID,
 		SharedAccount: account,

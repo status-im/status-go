@@ -25,7 +25,12 @@ type StorageStatsResultEvent struct {
 
 // SendStorageStatsProgress emits a progress update for a running collection.
 func SendStorageStatsProgress(requestID string, step, total int) {
-	send(EventStorageStatsProgress, StorageStatsProgressEvent{
+	CurrentSession().SendStorageStatsProgress(requestID, step, total)
+}
+
+// SendStorageStatsProgress sends in the session s.
+func (s Session) SendStorageStatsProgress(requestID string, step, total int) {
+	s.send(EventStorageStatsProgress, StorageStatsProgressEvent{
 		RequestID: requestID,
 		Step:      step,
 		Total:     total,
@@ -34,6 +39,11 @@ func SendStorageStatsProgress(requestID string, step, total int) {
 
 // SendStorageStatsResult emits the outcome of a collection.
 func SendStorageStatsResult(requestID string, data interface{}, err error) {
+	CurrentSession().SendStorageStatsResult(requestID, data, err)
+}
+
+// SendStorageStatsResult sends in the session s.
+func (s Session) SendStorageStatsResult(requestID string, data interface{}, err error) {
 	event := StorageStatsResultEvent{
 		RequestID: requestID,
 		Data:      data,
@@ -41,5 +51,5 @@ func SendStorageStatsResult(requestID string, data interface{}, err error) {
 	if err != nil {
 		event.Error = err.Error()
 	}
-	send(EventStorageStatsResult, event)
+	s.send(EventStorageStatsResult, event)
 }

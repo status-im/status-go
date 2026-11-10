@@ -6,5 +6,10 @@ const (
 
 // SendLocalPairingEvent sends event from services/pairing/events.
 func SendLocalPairingEvent(event interface{}) {
-	send(localPairingEvent, event)
+	CurrentSession().SendLocalPairingEvent(event)
+}
+
+// SendLocalPairingEvent sends in the session s.
+func (s Session) SendLocalPairingEvent(event interface{}) {
+	s.send(localPairingEvent, event)
 }

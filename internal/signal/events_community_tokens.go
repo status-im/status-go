@@ -30,7 +30,13 @@ type CommunityTokenTransactionSignal struct {
 
 func SendCommunityTokenTransactionStatusSignal(sendType int, success bool, hash common.Hash,
 	communityToken *token.CommunityToken, ownerToken *token.CommunityToken, masterToken *token.CommunityToken, errorString string) {
-	send(EventCommunityTokenTransactionStatusChanged, CommunityTokenTransactionSignal{
+	CurrentSession().SendCommunityTokenTransactionStatusSignal(sendType, success, hash, communityToken, ownerToken, masterToken, errorString)
+}
+
+// SendCommunityTokenTransactionStatusSignal sends in the session s.
+func (s Session) SendCommunityTokenTransactionStatusSignal(sendType int, success bool, hash common.Hash,
+	communityToken *token.CommunityToken, ownerToken *token.CommunityToken, masterToken *token.CommunityToken, errorString string) {
+	s.send(EventCommunityTokenTransactionStatusChanged, CommunityTokenTransactionSignal{
 		SendType:       sendType,
 		Success:        success,
 		Hash:           hash,
@@ -47,7 +53,12 @@ type CommunityTokenActionSignal struct {
 }
 
 func SendCommunityTokenActionSignal(communityToken *token.CommunityToken, actionType protobuf.CommunityTokenAction_ActionType) {
-	send(EventCommunityTokenAction, CommunityTokenActionSignal{
+	CurrentSession().SendCommunityTokenActionSignal(communityToken, actionType)
+}
+
+// SendCommunityTokenActionSignal sends in the session s.
+func (s Session) SendCommunityTokenActionSignal(communityToken *token.CommunityToken, actionType protobuf.CommunityTokenAction_ActionType) {
+	s.send(EventCommunityTokenAction, CommunityTokenActionSignal{
 		CommunityToken: communityToken,
 		ActionType:     actionType,
 	})

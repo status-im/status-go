@@ -31,9 +31,12 @@ var (
 // Service collects the account load profile on demand. Nothing is collected or
 // emitted unless a caller asks.
 type Service struct {
-	appDB    *sql.DB
-	walletDB *sql.DB
-	logger   *zap.Logger
+	// The backend session the service runs in; results are sent in it, also the
+	// cancelled result a logout causes.
+	signalSession signal.Session
+	appDB         *sql.DB
+	walletDB      *sql.DB
+	logger        *zap.Logger
 
 	// mu publishes requestID and cancel together: Stop must never observe a
 	// started collection whose cancel func is not yet visible, or logout would
@@ -46,9 +49,10 @@ type Service struct {
 
 func New(appDB, walletDB *sql.DB, logger *zap.Logger) *Service {
 	return &Service{
-		appDB:    appDB,
-		walletDB: walletDB,
-		logger:   logger.Named("StorageStatsService"),
+		signalSession: signal.CurrentSession(),
+		appDB:         appDB,
+		walletDB:      walletDB,
+		logger:        logger.Named("StorageStatsService"),
 	}
 }
 
@@ -135,7 +139,7 @@ func (s *Service) release(requestID string) {
 func (s *Service) collect(ctx context.Context, requestID string) {
 	profile, err := Collect(ctx, s.appDB, s.walletDB, time.Now(), s.logger,
 		func(done, total int) {
-			signal.SendStorageStatsProgress(requestID, done, total)
+			s.signalSession.SendStorageStatsProgress(requestID, done, total)
 		})
 
 	// Exactly one result per request, cancellation included: clients clear
@@ -162,5 +166,5 @@ func (s *Service) finish(requestID string, profile *Profile, err error) {
 	if profile != nil {
 		data = profile
 	}
-	signal.SendStorageStatsResult(requestID, data, err)
+	s.signalSession.SendStorageStatsResult(requestID, data, err)
 }

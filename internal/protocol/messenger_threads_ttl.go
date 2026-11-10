@@ -7,7 +7,6 @@ import (
 
 	"github.com/status-im/status-go/internal/panics"
 	"github.com/status-im/status-go/internal/protocol/common"
-	"github.com/status-im/status-go/internal/signal"
 )
 
 var (
@@ -131,7 +130,7 @@ func (m *Messenger) startThreadArchiveLoop() {
 				}
 				lastSweepAt = now
 				if !response.IsEmpty() {
-					signal.SendNewMessages(response)
+					m.signalSession.SendNewMessages(response)
 				}
 			case <-m.quit:
 				return

@@ -41,7 +41,6 @@ import (
 	"github.com/status-im/status-go/internal/protocol/protobuf"
 	"github.com/status-im/status-go/internal/protocol/requests"
 	v1protocol "github.com/status-im/status-go/internal/protocol/v1"
-	"github.com/status-im/status-go/internal/signal"
 	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
 	localnotifications "github.com/status-im/status-go/pkg/services/local-notifications"
 	"github.com/status-im/status-go/pkg/services/logosstorage"
@@ -2436,7 +2435,7 @@ func (m *Messenger) CheckAndDeletePendingRequestToJoinCommunity(ctx context.Cont
 	}
 
 	if sendSignal && !sendResponse {
-		signal.SendNewMessages(response)
+		m.signalSession.SendNewMessages(response)
 	}
 
 	if sendResponse {
@@ -3994,8 +3993,8 @@ importMessageArchivesLoop:
 				if !response.IsEmpty() {
 					notifications := response.Notifications()
 					response.ClearNotifications()
-					signal.SendNewMessages(response)
-					localnotifications.PushMessages(notifications)
+					m.signalSession.SendNewMessages(response)
+					localnotifications.PushMessages(m.signalSession, notifications)
 				}
 			}
 

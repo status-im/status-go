@@ -36,6 +36,7 @@ import (
 	"github.com/status-im/status-go/internal/protocol/pushnotificationclient"
 	"github.com/status-im/status-go/internal/protocol/sqlite"
 	"github.com/status-im/status-go/internal/rpc"
+	"github.com/status-im/status-go/internal/signal"
 	"github.com/status-im/status-go/internal/timesource"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/messaging"
@@ -173,7 +174,7 @@ func (s *Service) InitProtocol(params InitProtocolParams) error {
 	envelopeEventsConfig := &messagingtypes.EnvelopeEventsConfig{
 		MaxMessageDeliveryAttempts: s.config.ShhextConfig.MaxMessageDeliveryAttempts,
 		MailServerConfirmations:    s.config.ShhextConfig.MailServerConfirmations,
-		EnvelopeEventsHandler:      EnvelopeSignalHandler{},
+		EnvelopeEventsHandler:      EnvelopeSignalHandler{session: signal.CurrentSession()},
 	}
 
 	tracer := trace.NewNoopTracer()
@@ -216,7 +217,7 @@ func (s *Service) InitProtocol(params InitProtocolParams) error {
 
 	options, err := buildMessengerOptions(s.config, params.Identity, params.AppDB, params.WalletDB, params.HTTPServer,
 		s.rpcClient, s.multiAccountsDB, params.Account, envelopeEventsConfig, s.accountsDB, params.WalletService,
-		params.CommunityTokensService, s.logger, &MessengerSignalsHandler{}, params.AccountsManager, params.AccountsPublisher,
+		params.CommunityTokensService, s.logger, &MessengerSignalsHandler{session: signal.CurrentSession()}, params.AccountsManager, params.AccountsPublisher,
 		ensVerifier, params.TokenManager, params.TokenBalanceManager, params.NetworkManager)
 	if err != nil {
 		return err

@@ -21,7 +21,12 @@ type ConnectionStatusSignal struct {
 
 // SendConnectionStatusChange emits the connection-status-change signal.
 func SendConnectionStatusChange(status messagingtypes.ConnectionStatus) {
-	send(EventConnectionStatusChange, ConnectionStatusSignal{
+	CurrentSession().SendConnectionStatusChange(status)
+}
+
+// SendConnectionStatusChange sends in the session s.
+func (s Session) SendConnectionStatusChange(status messagingtypes.ConnectionStatus) {
+	s.send(EventConnectionStatusChange, ConnectionStatusSignal{
 		Status:   status.State.String(),
 		IsOnline: status.IsOnline,
 	})
