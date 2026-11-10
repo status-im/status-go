@@ -541,6 +541,12 @@ class WakuextService(Service):
     def edit_thread(self, chat_id: str, thread_id: str, name: str):
         return self.rpc_request("editThread", [{"chatId": chat_id, "threadId": thread_id, "name": name}])
 
+    def follow_thread(self, chat_id: str, thread_id: str):
+        return self.rpc_request("followThread", [{"chatId": chat_id, "threadId": thread_id}])
+
+    def unfollow_thread(self, chat_id: str, thread_id: str):
+        return self.rpc_request("unfollowThread", [{"chatId": chat_id, "threadId": thread_id}])
+
     def chat_threads(self, chat_id: str):
         return self.rpc_request("chatThreads", [chat_id])
 

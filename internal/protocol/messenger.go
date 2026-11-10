@@ -2174,6 +2174,10 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 			if thread.Deleted {
 				return nil, ErrThreadDeleted
 			}
+			// A synced or restored follow choice may be ahead of the chat clock.
+			if chat.LastClockValue < thread.FollowedClock {
+				chat.LastClockValue = thread.FollowedClock
+			}
 			message.ThreadMetadataCreationAuthorized = false
 		case errors.Is(err, common.ErrRecordNotFound):
 			parentMessage, parentErr := m.persistence.MessageByID(message.GetThreadId())
@@ -2278,6 +2282,9 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 		return nil, err
 	}
 	m.touchThreadActivity([]*common.Message{message}, func(*common.Message) bool { return true })
+	if err := m.updateThreadFollowsFromMessages([]*common.Message{message}, &response); err != nil {
+		return nil, err
+	}
 	msg, err := m.pullMessagesAndResponsesFromDB([]*common.Message{message})
 	if err != nil {
 		return nil, err
@@ -3721,6 +3728,9 @@ func (m *Messenger) saveDataAndPrepareResponse(messageState *ReceivedMessageStat
 			return nil, err
 		}
 		m.touchThreadActivity(messagesToSave, func(message *common.Message) bool { return message.New })
+		if err := m.updateThreadFollowsFromMessages(messagesToSave, messageState.Response); err != nil {
+			return nil, err
+		}
 	}
 
 	for _, emojiReaction := range messageState.EmojiReactions {
