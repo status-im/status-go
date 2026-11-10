@@ -1526,6 +1526,22 @@ func (db sqlitePersistence) ThreadByID(chatID string, threadID string) (*Thread,
 	return db.threadByID(db.db, chatID, threadID)
 }
 
+// ThreadRootChatID requires a visible root message bound to the stored thread's
+// chat. Received metadata alone must not establish a shared link's destination.
+func (db sqlitePersistence) ThreadRootChatID(threadID string) (string, error) {
+	var chatID string
+	err := db.db.QueryRow(`
+		SELECT t.chat_id FROM threads t
+		JOIN user_messages root ON root.id = t.parent_message_id AND root.local_chat_id = t.chat_id
+		WHERE t.thread_id = ? AND t.parent_message_id = t.thread_id
+			AND NOT root.hide AND NOT root.deleted AND NOT root.deleted_for_me
+			AND COALESCE(root.thread_id, '') = ''`, threadID).Scan(&chatID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", common.ErrRecordNotFound
+	}
+	return chatID, err
+}
+
 func (db sqlitePersistence) threadByID(queryer threadSummaryQuerier, chatID, threadID string) (*Thread, error) {
 	var thread Thread
 	row := queryer.QueryRowContext(context.Background(), threadMetadataSelect+`

@@ -181,7 +181,8 @@ func IsStatusSharedURL(url string) bool {
 		strings.HasPrefix(url, sharedURLMessagePrefix) ||
 		strings.HasPrefix(url, sharedURLChannelPrefixWithData) ||
 		strings.HasPrefix(url, sharedURLMessagePrefixHTTP) ||
-		strings.HasPrefix(url, sharedURLMessagePrefixInternal)
+		strings.HasPrefix(url, sharedURLMessagePrefixInternal) ||
+		IsThreadURL(url)
 }
 
 func splitSharedURLData(data string) (string, string, error) {

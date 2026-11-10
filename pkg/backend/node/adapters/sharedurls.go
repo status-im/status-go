@@ -1,6 +1,7 @@
 package adapters
 
 import (
+	"crypto/ecdsa"
 	"github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/protocol"
 	"github.com/status-im/status-go/internal/protocol/communities"
@@ -18,6 +19,20 @@ func NewSharedUrlsMessengerAdapter(messenger *protocol.Messenger) *SharedUrlsMes
 	return &SharedUrlsMessenger{
 		messenger: messenger,
 	}
+}
+
+func (p *SharedUrlsMessenger) IdentityPublicKey() *ecdsa.PublicKey {
+	if p.messenger == nil {
+		return nil
+	}
+	return p.messenger.IdentityPublicKey()
+}
+
+func (p *SharedUrlsMessenger) ResolveDirectThreadChatID(threadID string) (string, error) {
+	if p.messenger == nil {
+		return "", ErrMessengerNotReady
+	}
+	return p.messenger.ResolveDirectThreadChatID(threadID)
 }
 
 func (p *SharedUrlsMessenger) GetCommunityByID(communityID types.HexBytes) (*communities.Community, error) {

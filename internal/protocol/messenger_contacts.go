@@ -823,6 +823,19 @@ func (m *Messenger) GetContactByID(pubKey string) *contacts.Contact {
 	return contact
 }
 
+// GetContactByIDWithImages loads photo payloads from local persistence because
+// cached contacts retain only media-server URLs after initialization.
+func (m *Messenger) GetContactByIDWithImages(pubKey string) *contacts.Contact {
+	contact := m.GetContactByID(pubKey)
+	if contact == nil || pubKey == m.IdentityPublicKeyString() {
+		return contact
+	}
+	if stored, err := m.persistence.ContactByID(pubKey); err == nil && stored != nil {
+		return stored
+	}
+	return contact
+}
+
 func (m *Messenger) GetSelfContact() *contacts.Contact {
 	return m.selfContact
 }

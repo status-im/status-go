@@ -112,6 +112,7 @@ type Messenger struct {
 	mentionsManager           *MentionManager
 	storeNodeRequestsManager  *StoreNodeRequestManager
 	logger                    *zap.Logger
+	threadLinkPreviewResolver func(string) (*common.LinkPreview, error)
 	tracer                    trace.Tracer
 
 	outputCSV bool
@@ -3962,6 +3963,7 @@ func (m *Messenger) resolveMentionedNames(msg *common.Message) {
 }
 
 func (m *Messenger) prepareMessage(msg *common.Message, s *media.Server) error {
+	defer m.resolveThreadLinkPreviews(msg)
 	m.resolveMentionedNames(msg)
 	if s == nil {
 		return nil
