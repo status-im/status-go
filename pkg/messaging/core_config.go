@@ -2,6 +2,7 @@ package messaging
 
 import (
 	"database/sql"
+	"time"
 
 	"go.uber.org/zap"
 
@@ -18,6 +19,7 @@ type config struct {
 	metricsEnabled         bool
 	persistence            Persistence
 	missingDepsObserver    MissingDependenciesObserver
+	sdsSyncInterval        time.Duration
 }
 
 func newConfig(options ...Options) *config {
@@ -84,5 +86,12 @@ func WithSQLitePersistence(db *sql.DB) Options {
 func WithMissingDependenciesObserver(observer MissingDependenciesObserver) Options {
 	return func(c *config) {
 		c.missingDepsObserver = observer
+	}
+}
+
+// WithSDSSyncInterval sets the native SDS sync interval. Zero uses the native default.
+func WithSDSSyncInterval(interval time.Duration) Options {
+	return func(c *config) {
+		c.sdsSyncInterval = interval
 	}
 }
