@@ -102,7 +102,6 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
 
             self.wait_for_healthy()
 
-            # Skip sync signal client if we'll use async wrapper
             if not kwargs.get("skip_signal_client", False):
                 SignalClient.connect(self)
 
@@ -138,7 +137,6 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
 
         if Config.logs_dir:
             try:
-                # Check if base_url was initialized (may be missing if __init__ failed early)
                 if hasattr(self, "base_url") and hasattr(self, "data_dir"):
                     self._export_logs(Config.logs_dir, log_sufix)
             except Exception as e:
@@ -149,18 +147,15 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
 
     def _export_logs(self, logs_dir: str, log_sufix: str):
         if self.container:
-            # Container logs are exported by StatusGoContainer
             return
 
         timestamp = time.time()
         log_identifier = self.base_url.replace("http://", "").replace(":", "-")
         log_name = f"status-backend_{timestamp}_{log_sufix}_{log_identifier}"
 
-        # Create logs subdirectory
         log_dir_path = os.path.join(logs_dir, log_name)
         os.makedirs(log_dir_path, exist_ok=True)
 
-        # Copy all .log files from data_dir to log_dir_path
         for filename in os.listdir(self.data_dir):
             if not filename.endswith(".log"):
                 continue
@@ -243,9 +238,6 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
     def _set_networks(self, data, **kwargs):
         self.network_id = kwargs.get("network_id", ANVIL_NETWORK_ID)
 
-        # Allow callers (fixtures/tests) to add additional networks on top of the default Anvil network.
-        # - networks_override: full replacement for networksOverride (list[dict])
-        # - extra_networks_override: appended to the default Anvil network (list[dict])
         networks_override = kwargs.get("networks_override", None)
         extra_networks_override = kwargs.get("extra_networks_override", []) or []
 
@@ -337,15 +329,10 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
         return path
 
     def import_data(self, src_path: str, dest_path: str):
-        """
-        Import a file from the host (src_path) into the container at dest_path.
-        If not running in a container, just copy the file locally.
-        """
         if self.container:
             self.container.import_data(src_path, dest_path)
             return
 
-        # Not running in a container, just copy the file locally
         if not os.path.exists(src_path):
             raise FileNotFoundError(f"Source path '{src_path}' does not exist.")
 
@@ -362,18 +349,14 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
         data = {
             "rootDataDir": self.data_dir,
             "kdfIterations": 256000,
-            # Profile config
             "displayName": self.display_name,
             "password": self.password,
             "customizationColor": kwargs.get("customizationColor", "primary"),
-            # Logs config
             "logEnabled": True,
             "logToStderr": True,
             "logLevel": "DEBUG",
-            # Waku config
             "wakuV2LightClient": kwargs.get("waku_light_client", False),
             "wakuV2Fleet": Config.waku_fleet,
-            # Connector config
             "apiConfig": {
                 "apiModules": "connector",
                 "connectorEnabled": kwargs.get("connector_enabled", False),
@@ -436,7 +419,13 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
         return self.api_request_json(method, data)
 
     def restore_keycard_account_and_login(
-        self, keycard: dict, keycard_instance_uid: str, keycard_pairing_key: str, password: str | None = None, **kwargs
+        self,
+        keycard: dict,
+        keycard_instance_uid: str,
+        keycard_pairing_key: str,
+        password: str | None = None,
+        keycard_secure_channel_v2: bool = False,
+        **kwargs,
     ):
         self._set_display_name(**kwargs)
         method = "RestoreAccountAndLogin"
@@ -446,13 +435,13 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
         data["keycard"] = keycard
         data["keycardInstanceUID"] = keycard_instance_uid
         data["keycardPairingKey"] = keycard_pairing_key
+        data["keycardSecureChannelV2"] = keycard_secure_channel_v2
         self._boot_api_config = copy.deepcopy(data.get("apiConfig", {}))
         self._mark_login_signal()
         return self.api_request_json(method, data)
 
     def login(self, key_uid, password: str, kdf_iterations=256000):
         self.password = password
-        # Reconnect to signals before login to avoid missing node.login after logout.
         SignalClient.disconnect(self)
         SignalClient.connect(self)
         self.wait_until_connected()
@@ -524,7 +513,6 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
         return response
 
     def reinit_and_get_accounts(self):
-        # InitializeApplication is the only HTTP surface that exposes multiaccounts.keycard-pairing.
         self.logout()
         return self.init_status_backend().get("accounts", [])
 
@@ -543,19 +531,6 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
             raise
 
     def wait_for_login(self):
-        """Wait until the backend has completed login.
-
-        Historically we relied on the `node.login` signal.
-        In some environments (notably `wakuV2LightClient=true`) this signal can be delayed or
-        occasionally missed by the websocket client. To keep tests stable we:
-        - try to wait for `node.login` first
-        - if it doesn't arrive, fall back to polling RPC state and extracting the same fields
-
-        Only signals and state produced by the login the caller just triggered count. Every login
-        method records the signal backlog depth first, and a re-login cannot be confirmed from RPC
-        state an earlier login left behind.
-        """
-
         def _apply_login_signal(signal: dict):
             if "error" in signal.get("event", {}):
                 error_details = signal["event"]["error"]
@@ -566,7 +541,6 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
             self.mnemonic = self.node_login_event.get("event", {}).get("settings", {}).get("mnemonic", "")
             self.key_uid = self.node_login_event.get("event", {}).get("account", {}).get("key-uid", "")
 
-        # 1) Preferred path: wait for the `node.login` signal (race-safe with backlog).
         mark = self._login_signal_mark
         try:
             with self.expect_signal(SignalType.NODE_LOGIN, timeout=60, start=mark) as exp:
@@ -583,8 +557,6 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
                 )
             logging.warning("NODE_LOGIN signal was not received in time; falling back to RPC polling to confirm login")
 
-        # 2) Fallback path: poll RPC state until it reflects a logged-in account.
-        # We keep this bounded to avoid hiding real hangs.
         deadline = time.monotonic() + 60
         last_settings = None
         last_keypairs = None
@@ -592,7 +564,6 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
 
         while time.monotonic() < deadline:
             try:
-                # If the signal arrived late while we were falling back, prefer it.
                 buffered = self.received_signals.get(SignalType.NODE_LOGIN, [])[mark:]
                 if buffered:
                     signal = buffered[0]
@@ -607,7 +578,6 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
                 last_keypairs = self.accounts_service.get_account_keypairs() or []
                 key_uid = ""
                 if isinstance(last_keypairs, list) and last_keypairs:
-                    # The profile keypair is expected to be present as the first entry in most setups.
                     key_uid = (last_keypairs[0] or {}).get("key-uid", "")
 
                 if public_key and key_uid:
@@ -639,22 +609,6 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
         )
 
     def wait_for_wakuext_ready(self, timeout: float = 30, poll_interval: float = 0.5, *, start_messenger: bool = True):
-        """Wait until `wakuext_*` RPC namespace is available after login.
-
-        In some environments `wait_for_login()` can complete before the `wakuext` RPC namespace is fully
-        registered/ready, so the first `wakuext_*` call may fail with `-32601`.
-
-        This helper keeps the waiting logic out of tests.
-
-        Args:
-            timeout: Total time in seconds.
-            poll_interval: Sleep interval between attempts.
-            start_messenger: If True, try to call `wakuext_startMessenger` while waiting.
-
-        Raises:
-            TimeoutError: if `wakuext` does not become ready within the given timeout.
-        """
-
         deadline = time.monotonic() + float(timeout)
         last_error = None
         messenger_started = False
@@ -662,11 +616,9 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
         while time.monotonic() < deadline:
             try:
                 if start_messenger and not messenger_started:
-                    # Best-effort: this itself can fail with -32601 if the namespace isn't ready yet.
                     self.wakuext_service.start_messenger()
                     messenger_started = True
 
-                # Probe a lightweight wakuext call that doesn't produce log noise.
                 _ = self.wakuext_service.chats()
                 return
             except Exception as e:
@@ -742,7 +694,6 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
 
     def input_connection_string_for_bootstrapping(self, connection_string):
         method = "InputConnectionStringForBootstrappingV2"
-        # Empty user
         data = {
             "connectionString": connection_string,
             "receiverClientConfig": {
@@ -787,11 +738,9 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
         if not self.container:
             raise RuntimeError("Gathering metrics is only supported when running status-backend in a Docker container")
 
-        # Stop both monitoring threads and get independent arrays
         container_stats = self.container.stop_performance_monitoring()
         go_metrics = self.expvar_client.stop_monitoring()
 
-        # Create PerformanceMetrics with independent arrays
         return StatusGoMetrics(
             container_stats=container_stats,
             go_metrics=go_metrics,
@@ -800,7 +749,6 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
         )
 
     def start_performance_monitoring(self):
-        """Start performance monitoring with independent threads"""
         if not self.container:
             raise RuntimeError("Performance monitoring is only supported when running status-backend in a Docker container")
 
@@ -838,6 +786,5 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
 
     def serialize_legacy_key(self, key):
         method = "SerializeLegacyKey"
-        # Use client.post directly, because this method is old and has json-incompatible arguments
         response = self.client.post(self.method_url(method), data=key)
         return response.content.decode()

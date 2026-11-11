@@ -1,4 +1,3 @@
-# Main constants file for tests
 from dataclasses import dataclass
 import os
 from typing import Optional, List, Dict, Any
@@ -87,6 +86,8 @@ new_account_data_2 = {
     "colorId": "blue",
 }
 
+COLD_WALLET_TYPE_STATUS_KEYCARD = "status-keycard"
+
 user_keycard_1 = {
     "keyUID": "5a0dd657-165a-4810-b800-6005452be42f",
     "address": "0x1234567890abcdef1234567890abcdef12345678",
@@ -99,7 +100,7 @@ user_keycard_1 = {
     "eip1581Address": "0xeip1581address1234567890abcdef1234567890",
     "encryptionPublicKey": "example-encryption-public-key",
     "walletXPub": "xpub6example",
-    "coldWallet": "status-keycard",
+    "coldWallet": COLD_WALLET_TYPE_STATUS_KEYCARD,
 }
 
 keypair_name = "ImportedKeypairName"
@@ -142,10 +143,8 @@ STATUS_MEDIA_SERVER_PORT = 8587
 
 NATIVE_TOKEN_ADDRESS = "0x0000000000000000000000000000000000000000"
 
-# Well-known burn address, used as a generic recipient in tests
 BURN_ADDRESS = "0x000000000000000000000000000000000000dEaD"
 
-# Container paths for pre-deployed contracts
 SNT_ADDRESSES_CONTAINER_PATH = "/app/contracts/snt_addresses.json"
 COMMUNITIES_ADDRESSES_CONTAINER_PATH = "/app/contracts/communities_addresses.json"
 ENS_ADDRESSES_CONTAINER_PATH = "/app/contracts/ens_addresses.json"
