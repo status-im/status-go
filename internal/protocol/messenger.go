@@ -773,6 +773,7 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 		}
 	}
 
+	m.startSDSPeriodicSync()
 	return response, nil
 }
 
@@ -3476,6 +3477,11 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[types.ChatFilte
 
 			if allMessagesProcessed {
 				processedMessages = append(processedMessages, cryptotypes.EncodeHex(shhMessage.Hash))
+				for _, hash := range handleMessagesResponse.ConsumedEnvelopeHashes {
+					if !bytes.Equal(hash, shhMessage.Hash) {
+						processedMessages = append(processedMessages, cryptotypes.EncodeHex(hash))
+					}
+				}
 			}
 		}
 	}

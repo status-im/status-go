@@ -1,6 +1,7 @@
 package reliability
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"errors"
 	"testing"
@@ -20,6 +21,30 @@ import (
 )
 
 func noopDispatch(*ecdsa.PublicKey, []byte, [][]byte) error { return nil }
+
+func TestPeriodicSyncLifecycle(t *testing.T) {
+	r := newTestReliability(t)
+	t.Cleanup(r.Close)
+	require.NoError(t, r.Start(noopDispatch))
+	active := r.PeriodicSyncContext()
+	require.NotNil(t, active)
+	require.NoError(t, r.Start(noopDispatch))
+	require.Same(t, active, r.PeriodicSyncContext())
+	require.NoError(t, r.SetPaused(true))
+	require.ErrorIs(t, active.Err(), context.Canceled)
+	require.Nil(t, r.PeriodicSyncContext())
+	require.NoError(t, r.SetPaused(false))
+	active = r.PeriodicSyncContext()
+	require.NotNil(t, active)
+	r.Stop()
+	require.ErrorIs(t, active.Err(), context.Canceled)
+	require.Nil(t, r.PeriodicSyncContext())
+	require.NoError(t, r.Start(noopDispatch))
+	require.NotNil(t, r.PeriodicSyncContext())
+	active = r.PeriodicSyncContext()
+	r.Close()
+	require.ErrorIs(t, active.Err(), context.Canceled)
+}
 
 func newTestPersistence(t *testing.T) mvdsnode.Persistence {
 	t.Helper()

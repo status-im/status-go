@@ -74,6 +74,36 @@ func publicSDSChannelID(params messagingtypes.SendPublicParams) string {
 	return reliability.BuildChannelID(communityID, params.ContentTopic)
 }
 
+// SendSDSSync publishes a tick-generated metadata payload without tracking it as
+// an application message.
+func (s *Sender) SendSDSSync(ctx context.Context, payload []byte, pubsubTopic, syncTopic string) error {
+	if syncTopic == "" {
+		return errors.New("SDS sync topic is empty")
+	}
+	if len(payload) == 0 {
+		return errors.New("SDS sync payload is empty")
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	spec, err := s.stack.Encryption.BuildPublicMessage(s.identity, payload)
+	if err != nil {
+		return errors.Wrap(err, "failed to wrap SDS sync in encryption layer")
+	}
+	payload, err = proto.Marshal(spec.Message)
+	if err != nil {
+		return errors.Wrap(err, "failed to marshal SDS sync encryption layer")
+	}
+	_, _, err = s.sendPublic(ctx, s.logger.Named("sendSDSSync"), sendPublicParams{
+		payload:      payload,
+		pubsubTopic:  pubsubTopic,
+		contentTopic: syncTopic,
+		ephemeral:    true,
+		priority:     &messagingtypes.LowPriority,
+	})
+	return errors.Wrap(err, "failed to send SDS sync")
+}
+
 func (s *Sender) SendPublic(ctx context.Context, params messagingtypes.SendPublicParams) error {
 	messageID := messagingtypes.MessageID(params.Sender, params.Payload)
 	var sdsMessageIDBytes []byte

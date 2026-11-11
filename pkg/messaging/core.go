@@ -179,7 +179,9 @@ func newCore(waku wakutypes.Waku, params CoreParams, config *config) (*Core, err
 	)
 	core.missingDeps.reconciler = stack.Reliability
 
-	stack.Reliability.SetRetrievalHintProvider(core.resolveSDSRetrievalHint)
+	stack.Reliability.SetChannelRetrievalHintProvider(func(messageID, channelID string) []byte {
+		return core.resolveSDSRetrievalHintForChannel(channelID, messageID)
+	})
 	stack.Reliability.SetSDSRetrievalHintPersistence(config.persistence.SDSEnvelopeHashesStorage())
 	stack.Reliability.SetMessageSentHandler(core.handleSDSMessageSent)
 
@@ -234,10 +236,6 @@ func buildSDSRetrievalHintFromHashes(logger *zap.Logger, messageID string, hashe
 	}
 
 	return hint
-}
-
-func (c *Core) resolveSDSRetrievalHint(messageID string) []byte {
-	return c.resolveSDSRetrievalHintForChannel(c.stack.Reliability.CurrentSDSChannelID(), messageID)
 }
 
 func (c *Core) resolveSDSRetrievalHintForChannel(channelID, messageID string) []byte {

@@ -44,6 +44,40 @@ func TestWrapPayloadForSDSIntegrationDistinctPerChannel(t *testing.T) {
 	require.NotEqual(t, wrappedA, wrappedB, "SDS wrap should be channel-specific")
 }
 
+func TestSDSTickEnsuresChannels(t *testing.T) {
+	r := newTestReliability(t)
+	t.Cleanup(r.Close)
+
+	const channelID = "sync-channel"
+	require.NoError(t, r.EnsureSDSChannel(channelID))
+	events, err := r.TickSDS()
+	require.NoError(t, err)
+	for _, event := range events {
+		require.Equal(t, channelID, event.ChannelID)
+	}
+}
+
+func TestSDSChannelRetrievalHintProvider(t *testing.T) {
+	r := newTestReliability(t)
+	t.Cleanup(r.Close)
+
+	const (
+		messageID = "message-id"
+		channelID = "sync-hints"
+	)
+	want := []byte("retrieval-hint")
+	var gotMessageID, gotChannelID string
+	r.SetChannelRetrievalHintProvider(func(id, channel string) []byte {
+		gotMessageID = id
+		gotChannelID = channel
+		return want
+	})
+
+	require.Equal(t, want, r.provideRetrievalHint(sds.MessageID(messageID), channelID))
+	require.Equal(t, messageID, gotMessageID)
+	require.Equal(t, channelID, gotChannelID)
+}
+
 type historyCountingPersistence struct {
 	sds.PersistenceCallbacks
 	updateCount int
