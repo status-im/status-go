@@ -1,6 +1,5 @@
-# Ad-hoc test — no backend spec. Restores coverage deleted in 33be7c3e7 in cold-wallet vocabulary.
 import pytest
-from resources.constants import user_1, wallet_account_details_derivation, keypair_name
+from resources.constants import COLD_WALLET_TYPE_STATUS_KEYCARD, user_1, wallet_account_details_derivation, keypair_name
 
 
 @pytest.mark.rpc
@@ -21,7 +20,7 @@ class TestLoginAfterColdWalletMigration:
         key_uid = add_resp.get("key-uid")
         assert key_uid is not None, "Expected addKeypairViaSeedPhrase to return the created keypair's key-uid"
         addresses = [a.get("address") for a in add_resp.get("accounts", [])] + [add_resp.get("derived-from")]
-        backend.accounts_service.migrate_non_profile_keypair_to_cold_wallet(key_uid, backend.password, "status-keycard")
+        backend.accounts_service.migrate_non_profile_keypair_to_cold_wallet(key_uid, backend.password, COLD_WALLET_TYPE_STATUS_KEYCARD)
 
         backend.logout()
         backend.login(backend.key_uid, backend.password)
@@ -30,7 +29,7 @@ class TestLoginAfterColdWalletMigration:
 
         kp = backend.accounts_service.get_keypair_by_key_uid(key_uid)
         assert (
-            kp.get("cold-wallet") == "status-keycard"
+            kp.get("cold-wallet") == COLD_WALLET_TYPE_STATUS_KEYCARD
         ), "Expected the keypair to stay cold-wallet backed after relogin because login xpub backfill must skip cold keypairs"
         for address in addresses:
             resp = backend.accounts_service.verify_keystore_file_for_account(address, backend.password)

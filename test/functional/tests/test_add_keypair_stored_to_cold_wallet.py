@@ -2,7 +2,7 @@ import copy
 import re
 import pytest
 from clients.api import ApiResponseError
-from resources.constants import user_1, wallet_account_details_derivation, keypair_name
+from resources.constants import COLD_WALLET_TYPE_STATUS_KEYCARD, user_1, wallet_account_details_derivation, keypair_name
 
 
 @pytest.mark.rpc
@@ -32,7 +32,6 @@ class TestAddKeypairStoredToColdWallet:
             resp = backend.accounts_service.verify_keystore_file_for_account(address, backend.password)
             assert resp is True
 
-        # delete the keypair so we can add it back
         backend.accounts_service.delete_keypair(key_uid, backend.password)
         with pytest.raises(ApiResponseError, match=re.escape("keypair is not found")):
             backend.accounts_service.get_keypair_by_key_uid(key_uid)
@@ -82,12 +81,12 @@ class TestAddKeypairStoredToColdWallet:
             user_1.address,
             "cold-keypair",
             user_1.wallet_xpub,
-            "status-keycard",
+            COLD_WALLET_TYPE_STATUS_KEYCARD,
             [wallet_account_details_derivation],
         )
         kp = backend.accounts_service.get_keypair_by_key_uid(key_uid)
         assert (
-            kp.get("cold-wallet") == "status-keycard"
+            kp.get("cold-wallet") == COLD_WALLET_TYPE_STATUS_KEYCARD
         ), "Expected the keypair to be cold-wallet backed because it was added via addKeypairStoredToColdWallet"
 
         next_path = "m/44'/60'/0'/0/1"
@@ -126,7 +125,7 @@ class TestAddKeypairStoredToColdWallet:
                 user_1.address,
                 "cold-keypair",
                 user_1.wallet_xpub,
-                "status-keycard",
+                COLD_WALLET_TYPE_STATUS_KEYCARD,
                 [],
             )
         with pytest.raises(ApiResponseError, match=re.escape("keypair is not found")):
@@ -143,7 +142,7 @@ class TestAddKeypairStoredToColdWallet:
                 user_1.address,
                 "cold-keypair",
                 user_1.wallet_xpub,
-                "status-keycard",
+                COLD_WALLET_TYPE_STATUS_KEYCARD,
                 [bad_account],
             )
         with pytest.raises(ApiResponseError, match=re.escape("keypair is not found")):
@@ -165,7 +164,7 @@ class TestAddKeypairStoredToColdWallet:
                 user_1.address,
                 "cold-keypair",
                 user_1.wallet_xpub,
-                "status-keycard",
+                COLD_WALLET_TYPE_STATUS_KEYCARD,
                 [wallet_account_details_derivation],
             )
         kp = backend.accounts_service.get_keypair_by_key_uid(key_uid)

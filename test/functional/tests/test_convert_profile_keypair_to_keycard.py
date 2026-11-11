@@ -1,13 +1,11 @@
-"""Move the profile keypair onto a keycard through ConvertToKeycardAccountV2, driven with a mock pairing.
-The keycards tables and their RPCs were dropped, so the observable state is cold-wallet, keystore presence and the pairing."""
-
 import copy
 
 import pytest
 from clients.api import ApiResponseError
 from clients.signals import SignalType
-from resources.constants import user_1
+from resources.constants import COLD_WALLET_TYPE_STATUS_KEYCARD, user_1
 from steps.keycard import (
+    KEYCARD_PAIRING_SECURE_CHANNEL_V2,
     KEYCARD_UID,
     KEYPAIR_FIELDS,
     account_shape,
@@ -38,13 +36,12 @@ class TestConvertProfileKeypairToKeycard:
 
     def _assert_on_keycard(self, backend, kp0, old_password, keycard_password):
         kp1 = backend.accounts_service.get_keypair_by_key_uid(backend.key_uid)
-        assert kp1["cold-wallet"] == "status-keycard", "Expected the profile keypair to be flagged as keycard backed"
+        assert kp1["cold-wallet"] == COLD_WALLET_TYPE_STATUS_KEYCARD, "Expected the profile keypair to be flagged as keycard backed"
         for field in KEYPAIR_FIELDS:
             assert kp1.get(field) == kp0.get(field), f"Expected keypair field {field} to survive the keycard migration"
         assert account_shape(kp1) == account_shape(kp0), "Expected the profile accounts to be unchanged by the keycard migration"
         for account in kp1["accounts"]:
             assert account["operable"] == "fully", f"Expected {account['address']} fully operable because the keycard now holds the key"
-        # Files must be deleted, not re-encrypted: neither password may resolve them.
         assert_keystore_state(backend, keypair_addresses(kp1), old_password, present=False)
         assert_keystore_state(backend, keypair_addresses(kp1), keycard_password, present=False)
         return kp1
@@ -65,7 +62,7 @@ class TestConvertProfileKeypairToKeycard:
         kp1 = self._assert_on_keycard(backend, kp0, old_password, keycard_password)
         profiles = [kp for kp in backend.accounts_service.get_account_keypairs() if kp.get("type") == "profile"]
         assert len(profiles) == 1 and profiles[0]["key-uid"] == key_uid, "Expected exactly one profile keypair after the migration"
-        assert profiles[0]["cold-wallet"] == "status-keycard"
+        assert profiles[0]["cold-wallet"] == COLD_WALLET_TYPE_STATUS_KEYCARD
         listed = {a["address"]: a for a in backend.accounts_service.get_accounts()}
         for account in kp1["accounts"]:
             assert listed[account["address"]]["wallet"] == account["wallet"]
@@ -121,7 +118,7 @@ class TestConvertProfileKeypairToKeycard:
 
         self._assert_on_keycard(backend, kp0, old_password, keycard_password)
         assert (
-            keycard_pairing_of(backend.reinit_and_get_accounts(), key_uid) == "secure-channel-v2"
+            keycard_pairing_of(backend.reinit_and_get_accounts(), key_uid) == KEYCARD_PAIRING_SECURE_CHANNEL_V2
         ), "Expected the marker stored because a non-empty keycard-pairing is what marks a keycard account"
 
     def test_convert_without_pairing_or_secure_channel_v2_is_rejected(self, backend):
@@ -195,7 +192,6 @@ class TestConvertProfileKeypairToKeycard:
         old_password, keycard_password = self._convert(backend, pairing)
         backend.reinit_and_get_accounts()
 
-        # LoginAccount reports failures through the node.login signal, not the HTTP response.
         with backend.expect_signal(SignalType.NODE_LOGIN, timeout=60) as exp:
             backend.login_with_mnemonic(key_uid, user_1.passphrase)
         assert "mnemonic does not match this account" in exp.result["event"].get("error", "")
