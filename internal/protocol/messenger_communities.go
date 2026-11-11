@@ -2344,6 +2344,10 @@ func (m *Messenger) leaveCommunity(communityID cryptotypes.HexBytes) (*Messenger
 	if err != nil {
 		return nil, err
 	}
+	_, err = m.messaging.RemoveFilterByChatID(communitySDSSyncTopic(communityID.String()))
+	if err != nil {
+		return nil, err
+	}
 
 	response.AddCommunity(community)
 	return response, nil
@@ -2353,6 +2357,10 @@ func (m *Messenger) kickedOutOfCommunity(communityID cryptotypes.HexBytes, spect
 	response := &MessengerResponse{}
 
 	community, err := m.communitiesManager.KickedOutOfCommunity(communityID, spectateMode)
+	if err != nil {
+		return nil, err
+	}
+	_, err = m.messaging.RemoveFilterByChatID(communitySDSSyncTopic(communityID.String()))
 	if err != nil {
 		return nil, err
 	}
@@ -2533,6 +2541,12 @@ func (m *Messenger) InitCommunityFilters(c messagingtypes.CommunitiesToInitializ
 	return m.messaging.InitCommunities(c)
 }
 
+// communitySDSSyncTopic is a temporary migration topic, distinct from the
+// community's regular content topic so older SDS implementations do not see syncs.
+func communitySDSSyncTopic(communityID string) string {
+	return communityID + "-sds-sync-v1"
+}
+
 func (m *Messenger) DefaultFilters(o *communities.Community) messagingtypes.ChatsToInitialize {
 	cID := o.IDString()
 	uncompressedPubKey := crypto.PubkeyToHex(o.PublicKey())[2:]
@@ -2540,7 +2554,7 @@ func (m *Messenger) DefaultFilters(o *communities.Community) messagingtypes.Chat
 
 	communityPubsubTopic := o.PubsubTopic()
 
-	return messagingtypes.ChatsToInitialize{
+	filters := messagingtypes.ChatsToInitialize{
 		{ChatID: cID, PubsubTopic: communityPubsubTopic},
 		{ChatID: memberUpdateChannelID, PubsubTopic: communityPubsubTopic},
 		{ChatID: uncompressedPubKey, PubsubTopic: messagingtypes.DefaultNonProtectedPubsubTopic()},
@@ -2550,6 +2564,12 @@ func (m *Messenger) DefaultFilters(o *communities.Community) messagingtypes.Chat
 		// Sending is unchanged here.
 		{ChatID: uncompressedPubKey, PubsubTopic: messagingtypes.DefaultShardPubsubTopic()},
 	}
+	if o.Joined() {
+		filters = append(filters, &messagingtypes.ChatToInitialize{
+			ChatID: communitySDSSyncTopic(cID), PubsubTopic: communityPubsubTopic,
+		})
+	}
+	return filters
 }
 
 func (m *Messenger) CreateCommunity(request *requests.CreateCommunity, createDefaultChannel bool) (*MessengerResponse, error) {

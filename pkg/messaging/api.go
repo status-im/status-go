@@ -1,6 +1,7 @@
 package messaging
 
 import (
+	"context"
 	"time"
 
 	"github.com/status-im/status-go/pkg/messaging/types"
@@ -98,4 +99,8 @@ func (a *API) PauseDataSync(paused bool) error {
 		return nil
 	}
 	return a.core.stack.Reliability.SetPaused(paused)
+}
+
+func (a *API) SDSPeriodicSyncContext() context.Context {
+	return a.core.stack.Reliability.PeriodicSyncContext()
 }

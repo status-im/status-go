@@ -96,17 +96,26 @@ func (r *Processor) ProcessMessage(msg *messagingtypes.ReceivedMessage) (*messag
 		}
 		response.messages = append(response.messages, queuedMessagesResponse.messages...)
 		response.ackedMessageIDs = append(response.ackedMessageIDs, queuedMessagesResponse.ackedMessageIDs...)
+		response.consumedEnvelopeHashes = append(response.consumedEnvelopeHashes, queuedMessagesResponse.consumedEnvelopeHashes...)
 	}
 
 	return &messagingtypes.HandleMessageResponse{
-		Messages:        response.messages,
-		AckedMessageIDs: response.ackedMessageIDs,
+		Messages:               response.messages,
+		AckedMessageIDs:        response.ackedMessageIDs,
+		ConsumedEnvelopeHashes: response.consumedEnvelopeHashes,
 	}, nil
 }
 
 type processMessageResponse struct {
-	messages        []*messagingtypes.Message
-	ackedMessageIDs []types.HexBytes
+	messages               []*messagingtypes.Message
+	ackedMessageIDs        []types.HexBytes
+	consumedEnvelopeHashes [][]byte
+}
+
+type sdsLayerReliability interface {
+	UnwrapPayloadFromSDSWithMetadata([]byte) ([]byte, []byte, string, bool, error)
+	RecordSDSMessageReceived(string, []byte) error
+	RecordSDSRetrievalHints(string, []byte, [][]byte) error
 }
 
 func (r *Processor) processMessage(m *messagingtypes.ReceivedMessage) (*processMessageResponse, error) {
@@ -174,6 +183,11 @@ func (r *Processor) processMessage(m *messagingtypes.ReceivedMessage) (*processM
 		logger.Error("failed to unwrap payload for SDS", zap.Error(err))
 		return nil, err
 	}
+	if responseMessage.SDSSync {
+		response.messages = nil
+		response.consumedEnvelopeHashes = hashes
+		return response, nil
+	}
 
 	messages, ackedMessageIDs, err := r.processReliabilityLayer(responseMessage, logger)
 	if err == nil {
@@ -219,6 +233,7 @@ func (r *Processor) processQueuedHashRatchetMessages(hashRatchetInfos []*messagi
 
 			response.messages = append(response.messages, r.messages...)
 			response.ackedMessageIDs = append(response.ackedMessageIDs, r.ackedMessageIDs...)
+			response.consumedEnvelopeHashes = append(response.consumedEnvelopeHashes, r.consumedEnvelopeHashes...)
 		}
 
 		err = r.hashRatchetStorage.DeleteMessages(processedIds)
@@ -340,17 +355,22 @@ func (r *Processor) processEncryptionLayer(ctx context.Context, m *messagingtype
 }
 
 func (r *Processor) processSDSLayer(msg *messagingtypes.Message) error {
+	return r.processSDSLayerWithReliability(msg, r.stack.Reliability)
+}
+
+func (r *Processor) processSDSLayerWithReliability(msg *messagingtypes.Message, reliability sdsLayerReliability) error {
 	if len(msg.EncryptionLayer.Payload) <= 0 {
 		return nil
 	}
 
-	unwrappedPayload, sdsMessageID, channelID, isSDS, err := r.stack.Reliability.UnwrapPayloadFromSDSWithMetadata(msg.EncryptionLayer.Payload)
+	unwrappedPayload, sdsMessageID, channelID, isSDS, err := reliability.UnwrapPayloadFromSDSWithMetadata(msg.EncryptionLayer.Payload)
 	if err != nil {
 		return err
 	}
 
-	if isSDS {
-		if err := r.stack.Reliability.RecordSDSMessageReceived(channelID, sdsMessageID); err != nil {
+	metadataOnly := isSDS && unwrappedPayload == nil
+	if isSDS && !metadataOnly {
+		if err := reliability.RecordSDSMessageReceived(channelID, sdsMessageID); err != nil {
 			r.logger.Error("failed to persist received SDS message",
 				zap.String("channelID", channelID),
 				zap.String("messageID", types.EncodeHex(sdsMessageID)),
@@ -361,7 +381,7 @@ func (r *Processor) processSDSLayer(msg *messagingtypes.Message) error {
 		if msg.SegmentationLayer.Segmented {
 			envelopeHashes = msg.SegmentationLayer.Hashes
 		}
-		if err := r.stack.Reliability.RecordSDSRetrievalHints(channelID, sdsMessageID, envelopeHashes); err != nil {
+		if err := reliability.RecordSDSRetrievalHints(channelID, sdsMessageID, envelopeHashes); err != nil {
 			r.logger.Error("failed to persist received SDS retrieval hints",
 				zap.String("channelID", channelID),
 				zap.String("messageID", types.EncodeHex(sdsMessageID)),
@@ -371,6 +391,7 @@ func (r *Processor) processSDSLayer(msg *messagingtypes.Message) error {
 	}
 
 	msg.SDSWrapped = !bytes.Equal(msg.EncryptionLayer.Payload, unwrappedPayload)
+	msg.SDSSync = metadataOnly
 	msg.EncryptionLayer.Payload = unwrappedPayload
 	return nil
 }
