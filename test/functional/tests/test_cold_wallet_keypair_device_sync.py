@@ -1,12 +1,9 @@
-"""A cold-wallet migration has to reach the user's other device: the receiving side is handleSyncKeypair,
-driven here over real pairing and sync rather than the single backend the other cold-wallet modules use."""
-
 import asyncio
 import time
 
 import pytest
 from clients.api import ApiResponseError
-from resources.constants import user_1
+from resources.constants import COLD_WALLET_TYPE_STATUS_KEYCARD, user_1
 from steps.cold_wallet import add_seed_keypair, keystore_present
 from steps.multidevice import login_paired_device, pair_second_device
 
@@ -49,7 +46,6 @@ class TestColdWalletKeypairDeviceSync:
         secondary.backend.init_status_backend()
         await pair_second_device(primary, secondary)
         await login_paired_device(secondary, primary.backend.key_uid, primary.backend.password)
-        # Don't race the second device's Waku subscriptions.
         await asyncio.to_thread(secondary.backend.wait_for_online, timeout=60)
         return primary, secondary
 
@@ -62,9 +58,13 @@ class TestColdWalletKeypairDeviceSync:
         sent_xpub = _sent_xpub(primary, key_uid)
         assert synced["xpub"] == sent_xpub, "Expected the import to sync the sender's xpub"
 
-        primary.backend.accounts_service.migrate_non_profile_keypair_to_cold_wallet(key_uid, primary.backend.password, "status-keycard")
+        primary.backend.accounts_service.migrate_non_profile_keypair_to_cold_wallet(
+            key_uid, primary.backend.password, COLD_WALLET_TYPE_STATUS_KEYCARD
+        )
 
-        arrived = await _wait_for_keypair(secondary, key_uid, lambda kp: kp.get("cold-wallet") == "status-keycard", "the cold-wallet migration")
+        arrived = await _wait_for_keypair(
+            secondary, key_uid, lambda kp: kp.get("cold-wallet") == COLD_WALLET_TYPE_STATUS_KEYCARD, "the cold-wallet migration"
+        )
         assert arrived["xpub"] == sent_xpub, "Expected the xpub to survive the sync, since the second device cannot derive one"
         assert arrived["derived-from"] == synced["derived-from"]
         assert not any(
@@ -76,8 +76,10 @@ class TestColdWalletKeypairDeviceSync:
 
         key_uid = add_seed_keypair(primary.backend)["key-uid"]
         await _wait_for_keypair(secondary, key_uid, lambda kp: kp.get("key-uid") == key_uid, "the imported keypair")
-        primary.backend.accounts_service.migrate_non_profile_keypair_to_cold_wallet(key_uid, primary.backend.password, "status-keycard")
-        await _wait_for_keypair(secondary, key_uid, lambda kp: kp.get("cold-wallet") == "status-keycard", "the cold-wallet migration")
+        primary.backend.accounts_service.migrate_non_profile_keypair_to_cold_wallet(
+            key_uid, primary.backend.password, COLD_WALLET_TYPE_STATUS_KEYCARD
+        )
+        await _wait_for_keypair(secondary, key_uid, lambda kp: kp.get("cold-wallet") == COLD_WALLET_TYPE_STATUS_KEYCARD, "the cold-wallet migration")
 
         primary.backend.accounts_service.migrate_non_profile_cold_wallet_keypair_to_app(user_1.passphrase, primary.backend.password)
 
@@ -87,8 +89,6 @@ class TestColdWalletKeypairDeviceSync:
         ), "Expected the second device to have no keystore files, because only the first device had the seed"
 
     async def test_the_exact_cold_wallet_type_survives_the_sync(self, async_backend_new_profile, async_backend_factory):
-        # The handler stores whatever cold_wallet string arrives; an unknown one is not reachable over
-        # RPC, so this drives the nearest case: a known type the receiving device must not normalise.
         primary, secondary = await self._paired_devices(async_backend_new_profile, async_backend_factory)
 
         key_uid = add_seed_keypair(primary.backend)["key-uid"]

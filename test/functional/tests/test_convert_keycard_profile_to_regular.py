@@ -1,13 +1,10 @@
-"""Stop using a keycard for the profile keypair through ConvertToRegularAccountV2, driven with a mock pairing.
-The keycards tables and their RPCs were dropped, so the observable state is cold-wallet, keystore presence and the pairing."""
-
 import re
 from collections import namedtuple
 
 import pytest
 from clients.api import ApiResponseError
 from clients.signals import SignalType
-from resources.constants import user_2
+from resources.constants import COLD_WALLET_TYPE_STATUS_KEYCARD, user_2
 from steps.keycard import (
     KEYCARD_UID,
     KEYPAIR_FIELDS,
@@ -42,9 +39,8 @@ class TestConvertKeycardProfileToRegular:
         backend.convert_to_keycard_account_v2(backend.key_uid, pairing, KEYCARD_UID, old_password, keycard_password)
 
         kp = backend.accounts_service.get_keypair_by_key_uid(backend.key_uid)
-        assert kp["cold-wallet"] == "status-keycard", "Expected the setup to flag the profile keypair as keycard backed"
+        assert kp["cold-wallet"] == COLD_WALLET_TYPE_STATUS_KEYCARD, "Expected the setup to flag the profile keypair as keycard backed"
         assert kp["xpub"] == kp0["xpub"], "Expected the setup to keep the wallet xpub"
-        # Keystore files are deleted, not re-encrypted: the keycard password must not resolve them either.
         assert_keystore_state(backend, keypair_addresses(kp), keycard_password, present=False)
 
         return KeycardProfile(backend.key_uid, backend.mnemonic, old_password, keycard_password, pairing, kp0)
@@ -69,8 +65,6 @@ class TestConvertKeycardProfileToRegular:
 
         self._assert_regular(backend, ctx.kp0, new_password)
 
-        # Keystore files are written with currPassword, then ChangeDatabasePassword re-wraps the DB;
-        # whether the files also answer to the old passwords is a recorded observation, not a contract.
         probe_address = ctx.kp0["accounts"][0]["address"]
         keystore_with_keycard_password = backend.accounts_service.verify_keystore_file_for_account(probe_address, ctx.keycard_password)
         keystore_with_old_password = backend.accounts_service.verify_keystore_file_for_account(probe_address, ctx.old_password)
@@ -108,7 +102,7 @@ class TestConvertKeycardProfileToRegular:
             backend.convert_to_regular_account_v2(ctx.mnemonic, "definitely-wrong", "whatever-new")
 
         kp = backend.accounts_service.get_keypair_by_key_uid(ctx.key_uid)
-        assert kp["cold-wallet"] == "status-keycard", "Expected the keypair to stay on the keycard after a rejected conversion"
+        assert kp["cold-wallet"] == COLD_WALLET_TYPE_STATUS_KEYCARD, "Expected the keypair to stay on the keycard after a rejected conversion"
         assert kp["xpub"] == ctx.kp0["xpub"]
         assert_keystore_state(backend, keypair_addresses(kp), ctx.keycard_password, present=False)
         assert_keystore_state(backend, keypair_addresses(kp), ctx.old_password, present=False)
@@ -129,7 +123,7 @@ class TestConvertKeycardProfileToRegular:
             backend.convert_to_regular_account_v2(user_2.passphrase, ctx.keycard_password, "whatever-new")
 
         kp = backend.accounts_service.get_keypair_by_key_uid(ctx.key_uid)
-        assert kp["cold-wallet"] == "status-keycard", "Expected the keypair untouched by an unknown mnemonic"
+        assert kp["cold-wallet"] == COLD_WALLET_TYPE_STATUS_KEYCARD, "Expected the keypair untouched by an unknown mnemonic"
         assert_keystore_state(backend, keypair_addresses(kp), ctx.keycard_password, present=False)
         assert (
             keycard_pairing_of(backend.reinit_and_get_accounts(), ctx.key_uid) == ctx.pairing
@@ -152,6 +146,23 @@ class TestConvertKeycardProfileToRegular:
         assert (
             keycard_pairing_of(backend.reinit_and_get_accounts(), ctx.key_uid) == ""
         ), "Expected the keycard pairing cleared after a padded-mnemonic conversion"
+
+    def test_stop_using_secure_channel_v2_clears_the_marker(self, backend):
+        key_uid, mnemonic = backend.key_uid, backend.mnemonic
+        kp0 = fresh_profile_keypair(backend)
+        keycard_password = derive_keycard_password(backend, mnemonic)
+        old_password = backend.password
+        backend.convert_to_keycard_account_v2(key_uid, "", KEYCARD_UID, old_password, keycard_password, keycard_secure_channel_v2=True)
+        kp_on_card = backend.accounts_service.get_keypair_by_key_uid(key_uid)
+        assert kp_on_card["cold-wallet"] == COLD_WALLET_TYPE_STATUS_KEYCARD, "Expected the profile on Keycard before stop using"
+        new_password = "NewRegular-" + fake.profile_password()
+
+        backend.convert_to_regular_account_v2(mnemonic, keycard_password, new_password)
+
+        self._assert_regular(backend, kp0, new_password)
+        assert (
+            keycard_pairing_of(backend.reinit_and_get_accounts(), key_uid) == ""
+        ), "Expected the secure-channel-v2 marker cleared because the profile no longer uses a keycard"
 
     def test_stop_using_keycard_on_regular_profile_is_rejected(self, backend):
         kp0 = backend.accounts_service.get_keypair_by_key_uid(backend.key_uid)

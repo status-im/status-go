@@ -1,13 +1,16 @@
-"""Restoring an existing keycard account through RestoreAccountAndLogin, the path the app uses for keycard login.
-The card's contents are read off a real profile restored from the same seed rather than made up."""
-
 import copy
 
 import pytest
 from clients.api import ApiResponseError
 from clients.signals import SignalType
-from resources.constants import user_1, user_mnemonic_12
-from steps.keycard import PATH_EIP1581_CHAT, PATH_EIP1581_ENCRYPTION, derive_chat_private_key, keycard_pairing_of
+from resources.constants import COLD_WALLET_TYPE_STATUS_KEYCARD, user_1, user_mnemonic_12
+from steps.keycard import (
+    KEYCARD_PAIRING_SECURE_CHANNEL_V2,
+    PATH_EIP1581_CHAT,
+    PATH_EIP1581_ENCRYPTION,
+    derive_chat_private_key,
+    keycard_pairing_of,
+)
 
 PATH_WALLET_ROOT = "m/44'/60'/0'/0"
 PATH_EIP1581_ROOT = "m/43'/60'/1581'"
@@ -31,7 +34,6 @@ class TestRestoreKeycardAccount:
         origin.wallet_service.start_wallet()
 
         keypair = origin.accounts_service.get_keypair_by_key_uid(key_uid)
-        # Cross-checked against the recorded constant so a mis-derived payload fails here, not downstream.
         assert keypair["xpub"] == user_1.wallet_xpub, "Expected the source profile's xpub to match the recorded constant"
         paths = [PATH_WALLET_ROOT, PATH_EIP1581_ROOT, PATH_EIP1581_CHAT, PATH_DEFAULT_WALLET, PATH_EIP1581_ENCRYPTION]
         derived = dict(zip(paths, origin.wallet_service.get_derived_addresses_for_mnemonic(user_1.passphrase, paths)))
@@ -48,7 +50,7 @@ class TestRestoreKeycardAccount:
             "eip1581Address": derived[PATH_EIP1581_ROOT]["address"],
             "encryptionPublicKey": derived[PATH_EIP1581_ENCRYPTION]["public-key"],
             "walletXPub": keypair["xpub"],
-            "coldWallet": "status-keycard",
+            "coldWallet": COLD_WALLET_TYPE_STATUS_KEYCARD,
         }
         origin.logout()
         return data
@@ -71,7 +73,7 @@ class TestRestoreKeycardAccount:
 
         keypair = restoring.accounts_service.get_keypair_by_key_uid(card["keyUID"])
         assert keypair["type"] == "profile"
-        assert keypair["cold-wallet"] == "status-keycard", "Expected the restored profile keypair to be flagged as card backed"
+        assert keypair["cold-wallet"] == COLD_WALLET_TYPE_STATUS_KEYCARD, "Expected the restored profile keypair to be flagged as card backed"
         assert keypair["xpub"] == card["walletXPub"], "Expected the card's xpub to be stored, since the seed is not available to derive one"
         assert keypair["derived-from"].lower() == card["address"].lower()
 
@@ -103,12 +105,10 @@ class TestRestoreKeycardAccount:
         assert exp.result["event"]["account"]["key-uid"] == card["keyUID"]
 
         keypair = restoring.accounts_service.get_keypair_by_key_uid(card["keyUID"])
-        assert keypair["cold-wallet"] == "status-keycard", "Expected the card flag to survive a re-login"
+        assert keypair["cold-wallet"] == COLD_WALLET_TYPE_STATUS_KEYCARD, "Expected the card flag to survive a re-login"
         assert keypair["xpub"] == card["walletXPub"]
 
     def test_login_accepts_a_chat_key_that_does_not_match_the_profile(self, restoring, card):
-        # Characterises current behaviour, not a contract: the mnemonic login path rejects a seed that
-        # does not derive the account, the keycard path takes the supplied chat key verbatim.
         event = self._restore(restoring, card)
         public_key = event["settings"]["public-key"]
         keycard_password = restoring.password
@@ -133,9 +133,27 @@ class TestRestoreKeycardAccount:
 
         assert (restoring.init_status_backend().get("accounts") or []) == [], "Expected a rejected restore to create no account"
 
+    def test_restore_secure_channel_v2_logs_in_without_a_pairing_key(self, restoring, card):
+        with restoring.expect_signal(SignalType.NODE_LOGIN, timeout=60) as exp:
+            restoring.restore_keycard_account_and_login(card, KEYCARD_INSTANCE_UID, "", keycard_secure_channel_v2=True)
+        event = exp.result["event"]
+        assert not event.get("error"), event.get("error")
+        assert event["account"]["key-uid"] == card["keyUID"]
+        keycard_password = restoring.password
+        restoring.logout()
+
+        with restoring.expect_signal(SignalType.NODE_LOGIN, timeout=60) as exp:
+            restoring.login_with_keycard(card["keyUID"], keycard_password, card["whisperPrivateKey"])
+        assert not exp.result["event"].get("error"), exp.result["event"].get("error")
+        assert exp.result["event"]["account"]["key-uid"] == card["keyUID"]
+
+        keypair = restoring.accounts_service.get_keypair_by_key_uid(card["keyUID"])
+        assert keypair["cold-wallet"] == COLD_WALLET_TYPE_STATUS_KEYCARD, "Expected the card flag to survive a re-login"
+        assert (
+            keycard_pairing_of(restoring.reinit_and_get_accounts(), card["keyUID"]) == KEYCARD_PAIRING_SECURE_CHANNEL_V2
+        ), "Expected the marker stored because an applet 4.x card has no pairing key"
+
     def test_restore_via_keycard_without_a_pairing_key_is_rejected(self, restoring, card):
-        # An empty pairing key sends the backend to a pairings file this device never wrote; the
-        # failure arrives on node.login rather than in the HTTP response.
         event = self._restore(restoring, card, pairing_key="")
         assert "failed to prepare for keycard" in event.get("error", ""), event.get("error")
         assert "keycard pairings" in event.get("error", ""), event.get("error")

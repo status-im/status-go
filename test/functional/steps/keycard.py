@@ -4,13 +4,13 @@ PATH_EIP1581_CHAT = "m/43'/60'/1581'/0'/0"
 PATH_EIP1581_ENCRYPTION = "m/43'/60'/1581'/1'/0"
 
 KEYCARD_UID = "mock-keycard-uid"
+KEYCARD_PAIRING_SECURE_CHANNEL_V2 = "secure-channel-v2"
 KEYPAIR_FIELDS = ("key-uid", "type", "name", "derived-from", "xpub")
 
 Account.enable_unaudited_hdwallet_features()
 
 
 def derive_keycard_password(backend, mnemonic: str) -> str:
-    # A keycard profile's password is the encryption public key, the same value the mnemonic login path substitutes.
     derived = backend.wallet_service.get_derived_addresses_for_mnemonic(mnemonic, [PATH_EIP1581_ENCRYPTION])
     return derived[0]["public-key"]
 
@@ -49,7 +49,6 @@ def keycard_pairing_of(accounts, key_uid):
 
 
 def fresh_profile_keypair(backend):
-    """The profile keypair of a freshly created profile, checked to be off any cold wallet with its xpub and master address."""
     keypair = backend.accounts_service.get_keypair_by_key_uid(backend.key_uid)
     assert keypair["type"] == "profile"
     assert keypair.get("cold-wallet", "") == "", "Expected a fresh profile keypair to not be on a cold wallet"

@@ -1,12 +1,8 @@
-"""The three operability RPCs that decide whether a keypair's keys are on disk, all of which branch on cold-wallet state:
-makeSeedPhraseKeypairFullyOperable writes keystore files back from a mnemonic, makePartiallyOperableAccoutsFullyOperable
-sweeps accounts that were added without a password, and cleanKeystoreFiles deletes files again."""
-
 import copy
 
 import pytest
 from clients.api import ApiResponseError
-from resources.constants import user_1, user_mnemonic_12
+from resources.constants import COLD_WALLET_TYPE_STATUS_KEYCARD, user_1, user_mnemonic_12
 from steps.cold_wallet import add_seed_keypair, keystore_present
 
 NEXT_PATH = "m/44'/60'/0'/0/1"
@@ -68,7 +64,7 @@ class TestColdKeypairOperability:
         cold_key_uid = add_seed_keypair(backend, user_mnemonic_12, name="cold-keypair")["key-uid"]
         app_address = self._add_account_without_a_password(backend, app_key_uid, user_1.passphrase)
 
-        backend.accounts_service.migrate_non_profile_keypair_to_cold_wallet(cold_key_uid, backend.password, "status-keycard")
+        backend.accounts_service.migrate_non_profile_keypair_to_cold_wallet(cold_key_uid, backend.password, COLD_WALLET_TYPE_STATUS_KEYCARD)
         assert not any(self._keystore_present(backend, cold_key_uid).values()), "Expected migration to have deleted the cold keypair's files"
 
         promoted = backend.accounts_service.make_partially_operable_accouts_fully_operable(backend.password)
@@ -90,24 +86,22 @@ class TestColdKeypairOperability:
     def test_make_seed_phrase_keypair_fully_operable_restores_files_but_leaves_the_keypair_cold(self, backend):
         key_uid = add_seed_keypair(backend)["key-uid"]
 
-        backend.accounts_service.migrate_non_profile_keypair_to_cold_wallet(key_uid, backend.password, "status-keycard")
+        backend.accounts_service.migrate_non_profile_keypair_to_cold_wallet(key_uid, backend.password, COLD_WALLET_TYPE_STATUS_KEYCARD)
         assert not any(self._keystore_present(backend, key_uid).values())
 
         backend.accounts_service.make_seed_phrase_keypair_fully_operable(user_1.passphrase, backend.password)
 
         present = self._keystore_present(backend, key_uid)
         assert all(present.values()), f"Expected every file back, the master address included: {present}"
-        # Unlike migrateNonProfileColdWalletKeypairToApp this call does not clear cold_wallet, so the
-        # keypair now claims to be on a card while its keys sit on disk.
         assert (
-            backend.accounts_service.get_keypair_by_key_uid(key_uid)["cold-wallet"] == "status-keycard"
+            backend.accounts_service.get_keypair_by_key_uid(key_uid)["cold-wallet"] == COLD_WALLET_TYPE_STATUS_KEYCARD
         ), "Characterises current behaviour: this call writes keystore files without clearing cold-wallet"
 
     def test_clean_keystore_files_empties_a_cold_keypair_and_spares_a_regular_one(self, backend):
         cold_key_uid = add_seed_keypair(backend)["key-uid"]
         app_key_uid = add_seed_keypair(backend, user_mnemonic_12, name="app-keypair")["key-uid"]
 
-        backend.accounts_service.migrate_non_profile_keypair_to_cold_wallet(cold_key_uid, backend.password, "status-keycard")
+        backend.accounts_service.migrate_non_profile_keypair_to_cold_wallet(cold_key_uid, backend.password, COLD_WALLET_TYPE_STATUS_KEYCARD)
         backend.accounts_service.make_seed_phrase_keypair_fully_operable(user_1.passphrase, backend.password)
         assert any(self._keystore_present(backend, cold_key_uid).values()), "Expected files to exist before cleaning"
 
