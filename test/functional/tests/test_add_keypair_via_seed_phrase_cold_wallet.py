@@ -1,6 +1,5 @@
-# Ad-hoc test — no backend spec. Restores coverage deleted in 33be7c3e7 in cold-wallet vocabulary.
 import pytest
-from resources.constants import user_1, wallet_account_details_derivation, keypair_name
+from resources.constants import COLD_WALLET_TYPE_STATUS_KEYCARD, user_1, wallet_account_details_derivation, keypair_name
 
 
 @pytest.mark.rpc
@@ -15,7 +14,7 @@ class TestAddKeypairViaSeedPhraseColdWallet:
             user_1.passphrase,
             backend.password,
             keypair_name,
-            "status-keycard",
+            COLD_WALLET_TYPE_STATUS_KEYCARD,
             wallet_account_details_derivation,
         )
         key_uid = add_resp.get("key-uid")
@@ -24,7 +23,7 @@ class TestAddKeypairViaSeedPhraseColdWallet:
 
         kp = backend.accounts_service.get_keypair_by_key_uid(key_uid)
         assert (
-            kp.get("cold-wallet") == "status-keycard"
+            kp.get("cold-wallet") == COLD_WALLET_TYPE_STATUS_KEYCARD
         ), "Expected the coldWallet argument to survive the RPC->messenger->manager pass-through unchanged"
         for address in addresses:
             resp = backend.accounts_service.verify_keystore_file_for_account(address, backend.password)

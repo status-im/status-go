@@ -1,16 +1,12 @@
-"""signOnKeycard tells the client to route signing to the cold wallet instead of asking for a password.
-It is derived from the keypair, not the account; buildTransaction omits it when false, the router's signingDetails always sends it."""
-
 import json
 
 import pytest
 from clients.api import ApiResponseError
-from resources.constants import ANVIL_NETWORK_ID, user_1
+from resources.constants import ANVIL_NETWORK_ID, COLD_WALLET_TYPE_STATUS_KEYCARD, user_1
 from steps.cold_wallet import add_seed_keypair
 
-COLD_WALLET_TYPES = ("status-keycard", "ledger", "trezor")
+COLD_WALLET_TYPES = (COLD_WALLET_TYPE_STATUS_KEYCARD, "ledger", "trezor")
 RECIPIENT = "0x70997970c51812dc3a010c7d01b50e0d17dc79c8"
-# Fully specified so validateAndBuildTransaction never needs a nonce or gas estimate from the chain.
 TX_TEMPLATE = {
     "to": RECIPIENT,
     "value": "0x1",
@@ -50,7 +46,7 @@ class TestSignOnKeycardFlag:
         # TxResponse.SignOnKeycard is `omitempty`, so a regular keypair sends no such key at all.
         assert "signOnKeycard" not in before, "Expected buildTransaction to omit signOnKeycard for a keypair in the app keystore"
 
-        backend.accounts_service.migrate_non_profile_keypair_to_cold_wallet(key_uid, backend.password, "status-keycard")
+        backend.accounts_service.migrate_non_profile_keypair_to_cold_wallet(key_uid, backend.password, COLD_WALLET_TYPE_STATUS_KEYCARD)
 
         cold = self._build(backend, address)
         assert cold.get("signOnKeycard") is True, "Expected signOnKeycard once the keypair's key lives on the card"
@@ -76,7 +72,7 @@ class TestSignOnKeycardFlag:
         key_uid, cold_address = self._add_seed_keypair(backend)
         profile_address = self._profile_wallet_address(backend)
 
-        backend.accounts_service.migrate_non_profile_keypair_to_cold_wallet(key_uid, backend.password, "status-keycard")
+        backend.accounts_service.migrate_non_profile_keypair_to_cold_wallet(key_uid, backend.password, COLD_WALLET_TYPE_STATUS_KEYCARD)
 
         assert self._build(backend, cold_address).get("signOnKeycard") is True
         assert "signOnKeycard" not in self._build(

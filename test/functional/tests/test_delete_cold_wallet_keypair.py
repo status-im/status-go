@@ -1,9 +1,8 @@
-# Ad-hoc test — no backend spec. Restores coverage deleted in 33be7c3e7 in cold-wallet vocabulary.
 import copy
 import re
 import pytest
 from clients.api import ApiResponseError
-from resources.constants import user_1, wallet_account_details_derivation, keypair_name
+from resources.constants import COLD_WALLET_TYPE_STATUS_KEYCARD, user_1, wallet_account_details_derivation, keypair_name
 
 
 @pytest.mark.rpc
@@ -23,7 +22,7 @@ class TestDeleteColdWalletKeypair:
         )
         key_uid = add_resp.get("key-uid")
         assert key_uid is not None, "Expected addKeypairViaSeedPhrase to return the created keypair's key-uid"
-        backend.accounts_service.migrate_non_profile_keypair_to_cold_wallet(key_uid, backend.password, "status-keycard")
+        backend.accounts_service.migrate_non_profile_keypair_to_cold_wallet(key_uid, backend.password, COLD_WALLET_TYPE_STATUS_KEYCARD)
         return key_uid
 
     def test_delete_cold_wallet_keypair_without_password(self, backend):
@@ -64,7 +63,7 @@ class TestDeleteColdWalletKeypair:
             }
         )
         backend.accounts_service.add_account(backend.password, template)
-        backend.accounts_service.migrate_non_profile_keypair_to_cold_wallet(key_uid, backend.password, "status-keycard")
+        backend.accounts_service.migrate_non_profile_keypair_to_cold_wallet(key_uid, backend.password, COLD_WALLET_TYPE_STATUS_KEYCARD)
         target_address = derived[0].get("address")
 
         backend.accounts_service.delete_account(target_address, "")
