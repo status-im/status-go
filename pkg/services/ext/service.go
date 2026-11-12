@@ -77,8 +77,12 @@ type EnvelopeEventsHandler interface {
 // Service is a service that provides some additional API to whisper-based protocols like Whisper or Waku.
 type Service struct {
 	pausable.PauseBroadcaster
-	messaging       *messaging.API
+	messaging *messaging.API
+	// Read through currentMessenger() by work that runs on its own goroutines (the
+	// wallet's community and collectible info): Stop clears it while that work may
+	// still run, e.g. on logout.
 	messenger       *protocol.Messenger
+	messengerMu     sync.RWMutex
 	cancelMessenger chan struct{}
 	rpcClient       *rpc.Client
 	config          params.NodeConfig
@@ -233,7 +237,7 @@ func (s *Service) InitProtocol(params InitProtocolParams) error {
 	if err != nil {
 		return err
 	}
-	s.messenger = messenger
+	s.setMessenger(messenger)
 
 	// Be mindful of adding more initialization code, as it can easily
 	// impact login times for mobile users. For example, we avoid calling
@@ -304,12 +308,12 @@ func (s *Service) Stop() error {
 		}
 	}
 
-	if s.messenger != nil {
-		if err := s.messenger.Shutdown(); err != nil {
+	if messenger := s.currentMessenger(); messenger != nil {
+		if err := messenger.Shutdown(); err != nil {
 			s.logger.Error("failed to stop messenger", zap.Error(err))
 			return err
 		}
-		s.messenger = nil
+		s.setMessenger(nil)
 	}
 
 	if s.messaging != nil {
@@ -409,7 +413,7 @@ func buildMessengerOptions(
 }
 
 func (s *Service) Messenger() *protocol.Messenger {
-	return s.messenger
+	return s.currentMessenger()
 }
 
 func (s *Service) Metrics() string {
@@ -440,6 +444,36 @@ func tokenURIToCommunityID(tokenURI string) string {
 	return communityID
 }
 
+func (s *Service) currentMessenger() *protocol.Messenger {
+	s.messengerMu.RLock()
+	defer s.messengerMu.RUnlock()
+	return s.messenger
+}
+
+func (s *Service) setMessenger(messenger *protocol.Messenger) {
+	s.messengerMu.Lock()
+	defer s.messengerMu.Unlock()
+	s.messenger = messenger
+}
+
+// communityInfoSource is what the wallet's community and collectible info needs from
+// the messenger. That work runs on its own goroutines: it takes the messenger once and
+// keeps using it, so a concurrent Stop (logout) makes its calls fail instead of leaving
+// it with a nil messenger halfway.
+type communityInfoSource interface {
+	FindCommunityInfoFromDB(communityID string) (*communities.Community, error)
+	FetchCommunity(request *protocol.FetchCommunityRequest) (*communities.Community, error)
+	GetCommunityToken(communityID string, chainID int, address string) (*communitiestoken.CommunityToken, error)
+}
+
+func (s *Service) communityInfoSource() (communityInfoSource, error) {
+	messenger := s.currentMessenger()
+	if messenger == nil {
+		return nil, fmt.Errorf("messenger not ready")
+	}
+	return messenger, nil
+}
+
 func (s *Service) GetCommunityID(tokenURI string) string {
 	if tokenURI != "" {
 		return tokenURIToCommunityID(tokenURI)
@@ -448,11 +482,12 @@ func (s *Service) GetCommunityID(tokenURI string) string {
 }
 
 func (s *Service) FillCollectiblesMetadata(communityID string, cs []*thirdparty.FullCollectibleData) (bool, error) {
-	if s.messenger == nil {
-		return false, fmt.Errorf("messenger not ready")
+	source, err := s.communityInfoSource()
+	if err != nil {
+		return false, err
 	}
 
-	community, err := s.fetchCommunityInfoForCollectibles(communityID, collectibles.IDsFromAssets(cs))
+	community, err := fetchCommunityInfoForCollectibles(source, communityID, collectibles.IDsFromAssets(cs))
 	if err != nil {
 		return false, err
 	}
@@ -461,7 +496,7 @@ func (s *Service) FillCollectiblesMetadata(communityID string, cs []*thirdparty.
 	}
 
 	for _, collectible := range cs {
-		err := s.FillCollectibleMetadata(community, collectible)
+		err := fillCollectibleMetadataFrom(source, community, collectible)
 		if err != nil {
 			return true, err
 		}
@@ -471,10 +506,14 @@ func (s *Service) FillCollectiblesMetadata(communityID string, cs []*thirdparty.
 }
 
 func (s *Service) FillCollectibleMetadata(community *communities.Community, collectible *thirdparty.FullCollectibleData) error {
-	if s.messenger == nil {
-		return fmt.Errorf("messenger not ready")
+	source, err := s.communityInfoSource()
+	if err != nil {
+		return err
 	}
+	return fillCollectibleMetadataFrom(source, community, collectible)
+}
 
+func fillCollectibleMetadataFrom(source communityInfoSource, community *communities.Community, collectible *thirdparty.FullCollectibleData) error {
 	if collectible == nil {
 		return fmt.Errorf("empty collectible")
 	}
@@ -486,7 +525,7 @@ func (s *Service) FillCollectibleMetadata(community *communities.Community, coll
 		return fmt.Errorf("invalid communityID")
 	}
 
-	tokenMetadata, err := s.fetchCommunityCollectibleMetadata(community, id.ContractID)
+	tokenMetadata, err := fetchCommunityCollectibleMetadata(community, id.ContractID)
 
 	if err != nil {
 		return err
@@ -496,7 +535,7 @@ func (s *Service) FillCollectibleMetadata(community *communities.Community, coll
 		return nil
 	}
 
-	communityToken, err := s.fetchCommunityToken(communityID, id.ContractID)
+	communityToken, err := source.GetCommunityToken(communityID, int(id.ContractID.ChainID), id.ContractID.Address.String())
 	if err != nil {
 		return err
 	}
@@ -580,8 +619,8 @@ func communityToInfo(community *communities.Community) *thirdparty.CommunityInfo
 	}
 }
 
-func (s *Service) fetchCommunityFromStoreNodes(communityID string) (*communities.Community, error) {
-	community, err := s.messenger.FetchCommunity(&protocol.FetchCommunityRequest{
+func fetchCommunityFromStoreNodes(source communityInfoSource, communityID string) (*communities.Community, error) {
+	community, err := source.FetchCommunity(&protocol.FetchCommunityRequest{
 		CommunityKey:    communityID,
 		TryDatabase:     false,
 		WaitForResponse: true,
@@ -594,18 +633,22 @@ func (s *Service) fetchCommunityFromStoreNodes(communityID string) (*communities
 
 // Fetch latest community from store nodes.
 func (s *Service) FetchCommunityInfo(communityID string) (*thirdparty.CommunityInfo, error) {
-	if s.messenger == nil {
-		return nil, fmt.Errorf("messenger not ready")
+	source, err := s.communityInfoSource()
+	if err != nil {
+		return nil, err
 	}
+	return fetchCommunityInfo(source, communityID)
+}
 
-	community, err := s.messenger.FindCommunityInfoFromDB(communityID)
+func fetchCommunityInfo(source communityInfoSource, communityID string) (*thirdparty.CommunityInfo, error) {
+	community, err := source.FindCommunityInfoFromDB(communityID)
 	if err != nil && err != communities.ErrOrgNotFound {
 		return nil, err
 	}
 
 	// Fetch latest version from store nodes
 	if community == nil || !community.IsControlNode() {
-		community, err = s.fetchCommunityFromStoreNodes(communityID)
+		community, err = fetchCommunityFromStoreNodes(source, communityID)
 		if err != nil {
 			return nil, err
 		}
@@ -615,14 +658,14 @@ func (s *Service) FetchCommunityInfo(communityID string) (*thirdparty.CommunityI
 }
 
 // Fetch latest community from store nodes only if any collectibles data is missing.
-func (s *Service) fetchCommunityInfoForCollectibles(communityID string, ids []thirdparty.CollectibleUniqueID) (*communities.Community, error) {
-	community, err := s.messenger.FindCommunityInfoFromDB(communityID)
+func fetchCommunityInfoForCollectibles(source communityInfoSource, communityID string, ids []thirdparty.CollectibleUniqueID) (*communities.Community, error) {
+	community, err := source.FindCommunityInfoFromDB(communityID)
 	if err != nil && err != communities.ErrOrgNotFound {
 		return nil, err
 	}
 
 	if community == nil {
-		return s.fetchCommunityFromStoreNodes(communityID)
+		return fetchCommunityFromStoreNodes(source, communityID)
 	}
 
 	if community.IsControlNode() {
@@ -639,7 +682,7 @@ func (s *Service) fetchCommunityInfoForCollectibles(communityID string, ids []th
 
 	hasAllMetadata := true
 	for _, contractID := range contractIDs {
-		tokenMetadata, err := s.fetchCommunityCollectibleMetadata(community, contractID)
+		tokenMetadata, err := fetchCommunityCollectibleMetadata(community, contractID)
 		if err != nil {
 			return nil, err
 		}
@@ -650,21 +693,13 @@ func (s *Service) fetchCommunityInfoForCollectibles(communityID string, ids []th
 	}
 
 	if !hasAllMetadata {
-		return s.fetchCommunityFromStoreNodes(communityID)
+		return fetchCommunityFromStoreNodes(source, communityID)
 	}
 
 	return community, nil
 }
 
-func (s *Service) fetchCommunityToken(communityID string, contractID thirdparty.ContractID) (*communitiestoken.CommunityToken, error) {
-	if s.messenger == nil {
-		return nil, fmt.Errorf("messenger not ready")
-	}
-
-	return s.messenger.GetCommunityToken(communityID, int(contractID.ChainID), contractID.Address.String())
-}
-
-func (s *Service) fetchCommunityCollectibleMetadata(community *communities.Community, contractID thirdparty.ContractID) (*protobuf.CommunityTokenMetadata, error) {
+func fetchCommunityCollectibleMetadata(community *communities.Community, contractID thirdparty.ContractID) (*protobuf.CommunityTokenMetadata, error) {
 	tokensMetadata := community.CommunityTokensMetadata()
 
 	for _, tokenMetadata := range tokensMetadata {
@@ -825,7 +860,7 @@ func (s *Service) ConnectionChanged(state connection.State) {
 	s.connectionStateMu.Lock()
 	s.lastConnectionState = state
 	s.hasLastConnectionState = true
-	messenger := s.messenger
+	messenger := s.currentMessenger()
 	s.connectionStateMu.Unlock()
 
 	if messenger != nil {
