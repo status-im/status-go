@@ -12,8 +12,24 @@ concurrency:
   group: build-windows-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
-  windows:
-    name: windows/x86_64
+  # One runner per library: the two builds do not wait for each other.
+  libraries:
+    name: windows/x86_64 (${{ matrix.library }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - library: static
+            target: statusgo-library
+            files: |
+              build/bin/libstatus.a
+              build/bin/libstatus.h
+          - library: shared
+            target: statusgo-shared-library
+            files: |
+              build/bin/libstatus.dll
+              build/bin/libstatus.h
+              build/libsds.dll
     runs-on: windows-2022
     timeout-minutes: 30
     defaults:
@@ -128,19 +144,29 @@ jobs:
       # library's own Makefile still runs under MSYS make.
       - name: Generate
         run: mingw32-make generate $MAKE_ARGS
-      - name: Static library
-        run: mingw32-make statusgo-library $MAKE_ARGS
-      - name: Shared library
-        run: mingw32-make statusgo-shared-library $MAKE_ARGS
-      - name: Upload libraries
+      - name: Library
+        run: mingw32-make ${{ matrix.target }} $MAKE_ARGS
+      - name: Upload library
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: status-go-windows-x86_64
-          path: |
-            build/bin/libstatus.a
-            build/bin/libstatus.h
-            build/bin/libstatus.dll
-            build/libsds.dll
+          name: status-go-windows-x86_64-${{ matrix.library }}
+          path: ${{ matrix.files }}
           if-no-files-found: error
           retention-days: 7
+      # One job writes the caches, so the key has one owner.
       - uses: ./.github/actions/go-cache/save
+        if: matrix.library == 'static'
+
+  # One check name for branch rules.
+  windows:
+    name: windows/x86_64
+    if: always()
+    needs: libraries
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - env:
+          LIBRARIES: ${{ needs.libraries.result }}
+        run: |
+          echo "libraries: $LIBRARIES"
+          [ "$LIBRARIES" = success ]
