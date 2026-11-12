@@ -3,13 +3,17 @@ description: Restores the Go caches and gets the toolchain image for scripts/too
 outputs:
   cache-key:
     description: Key the Go caches are stored under for this go.sum.
-    value: toolchain-linux-x86_64-${{ hashFiles('go.sum') }}
+    value: ${{ steps.key.outputs.key }}
   cache-hit:
     description: "'true' when the caches were restored from exactly that key."
     value: ${{ steps.cache.outputs.cache-hit }}
 runs:
   using: composite
   steps:
+    # hashFiles is only available inside steps, not in the outputs above.
+    - id: key
+      shell: bash
+      run: echo "key=toolchain-linux-x86_64-${{ hashFiles('go.sum') }}" >> "$GITHUB_OUTPUT"
     - name: Restore Go caches
       id: cache
       uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
@@ -17,7 +21,7 @@ runs:
         path: |
           ~/.cache/status-go-toolchain/go-build
           ~/.cache/status-go-toolchain/go-mod
-        key: toolchain-linux-x86_64-${{ hashFiles('go.sum') }}
+        key: ${{ steps.key.outputs.key }}
         restore-keys: toolchain-linux-x86_64-
     - name: Toolchain image
       shell: bash
