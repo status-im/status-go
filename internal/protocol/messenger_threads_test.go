@@ -189,6 +189,75 @@ func (s *MessengerThreadsSuite) TestCreateThreadSucceedsWithExistingParent() {
 	s.Require().Equal("This is a test thread message", thread.Name)
 }
 
+func (s *MessengerThreadsSuite) TestResolveDirectThreadChatID() {
+	for _, scenario := range []string{"valid", "missing-root", "missing-thread", "wrong-chat", "wrong-parent", "inactive", "public", "deleted", "deleted-for-me", "hidden", "reply"} {
+		s.Run(scenario, func() {
+			peer, err := crypto.GenerateKey()
+			s.Require().NoError(err)
+			chat := CreateOneToOneChat(scenario, &peer.PublicKey, s.m.getTimesource())
+			if scenario == "inactive" {
+				chat.Active = false
+			}
+			if scenario == "public" {
+				chat.ChatType = ChatTypePublic
+			}
+			s.Require().NoError(s.m.SaveChat(chat))
+			parent := buildTestMessage(*chat)
+			parent.ID = "root-" + scenario
+			parent.Deleted = scenario == "deleted"
+			parent.DeletedForMe = scenario == "deleted-for-me"
+			if scenario == "reply" {
+				threadID := "another-root"
+				parent.ThreadId = &threadID
+			}
+			if scenario != "missing-root" {
+				s.Require().NoError(s.m.SaveMessages([]*common.Message{parent}))
+				if scenario == "hidden" {
+					s.Require().NoError(s.m.persistence.HideMessage(parent.ID))
+				}
+			}
+			if scenario != "missing-thread" {
+				chatID, parentID := chat.ID, parent.ID
+				if scenario == "wrong-chat" {
+					chatID = "another-chat"
+				}
+				if scenario == "wrong-parent" {
+					parentID = "another-parent"
+				}
+				s.Require().NoError(s.m.persistence.UpsertThread(parent.ID, chatID, parentID, "Thread"))
+			}
+			chatID, err := s.m.ResolveDirectThreadChatID(parent.ID)
+			if scenario == "valid" {
+				s.Require().NoError(err)
+				s.Require().Equal(chat.ID, chatID)
+			} else {
+				s.Require().Error(err)
+				s.Require().Empty(chatID)
+			}
+		})
+	}
+	s.m.featureFlags.Threads = false
+	_, err := s.m.ResolveDirectThreadChatID("root-valid")
+	s.Require().ErrorIs(err, ErrThreadFeatureDisabled)
+}
+
+func (s *MessengerThreadsSuite) TestResolveDirectThreadAcrossParticipants() {
+	peer := s.newMessenger()
+	peer.featureFlags.Threads = true
+	for _, pair := range [][2]*Messenger{{s.m, peer}, {peer, s.m}} {
+		viewer, other := pair[0], pair[1]
+		chat := CreateOneToOneChat("peer", &other.identity.PublicKey, viewer.getTimesource())
+		s.Require().NoError(viewer.SaveChat(chat))
+		parent := buildTestMessage(*chat)
+		parent.ID = "shared-root"
+		s.Require().NoError(viewer.SaveMessages([]*common.Message{parent}))
+		s.Require().NoError(viewer.persistence.UpsertThread(parent.ID, chat.ID, parent.ID, "Thread"))
+		chatID, err := viewer.ResolveDirectThreadChatID(parent.ID)
+		s.Require().NoError(err)
+		s.Require().Equal(chat.ID, chatID)
+	}
+}
+
 func (s *MessengerThreadsSuite) TestEditThreadUpdatesMetadataWithoutChangingParent() {
 	chat := CreateOneToOneChat("test-user", &s.m.identity.PublicKey, s.m.getTimesource())
 	s.Require().NoError(s.m.SaveChat(chat))

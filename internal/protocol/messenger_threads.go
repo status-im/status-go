@@ -66,6 +66,26 @@ func (m *Messenger) ThreadsByChatID(chatID string) ([]*Thread, error) {
 	return m.persistence.ThreadsByChatID(chatID)
 }
 
+// ResolveDirectThreadChatID resolves a shared thread using only local data.
+// Bind it to its root message rather than trusting received thread metadata alone.
+func (m *Messenger) ResolveDirectThreadChatID(threadID string) (string, error) {
+	if !m.featureFlags.Threads {
+		return "", ErrThreadFeatureDisabled
+	}
+	if threadID == "" {
+		return "", common.ErrRecordNotFound
+	}
+	chatID, err := m.persistence.ThreadRootChatID(threadID)
+	if err != nil {
+		return "", err
+	}
+	chat, ok := m.allChats.Load(chatID)
+	if !ok || !chat.Active || !chat.OneToOne() {
+		return "", ErrChatNotFoundError
+	}
+	return chat.ID, nil
+}
+
 // ThreadSummariesByParentMessageIDs returns card data only for the requested
 // parent messages, keeping summary work aligned with message pagination.
 func (m *Messenger) ThreadSummariesByParentMessageIDs(chatID string, parentMessageIDs []string, participantPreviewLimit int) ([]*Thread, error) {

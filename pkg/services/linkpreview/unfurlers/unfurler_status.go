@@ -2,6 +2,7 @@ package unfurlers
 
 import (
 	"fmt"
+	"strings"
 
 	"go.uber.org/zap"
 
@@ -20,6 +21,14 @@ type StatusDataProvider interface {
 	GetContactByID(pubKey string) (*contacts.Contact, error)
 	FetchContact(contactID string, waitForResponse bool) (*contacts.Contact, error)
 	FetchCommunity(communityID string) (*communities.Community, error)
+	GetThreadPreviewData(URL string) (*ThreadPreviewData, error)
+}
+
+type ThreadPreviewData struct {
+	Name         string
+	ParentName   string
+	Community    *communities.Community
+	ImageDataURI string
 }
 
 type StatusUnfurler struct {
@@ -134,6 +143,43 @@ func (u *StatusUnfurler) buildChannelData(channelUUID string, communityID string
 		Color:       channel.Identity.Color,
 		Community:   communityData,
 	}, nil
+}
+
+// UnfurlThread resolves metadata locally. Message serialization redacts thread
+// metadata so each recipient resolves it using their own access.
+func (u *StatusUnfurler) UnfurlThread() (*common.LinkPreview, error) {
+	if u.provider == nil {
+		return nil, fmt.Errorf("thread data provider unavailable")
+	}
+	data, err := u.provider.GetThreadPreviewData(u.url)
+	if err != nil {
+		return nil, err
+	}
+	if data == nil || strings.TrimSpace(data.Name) == "" || strings.TrimSpace(data.ParentName) == "" {
+		return nil, fmt.Errorf("thread preview metadata unavailable")
+	}
+	preview := &common.LinkPreview{
+		URL: u.url, Hostname: "status.app", Title: data.Name,
+		Description: data.ParentName, ThreadParentName: data.ParentName,
+		ThreadAccessible: true,
+	}
+	if data.Community != nil {
+		community, err := data.Community.ToStatusLinkPreview()
+		if err != nil {
+			return nil, err
+		}
+		preview.Thumbnail = community.Banner
+		preview.Description = community.DisplayName
+		preview.ThreadParentName = "#" + strings.TrimPrefix(data.ParentName, "#")
+	} else if data.ImageDataURI != "" {
+		if payload, err := images.GetPayloadFromURI(data.ImageDataURI); err == nil {
+			var thumbnail common.LinkPreviewThumbnail
+			if err := updateThumbnail(&images.IdentityImage{Payload: payload}, &thumbnail); err == nil {
+				preview.Thumbnail = thumbnail
+			}
+		}
+	}
+	return preview, nil
 }
 
 func (u *StatusUnfurler) Unfurl() (*common.StatusLinkPreview, error) {
