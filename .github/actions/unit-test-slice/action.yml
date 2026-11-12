@@ -1,0 +1,40 @@
+name: Unit test slice
+description: Runs one slice of the unit tests on the prepared tree. Needs a checkout and UNIT_TEST_PART.
+inputs:
+  make-args:
+    description: Arguments for make test-unit-prepared.
+    required: true
+  report-name:
+    description: Name of the artifact with the reports.
+    required: true
+runs:
+  using: composite
+  steps:
+    - uses: ./.github/actions/toolchain
+    - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+      with:
+        name: prepared-tree
+        path: ${{ runner.temp }}
+    - name: Unpack the prepared tree
+      shell: bash
+      run: tar -xf "$RUNNER_TEMP/prepared-tree.tar"
+    - name: Unit tests
+      shell: bash
+      run: scripts/toolchain.sh make test-unit-prepared V=1 ${{ inputs.make-args }}
+    # With CI=true the test output goes to files, not to the job log.
+    - name: Show test logs
+      if: failure()
+      shell: bash
+      run: tail -n 200 test_*.log
+    - name: Upload reports
+      if: always()
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      with:
+        name: ${{ inputs.report-name }}
+        path: |
+          report_*.xml
+          report_rerun_fails_*.txt
+          test_*.log
+          test-coverage.html
+        if-no-files-found: ignore
+        retention-days: 14

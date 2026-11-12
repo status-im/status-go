@@ -18,7 +18,7 @@ env:
     USE_LOGOS_STORAGE=true USE_TORRENT=true
     LOGOS_STORAGE_LIB_DIR=${{ github.workspace }}/build/deps/logos-storage/build
     LOGOS_STORAGE_INC_DIR=${{ github.workspace }}/build/deps/logos-storage/library
-  # Written by the prepare job, read by the protocol slices.
+  # Written by the protocol-tests job, read by the protocol slices.
   UNIT_TEST_PROTOCOL_TESTS_FILE: build/protocol-tests.txt
 jobs:
   # Generated code and native libraries, built once and handed to every test job.
@@ -49,20 +49,33 @@ jobs:
           mkdir -p build/deps/logos-storage/build
           cp "$source/build/libstorage.so" build/deps/logos-storage/build/
           cp -R "$source/library" build/deps/logos-storage/
+      # With libsds restored, nimble and its Nim download are skipped.
+      - name: Restore libsds
+        id: libsds
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            build/libsds.so
+            build/libsds.h
+          key: libsds-linux-x86_64-${{ hashFiles('status_go.nimble', 'Makefile', 'Dockerfile') }}
+      - name: Restore the code generation cache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/.cache/status-go-toolchain/home/.config/go-generate-fast
+          key: go-generate-fast-toolchain-${{ hashFiles('**/*.go', '**/go.mod', '**/go.sum') }}
+          restore-keys: go-generate-fast-toolchain-
       - name: Generate code, build libsds and libtkl
-        run: scripts/toolchain.sh make test-unit-prep build-libtkl $MAKE_ARGS
-      # Listing compiles the package; a dry run of one slice writes the list for all of them.
-      - name: List the protocol tests
         env:
-          UNIT_TEST_DRY_RUN: true
-          UNIT_TEST_PART: protocol:1/1
-        run: scripts/toolchain.sh make test-unit-prepared $MAKE_ARGS
+          PREBUILT_SDS: NIM_SDS_LIB_DIR=${{ github.workspace }}/build NIM_SDS_INC_DIR=${{ github.workspace }}/build
+        run: |
+          [ "${{ steps.libsds.outputs.cache-hit }}" = true ] || PREBUILT_SDS=
+          scripts/toolchain.sh make test-unit-prep build-libtkl $MAKE_ARGS $PREBUILT_SDS
       - name: Pack the prepared tree
         run: |
           # Generated files are the ignored ones; from build/ only the libraries are needed.
           {
             git ls-files -z --others --ignored --exclude-standard | grep -zvE '^(build|nimbledeps)/'
-            printf '%s\0' build/libsds.so build/libsds.h build/deps "$UNIT_TEST_PROTOCOL_TESTS_FILE"
+            printf '%s\0' build/libsds.so build/libsds.h build/deps
           } | tar --null --files-from=- -cf "$RUNNER_TEMP/prepared-tree.tar"
           ls -lh "$RUNNER_TEMP/prepared-tree.tar"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -85,7 +98,50 @@ jobs:
       - uses: ./.github/actions/toolchain
       - run: scripts/toolchain.sh make test-libtkl-coexistence
 
-  tests:
+  # Listing the protocol tests compiles the package, so the list is cached until the
+  # test files change. Only the protocol slices wait for it.
+  protocol-tests:
+    name: protocol test list
+    needs: prepare
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          filter: blob:none
+          persist-credentials: false
+      - name: Restore the list
+        id: list
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ${{ env.UNIT_TEST_PROTOCOL_TESTS_FILE }}
+          key: protocol-tests-${{ hashFiles('internal/protocol/*_test.go', 'Makefile') }}
+      - uses: ./.github/actions/toolchain
+        if: steps.list.outputs.cache-hit != 'true'
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        if: steps.list.outputs.cache-hit != 'true'
+        with:
+          name: prepared-tree
+          path: ${{ runner.temp }}
+      # A dry run of one slice writes the list.
+      - name: List the tests
+        if: steps.list.outputs.cache-hit != 'true'
+        env:
+          UNIT_TEST_DRY_RUN: true
+          UNIT_TEST_PART: protocol:1/1
+        run: |
+          tar -xf "$RUNNER_TEMP/prepared-tree.tar"
+          scripts/toolchain.sh make test-unit-prepared $MAKE_ARGS
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: protocol-tests
+          path: ${{ env.UNIT_TEST_PROTOCOL_TESTS_FILE }}
+          if-no-files-found: error
+          retention-days: 1
+
+  # Slices of the suite, see UNIT_TEST_PART in scripts/run_unit_tests.sh.
+  packages:
     name: ${{ matrix.part }}
     needs: prepare
     runs-on: ubuntu-24.04
@@ -93,11 +149,37 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Slices of the suite, see UNIT_TEST_PART in scripts/run_unit_tests.sh.
         part:
           - packages:1/3
           - packages:2/3
           - packages:3/3
+    env:
+      UNIT_TEST_PART: ${{ matrix.part }}
+      UNIT_TEST_COUNT: 1
+      UNIT_TEST_FAILFAST: true
+      UNIT_TEST_RERUN_FAILS: true
+      UNIT_TEST_USE_DEVELOPMENT_LOGGER: false
+      UNIT_TEST_REPORT_CODECOV: false
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          filter: blob:none
+          persist-credentials: false
+      - uses: ./.github/actions/unit-test-slice
+        with:
+          make-args: ${{ env.MAKE_ARGS }}
+          report-name: unit-test-reports-packages-${{ strategy.job-index }}
+
+  protocol:
+    name: ${{ matrix.part }}
+    needs: [prepare, protocol-tests]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        part:
           - protocol:1/10
           - protocol:2/10
           - protocol:3/10
@@ -121,43 +203,27 @@ jobs:
           fetch-depth: 0
           filter: blob:none
           persist-credentials: false
-      - uses: ./.github/actions/toolchain
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
-          name: prepared-tree
-          path: ${{ runner.temp }}
-      - name: Unpack the prepared tree
-        run: tar -xf "$RUNNER_TEMP/prepared-tree.tar"
-      - name: Unit tests
-        run: scripts/toolchain.sh make test-unit-prepared V=1 $MAKE_ARGS
-      # With CI=true the test output goes to files, not to the job log.
-      - name: Show test logs
-        if: failure()
-        run: tail -n 200 test_*.log
-      - name: Upload reports
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+          name: protocol-tests
+          path: build
+      - uses: ./.github/actions/unit-test-slice
         with:
-          name: unit-test-reports-${{ strategy.job-index }}
-          path: |
-            report_*.xml
-            report_rerun_fails_*.txt
-            test_*.log
-            test-coverage.html
-          if-no-files-found: ignore
-          retention-days: 14
+          make-args: ${{ env.MAKE_ARGS }}
+          report-name: unit-test-reports-protocol-${{ strategy.job-index }}
 
   # One check name for branch rules, whatever the number of slices.
   unit:
     name: unit
     if: always()
-    needs: [coexistence, tests]
+    needs: [coexistence, packages, protocol]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
       - env:
           COEXISTENCE: ${{ needs.coexistence.result }}
-          TESTS: ${{ needs.tests.result }}
+          PACKAGES: ${{ needs.packages.result }}
+          PROTOCOL: ${{ needs.protocol.result }}
         run: |
-          echo "coexistence: $COEXISTENCE, tests: $TESTS"
-          [ "$COEXISTENCE" = success ] && [ "$TESTS" = success ]
+          echo "coexistence: $COEXISTENCE, packages: $PACKAGES, protocol: $PROTOCOL"
+          [ "$COEXISTENCE" = success ] && [ "$PACKAGES" = success ] && [ "$PROTOCOL" = success ]
