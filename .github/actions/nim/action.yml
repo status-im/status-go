@@ -1,0 +1,74 @@
+name: Nim
+description: Puts Nim and nimble on PATH, from the cache when it has them. Needs a checkout. Save the cache with ./.github/actions/nim/save after the build.
+inputs:
+  nim-version:
+    description: Nim on PATH. Same as TKL_NIM in the root Dockerfile.
+    default: '2.2.10'
+  nimble-version:
+    description: nimble on PATH. Same as in the root Dockerfile.
+    default: '0.26.1'
+outputs:
+  cache-key:
+    description: Key the cache is stored under for these versions and status_go.nimble.
+    value: ${{ steps.key.outputs.key }}
+  cache-hit:
+    description: "'true' when the cache was restored from exactly that key."
+    value: ${{ steps.cache.outputs.cache-hit }}
+  cache-matched-key:
+    description: Key of the restored cache, empty when nothing was restored.
+    value: ${{ steps.cache.outputs.cache-matched-key }}
+runs:
+  using: composite
+  steps:
+    # hashFiles is only available inside steps, not in the outputs above.
+    - id: key
+      shell: bash
+      env:
+        PREFIX: nim-${{ runner.os }}-${{ runner.arch }}-${{ inputs.nim-version }}-${{ inputs.nimble-version }}-
+        NIMBLE_FILE_HASH: ${{ hashFiles('status_go.nimble') }}
+      run: |
+        echo "prefix=$PREFIX" >> "$GITHUB_OUTPUT"
+        echo "key=$PREFIX$NIMBLE_FILE_HASH" >> "$GITHUB_OUTPUT"
+    # .nim_runtime is the Nim on PATH. nimble keeps the Nim it installs for
+    # libsds in ~/.nimble/nimbinaries and looks for it only there; nimbledeps
+    # holds the Nim dependencies. An older cache of the same versions is still
+    # useful: nimble adds what status_go.nimble changed.
+    - name: Restore Nim
+      id: cache
+      uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+      with:
+        path: |
+          .nim_runtime
+          nimbledeps
+          ~/.nimble/nimbinaries
+        key: ${{ steps.key.outputs.key }}
+        restore-keys: ${{ steps.key.outputs.prefix }}
+    # Compiles Nim where there is no prebuilt one (macOS, Linux arm64).
+    - uses: jiro4989/setup-nim-action@189b145833368cc92f1e7b3e166a25a3e057a693 # v2.3.1
+      if: steps.cache.outputs.cache-matched-key == ''
+      with:
+        nim-version: ${{ inputs.nim-version }}
+    # setup-nim always reinstalls, so a restored compiler only needs its PATH entry.
+    - name: Use the restored Nim
+      if: steps.cache.outputs.cache-matched-key != ''
+      shell: bash
+      run: echo "$GITHUB_WORKSPACE/.nim_runtime/bin" >> "$GITHUB_PATH"
+    # The nimble bundled with Nim cannot resolve nim-sds through the bindings.
+    - name: Install nimble
+      shell: bash
+      env:
+        NIMBLE_VERSION: ${{ inputs.nimble-version }}
+        PLATFORM: ${{ runner.os }}-${{ runner.arch }}
+      run: |
+        case "$PLATFORM" in
+          Linux-X64) asset=linux_x64 ;;
+          Linux-ARM64) asset=linux_aarch64 ;;
+          macOS-X64) asset=macosx_x64 ;;
+          macOS-ARM64) asset=macosx_aarch64 ;;
+          *) echo "No nimble build for $PLATFORM" >&2; exit 1 ;;
+        esac
+        mkdir -p "$RUNNER_TEMP/nimble"
+        curl -sSfL --retry 5 --retry-all-errors \
+          "https://github.com/nim-lang/nimble/releases/download/v$NIMBLE_VERSION/nimble-$asset.tar.gz" |
+          tar -xz -C "$RUNNER_TEMP/nimble"
+        echo "$RUNNER_TEMP/nimble" >> "$GITHUB_PATH"
