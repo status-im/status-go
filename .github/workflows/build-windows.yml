@@ -1,0 +1,109 @@
+name: Build Windows
+on:
+  pull_request:
+  push:
+    branches:
+      - develop
+      - 'release/**'
+      - ab/issue-23128-gh-windows-build
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: build-windows-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+jobs:
+  windows:
+    name: windows/x86_64
+    runs-on: windows-2022
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: msys2 {0}
+    env:
+      # Nim dependency trees nest past MAX_PATH, and Bash needs the scripts with LF endings.
+      # Set through the environment so that the checkout and nimble's clones see it too.
+      GIT_CONFIG_COUNT: 2
+      GIT_CONFIG_KEY_0: core.longpaths
+      GIT_CONFIG_VALUE_0: 'true'
+      GIT_CONFIG_KEY_1: core.autocrlf
+      GIT_CONFIG_VALUE_1: 'false'
+      # Same versions as the toolchain stage of the Dockerfile.
+      NIMBLE_VERSION: '0.26.1'
+      PROTOC_VERSION: '36.0'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          # scripts/version.sh describes the commit from the nearest tag
+          fetch-depth: 0
+          filter: blob:none
+          persist-credentials: false
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
+        with:
+          go-version: '1.26.5'
+          cache: false
+      - uses: jiro4989/setup-nim-action@189b145833368cc92f1e7b3e166a25a3e057a693 # v2.3.1
+        with:
+          nim-version: '2.2.6'
+          repo-token: ${{ github.token }}
+      # MinGW compiles the cgo and Nim code; Go, Nim and Git come from the Windows PATH.
+      - uses: msys2/setup-msys2@ec48f7c5447b3140e2b088413ae3a55687bccb6e # v2.33.0
+        with:
+          msystem: MINGW64
+          path-type: inherit
+          install: mingw-w64-x86_64-gcc make unzip
+      - name: Nimble and protoc
+        run: |
+          tools="$(cygpath -u "$RUNNER_TEMP")/tools"
+          mkdir -p "$tools"
+          curl -sSfL --retry 3 -o "$tools/nimble.zip" \
+            "https://github.com/nim-lang/nimble/releases/download/v$NIMBLE_VERSION/nimble-windows_x64.zip"
+          unzip -q "$tools/nimble.zip" -d "$tools/nimble"
+          curl -sSfL --retry 3 -o "$tools/protoc.zip" \
+            "https://github.com/protocolbuffers/protobuf/releases/download/v$PROTOC_VERSION/protoc-$PROTOC_VERSION-win64.zip"
+          unzip -q "$tools/protoc.zip" -d "$tools/protoc"
+          ls -la "$tools/nimble" "$tools/protoc/bin"
+          cygpath -w "$tools/protoc/bin" >> "$GITHUB_PATH"
+          # Added last so that it precedes the nimble bundled with Nim.
+          cygpath -w "$tools/nimble" >> "$GITHUB_PATH"
+      - name: Toolchain versions
+        run: |
+          echo "OS=$OS uname=$(uname -s) pwd=$(pwd) ($(pwd -W))"
+          for tool in go nim nimble gcc make protoc git sh bash objdump ar sha256sum python3; do
+            echo "$tool: $(command -v "$tool" || echo missing)"
+          done
+          go version
+          nim --version | head -n 1
+          nimble --version | head -n 1
+          gcc --version | head -n 1
+          gcc -dumpmachine
+          make --version | head -n 1
+          protoc --version
+          git --version
+          echo "autocrlf=$(git config core.autocrlf) longpaths=$(git config core.longpaths)"
+          go env GOPATH GOCACHE GOMODCACHE CC
+          # Probe: how flags built from make's CURDIR reach the native Go.
+          CGO_CFLAGS="-I$PWD/build -Wno-implicit-function-declaration" \
+          CGO_LDFLAGS="-L$PWD/build -lsds -Wl,-rpath,$PWD/build" \
+            go env CGO_CFLAGS CGO_LDFLAGS
+          make -n statusgo-c-bindings
+      - name: Generate
+        run: make generate
+      - name: Static library
+        run: make statusgo-library
+      - name: Shared library
+        run: make statusgo-shared-library
+      - name: Built files
+        if: always()
+        run: ls -la build build/bin || true
+      - name: Upload libraries
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: status-go-windows-x86_64
+          path: |
+            build/bin/libstatus.a
+            build/bin/libstatus.h
+            build/bin/libstatus.dll
+            build/libsds.dll
+          if-no-files-found: error
+          retention-days: 7
