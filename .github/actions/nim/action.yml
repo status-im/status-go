@@ -1,74 +1,77 @@
 name: Nim
-description: Puts Nim and nimble on PATH, from the cache when it has them. Needs a checkout. Save the cache with ./.github/actions/nim/save after the build.
+description: Puts prebuilt Nim compilers and nimble on PATH of an Apple Silicon runner. Every download is checked against a pinned checksum.
 inputs:
   nim-version:
-    description: Nim on PATH. Same as TKL_NIM in the root Dockerfile.
-    default: '2.2.10'
+    description: Nim on PATH.
+    default: '2.2.4'
+  tkl-nim-version:
+    description: A second Nim for the token library; TKL_NIM points at it. Empty for none.
+    default: ''
   nimble-version:
-    description: nimble on PATH. Same as in the root Dockerfile.
+    description: nimble on PATH.
     default: '0.26.1'
-outputs:
-  cache-key:
-    description: Key the cache is stored under for these versions and status_go.nimble.
-    value: ${{ steps.key.outputs.key }}
-  cache-hit:
-    description: "'true' when the cache was restored from exactly that key."
-    value: ${{ steps.cache.outputs.cache-hit }}
-  cache-matched-key:
-    description: Key of the restored cache, empty when nothing was restored.
-    value: ${{ steps.cache.outputs.cache-matched-key }}
 runs:
   using: composite
   steps:
-    # hashFiles is only available inside steps, not in the outputs above.
-    - id: key
+    # setup-nim-action and nimble build Nim from source on macOS, about five
+    # minutes for each compiler.
+    - name: Nim and nimble
       shell: bash
       env:
-        PREFIX: nim-${{ runner.os }}-${{ runner.arch }}-${{ inputs.nim-version }}-${{ inputs.nimble-version }}-
-        NIMBLE_FILE_HASH: ${{ hashFiles('status_go.nimble') }}
-      run: |
-        echo "prefix=$PREFIX" >> "$GITHUB_OUTPUT"
-        echo "key=$PREFIX$NIMBLE_FILE_HASH" >> "$GITHUB_OUTPUT"
-    # .nim_runtime is the Nim on PATH. nimble keeps the Nim it installs for
-    # libsds in ~/.nimble/nimbinaries and looks for it only there; nimbledeps
-    # holds the Nim dependencies. An older cache of the same versions is still
-    # useful: nimble adds what status_go.nimble changed.
-    - name: Restore Nim
-      id: cache
-      uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
-      with:
-        path: |
-          .nim_runtime
-          nimbledeps
-          ~/.nimble/nimbinaries
-        key: ${{ steps.key.outputs.key }}
-        restore-keys: ${{ steps.key.outputs.prefix }}
-    # Compiles Nim where there is no prebuilt one (macOS, Linux arm64).
-    - uses: jiro4989/setup-nim-action@189b145833368cc92f1e7b3e166a25a3e057a693 # v2.3.1
-      if: steps.cache.outputs.cache-matched-key == ''
-      with:
-        nim-version: ${{ inputs.nim-version }}
-    # setup-nim always reinstalls, so a restored compiler only needs its PATH entry.
-    - name: Use the restored Nim
-      if: steps.cache.outputs.cache-matched-key != ''
-      shell: bash
-      run: echo "$GITHUB_WORKSPACE/.nim_runtime/bin" >> "$GITHUB_PATH"
-    # The nimble bundled with Nim cannot resolve nim-sds through the bindings.
-    - name: Install nimble
-      shell: bash
-      env:
+        NIM_VERSION: ${{ inputs.nim-version }}
+        TKL_NIM_VERSION: ${{ inputs.tkl-nim-version }}
         NIMBLE_VERSION: ${{ inputs.nimble-version }}
-        PLATFORM: ${{ runner.os }}-${{ runner.arch }}
+        # The compiler nim-sds pins. nimble looks for it only in its own directory
+        # and builds it from source when it is not there.
+        NIMBLE_NIM_VERSION: '2.2.6'
       run: |
-        case "$PLATFORM" in
-          Linux-X64) asset=linux_x64 ;;
-          Linux-ARM64) asset=linux_aarch64 ;;
-          macOS-X64) asset=macosx_x64 ;;
-          macOS-ARM64) asset=macosx_aarch64 ;;
-          *) echo "No nimble build for $PLATFORM" >&2; exit 1 ;;
+        if [ "$RUNNER_OS-$RUNNER_ARCH" != macOS-ARM64 ]; then
+          echo "No pinned downloads for $RUNNER_OS-$RUNNER_ARCH" >&2
+          exit 1
+        fi
+        tools="$RUNNER_TEMP/nim-toolchain"
+        nightlies=https://github.com/nim-lang/nightlies/releases/download
+        fetch() { # <directory> <sha256> <url> [tar options]
+          local dir="$1" sum="$2" url="$3"
+          shift 3
+          mkdir -p "$dir"
+          curl -sSfL --retry 5 --retry-all-errors -o "$RUNNER_TEMP/download" "$url"
+          echo "$sum  $RUNNER_TEMP/download" | shasum -a 256 -c -
+          tar -xf "$RUNNER_TEMP/download" -C "$dir" "$@"
+        }
+        install_nim() { # <version> <directory>
+          case "$1" in
+            2.2.4)
+              fetch "$2" 86391e69225feae2c8ea54eadf560307aaf35b9b8f0bf7df40ffa84fceb2ee74 \
+                "$nightlies/2025-04-22-version-2-2-f7145dd26efeeeb6eeae6fff649db244d81b212d/nim-2.2.4-macosx_arm64.tar.xz" \
+                --strip-components=1 ;;
+            2.2.6)
+              fetch "$2" a62ff3c34a2eb3fc69866fcae05b32dc5c2b6668ecfb1d10d91ad72c0183fae5 \
+                "$nightlies/2025-10-31-version-2-2-ab00c56904e3126ad826bb520d243513a139436a/nim-2.2.6-macosx_arm64.tar.xz" \
+                --strip-components=1 ;;
+            2.2.10)
+              fetch "$2" 9a3b012d0680d11d6163dd2f145470b090c1045f5e634f42daf119bea1cb2b5e \
+                "$nightlies/2026-04-24-version-2-2-bfeb3146d1638b39f69007a4ae5a23e23ae4e5ef/nim-2.2.10-macosx_arm64.tar.xz" \
+                --strip-components=1 ;;
+            *)
+              echo "No pinned download for Nim $1" >&2
+              exit 1 ;;
+          esac
+        }
+        install_nim "$NIM_VERSION" "$tools/nim-$NIM_VERSION"
+        if [ -n "$TKL_NIM_VERSION" ]; then
+          [ -d "$tools/nim-$TKL_NIM_VERSION" ] || install_nim "$TKL_NIM_VERSION" "$tools/nim-$TKL_NIM_VERSION"
+          echo "TKL_NIM=$tools/nim-$TKL_NIM_VERSION/bin/nim" >> "$GITHUB_ENV"
+        fi
+        install_nim "$NIMBLE_NIM_VERSION" "$HOME/.nimble/nimbinaries/nim-$NIMBLE_NIM_VERSION"
+        case "$NIMBLE_VERSION" in
+          0.26.1)
+            fetch "$tools/nimble/bin" ec27b85cd743dee9814b34811cece487b53cb19a3b696e72c06a9bc4c9a18c42 \
+              "https://github.com/nim-lang/nimble/releases/download/v$NIMBLE_VERSION/nimble-macosx_aarch64.tar.gz" ;;
+          *)
+            echo "No pinned download for nimble $NIMBLE_VERSION" >&2
+            exit 1 ;;
         esac
-        mkdir -p "$RUNNER_TEMP/nimble"
-        curl -sSfL --retry 5 --retry-all-errors \
-          "https://github.com/nim-lang/nimble/releases/download/v$NIMBLE_VERSION/nimble-$asset.tar.gz" |
-          tar -xz -C "$RUNNER_TEMP/nimble"
-        echo "$RUNNER_TEMP/nimble" >> "$GITHUB_PATH"
+        # Nim ships an older nimble next to the compiler; the path added last comes first.
+        echo "$tools/nim-$NIM_VERSION/bin" >> "$GITHUB_PATH"
+        echo "$tools/nimble/bin" >> "$GITHUB_PATH"

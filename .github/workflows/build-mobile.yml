@@ -94,10 +94,7 @@ jobs:
       # Its pattern takes the generator's progress lines for compile errors.
       - name: Remove the Go problem matcher
         run: echo "::remove-matcher owner=go::"
-      # macOS has no prebuilt Nim: without the cache setup-nim compiles one and
-      # nimble compiles the one libsds is pinned to, about four minutes each.
       - uses: ./.github/actions/nim
-        id: nim
         with:
           nim-version: ${{ env.NIM_VERSION }}
           nimble-version: ${{ env.NIMBLE_VERSION }}
@@ -125,12 +122,3 @@ jobs:
             build/libsds.a
           if-no-files-found: error
           retention-days: 7
-      # develop owns the cache. A pull request saves one only while there is nothing
-      # to restore, so pull requests cannot fill the repository quota.
-      - name: Save Nim
-        if: >-
-          steps.nim.outputs.cache-hit != 'true' &&
-          (github.ref == 'refs/heads/develop' || steps.nim.outputs.cache-matched-key == '')
-        uses: ./.github/actions/nim/save
-        with:
-          key: ${{ steps.nim.outputs.cache-key }}

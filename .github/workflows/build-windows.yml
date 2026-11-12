@@ -83,20 +83,11 @@ jobs:
           cygpath -w "$tools/protoc/bin" >> "$GITHUB_PATH"
           # Added last so that it precedes the nimble bundled with Nim.
           cygpath -w "$tools/nimble" >> "$GITHUB_PATH"
-          # Fixed places for the caches below, on the runner's work disk.
-          cache="$(cygpath -m "$RUNNER_TEMP")/status-go-cache"
-          echo "GOCACHE=$cache/go-build" >> "$GITHUB_ENV"
-          echo "GOMODCACHE=$cache/go-mod" >> "$GITHUB_ENV"
-          echo "GO_GENERATE_FAST_DIR=$cache/go-generate-fast" >> "$GITHUB_ENV"
-      - name: Restore Go caches
-        id: cache
-        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+          # A fixed place for the cache below, on the runner's work disk.
+          echo "GO_GENERATE_FAST_DIR=$(cygpath -m "$RUNNER_TEMP")/status-go-cache/go-generate-fast" >> "$GITHUB_ENV"
+      - uses: ./.github/actions/go-cache
         with:
-          path: |
-            ${{ runner.temp }}/status-go-cache/go-build
-            ${{ runner.temp }}/status-go-cache/go-mod
-          key: toolchain-windows-x86_64-${{ hashFiles('go.sum') }}
-          restore-keys: toolchain-windows-x86_64-
+          name: windows-x86_64
       - name: Restore the code generation cache
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
@@ -152,15 +143,4 @@ jobs:
             build/libsds.dll
           if-no-files-found: error
           retention-days: 7
-      # develop owns the cache. A pull request saves one only while there is nothing
-      # to restore, so pull requests cannot fill the repository quota.
-      - name: Save Go caches
-        if: >-
-          steps.cache.outputs.cache-hit != 'true' &&
-          (github.ref == 'refs/heads/develop' || steps.cache.outputs.cache-matched-key == '')
-        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
-        with:
-          path: |
-            ${{ runner.temp }}/status-go-cache/go-build
-            ${{ runner.temp }}/status-go-cache/go-mod
-          key: ${{ steps.cache.outputs.cache-primary-key }}
+      - uses: ./.github/actions/go-cache/save

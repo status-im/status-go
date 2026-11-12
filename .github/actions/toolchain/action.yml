@@ -4,32 +4,15 @@ inputs:
   token:
     description: Token used to pull the toolchain image from GHCR.
     default: ${{ github.token }}
-outputs:
-  cache-key:
-    description: Key the Go caches are stored under for this go.sum.
-    value: ${{ steps.key.outputs.key }}
-  cache-hit:
-    description: "'true' when the caches were restored from exactly that key."
-    value: ${{ steps.cache.outputs.cache-hit }}
-  cache-matched-key:
-    description: Key of the restored caches, empty when nothing was restored.
-    value: ${{ steps.cache.outputs.cache-matched-key }}
 runs:
   using: composite
   steps:
-    # hashFiles is only available inside steps, not in the outputs above.
-    - id: key
-      shell: bash
-      run: echo "key=toolchain-linux-x86_64-${{ hashFiles('go.sum') }}" >> "$GITHUB_OUTPUT"
-    - name: Restore Go caches
-      id: cache
-      uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+    # scripts/toolchain.sh mounts this directory and points Go at it inside the container.
+    - uses: ./.github/actions/go-cache
       with:
-        path: |
-          ~/.cache/status-go-toolchain/go-build
-          ~/.cache/status-go-toolchain/go-mod
-        key: ${{ steps.key.outputs.key }}
-        restore-keys: toolchain-linux-x86_64-
+        name: linux-x86_64
+        directory: ~/.cache/status-go-toolchain
+        export-env: 'false'
     # Without access to the published image the script builds it instead.
     - name: Toolchain image
       shell: bash

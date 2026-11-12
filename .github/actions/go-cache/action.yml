@@ -1,0 +1,61 @@
+name: Go caches
+description: Restores the Go build and module caches. Save them with ./.github/actions/go-cache/save after the build. Needs a checkout.
+inputs:
+  name:
+    description: What the caches are built for, such as linux-x86_64. Part of the key.
+    required: true
+  directory:
+    description: Holds the go-build and go-mod directories. The runner's temporary directory by default.
+    default: ''
+  export-env:
+    description: "'true' points GOCACHE and GOMODCACHE at the directory; 'false' when the build sets them itself."
+    default: 'true'
+runs:
+  using: composite
+  steps:
+    # hashFiles is only available inside steps.
+    - id: plan
+      shell: bash
+      env:
+        DIRECTORY: ${{ inputs.directory || format('{0}/go-cache', runner.temp) }}
+        PREFIX: go-${{ inputs.name }}-
+        GO_SUM_HASH: ${{ hashFiles('go.sum') }}
+      run: |
+        # Windows runners give the directory with backslashes.
+        echo "directory=${DIRECTORY//\\//}" >> "$GITHUB_OUTPUT"
+        echo "prefix=$PREFIX" >> "$GITHUB_OUTPUT"
+        echo "key=$PREFIX$GO_SUM_HASH" >> "$GITHUB_OUTPUT"
+    - id: cache
+      uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+      with:
+        path: |
+          ${{ steps.plan.outputs.directory }}/go-build
+          ${{ steps.plan.outputs.directory }}/go-mod
+        key: ${{ steps.plan.outputs.key }}
+        restore-keys: ${{ steps.plan.outputs.prefix }}
+    # develop owns the caches. Another ref saves them only while there is nothing
+    # to restore, so pull requests cannot fill the repository quota.
+    - name: Decide whether to save
+      shell: bash
+      env:
+        DIRECTORY: ${{ steps.plan.outputs.directory }}
+        KEY: ${{ steps.plan.outputs.key }}
+        HIT: ${{ steps.cache.outputs.cache-hit }}
+        MATCHED_KEY: ${{ steps.cache.outputs.cache-matched-key }}
+        EXPORT_ENV: ${{ inputs.export-env }}
+      run: |
+        save=false
+        if [ "$HIT" != true ] && { [ "$GITHUB_REF" = refs/heads/develop ] || [ -z "$MATCHED_KEY" ]; }; then
+          save=true
+        fi
+        {
+          echo "GO_CACHE_DIRECTORY=$DIRECTORY"
+          echo "GO_CACHE_KEY=$KEY"
+          echo "GO_CACHE_SAVE=$save"
+        } >> "$GITHUB_ENV"
+        if [ "$EXPORT_ENV" = true ]; then
+          {
+            echo "GOCACHE=$DIRECTORY/go-build"
+            echo "GOMODCACHE=$DIRECTORY/go-mod"
+          } >> "$GITHUB_ENV"
+        fi
