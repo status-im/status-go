@@ -41,9 +41,12 @@ jobs:
             build/libsds.so
           if-no-files-found: error
           retention-days: 7
-      # Pull requests only read the cache, so they cannot fill the repository quota.
+      # develop owns the cache. A pull request saves one only while there is nothing
+      # to restore, so pull requests cannot fill the repository quota.
       - name: Save Go caches
-        if: github.ref == 'refs/heads/develop' && steps.toolchain.outputs.cache-hit != 'true'
+        if: >-
+          steps.toolchain.outputs.cache-hit != 'true' &&
+          (github.ref == 'refs/heads/develop' || steps.toolchain.outputs.cache-matched-key == '')
         uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: |

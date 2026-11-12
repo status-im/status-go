@@ -11,6 +11,9 @@ outputs:
   cache-hit:
     description: "'true' when the caches were restored from exactly that key."
     value: ${{ steps.cache.outputs.cache-hit }}
+  cache-matched-key:
+    description: Key of the restored caches, empty when nothing was restored.
+    value: ${{ steps.cache.outputs.cache-matched-key }}
 runs:
   using: composite
   steps:
