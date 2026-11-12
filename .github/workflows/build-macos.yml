@@ -1,0 +1,93 @@
+name: Build macOS
+on:
+  pull_request:
+  push:
+    branches:
+      - develop
+      - 'release/**'
+      # Temporary: runs the workflow before a pull request exists.
+      - ab/issue-23128-gh-macos-build
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: build-macos-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+jobs:
+  macos:
+    name: macos/aarch64
+    # GitHub's macOS 15 runners are Apple Silicon.
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          # scripts/version.sh describes the commit from the nearest tag
+          fetch-depth: 0
+          filter: blob:none
+          persist-credentials: false
+      # Tool versions follow the toolchain stage of the root Dockerfile.
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version: '1.26.5'
+          cache: false
+      - name: Protocol buffer compiler
+        uses: arduino/setup-protoc@c65c819552d16ad3c9b72d9dfd5ba5237b9c906b # v3
+        with:
+          version: '36.0'
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+      # Prebuilt compilers: setup-nim-action builds Nim from source on macOS,
+      # about five minutes for each of the two.
+      - name: Nim and nimble
+        run: |
+          tools="$RUNNER_TEMP/toolchain"
+          nightlies=https://github.com/nim-lang/nightlies/releases/download
+          fetch() { # <directory> <sha256> <url> [tar options]
+            local dir="$tools/$1" sum="$2" url="$3"
+            shift 3
+            mkdir -p "$dir"
+            curl -sSfL --retry 5 --retry-all-errors -o "$RUNNER_TEMP/download" "$url"
+            echo "$sum  $RUNNER_TEMP/download" | shasum -a 256 -c -
+            tar -xf "$RUNNER_TEMP/download" -C "$dir" "$@"
+          }
+          # Nim 2.2.4
+          fetch nim 86391e69225feae2c8ea54eadf560307aaf35b9b8f0bf7df40ffa84fceb2ee74 \
+            "$nightlies/2025-04-22-version-2-2-f7145dd26efeeeb6eeae6fff649db244d81b212d/nim-2.2.4-macosx_arm64.tar.xz" \
+            --strip-components=1
+          # Nim 2.2.10, the compiler of the token library
+          fetch nim-tkl 9a3b012d0680d11d6163dd2f145470b090c1045f5e634f42daf119bea1cb2b5e \
+            "$nightlies/2026-04-24-version-2-2-bfeb3146d1638b39f69007a4ae5a23e23ae4e5ef/nim-2.2.10-macosx_arm64.tar.xz" \
+            --strip-components=1
+          # nimble 0.26.1
+          fetch nimble/bin ec27b85cd743dee9814b34811cece487b53cb19a3b696e72c06a9bc4c9a18c42 \
+            https://github.com/nim-lang/nimble/releases/download/v0.26.1/nimble-macosx_aarch64.tar.gz
+          echo "TKL_NIM=$tools/nim-tkl/bin/nim" >> "$GITHUB_ENV"
+          # Nim ships an older nimble next to the compiler; the path added last comes first.
+          echo "$tools/nim/bin" >> "$GITHUB_PATH"
+          echo "$tools/nimble/bin" >> "$GITHUB_PATH"
+      - name: Toolchain versions
+        run: |
+          go version
+          protoc --version
+          nim --version | head -n 1
+          "$TKL_NIM" --version | head -n 1
+          nimble --version | grep -F 'nimble v0.26.1'
+      - name: Nim dependencies and libsds
+        run: make build-libsds
+      - name: Generate
+        run: make generate
+      - name: Static library
+        run: make statusgo-library
+      - name: Shared library
+        run: make statusgo-shared-library
+      - name: Upload libraries
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: status-go-macos-aarch64
+          path: |
+            build/bin/libstatus.a
+            build/bin/libstatus.h
+            build/bin/libstatus.dylib
+            build/libsds.dylib
+          if-no-files-found: error
+          retention-days: 7
