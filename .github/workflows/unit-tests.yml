@@ -8,6 +8,7 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+  packages: read
 concurrency:
   group: unit-tests-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}

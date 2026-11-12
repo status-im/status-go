@@ -1,5 +1,9 @@
 name: Toolchain
 description: Restores the Go caches and gets the toolchain image for scripts/toolchain.sh. Needs a checkout.
+inputs:
+  token:
+    description: Token used to pull the toolchain image from GHCR.
+    default: ${{ github.token }}
 outputs:
   cache-key:
     description: Key the Go caches are stored under for this go.sum.
@@ -23,6 +27,12 @@ runs:
           ~/.cache/status-go-toolchain/go-mod
         key: ${{ steps.key.outputs.key }}
         restore-keys: toolchain-linux-x86_64-
+    # Without access to the published image the script builds it instead.
     - name: Toolchain image
       shell: bash
-      run: scripts/toolchain.sh go version
+      env:
+        GHCR_TOKEN: ${{ inputs.token }}
+        GHCR_USER: ${{ github.actor }}
+      run: |
+        echo "$GHCR_TOKEN" | docker login ghcr.io --username "$GHCR_USER" --password-stdin || true
+        scripts/toolchain.sh go version

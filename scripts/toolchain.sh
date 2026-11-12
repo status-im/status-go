@@ -18,9 +18,15 @@ if [ "${1:-}" = --image ]; then
 fi
 [ $# -gt 0 ] || { echo "usage: $0 <command> [args...]" >&2; exit 2; }
 
-if ! docker image inspect "$image" >/dev/null 2>&1; then
-  docker pull --quiet --platform "$platform" "$image" 2>/dev/null ||
-    docker build --platform "$platform" --target toolchain --tag "$image" "$repo"
+if ! docker image inspect "$image" >/dev/null 2>&1 &&
+  ! docker pull --quiet --platform "$platform" "$image" 2>/dev/null; then
+  # The build downloads the compilers; a retry continues after the layers already built.
+  attempt=1
+  until docker build --platform "$platform" --target toolchain --tag "$image" "$repo"; do
+    [ "$attempt" -lt 3 ] || exit 1
+    attempt=$((attempt + 1))
+    sleep 15
+  done
 fi
 
 cache="${STATUS_GO_TOOLCHAIN_CACHE:-$HOME/.cache/status-go-toolchain}"
