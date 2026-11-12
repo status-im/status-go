@@ -51,8 +51,9 @@ jobs:
         run: scripts/toolchain.sh make test-unit-prep build-libtkl $MAKE_ARGS
       - name: Pack the prepared tree
         run: |
+          # Generated files are the ignored ones; from build/ only the libraries are needed.
           {
-            git ls-files -z --others --ignored --exclude-standard -- . ':!build' ':!nimbledeps'
+            git ls-files -z --others --ignored --exclude-standard | grep -zvE '^(build|nimbledeps)/'
             printf '%s\0' build/libsds.so build/libsds.h build/deps
           } | tar --null --files-from=- -cf "$RUNNER_TEMP/prepared-tree.tar"
           ls -lh "$RUNNER_TEMP/prepared-tree.tar"
