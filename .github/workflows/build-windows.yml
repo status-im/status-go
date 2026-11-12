@@ -16,7 +16,7 @@ jobs:
   windows:
     name: windows/x86_64
     runs-on: windows-2022
-    timeout-minutes: 60
+    timeout-minutes: 30
     defaults:
       run:
         shell: msys2 {0}
@@ -73,32 +73,24 @@ jobs:
           cygpath -w "$tools/nimble" >> "$GITHUB_PATH"
       - name: Toolchain versions
         run: |
-          echo "OS=$OS uname=$(uname -s) pwd=$(pwd) ($(pwd -W))"
-          for tool in go nim nimble gcc mingw32-make make protoc git sh bash objdump ar sha256sum python3; do
+          # go-generate-fast prints "file.go: command" lines, which setup-go's matcher reports as errors.
+          echo "::remove-matcher owner=go::"
+          for tool in go nim nimble gcc mingw32-make make protoc git sh; do
             echo "$tool: $(command -v "$tool" || echo missing)"
           done
           go version
           nim --version | head -n 1
           nimble --version | head -n 1
           gcc --version | head -n 1
-          gcc -dumpmachine
           mingw32-make --version | head -n 1
-          make --version | head -n 1
           protoc --version
           git --version
-          echo "autocrlf=$(git config core.autocrlf) longpaths=$(git config core.longpaths)"
-          go env GOPATH GOCACHE GOMODCACHE CC
-          # Probe: the shell and the paths MinGW make gives the Makefile.
-          mingw32-make -pn help 2>/dev/null | grep -E '^(SHELL|CURDIR|MAKE|GIT_ROOT|LIBSDS|CGO_CFLAGS|CGO_LDFLAGS) ' || true
       - name: Generate
         run: mingw32-make generate
       - name: Static library
         run: mingw32-make statusgo-library
       - name: Shared library
         run: mingw32-make statusgo-shared-library
-      - name: Built files
-        if: always()
-        run: ls -la build build/bin || true
       - name: Upload libraries
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
