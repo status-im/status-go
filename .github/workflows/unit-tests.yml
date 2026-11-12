@@ -1,0 +1,63 @@
+name: Unit Tests
+on:
+  pull_request:
+  push:
+    branches:
+      - develop
+      - 'release/**'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: unit-tests-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+jobs:
+  unit:
+    name: unit
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      UNIT_TEST_COUNT: 1
+      # Pull requests stop at the first failing group; branch runs finish all of them.
+      UNIT_TEST_FAILFAST: ${{ github.event_name == 'pull_request' }}
+      UNIT_TEST_RERUN_FAILS: true
+      UNIT_TEST_USE_DEVELOPMENT_LOGGER: false
+      UNIT_TEST_REPORT_CODECOV: false
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          # scripts/version.sh describes the commit from the nearest tag
+          fetch-depth: 0
+          filter: blob:none
+          persist-credentials: false
+      # Read-only: the Build workflow owns this cache.
+      - name: Restore Go caches
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            ~/.cache/status-go-toolchain/go-build
+            ~/.cache/status-go-toolchain/go-mod
+          key: toolchain-linux-x86_64-${{ hashFiles('go.sum') }}
+          restore-keys: toolchain-linux-x86_64-
+      - name: Toolchain image
+        run: scripts/toolchain.sh go version
+      - name: Token library coexistence
+        run: scripts/toolchain.sh make test-libtkl-coexistence
+      - name: Unit tests
+        run: scripts/toolchain.sh make test-unit V=1 USE_LOGOS_STORAGE=true USE_TORRENT=true
+      # With CI=true the test output goes to files, not to the job log.
+      - name: Show test logs
+        if: failure()
+        run: tail -n 200 test_*.log
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: unit-test-reports
+          path: |
+            report_*.xml
+            report_rerun_fails_*.txt
+            test_*.log
+            test-coverage.html
+          if-no-files-found: ignore
+          retention-days: 14

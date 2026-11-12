@@ -86,6 +86,12 @@ RUN set -eu && \
 
 ENV PATH="/opt/nimble/bin:${PATH}"
 
+# Test runner behind `make test-unit`
+ARG GOTESTSUM_VERSION=1.13.0
+RUN go install "gotest.tools/gotestsum@v${GOTESTSUM_VERSION}" && \
+    go clean -cache -modcache && \
+    gotestsum --version
+
 # Build status-go in the toolchain container
 FROM toolchain AS builder
 

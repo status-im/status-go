@@ -37,6 +37,14 @@ esac
 args+=(--env HOME=/cache/home --env GOCACHE=/cache/go-build --env GOMODCACHE=/cache/go-mod)
 # Tools built during the build link against the libsds.so it produces.
 args+=(--env "LD_LIBRARY_PATH=$repo/build")
+# The Makefile clones logos-storage-nim next to the checkout, which is not mounted.
+args+=(--env LOGOS_STORAGE_SOURCE_DIR=/cache/logos-storage-nim)
+# CI and test settings reach the container by name.
+for name in $(compgen -e); do
+  case "$name" in
+    CI | CODECOV_* | UNIT_TEST_*) args+=(--env "$name") ;;
+  esac
+done
 if [ -t 0 ] && [ -t 1 ]; then
   args+=(--interactive --tty)
 fi
