@@ -5,6 +5,7 @@ on:
     branches:
       - develop
       - 'release/**'
+      - ab/issue-23128-gh-windows-build
   workflow_dispatch:
 permissions:
   contents: read
@@ -83,19 +84,39 @@ jobs:
           cygpath -w "$tools/protoc/bin" >> "$GITHUB_PATH"
           # Added last so that it precedes the nimble bundled with Nim.
           cygpath -w "$tools/nimble" >> "$GITHUB_PATH"
-          # Fixed places for the caches below; the Makefile would derive them from the MSYS home.
-          cache="$(cygpath -m "$USERPROFILE")/.cache/status-go"
+          # Fixed places for the caches below, on the runner's work disk.
+          cache="$(cygpath -m "$RUNNER_TEMP")/status-go-cache"
           echo "GOCACHE=$cache/go-build" >> "$GITHUB_ENV"
           echo "GOMODCACHE=$cache/go-mod" >> "$GITHUB_ENV"
+          echo "GO_GENERATE_FAST_DIR=$cache/go-generate-fast" >> "$GITHUB_ENV"
       - name: Restore Go caches
         id: cache
         uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: |
-            ~/.cache/status-go/go-build
-            ~/.cache/status-go/go-mod
+            ${{ runner.temp }}/status-go-cache/go-build
+            ${{ runner.temp }}/status-go-cache/go-mod
           key: toolchain-windows-x86_64-${{ hashFiles('go.sum') }}
           restore-keys: toolchain-windows-x86_64-
+      - name: Restore the code generation cache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ${{ runner.temp }}/status-go-cache/go-generate-fast
+          key: go-generate-fast-windows-x86_64-${{ hashFiles('**/*.go', '**/go.mod', '**/go.sum') }}
+          restore-keys: go-generate-fast-windows-x86_64-
+      # With libsds restored, nimble and the Nim dependencies are skipped.
+      - name: Restore libsds
+        id: libsds
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            build/libsds.dll
+            build/libsds.h
+          # status_go.nimble pins the revision, this file the compilers.
+          key: libsds-windows-x86_64-${{ hashFiles('status_go.nimble', 'Makefile', '.github/workflows/build-windows.yml') }}
+      - name: Use the restored libsds
+        if: steps.libsds.outputs.cache-hit == 'true'
+        run: echo "MAKE_ARGS=NIM_SDS_LIB_DIR=$(pwd -W)/build NIM_SDS_INC_DIR=$(pwd -W)/build" >> "$GITHUB_ENV"
       - name: Toolchain versions
         run: |
           # go-generate-fast prints "file.go: command" lines, which setup-go's matcher reports as errors.
@@ -111,15 +132,16 @@ jobs:
           protoc --version
           git --version
           go env GOCACHE GOMODCACHE
+          echo "GO_GENERATE_FAST_DIR=$GO_GENERATE_FAST_DIR MAKE_ARGS=${MAKE_ARGS:-}"
       # The Makefile runs under MinGW make: MSYS make would hand it POSIX paths, which
       # end up in cgo flags that the native Go and gcc cannot resolve. The token
       # library's own Makefile still runs under MSYS make.
       - name: Generate
-        run: mingw32-make generate
+        run: mingw32-make generate $MAKE_ARGS
       - name: Static library
-        run: mingw32-make statusgo-library
+        run: mingw32-make statusgo-library $MAKE_ARGS
       - name: Shared library
-        run: mingw32-make statusgo-shared-library
+        run: mingw32-make statusgo-shared-library $MAKE_ARGS
       - name: Upload libraries
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
@@ -140,6 +162,6 @@ jobs:
         uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: |
-            ~/.cache/status-go/go-build
-            ~/.cache/status-go/go-mod
+            ${{ runner.temp }}/status-go-cache/go-build
+            ${{ runner.temp }}/status-go-cache/go-mod
           key: ${{ steps.cache.outputs.cache-primary-key }}
