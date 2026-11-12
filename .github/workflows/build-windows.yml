@@ -45,13 +45,18 @@ jobs:
       - uses: jiro4989/setup-nim-action@189b145833368cc92f1e7b3e166a25a3e057a693 # v2.3.1
         with:
           nim-version: '2.2.6'
+          # Outside the checkout, which the build fingerprints.
+          parent-nim-install-directory: ${{ runner.temp }}
           repo-token: ${{ github.token }}
       # MinGW compiles the cgo and Nim code; Go, Nim and Git come from the Windows PATH.
+      # The Makefile runs under MinGW make: MSYS make would hand it POSIX paths, which
+      # end up in cgo flags that the native Go and gcc cannot resolve. The token
+      # library's own Makefile still runs under MSYS make.
       - uses: msys2/setup-msys2@ec48f7c5447b3140e2b088413ae3a55687bccb6e # v2.33.0
         with:
           msystem: MINGW64
           path-type: inherit
-          install: mingw-w64-x86_64-gcc make unzip
+          install: mingw-w64-x86_64-gcc mingw-w64-x86_64-make make unzip
       - name: Nimble and protoc
         run: |
           tools="$(cygpath -u "$RUNNER_TEMP")/tools"
@@ -69,7 +74,7 @@ jobs:
       - name: Toolchain versions
         run: |
           echo "OS=$OS uname=$(uname -s) pwd=$(pwd) ($(pwd -W))"
-          for tool in go nim nimble gcc make protoc git sh bash objdump ar sha256sum python3; do
+          for tool in go nim nimble gcc mingw32-make make protoc git sh bash objdump ar sha256sum python3; do
             echo "$tool: $(command -v "$tool" || echo missing)"
           done
           go version
@@ -77,22 +82,20 @@ jobs:
           nimble --version | head -n 1
           gcc --version | head -n 1
           gcc -dumpmachine
+          mingw32-make --version | head -n 1
           make --version | head -n 1
           protoc --version
           git --version
           echo "autocrlf=$(git config core.autocrlf) longpaths=$(git config core.longpaths)"
           go env GOPATH GOCACHE GOMODCACHE CC
-          # Probe: how flags built from make's CURDIR reach the native Go.
-          CGO_CFLAGS="-I$PWD/build -Wno-implicit-function-declaration" \
-          CGO_LDFLAGS="-L$PWD/build -lsds -Wl,-rpath,$PWD/build" \
-            go env CGO_CFLAGS CGO_LDFLAGS
-          make -n statusgo-c-bindings
+          # Probe: the shell and the paths MinGW make gives the Makefile.
+          mingw32-make -pn help 2>/dev/null | grep -E '^(SHELL|CURDIR|MAKE|GIT_ROOT|LIBSDS|CGO_CFLAGS|CGO_LDFLAGS) ' || true
       - name: Generate
-        run: make generate
+        run: mingw32-make generate
       - name: Static library
-        run: make statusgo-library
+        run: mingw32-make statusgo-library
       - name: Shared library
-        run: make statusgo-shared-library
+        run: mingw32-make statusgo-shared-library
       - name: Built files
         if: always()
         run: ls -la build build/bin || true
