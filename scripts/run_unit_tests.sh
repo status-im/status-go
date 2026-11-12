@@ -118,6 +118,45 @@ DEFAULT_PROTOCOL_SHARDS=2
 MIN_PROTOCOL_SHARDS=1
 MAX_PROTOCOL_SHARDS=5
 
+# Seconds each top-level `protocol` test takes, see scripts/protocol_test_seconds.py.
+PROTOCOL_TEST_SECONDS_FILE="${GIT_ROOT}/scripts/protocol_test_seconds.txt"
+
+# Reads test names on stdin and prints "<shard> <test>" for each of them, shards
+# numbered from 0. The slowest tests are placed first, each into the shard with
+# the least work so far. A test without a measured time counts as an average one.
+assign_protocol_shards() {
+  local shards="$1"
+
+  awk -v shards="${shards}" -v seconds_file="${PROTOCOL_TEST_SECONDS_FILE}" '
+    BEGIN {
+      while ((getline line < seconds_file) > 0) {
+        split(line, field, " ")
+        if (field[1] ~ /^[0-9]+$/) { seconds[field[2]] = field[1]; sum += field[1]; known++ }
+      }
+    }
+    { tests[++count] = $1 }
+    END {
+      average = known ? sum / known : 1
+      for (i = 1; i <= count; i++) {
+        weight[i] = (tests[i] in seconds) ? seconds[tests[i]] : average
+        order[i] = i
+      }
+      for (i = 1; i <= count; i++) {
+        heaviest = i
+        for (j = i + 1; j <= count; j++) {
+          if (weight[order[j]] > weight[order[heaviest]]) heaviest = j
+        }
+        swap = order[i]; order[i] = order[heaviest]; order[heaviest] = swap
+        lightest = 0
+        for (shard = 1; shard < shards; shard++) {
+          if (load[shard] < load[lightest]) lightest = shard
+        }
+        load[lightest] += weight[order[i]]
+        print lightest, tests[order[i]]
+      }
+    }'
+}
+
 resolve_protocol_shards() {
   local shards
 
@@ -212,7 +251,16 @@ else
     fi
     protocol_list_cmd+=(github.com/status-im/status-go/internal/protocol)
 
-    mapfile -t protocol_tests < <("${protocol_list_cmd[@]}" | awk '/^Test/ { print $0 }' | sort -u)
+    # Listing the tests compiles the package. UNIT_TEST_PROTOCOL_TESTS_FILE keeps the
+    # list, so that machines sharing one prepared tree compile it once.
+    if [[ -n "${UNIT_TEST_PROTOCOL_TESTS_FILE}" && -s "${UNIT_TEST_PROTOCOL_TESTS_FILE}" ]]; then
+      mapfile -t protocol_tests < "${UNIT_TEST_PROTOCOL_TESTS_FILE}"
+    else
+      mapfile -t protocol_tests < <("${protocol_list_cmd[@]}" | awk '/^Test/ { print $0 }' | sort -u)
+      if [[ -n "${UNIT_TEST_PROTOCOL_TESTS_FILE}" && ${#protocol_tests[@]} -gt 0 ]]; then
+        printf '%s\n' "${protocol_tests[@]}" > "${UNIT_TEST_PROTOCOL_TESTS_FILE}"
+      fi
+    fi
     if [[ ${#protocol_tests[@]} -eq 0 ]]; then
       echo -e "${YLW}No protocol tests discovered, running package without sharding${RST}"
       run_test_for_packages github.com/status-im/status-go/internal/protocol "1" 1 "${PROTOCOL_TIMEOUT_MINUTES}" "Only 'protocol' package (fallback, no discovered tests)" &
@@ -224,14 +272,13 @@ else
         protocol_shard_filters[i]=""
       done
 
-      for ((i=0; i<${#protocol_tests[@]}; i++)); do
-        shard_idx=$((i % protocol_shards))
+      while read -r shard_idx protocol_test; do
         if [[ -z "${protocol_shard_filters[$shard_idx]}" ]]; then
-          protocol_shard_filters[$shard_idx]="${protocol_tests[$i]}"
+          protocol_shard_filters[$shard_idx]="${protocol_test}"
         else
-          protocol_shard_filters[$shard_idx]="${protocol_shard_filters[$shard_idx]}|${protocol_tests[$i]}"
+          protocol_shard_filters[$shard_idx]="${protocol_shard_filters[$shard_idx]}|${protocol_test}"
         fi
-      done
+      done < <(printf '%s\n' "${protocol_tests[@]}" | assign_protocol_shards "${protocol_shards}")
 
       protocol_iteration=1
       for ((i=0; i<protocol_shards; i++)); do

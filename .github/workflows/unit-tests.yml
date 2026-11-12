@@ -18,6 +18,8 @@ env:
     USE_LOGOS_STORAGE=true USE_TORRENT=true
     LOGOS_STORAGE_LIB_DIR=${{ github.workspace }}/build/deps/logos-storage/build
     LOGOS_STORAGE_INC_DIR=${{ github.workspace }}/build/deps/logos-storage/library
+  # Written by the prepare job, read by the protocol slices.
+  UNIT_TEST_PROTOCOL_TESTS_FILE: build/protocol-tests.txt
 jobs:
   # Generated code and native libraries, built once and handed to every test job.
   prepare:
@@ -49,12 +51,18 @@ jobs:
           cp -R "$source/library" build/deps/logos-storage/
       - name: Generate code, build libsds and libtkl
         run: scripts/toolchain.sh make test-unit-prep build-libtkl $MAKE_ARGS
+      # Listing compiles the package; a dry run of one slice writes the list for all of them.
+      - name: List the protocol tests
+        env:
+          UNIT_TEST_DRY_RUN: true
+          UNIT_TEST_PART: protocol:1/1
+        run: scripts/toolchain.sh make test-unit-prepared $MAKE_ARGS
       - name: Pack the prepared tree
         run: |
           # Generated files are the ignored ones; from build/ only the libraries are needed.
           {
             git ls-files -z --others --ignored --exclude-standard | grep -zvE '^(build|nimbledeps)/'
-            printf '%s\0' build/libsds.so build/libsds.h build/deps
+            printf '%s\0' build/libsds.so build/libsds.h build/deps "$UNIT_TEST_PROTOCOL_TESTS_FILE"
           } | tar --null --files-from=- -cf "$RUNNER_TEMP/prepared-tree.tar"
           ls -lh "$RUNNER_TEMP/prepared-tree.tar"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -90,12 +98,16 @@ jobs:
           - packages:1/3
           - packages:2/3
           - packages:3/3
-          - protocol:1/6
-          - protocol:2/6
-          - protocol:3/6
-          - protocol:4/6
-          - protocol:5/6
-          - protocol:6/6
+          - protocol:1/10
+          - protocol:2/10
+          - protocol:3/10
+          - protocol:4/10
+          - protocol:5/10
+          - protocol:6/10
+          - protocol:7/10
+          - protocol:8/10
+          - protocol:9/10
+          - protocol:10/10
     env:
       UNIT_TEST_PART: ${{ matrix.part }}
       UNIT_TEST_COUNT: 1
