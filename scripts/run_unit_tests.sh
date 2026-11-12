@@ -154,6 +154,28 @@ if [[ $(echo "${UNIT_TEST_PACKAGES}" | grep -E '\s?\S+protocol\s+') == "" ]]; th
   HAS_PROTOCOL_PACKAGE=false
 fi
 
+# UNIT_TEST_PART limits the run to one slice of the suite, so that CI can spread
+# it over several machines. Only for UNIT_TEST_COUNT=1.
+#   packages:<i>/<n>  slice i of n of every package except `protocol`
+#   protocol:<i>/<n>  slice i of n of the `protocol` tests
+part_group=""
+part_index=0
+part_total=0
+if [[ -n "${UNIT_TEST_PART}" ]]; then
+  if [[ ! "${UNIT_TEST_PART}" =~ ^(packages|protocol):([1-9][0-9]*)/([1-9][0-9]*)$ ]] ||
+     [[ "${BASH_REMATCH[2]}" -gt "${BASH_REMATCH[3]}" ]]; then
+    echo -e "${RED}Invalid UNIT_TEST_PART='${UNIT_TEST_PART}'${RST}, expected packages:<i>/<n> or protocol:<i>/<n>" >&2
+    exit 2
+  fi
+  if [[ $HAS_PROTOCOL_PACKAGE == 'false' || $UNIT_TEST_COUNT -ne 1 ]]; then
+    echo -e "${RED}UNIT_TEST_PART needs the full package list and UNIT_TEST_COUNT=1${RST}" >&2
+    exit 2
+  fi
+  part_group="${BASH_REMATCH[1]}"
+  part_index="${BASH_REMATCH[2]}"
+  part_total="${BASH_REMATCH[3]}"
+fi
+
 bg_pids=()
 
 if [[ $HAS_PROTOCOL_PACKAGE == 'false' ]]; then
@@ -162,12 +184,27 @@ if [[ $HAS_PROTOCOL_PACKAGE == 'false' ]]; then
   run_test_for_packages "${UNIT_TEST_PACKAGES}" "0" "${UNIT_TEST_COUNT}" "${DEFAULT_TIMEOUT_MINUTES}" "All packages"
 else
   # Spawn a process to test all packages except `protocol`
-  UNIT_TEST_PACKAGES_FILTERED=$(echo "${UNIT_TEST_PACKAGES}" | tr ' ' '\n' | grep -v '/protocol$' | tr '\n' ' ')
-  run_test_for_packages "${UNIT_TEST_PACKAGES_FILTERED}" "0" "${UNIT_TEST_COUNT}" "${DEFAULT_TIMEOUT_MINUTES}" "All packages except 'protocol'" &
-  bg_pids+=("$!")
+  if [[ "${part_group}" != 'protocol' ]]; then
+    UNIT_TEST_PACKAGES_FILTERED=$(echo "${UNIT_TEST_PACKAGES}" | tr ' ' '\n' | grep -v '/protocol$' | grep .)
+    packages_message="All packages except 'protocol'"
+    if [[ "${part_group}" == 'packages' ]]; then
+      UNIT_TEST_PACKAGES_FILTERED=$(echo "${UNIT_TEST_PACKAGES_FILTERED}" | awk -v i="${part_index}" -v n="${part_total}" '(NR - 1) % n == i - 1')
+      packages_message="${packages_message} (slice ${part_index}/${part_total})"
+    fi
+    UNIT_TEST_PACKAGES_FILTERED=$(echo "${UNIT_TEST_PACKAGES_FILTERED}" | tr '\n' ' ')
+    run_test_for_packages "${UNIT_TEST_PACKAGES_FILTERED}" "0" "${UNIT_TEST_COUNT}" "${DEFAULT_TIMEOUT_MINUTES}" "${packages_message}" &
+    bg_pids+=("$!")
+  fi
 
-  if [[ $UNIT_TEST_COUNT -eq 1 ]]; then
-    protocol_shards="$(resolve_protocol_shards)"
+  if [[ "${part_group}" == 'packages' ]]; then
+    : # the `protocol` package belongs to the protocol slices
+  elif [[ $UNIT_TEST_COUNT -eq 1 ]]; then
+    if [[ "${part_group}" == 'protocol' ]]; then
+      # One slice runs here, so the CPU limit on parallel shards does not apply.
+      protocol_shards="${part_total}"
+    else
+      protocol_shards="$(resolve_protocol_shards)"
+    fi
 
     protocol_list_cmd=(go test -list '^Test')
     if [[ -n "${BUILD_TAGS}" ]]; then
@@ -199,6 +236,9 @@ else
       protocol_iteration=1
       for ((i=0; i<protocol_shards; i++)); do
         if [[ -z "${protocol_shard_filters[$i]}" ]]; then
+          continue
+        fi
+        if [[ "${part_group}" == 'protocol' && $((i + 1)) -ne "${part_index}" ]]; then
           continue
         fi
         protocol_filter="^(${protocol_shard_filters[$i]})$"
