@@ -118,12 +118,13 @@ DEFAULT_PROTOCOL_SHARDS=2
 MIN_PROTOCOL_SHARDS=1
 MAX_PROTOCOL_SHARDS=5
 
-# Seconds each top-level `protocol` test takes, see scripts/protocol_test_seconds.py.
+# Seconds the slow top-level `protocol` tests take, and one `default` line for
+# all the others; see scripts/protocol_test_seconds.py.
 PROTOCOL_TEST_SECONDS_FILE="${GIT_ROOT}/scripts/protocol_test_seconds.txt"
 
 # Reads test names on stdin and prints "<shard> <test>" for each of them, shards
 # numbered from 0. The slowest tests are placed first, each into the shard with
-# the least work so far. A test without a measured time counts as an average one.
+# the least work so far.
 assign_protocol_shards() {
   local shards="$1"
 
@@ -131,14 +132,14 @@ assign_protocol_shards() {
     BEGIN {
       while ((getline line < seconds_file) > 0) {
         split(line, field, " ")
-        if (field[1] ~ /^[0-9]+$/) { seconds[field[2]] = field[1]; sum += field[1]; known++ }
+        if (field[1] ~ /^[0-9]+$/) seconds[field[2]] = field[1]
       }
     }
     { tests[++count] = $1 }
     END {
-      average = known ? sum / known : 1
+      other = ("default" in seconds) ? seconds["default"] : 1
       for (i = 1; i <= count; i++) {
-        weight[i] = (tests[i] in seconds) ? seconds[tests[i]] : average
+        weight[i] = (tests[i] in seconds) ? seconds[tests[i]] : other
         order[i] = i
       }
       for (i = 1; i <= count; i++) {
