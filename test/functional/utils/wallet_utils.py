@@ -1,6 +1,9 @@
 import json
 import logging
+import os
 import uuid as uuid_lib
+
+import pytest
 
 import resources.constants as constants
 from clients.signals import SignalType, WalletEventType
@@ -15,6 +18,10 @@ def get_token_key(chain_id, token_address):
 
 
 def get_suggested_routes(rpc_client, **kwargs):
+    # Without the Status proxy credentials the router does not answer in time.
+    if "STATUS_BUILD_PROXY_USER" not in os.environ:
+        pytest.skip("suggested routes need the Status proxy credentials")
+
     required_params = [
         "uuid",
         "sendType",
