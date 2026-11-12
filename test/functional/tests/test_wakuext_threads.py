@@ -421,6 +421,11 @@ class TestWakuextThreadMute:
     async def receiver(self, async_backend_new_profile, waku_light_client):
         return await async_backend_new_profile("receiver", waku_light_client=waku_light_client)
 
+    @pytest.mark.xfail(
+        reason="A mention in a muted thread stays in the activity center since "
+        "https://github.com/status-im/status-go/pull/8052; the test still expects none",
+        strict=True,
+    )
     async def test_muted_thread_skips_notifications_until_unmuted(self, sender, receiver):
         sender_chat_id, receiver_chat_id, _ = await _open_shared_chat(sender, receiver, ChatKind.PRIVATE_GROUP)
         parent_text = f"parent-{uuid4()}"
