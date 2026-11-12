@@ -29,9 +29,10 @@ runs:
       run: |
         echo "prefix=$PREFIX" >> "$GITHUB_OUTPUT"
         echo "key=$PREFIX$NIMBLE_FILE_HASH" >> "$GITHUB_OUTPUT"
-    # .nim_runtime is the Nim on PATH. nimbledeps holds the Nim dependencies and
-    # the Nim that nimble installs for libsds. An older cache of the same
-    # versions is still useful: nimble adds what status_go.nimble changed.
+    # .nim_runtime is the Nim on PATH. nimble keeps the Nim it installs for
+    # libsds in ~/.nimble/nimbinaries and looks for it only there; nimbledeps
+    # holds the Nim dependencies. An older cache of the same versions is still
+    # useful: nimble adds what status_go.nimble changed.
     - name: Restore Nim
       id: cache
       uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
@@ -39,6 +40,7 @@ runs:
         path: |
           .nim_runtime
           nimbledeps
+          ~/.nimble/nimbinaries
         key: ${{ steps.key.outputs.key }}
         restore-keys: ${{ steps.key.outputs.prefix }}
     # Compiles Nim where there is no prebuilt one (macOS, Linux arm64).

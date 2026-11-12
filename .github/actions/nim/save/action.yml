@@ -7,17 +7,21 @@ inputs:
 runs:
   using: composite
   steps:
-    # The C sources and objects a compiler was built from are 1.9 GB each and
-    # are not needed to run it.
+    # The archives, C sources and objects a compiler was built from are about
+    # 2 GB each and are not needed to run it.
     - name: Trim the Nim build trees
       shell: bash
       run: |
         rm -rf .nim_runtime/c_code .nim_runtime/nimcache \
-          nimbledeps/pkgs2/nim-*/c_code nimbledeps/pkgs2/nim-*/nimcache
-        du -sh .nim_runtime nimbledeps
+          nimbledeps/pkgs2/nim-*/c_code nimbledeps/pkgs2/nim-*/nimcache \
+          ~/.nimble/nimbinaries/nim-*/c_code ~/.nimble/nimbinaries/nim-*/nimcache \
+          ~/.nimble/nimbinaries/csources_* ~/.nimble/nimbinaries/*.tar*
+        mkdir -p ~/.nimble/nimbinaries
+        du -sh .nim_runtime nimbledeps ~/.nimble/nimbinaries
     - uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
       with:
         path: |
           .nim_runtime
           nimbledeps
+          ~/.nimble/nimbinaries
         key: ${{ inputs.key }}
