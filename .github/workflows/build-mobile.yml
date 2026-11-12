@@ -36,6 +36,9 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: false
+      # Its pattern takes the generator's progress lines for compile errors.
+      - name: Remove the Go problem matcher
+        run: echo "::remove-matcher owner=go::"
       - uses: jiro4989/setup-nim-action@189b145833368cc92f1e7b3e166a25a3e057a693 # v2.3.1
         with:
           nim-version: ${{ env.NIM_VERSION }}
@@ -89,6 +92,9 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: false
+      # Its pattern takes the generator's progress lines for compile errors.
+      - name: Remove the Go problem matcher
+        run: echo "::remove-matcher owner=go::"
       - uses: jiro4989/setup-nim-action@189b145833368cc92f1e7b3e166a25a3e057a693 # v2.3.1
         with:
           nim-version: ${{ env.NIM_VERSION }}
