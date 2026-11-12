@@ -72,8 +72,24 @@ jobs:
           nim --version | head -n 1
           "$TKL_NIM" --version | head -n 1
           nimble --version | grep -F 'nimble v0.26.1'
+      # nimble builds the Nim that nim-sds pins from source, about five minutes;
+      # with libsds restored it does not run at all.
+      - name: Restore libsds
+        id: libsds
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            build/libsds.dylib
+            build/libsds.h
+          key: libsds-macos-aarch64-${{ hashFiles('status_go.nimble', 'Makefile', '.github/workflows/build-macos.yml') }}
       - name: Nim dependencies and libsds
+        if: steps.libsds.outputs.cache-hit != 'true'
         run: make build-libsds
+      - name: Use the restored libsds
+        if: steps.libsds.outputs.cache-hit == 'true'
+        run: |
+          echo "NIM_SDS_LIB_DIR=$GITHUB_WORKSPACE/build" >> "$GITHUB_ENV"
+          echo "NIM_SDS_INC_DIR=$GITHUB_WORKSPACE/build" >> "$GITHUB_ENV"
       - name: Generate
         run: make generate
       - name: Static library
