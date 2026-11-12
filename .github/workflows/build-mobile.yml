@@ -95,32 +95,13 @@ jobs:
       # Its pattern takes the generator's progress lines for compile errors.
       - name: Remove the Go problem matcher
         run: echo "::remove-matcher owner=go::"
-      # macOS has no prebuilt Nim: setup-nim compiles one and nimble compiles the
-      # one libsds is pinned to, about four minutes each.
-      - name: Restore Nim compilers
+      # macOS has no prebuilt Nim: without the cache setup-nim compiles one and
+      # nimble compiles the one libsds is pinned to, about four minutes each.
+      - uses: ./.github/actions/nim
         id: nim
-        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
-        with:
-          path: |
-            .nim_runtime
-            nimbledeps
-          key: build-mobile-nim-macos-15-arm64-${{ env.NIM_VERSION }}-${{ env.NIMBLE_VERSION }}-${{ hashFiles('status_go.nimble') }}
-      - uses: jiro4989/setup-nim-action@189b145833368cc92f1e7b3e166a25a3e057a693 # v2.3.1
-        if: steps.nim.outputs.cache-hit != 'true'
         with:
           nim-version: ${{ env.NIM_VERSION }}
-      # setup-nim always reinstalls, so a restored compiler only needs its PATH entry.
-      - name: Use the restored Nim
-        if: steps.nim.outputs.cache-hit == 'true'
-        run: echo "$GITHUB_WORKSPACE/.nim_runtime/bin" >> "$GITHUB_PATH"
-      # The nimble bundled with Nim cannot resolve nim-sds through the bindings.
-      - name: Install nimble
-        run: |
-          mkdir -p "$RUNNER_TEMP/nimble"
-          curl -sSfL --retry 5 --retry-all-errors \
-            "https://github.com/nim-lang/nimble/releases/download/v$NIMBLE_VERSION/nimble-macosx_aarch64.tar.gz" |
-            tar -xz -C "$RUNNER_TEMP/nimble"
-          echo "$RUNNER_TEMP/nimble" >> "$GITHUB_PATH"
+          nimble-version: ${{ env.NIMBLE_VERSION }}
       - uses: arduino/setup-protoc@c65c819552d16ad3c9b72d9dfd5ba5237b9c906b # v3.0.0
         with:
           version: ${{ env.PROTOC_VERSION }}
@@ -145,19 +126,12 @@ jobs:
             build/libsds.a
           if-no-files-found: error
           retention-days: 7
-      # The C sources and objects a compiler was built from are 1.9 GB each and
-      # are not needed to run it.
-      - name: Trim the Nim build trees
-        if: steps.nim.outputs.cache-hit != 'true'
-        run: |
-          rm -rf .nim_runtime/c_code .nim_runtime/nimcache \
-            nimbledeps/pkgs2/nim-*/c_code nimbledeps/pkgs2/nim-*/nimcache
-          du -sh .nim_runtime nimbledeps
-      - name: Save Nim compilers
-        if: steps.nim.outputs.cache-hit != 'true'
-        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+      # develop owns the cache. A pull request saves one only while there is nothing
+      # to restore, so pull requests cannot fill the repository quota.
+      - name: Save Nim
+        if: >-
+          steps.nim.outputs.cache-hit != 'true' &&
+          (github.ref == 'refs/heads/develop' || steps.nim.outputs.cache-matched-key == '')
+        uses: ./.github/actions/nim/save
         with:
-          path: |
-            .nim_runtime
-            nimbledeps
-          key: ${{ steps.nim.outputs.cache-primary-key }}
+          key: ${{ steps.nim.outputs.cache-key }}
