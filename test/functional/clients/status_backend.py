@@ -436,7 +436,13 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
         return self.api_request_json(method, data)
 
     def restore_keycard_account_and_login(
-        self, keycard: dict, keycard_instance_uid: str, keycard_pairing_key: str, password: str | None = None, **kwargs
+        self,
+        keycard: dict,
+        keycard_instance_uid: str,
+        keycard_pairing_key: str,
+        password: str | None = None,
+        keycard_secure_channel_v2: bool = False,
+        **kwargs,
     ):
         self._set_display_name(**kwargs)
         method = "RestoreAccountAndLogin"
@@ -446,6 +452,7 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
         data["keycard"] = keycard
         data["keycardInstanceUID"] = keycard_instance_uid
         data["keycardPairingKey"] = keycard_pairing_key
+        data["keycardSecureChannelV2"] = keycard_secure_channel_v2
         self._boot_api_config = copy.deepcopy(data.get("apiConfig", {}))
         self._mark_login_signal()
         return self.api_request_json(method, data)

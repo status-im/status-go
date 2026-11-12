@@ -110,6 +110,7 @@ class TestConvertProfileKeypairToKeycard:
         added = [a for a in kp3["accounts"] if a["path"] == next_path]
         assert len(added) == 1, "Expected the empty-password add_account to succeed because the keycard migration retains the stored xpub"
 
+    @pytest.mark.spec("SC-APLT-10")
     def test_convert_keycard_without_pairing(self, backend):
         """Applet 4.x keycards (SecureChannelV2) have no pairing: the conversion stores a marker instead."""
         key_uid = backend.key_uid
@@ -124,6 +125,7 @@ class TestConvertProfileKeypairToKeycard:
             keycard_pairing_of(backend.reinit_and_get_accounts(), key_uid) == "secure-channel-v2"
         ), "Expected the marker stored because a non-empty keycard-pairing is what marks a keycard account"
 
+    @pytest.mark.spec("SC-APLT-11")
     def test_convert_without_pairing_or_secure_channel_v2_is_rejected(self, backend):
         key_uid = backend.key_uid
         kp0 = self._profile_precondition(backend)
