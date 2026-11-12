@@ -23,17 +23,8 @@ jobs:
           fetch-depth: 0
           filter: blob:none
           persist-credentials: false
-      - name: Restore Go caches
-        id: cache
-        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
-        with:
-          path: |
-            ~/.cache/status-go-toolchain/go-build
-            ~/.cache/status-go-toolchain/go-mod
-          key: toolchain-linux-x86_64-${{ hashFiles('go.sum') }}
-          restore-keys: toolchain-linux-x86_64-
-      - name: Toolchain image
-        run: scripts/toolchain.sh go version
+      - uses: ./.github/actions/toolchain
+        id: toolchain
       - name: Static library
         run: scripts/toolchain.sh make statusgo-library
       - name: Shared library
@@ -51,10 +42,10 @@ jobs:
           retention-days: 7
       # Pull requests only read the cache, so they cannot fill the repository quota.
       - name: Save Go caches
-        if: github.ref == 'refs/heads/develop' && steps.cache.outputs.cache-hit != 'true'
+        if: github.ref == 'refs/heads/develop' && steps.toolchain.outputs.cache-hit != 'true'
         uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: |
             ~/.cache/status-go-toolchain/go-build
             ~/.cache/status-go-toolchain/go-mod
-          key: toolchain-linux-x86_64-${{ hashFiles('go.sum') }}
+          key: ${{ steps.toolchain.outputs.cache-key }}
