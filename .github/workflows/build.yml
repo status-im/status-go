@@ -1,0 +1,60 @@
+name: Build
+on:
+  pull_request:
+  push:
+    branches:
+      - develop
+      - 'release/**'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+jobs:
+  linux:
+    name: linux/x86_64
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          # scripts/version.sh describes the commit from the nearest tag
+          fetch-depth: 0
+          filter: blob:none
+          persist-credentials: false
+      - name: Restore Go caches
+        id: cache
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            ~/.cache/status-go-toolchain/go-build
+            ~/.cache/status-go-toolchain/go-mod
+          key: toolchain-linux-x86_64-${{ hashFiles('go.sum') }}
+          restore-keys: toolchain-linux-x86_64-
+      - name: Toolchain image
+        run: scripts/toolchain.sh go version
+      - name: Static library
+        run: scripts/toolchain.sh make statusgo-library
+      - name: Shared library
+        run: scripts/toolchain.sh make statusgo-shared-library
+      - name: Upload libraries
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: status-go-linux-x86_64
+          path: |
+            build/bin/libstatus.a
+            build/bin/libstatus.h
+            build/bin/libstatus.so.0
+            build/libsds.so
+          if-no-files-found: error
+          retention-days: 7
+      # Pull requests only read the cache, so they cannot fill the repository quota.
+      - name: Save Go caches
+        if: github.ref == 'refs/heads/develop' && steps.cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            ~/.cache/status-go-toolchain/go-build
+            ~/.cache/status-go-toolchain/go-mod
+          key: toolchain-linux-x86_64-${{ hashFiles('go.sum') }}

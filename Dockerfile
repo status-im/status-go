@@ -1,5 +1,6 @@
-# Build status-go in a Go builder container
-FROM golang:1.26.5-trixie AS builder
+# Toolchain for building and testing status-go: Go, clang, protoc, Nim, nimble.
+# CI publishes this stage on its own: docker build --target toolchain .
+FROM golang:1.26.5-trixie AS toolchain
 
 # Set environment variables to use Clang
 ENV CC=clang
@@ -84,6 +85,9 @@ RUN set -eu && \
     chmod +x /opt/nimble/bin/nimble
 
 ENV PATH="/opt/nimble/bin:${PATH}"
+
+# Build status-go in the toolchain container
+FROM toolchain AS builder
 
 ARG build_tags='gowaku_no_rln'
 ARG build_flags=''
