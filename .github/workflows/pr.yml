@@ -22,6 +22,10 @@ jobs:
           # Its own cache is saved again by every pull request.
           cache: false
 
+      # Its pattern takes the generator's progress lines for compile errors.
+      - name: Remove the Go problem matcher
+        run: echo "::remove-matcher owner=go::"
+
       - uses: ./.github/actions/go-cache
         with:
           name: lint-linux-x86_64
