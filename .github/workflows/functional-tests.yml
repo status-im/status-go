@@ -42,6 +42,10 @@ jobs:
       # does not go through the toolchain container.
       - name: Functional tests
         run: make test-functional USE_LOGOS_STORAGE=true
+      # Log file names carry test parameters with characters artifacts do not allow.
+      - name: Pack the logs
+        if: always()
+        run: tar -czf test/functional/logs.tar.gz -C test/functional logs
       - name: Upload reports
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -49,7 +53,7 @@ jobs:
           name: functional-test-reports-rpc
           path: |
             test/functional/reports/*.xml
-            test/functional/logs/*.log
+            test/functional/logs.tar.gz
             test/functional/coverage/coverage.html
           if-no-files-found: ignore
           retention-days: 14
@@ -80,6 +84,9 @@ jobs:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Compatibility tests
         run: make test-functional-compatibility
+      - name: Pack the logs
+        if: always()
+        run: tar -czf test/functional/logs.tar.gz -C test/functional logs
       - name: Upload reports
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -87,6 +94,6 @@ jobs:
           name: functional-test-reports-rpc-compat
           path: |
             test/functional/reports/*.xml
-            test/functional/logs/*.log
+            test/functional/logs.tar.gz
           if-no-files-found: ignore
           retention-days: 14
