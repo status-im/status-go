@@ -5,6 +5,8 @@ on:
     branches:
       - develop
       - 'release/**'
+      # Temporary: runs the workflow before a pull request exists.
+      - ab/issue-23128-gh-macos-build
   workflow_dispatch:
 permissions:
   contents: read
@@ -12,8 +14,26 @@ concurrency:
   group: build-macos-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
-  macos:
-    name: macos/aarch64
+  # One runner per library: the two builds do not wait for each other.
+  libraries:
+    name: macos/aarch64 (${{ matrix.library }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - library: static
+            target: statusgo-library
+            files: |
+              build/bin/libstatus.a
+              build/bin/libstatus.h
+          - library: shared
+            target: statusgo-shared-library
+            files: |
+              build/bin/libstatus.dylib
+              build/bin/libstatus.h
+              build/libsds.dylib
+    # No Nix: without the Status caches the dev shell fetches 2 GiB and builds
+    # 95 derivations on an empty runner. libsds and libtkl are built here instead.
     # GitHub's macOS 15 runners are Apple Silicon.
     runs-on: macos-15
     timeout-minutes: 60
@@ -92,20 +112,48 @@ jobs:
         run: |
           echo "NIM_SDS_LIB_DIR=$GITHUB_WORKSPACE/build" >> "$GITHUB_ENV"
           echo "NIM_SDS_INC_DIR=$GITHUB_WORKSPACE/build" >> "$GITHUB_ENV"
-      - name: Generate
-        run: make generate
-      - name: Static library
-        run: make statusgo-library
-      - name: Shared library
-        run: make statusgo-shared-library
-      - name: Upload libraries
+      - name: Restore Go caches
+        id: go-cache
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            ~/Library/Caches/go-build
+            ~/go/pkg/mod
+          key: go-macos-aarch64-${{ hashFiles('go.sum') }}
+          restore-keys: go-macos-aarch64-
+      # The target generates the code itself, once.
+      - name: Library
+        run: make ${{ matrix.target }}
+      - name: Upload library
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: status-go-macos-aarch64
-          path: |
-            build/bin/libstatus.a
-            build/bin/libstatus.h
-            build/bin/libstatus.dylib
-            build/libsds.dylib
+          name: status-go-macos-aarch64-${{ matrix.library }}
+          path: ${{ matrix.files }}
           if-no-files-found: error
           retention-days: 7
+      # One job writes the cache, so the key has one owner. develop owns it; a pull
+      # request saves one only while there is nothing to restore.
+      - name: Save Go caches
+        if: >-
+          matrix.library == 'static' && steps.go-cache.outputs.cache-hit != 'true' &&
+          (github.ref == 'refs/heads/develop' || steps.go-cache.outputs.cache-matched-key == '')
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            ~/Library/Caches/go-build
+            ~/go/pkg/mod
+          key: go-macos-aarch64-${{ hashFiles('go.sum') }}
+
+  # One check name for branch rules.
+  macos:
+    name: macos/aarch64
+    if: always()
+    needs: libraries
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - env:
+          LIBRARIES: ${{ needs.libraries.result }}
+        run: |
+          echo "libraries: $LIBRARIES"
+          [ "$LIBRARIES" = success ]
