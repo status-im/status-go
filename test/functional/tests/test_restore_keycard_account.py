@@ -59,9 +59,9 @@ class TestRestoreKeycardAccount:
         backend.init_status_backend()
         return backend
 
-    def _restore(self, backend, card, pairing_key=KEYCARD_PAIRING_KEY, instance_uid=KEYCARD_INSTANCE_UID):
+    def _restore(self, backend, card, pairing_key=KEYCARD_PAIRING_KEY, instance_uid=KEYCARD_INSTANCE_UID, secure_channel_v2=False):
         with backend.expect_signal(SignalType.NODE_LOGIN, timeout=60) as exp:
-            backend.restore_keycard_account_and_login(card, instance_uid, pairing_key)
+            backend.restore_keycard_account_and_login(card, instance_uid, pairing_key, keycard_secure_channel_v2=secure_channel_v2)
         return exp.result["event"]
 
     def test_restore_an_account_that_already_lives_on_a_keycard(self, restoring, card):
@@ -141,3 +141,17 @@ class TestRestoreKeycardAccount:
         assert "keycard pairings" in event.get("error", ""), event.get("error")
 
         assert (restoring.init_status_backend().get("accounts") or []) == [], "Expected no account to survive a restore that failed the pairings gate"
+
+    @pytest.mark.spec("SC-APLT-08")
+    def test_restore_via_keycard_without_pairing(self, restoring, card):
+        """Applet 4.x keycards (SecureChannelV2) have no pairing: the restore skips the pairings file and stores a marker instead."""
+        event = self._restore(restoring, card, pairing_key="", secure_channel_v2=True)
+        assert not event.get("error"), event.get("error")
+        assert event["account"]["key-uid"] == card["keyUID"], "Expected the restored profile to keep the card's key-uid"
+
+        keypair = restoring.accounts_service.get_keypair_by_key_uid(card["keyUID"])
+        assert keypair["cold-wallet"] == "status-keycard", "Expected the restored profile keypair to be flagged as card backed"
+
+        assert (
+            keycard_pairing_of(restoring.reinit_and_get_accounts(), card["keyUID"]) == "secure-channel-v2"
+        ), "Expected the marker stored because a non-empty keycard-pairing is what marks a keycard account"

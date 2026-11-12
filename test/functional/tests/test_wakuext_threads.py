@@ -107,6 +107,15 @@ class TestWakuextThreads:
     async def receiver(self, async_backend_new_profile, waku_light_client):
         return await async_backend_new_profile("receiver", waku_light_client=waku_light_client)
 
+    @pytest.mark.spec("SC-THRD-01")
+    @pytest.mark.spec("SC-THRD-03")
+    @pytest.mark.spec("SC-THRD-04")
+    @pytest.mark.spec("SC-THRD-06")
+    @pytest.mark.spec("SC-THRD-07")
+    @pytest.mark.spec("SC-THRD-10")
+    @pytest.mark.spec("SC-THRD-20")
+    @pytest.mark.spec("SC-THRD-25")
+    @pytest.mark.spec("SC-THRD-26")
     @pytest.mark.parametrize("chat_kind", list(ChatKind), ids=lambda kind: kind.value)
     async def test_thread_reply_does_not_unread_parent_chat(self, sender, receiver, chat_kind):
         sender_chat_id, receiver_chat_id, community_id = await _open_shared_chat(sender, receiver, chat_kind)
@@ -201,6 +210,7 @@ class TestWakuextThreadExtras:
     async def receiver(self, async_backend_new_profile, waku_light_client):
         return await async_backend_new_profile("receiver", waku_light_client=waku_light_client)
 
+    @pytest.mark.spec("SC-THRD-02")
     async def test_start_thread_from_new_message(self, sender, receiver):
         sender_chat_id = receiver.public_key
         receiver_chat_id = sender.public_key
@@ -226,6 +236,7 @@ class TestWakuextThreadExtras:
         received = _thread(receiver.wakuext_service.chat_threads(receiver_chat_id), root["id"])
         assert received["name"] == thread_name
 
+    @pytest.mark.spec("SC-THRD-23")
     async def test_thread_reply_reaction_stays_in_thread(self, sender, receiver):
         parent_text = f"parent-{uuid4()}"
         reply_text = f"reply-{uuid4()}"
@@ -245,6 +256,7 @@ class TestWakuextThreadExtras:
         assert any(item.get("messageId") == reply_id and item.get("emoji") == "2764" for item in thread_reactions)
         assert all(item.get("messageId") != parent_id for item in thread_reactions)
 
+    @pytest.mark.spec("SC-THRD-29")
     async def test_thread_search_finds_reply_not_sibling(self, sender, receiver):
         chat_id, _, _ = await _open_shared_chat(sender, receiver, ChatKind.PRIVATE_GROUP)
         parent_text = f"parent-{uuid4()}"
@@ -265,6 +277,8 @@ class TestWakuextThreadExtras:
         missed = receiver.wakuext_service.all_messages_from_thread_which_match_term(chat_id, parent_id, sibling_text, False)
         assert sibling_text not in _texts(missed)
 
+    @pytest.mark.spec("SC-THRD-06")
+    @pytest.mark.spec("SC-THRD-10")
     async def test_community_member_can_create_thread(self, sender, receiver):
         sender_chat_id, receiver_chat_id, _ = await _open_shared_chat(sender, receiver, ChatKind.COMMUNITY)
         parent_text = f"parent-{uuid4()}"
@@ -297,6 +311,8 @@ class TestWakuextThreadExtras:
         assert _thread(sender.wakuext_service.chat_threads(sender_chat_id), root["id"])["name"] == thread_name
         assert first_reply_text in _texts(sender.wakuext_service.chat_messages_in_thread(sender_chat_id, root["id"], limit=20))
 
+    @pytest.mark.spec("SC-THRD-06")
+    @pytest.mark.spec("SC-THRD-10")
     async def test_community_member_can_reply_in_admin_thread(self, sender, receiver):
         sender_chat_id, receiver_chat_id, _ = await _open_shared_chat(sender, receiver, ChatKind.COMMUNITY)
         parent_text = f"parent-{uuid4()}"
@@ -336,6 +352,7 @@ class TestWakuextThreadRename:
     async def receiver(self, async_backend_new_profile, waku_light_client):
         return await async_backend_new_profile("receiver", waku_light_client=waku_light_client)
 
+    @pytest.mark.spec("SC-THRD-03")
     async def test_thread_rename_reaches_the_peer(self, sender, receiver):
         parent_text = f"parent-{uuid4()}"
         reply_text = f"reply-{uuid4()}"
@@ -362,6 +379,7 @@ class TestWakuextThreadActivityCenter:
     async def receiver(self, async_backend_new_profile):
         return await async_backend_new_profile("receiver")
 
+    @pytest.mark.spec("SC-THRD-27")
     @pytest.mark.parametrize("chat_kind", [ChatKind.PRIVATE_GROUP, ChatKind.COMMUNITY], ids=lambda kind: kind.value)
     async def test_mention_and_reply_in_thread_expose_thread_name(self, sender, receiver, chat_kind):
         sender_chat_id, receiver_chat_id, _ = await _open_shared_chat(sender, receiver, chat_kind)
@@ -421,6 +439,7 @@ class TestWakuextThreadMute:
     async def receiver(self, async_backend_new_profile, waku_light_client):
         return await async_backend_new_profile("receiver", waku_light_client=waku_light_client)
 
+    @pytest.mark.spec("SC-THRD-18")
     async def test_muted_thread_skips_notifications_until_unmuted(self, sender, receiver):
         sender_chat_id, receiver_chat_id, _ = await _open_shared_chat(sender, receiver, ChatKind.PRIVATE_GROUP)
         parent_text = f"parent-{uuid4()}"
