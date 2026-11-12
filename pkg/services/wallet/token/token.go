@@ -17,6 +17,7 @@ import (
 
 	"golang.org/x/exp/maps"
 
+	"github.com/status-im/status-go/internal/signal"
 	"github.com/status-im/status-go/pkg/services/wallet/token/tklmanager"
 	types "github.com/status-im/status-go/pkg/services/wallet/token/tokenlist"
 
@@ -76,6 +77,8 @@ type ManagerInterface interface {
 
 // Manager is used for accessing token store. It changes the token store based on overridden tokens
 type Manager struct {
+	// The backend session the manager runs in; its signals are sent in it.
+	signalSession              signal.Session
 	walletDB                   *sql.DB
 	settings                   *settings.Database
 	ethClientGetter            rpc.EthClientGetter
@@ -128,6 +131,7 @@ func NewTokenManager(
 	}
 
 	manager := &Manager{
+		signalSession:              signal.CurrentSession(),
 		walletDB:                   walletDB,
 		settings:                   settings,
 		ethClientGetter:            ethClientGetter,

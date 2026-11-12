@@ -18,6 +18,7 @@ import (
 	"github.com/status-im/status-go/internal/db/multiaccounts/accounts"
 	"github.com/status-im/status-go/internal/logutils"
 	"github.com/status-im/status-go/internal/rpc"
+	"github.com/status-im/status-go/internal/signal"
 	"github.com/status-im/status-go/internal/traffic"
 	"github.com/status-im/status-go/internal/transactions"
 	"github.com/status-im/status-go/pkg/services/wallet/common"
@@ -137,7 +138,8 @@ func NewService(
 	tokenManager *token.Manager,
 ) (*Service, error) {
 	signals := &walletevent.SignalsTransmitter{
-		Publisher: feed,
+		Publisher:     feed,
+		SignalSession: signal.CurrentSession(),
 	}
 	communityManager := community.NewManager(db, mediaServer, feed)
 

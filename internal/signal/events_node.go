@@ -41,7 +41,12 @@ type NodeLoginEvent struct {
 // SendNodeCrashed emits a signal when status node has crashed, and
 // provides error description.
 func SendNodeCrashed(err error) {
-	send(EventNodeCrashed,
+	CurrentSession().SendNodeCrashed(err)
+}
+
+// SendNodeCrashed sends in the session s.
+func (s Session) SendNodeCrashed(err error) {
+	s.send(EventNodeCrashed,
 		NodeCrashEvent{
 			Error: err.Error(),
 		})
@@ -50,24 +55,44 @@ func SendNodeCrashed(err error) {
 // SendNodeStarted emits a signal when status node has just started (but not
 // finished startup yet).
 func SendNodeStarted() {
-	send(EventNodeStarted, nil)
+	CurrentSession().SendNodeStarted()
+}
+
+// SendNodeStarted sends in the session s.
+func (s Session) SendNodeStarted() {
+	s.send(EventNodeStarted, nil)
 }
 
 // SendNodeReady emits a signal when status node has started and successfully
 // completed startup.
 func SendNodeReady() {
-	send(EventNodeReady, nil)
+	CurrentSession().SendNodeReady()
+}
+
+// SendNodeReady sends in the session s.
+func (s Session) SendNodeReady() {
+	s.send(EventNodeReady, nil)
 }
 
 // SendNodeStopped emits a signal when underlying node has stopped.
 func SendNodeStopped() {
-	send(EventNodeStopped, nil)
+	CurrentSession().SendNodeStopped()
+}
+
+// SendNodeStopped sends in the session s.
+func (s Session) SendNodeStopped() {
+	s.send(EventNodeStopped, nil)
 }
 
 func SendLoggedIn(account *multiaccounts.Account, settings *settings.Settings, ensUsernames json.RawMessage, err error) {
+	CurrentSession().SendLoggedIn(account, settings, ensUsernames, err)
+}
+
+// SendLoggedIn sends in the session s.
+func (s Session) SendLoggedIn(account *multiaccounts.Account, settings *settings.Settings, ensUsernames json.RawMessage, err error) {
 	event := NodeLoginEvent{Settings: settings, Account: account, EnsUsernames: ensUsernames}
 	if err != nil {
 		event.Error = err.Error()
 	}
-	send(EventLoggedIn, event)
+	s.send(EventLoggedIn, event)
 }

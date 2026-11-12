@@ -12,5 +12,10 @@ const (
 type BlockchainHealthChangedSignal healthmanager.BlockchainFullStatus
 
 func SendNetworksBlockchainHealthChanged(status healthmanager.BlockchainFullStatus) {
-	send(EventNetworksBlockchainHealthChanged, BlockchainHealthChangedSignal(status))
+	CurrentSession().SendNetworksBlockchainHealthChanged(status)
+}
+
+// SendNetworksBlockchainHealthChanged sends in the session s.
+func (s Session) SendNetworksBlockchainHealthChanged(status healthmanager.BlockchainFullStatus) {
+	s.send(EventNetworksBlockchainHealthChanged, BlockchainHealthChangedSignal(status))
 }

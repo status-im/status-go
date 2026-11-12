@@ -18,9 +18,19 @@ type CommunityMemberReevaluationSignal struct {
 }
 
 func SendCommunityMemberReevaluationStarted(communityID string) {
-	send(MemberReevaluationStatus, CommunityMemberReevaluationSignal{CommunityID: communityID, Status: InProgress})
+	CurrentSession().SendCommunityMemberReevaluationStarted(communityID)
+}
+
+// SendCommunityMemberReevaluationStarted sends in the session s.
+func (s Session) SendCommunityMemberReevaluationStarted(communityID string) {
+	s.send(MemberReevaluationStatus, CommunityMemberReevaluationSignal{CommunityID: communityID, Status: InProgress})
 }
 
 func SendCommunityMemberReevaluationEnded(communityID string) {
-	send(MemberReevaluationStatus, CommunityMemberReevaluationSignal{CommunityID: communityID, Status: Done})
+	CurrentSession().SendCommunityMemberReevaluationEnded(communityID)
+}
+
+// SendCommunityMemberReevaluationEnded sends in the session s.
+func (s Session) SendCommunityMemberReevaluationEnded(communityID string) {
+	s.send(MemberReevaluationStatus, CommunityMemberReevaluationSignal{CommunityID: communityID, Status: Done})
 }

@@ -89,19 +89,39 @@ type IndexDownloadCompletedSignal struct {
 }
 
 func SendHistoryArchivesProtocolEnabled() {
-	send(EventHistoryArchivesProtocolEnabled, nil)
+	CurrentSession().SendHistoryArchivesProtocolEnabled()
+}
+
+// SendHistoryArchivesProtocolEnabled sends in the session s.
+func (s Session) SendHistoryArchivesProtocolEnabled() {
+	s.send(EventHistoryArchivesProtocolEnabled, nil)
 }
 
 func SendHistoryArchivesProtocolDisabled() {
-	send(EventHistoryArchivesProtocolDisabled, nil)
+	CurrentSession().SendHistoryArchivesProtocolDisabled()
+}
+
+// SendHistoryArchivesProtocolDisabled sends in the session s.
+func (s Session) SendHistoryArchivesProtocolDisabled() {
+	s.send(EventHistoryArchivesProtocolDisabled, nil)
 }
 
 func SendCreatingHistoryArchives(communityID string) {
-	send(EventCreatingHistoryArchives, CreatingHistoryArchivesSignal{CommunityID: communityID})
+	CurrentSession().SendCreatingHistoryArchives(communityID)
+}
+
+// SendCreatingHistoryArchives sends in the session s.
+func (s Session) SendCreatingHistoryArchives(communityID string) {
+	s.send(EventCreatingHistoryArchives, CreatingHistoryArchivesSignal{CommunityID: communityID})
 }
 
 func SendNoHistoryArchivesCreated(communityID string, from int, to int) {
-	send(EventNoHistoryArchivesCreated, NoHistoryArchivesCreatedSignal{
+	CurrentSession().SendNoHistoryArchivesCreated(communityID, from, to)
+}
+
+// SendNoHistoryArchivesCreated sends in the session s.
+func (s Session) SendNoHistoryArchivesCreated(communityID string, from int, to int) {
+	s.send(EventNoHistoryArchivesCreated, NoHistoryArchivesCreatedSignal{
 		CommunityID: communityID,
 		From:        from,
 		To:          to,
@@ -109,7 +129,12 @@ func SendNoHistoryArchivesCreated(communityID string, from int, to int) {
 }
 
 func SendHistoryArchivesCreated(communityID string, from int, to int) {
-	send(EventHistoryArchivesCreated, HistoryArchivesCreatedSignal{
+	CurrentSession().SendHistoryArchivesCreated(communityID, from, to)
+}
+
+// SendHistoryArchivesCreated sends in the session s.
+func (s Session) SendHistoryArchivesCreated(communityID string, from int, to int) {
+	s.send(EventHistoryArchivesCreated, HistoryArchivesCreatedSignal{
 		CommunityID: communityID,
 		From:        from,
 		To:          to,
@@ -117,15 +142,30 @@ func SendHistoryArchivesCreated(communityID string, from int, to int) {
 }
 
 func SendHistoryArchivesSeeding(communityID string) {
-	send(EventHistoryArchivesSeeding, HistoryArchivesSeedingSignal{CommunityID: communityID})
+	CurrentSession().SendHistoryArchivesSeeding(communityID)
+}
+
+// SendHistoryArchivesSeeding sends in the session s.
+func (s Session) SendHistoryArchivesSeeding(communityID string) {
+	s.send(EventHistoryArchivesSeeding, HistoryArchivesSeedingSignal{CommunityID: communityID})
 }
 
 func SendHistoryArchivesUnseeded(communityID string) {
-	send(EventHistoryArchivesUnseeded, HistoryArchivesUnseededSignal{CommunityID: communityID})
+	CurrentSession().SendHistoryArchivesUnseeded(communityID)
+}
+
+// SendHistoryArchivesUnseeded sends in the session s.
+func (s Session) SendHistoryArchivesUnseeded(communityID string) {
+	s.send(EventHistoryArchivesUnseeded, HistoryArchivesUnseededSignal{CommunityID: communityID})
 }
 
 func SendHistoryArchiveDownloaded(communityID string, from int, to int) {
-	send(EventHistoryArchiveDownloaded, HistoryArchiveDownloadedSignal{
+	CurrentSession().SendHistoryArchiveDownloaded(communityID, from, to)
+}
+
+// SendHistoryArchiveDownloaded sends in the session s.
+func (s Session) SendHistoryArchiveDownloaded(communityID string, from int, to int) {
+	s.send(EventHistoryArchiveDownloaded, HistoryArchiveDownloadedSignal{
 		CommunityID: communityID,
 		From:        from,
 		To:          to,
@@ -133,25 +173,45 @@ func SendHistoryArchiveDownloaded(communityID string, from int, to int) {
 }
 
 func SendDownloadingHistoryArchivesStarted(communityID string) {
-	send(EventDownloadingHistoryArchivesStarted, DownloadingHistoryArchivesStartedSignal{
+	CurrentSession().SendDownloadingHistoryArchivesStarted(communityID)
+}
+
+// SendDownloadingHistoryArchivesStarted sends in the session s.
+func (s Session) SendDownloadingHistoryArchivesStarted(communityID string) {
+	s.send(EventDownloadingHistoryArchivesStarted, DownloadingHistoryArchivesStartedSignal{
 		CommunityID: communityID,
 	})
 }
 
 func SendImportingHistoryArchiveMessages(communityID string) {
-	send(EventImportingHistoryArchiveMessages, ImportingHistoryArchiveMessagesSignal{
+	CurrentSession().SendImportingHistoryArchiveMessages(communityID)
+}
+
+// SendImportingHistoryArchiveMessages sends in the session s.
+func (s Session) SendImportingHistoryArchiveMessages(communityID string) {
+	s.send(EventImportingHistoryArchiveMessages, ImportingHistoryArchiveMessagesSignal{
 		CommunityID: communityID,
 	})
 }
 
 func SendDownloadingHistoryArchivesFinished(communityID string) {
-	send(EventDownloadingHistoryArchivesFinished, DownloadingHistoryArchivesFinishedSignal{
+	CurrentSession().SendDownloadingHistoryArchivesFinished(communityID)
+}
+
+// SendDownloadingHistoryArchivesFinished sends in the session s.
+func (s Session) SendDownloadingHistoryArchivesFinished(communityID string) {
+	s.send(EventDownloadingHistoryArchivesFinished, DownloadingHistoryArchivesFinishedSignal{
 		CommunityID: communityID,
 	})
 }
 
 func SendIndexDownloadCompleted(communityID string, indexCid string) {
-	send(EventIndexDownloadCompleted, IndexDownloadCompletedSignal{
+	CurrentSession().SendIndexDownloadCompleted(communityID, indexCid)
+}
+
+// SendIndexDownloadCompleted sends in the session s.
+func (s Session) SendIndexDownloadCompleted(communityID string, indexCid string) {
+	s.send(EventIndexDownloadCompleted, IndexDownloadCompletedSignal{
 		CommunityID: communityID,
 		IndexCid:    indexCid,
 	})

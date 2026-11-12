@@ -5,6 +5,17 @@ type APIResponse struct {
 	Error string `json:"error"`
 }
 
+// LogoutResponse is the response of Logout.
+type LogoutResponse struct {
+	Error       string `json:"error"`
+	SignalEpoch uint64 `json:"signalEpoch"`
+}
+
+// SignalEpochResponse is the response of SignalEpoch.
+type SignalEpochResponse struct {
+	SignalEpoch uint64 `json:"signalEpoch"`
+}
+
 // APIKeyUIDResponse
 type APIKeyUIDResponse struct {
 	KeyUID string `json:"keyUID"`

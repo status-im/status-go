@@ -10,6 +10,7 @@ extern void SetEventCallback(void *cb);
 import "C"
 import (
 	"encoding/json"
+	"sync/atomic"
 	"time"
 	"unsafe"
 
@@ -29,25 +30,75 @@ var signalHandler Handler
 // All general log messages in this package should be routed through this logger.
 var logger = logutils.ZapLogger().Named("signal")
 
+// epoch identifies the backend session that produced a signal. It starts at 1 so
+// a client can treat a missing or zero epoch as invalid, and only advances when a
+// client explicitly logs out (see AdvanceEpoch).
+var epoch atomic.Uint64
+
+func init() {
+	epoch.Store(1)
+}
+
+// Epoch returns the epoch stamped on signals sent from now on.
+func Epoch() uint64 {
+	return epoch.Load()
+}
+
+// AdvanceEpoch starts a new signal epoch and returns it. Clients that log out and
+// back in within the same process use the epoch to reject signals the previous
+// session queued before the logout but which are delivered after it.
+func AdvanceEpoch() uint64 {
+	return epoch.Add(1)
+}
+
 // Envelope is a general signal sent upward from node to RN app
 type Envelope struct {
 	Type      string      `json:"type"`
+	Epoch     uint64      `json:"epoch"`
 	Event     interface{} `json:"event"`
 	Timestamp int64       `json:"timestamp"`
 }
 
+// Session is a backend session, identified by its signal epoch. Objects created for a
+// session keep the session they were created in and send their signals through it, so
+// a signal keeps its session's epoch however late it is sent: work that is still
+// running after a logout must not reach the client as the next session's.
+// The zero value sends in the current session.
+type Session struct {
+	epoch uint64
+}
+
+// CurrentSession returns the session signals are sent in from now on.
+func CurrentSession() Session {
+	return Session{epoch: Epoch()}
+}
+
+func (s Session) send(typ string, event interface{}) {
+	epoch := s.epoch
+	if epoch == 0 {
+		epoch = Epoch()
+	}
+	sendInEpoch(epoch, typ, event)
+}
+
 // newEnvelope creates new envelope of given type and event payload.
-func newEnvelope(typ string, event interface{}) *Envelope {
+func newEnvelope(epoch uint64, typ string, event interface{}) *Envelope {
 	return &Envelope{
 		Type:      typ,
+		Epoch:     epoch,
 		Event:     event,
 		Timestamp: time.Now().Unix(),
 	}
 }
 
-// send sends application signal (in JSON) upwards to application via go or C callback.
+// send sends application signal (in JSON) upwards to application via go or C callback,
+// in the current session.
 func send(typ string, event interface{}) {
-	signal := newEnvelope(typ, event)
+	sendInEpoch(Epoch(), typ, event)
+}
+
+func sendInEpoch(epoch uint64, typ string, event interface{}) {
+	signal := newEnvelope(epoch, typ, event)
 	data, err := json.Marshal(&signal)
 	if err != nil {
 		logger.Error("Marshalling signal envelope", zap.Error(err))

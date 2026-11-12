@@ -203,3 +203,36 @@ func TestServiceStopAlwaysCancelsAStartedCollection(t *testing.T) {
 		}
 	}
 }
+
+// A collection still running when the client logs out sends its (cancelled) result
+// after the logout started the next session. It must carry the session it belongs to,
+// so the client does not hand it to the next session.
+func TestResultSentAfterLogoutKeepsItsSession(t *testing.T) {
+	appDB := setupAppDB(t)
+	seedAccount(t, appDB, setupWalletDB(t))
+
+	epochs := make(chan uint64, 8)
+	signal.SetHandler(func(data []byte) {
+		var e signal.Envelope
+		if err := json.Unmarshal(data, &e); err == nil && e.Type == signal.EventStorageStatsResult {
+			epochs <- e.Epoch
+		}
+	})
+	t.Cleanup(signal.ResetHandler)
+
+	s := New(appDB, nil, zap.NewNop())
+	session := signal.Epoch()
+	_, err := s.StartCollect()
+	require.NoError(t, err)
+
+	// The logout: the node stops its services, then the next session starts.
+	require.NoError(t, s.Stop())
+	signal.AdvanceEpoch()
+
+	select {
+	case epoch := <-epochs:
+		require.Equal(t, session, epoch)
+	case <-time.After(60 * time.Second):
+		t.Fatal("no storage-stats.result signal arrived")
+	}
+}

@@ -20,6 +20,8 @@ type Publisher interface {
 // SignalsTransmitter transmits received events as wallet signals.
 type SignalsTransmitter struct {
 	Publisher
+	// The backend session the transmitter runs in; its signals are sent in it.
+	SignalSession signal.Session
 
 	wg   sync.WaitGroup
 	quit chan struct{}
@@ -53,7 +55,7 @@ func (tmr *SignalsTransmitter) Start(ctx context.Context) error {
 				return
 			case event := <-events:
 				if !event.Type.IsInternal() {
-					signal.SendWalletEvent(signal.Wallet, event)
+					tmr.SignalSession.SendWalletEvent(signal.Wallet, event)
 				}
 			}
 		}
