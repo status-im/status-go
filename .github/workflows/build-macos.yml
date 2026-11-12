@@ -37,13 +37,13 @@ jobs:
           version: '36.0'
           repo-token: ${{ secrets.GITHUB_TOKEN }}
       # Prebuilt compilers: setup-nim-action builds Nim from source on macOS,
-      # about five minutes for each of the two.
+      # about five minutes for each one.
       - name: Nim and nimble
         run: |
           tools="$RUNNER_TEMP/toolchain"
           nightlies=https://github.com/nim-lang/nightlies/releases/download
           fetch() { # <directory> <sha256> <url> [tar options]
-            local dir="$tools/$1" sum="$2" url="$3"
+            local dir="$1" sum="$2" url="$3"
             shift 3
             mkdir -p "$dir"
             curl -sSfL --retry 5 --retry-all-errors -o "$RUNNER_TEMP/download" "$url"
@@ -51,15 +51,20 @@ jobs:
             tar -xf "$RUNNER_TEMP/download" -C "$dir" "$@"
           }
           # Nim 2.2.4
-          fetch nim 86391e69225feae2c8ea54eadf560307aaf35b9b8f0bf7df40ffa84fceb2ee74 \
+          fetch "$tools/nim" 86391e69225feae2c8ea54eadf560307aaf35b9b8f0bf7df40ffa84fceb2ee74 \
             "$nightlies/2025-04-22-version-2-2-f7145dd26efeeeb6eeae6fff649db244d81b212d/nim-2.2.4-macosx_arm64.tar.xz" \
             --strip-components=1
           # Nim 2.2.10, the compiler of the token library
-          fetch nim-tkl 9a3b012d0680d11d6163dd2f145470b090c1045f5e634f42daf119bea1cb2b5e \
+          fetch "$tools/nim-tkl" 9a3b012d0680d11d6163dd2f145470b090c1045f5e634f42daf119bea1cb2b5e \
             "$nightlies/2026-04-24-version-2-2-bfeb3146d1638b39f69007a4ae5a23e23ae4e5ef/nim-2.2.10-macosx_arm64.tar.xz" \
             --strip-components=1
+          # Nim 2.2.6, the compiler nim-sds pins. nimble asks nim-lang.org for it, gets
+          # a 404 and builds it from source unless it is already in its directory.
+          fetch "$HOME/.nimble/nimbinaries/nim-2.2.6" a62ff3c34a2eb3fc69866fcae05b32dc5c2b6668ecfb1d10d91ad72c0183fae5 \
+            "$nightlies/2025-10-31-version-2-2-ab00c56904e3126ad826bb520d243513a139436a/nim-2.2.6-macosx_arm64.tar.xz" \
+            --strip-components=1
           # nimble 0.26.1
-          fetch nimble/bin ec27b85cd743dee9814b34811cece487b53cb19a3b696e72c06a9bc4c9a18c42 \
+          fetch "$tools/nimble/bin" ec27b85cd743dee9814b34811cece487b53cb19a3b696e72c06a9bc4c9a18c42 \
             https://github.com/nim-lang/nimble/releases/download/v0.26.1/nimble-macosx_aarch64.tar.gz
           echo "TKL_NIM=$tools/nim-tkl/bin/nim" >> "$GITHUB_ENV"
           # Nim ships an older nimble next to the compiler; the path added last comes first.
@@ -72,8 +77,7 @@ jobs:
           nim --version | head -n 1
           "$TKL_NIM" --version | head -n 1
           nimble --version | grep -F 'nimble v0.26.1'
-      # nimble builds the Nim that nim-sds pins from source, about five minutes;
-      # with libsds restored it does not run at all.
+      # With libsds restored, nimble does not run: nothing to download or compile.
       - name: Restore libsds
         id: libsds
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
