@@ -16,6 +16,11 @@ source "${GIT_ROOT}/scripts/codecov.sh"
 : "${PEER_IMAGES:=}"
 : "${PEER_REFS:=}"
 : "${USE_TORRENT:=false}"
+# CI builds the image in one job and tests it in others:
+#   FUNCTIONAL_TESTS_IMAGE_ONLY=true        build the status-go image and stop
+#   FUNCTIONAL_TESTS_SKIP_IMAGE_BUILD=true  test the image that is already there
+: "${FUNCTIONAL_TESTS_IMAGE_ONLY:=false}"
+: "${FUNCTIONAL_TESTS_SKIP_IMAGE_BUILD:=false}"
 
 if [[ "${USE_LOGOS_STORAGE}" == "true" ]]; then
   export WAKU_STORE_MESSAGE_RETENTION_SECONDS="${WAKU_STORE_MESSAGE_RETENTION_SECONDS:-60}"
@@ -44,7 +49,7 @@ mkdir -p "${logs_path}"
 all_compose_files="-f ${root_path}/docker-compose.anvil.yml -f ${root_path}/docker-compose.waku.yml"
 identifier=${FUNCTIONAL_TESTS_CONTAINER_PREFIX:-"status-go-func-tests-$(git rev-parse --short HEAD)"}
 project_name="${identifier,,}"
-image_name="statusgo-${identifier,,}"
+image_name="${FUNCTIONAL_TESTS_DOCKER_IMAGE:-statusgo-${identifier,,}}"
 
 dump_compose_logs_done=0
 dump_compose_logs() {
@@ -79,17 +84,31 @@ fi
 if [[ "${USE_TORRENT}" == "true" ]]; then
   build_tags="${build_tags} use_torrent"
 fi
-docker build . \
-  --build-arg "build_flags=-cover" \
-  --build-arg "build_tags=${build_tags}" \
-  --build-arg "use_logos_storage=${USE_LOGOS_STORAGE}" \
-  --build-arg "use_torrent=${USE_TORRENT}" \
-  --build-arg "enable_go_cache=false" \
-  --tag "${image_name}"
-
-if [[ $? -ne 0 ]]; then
-    echo -e "${RED}Docker build failed. Exiting.${RST}"
+if [[ "${FUNCTIONAL_TESTS_SKIP_IMAGE_BUILD}" == "true" ]]; then
+  if ! docker image inspect "${image_name}" > /dev/null 2>&1; then
+    echo -e "${RED}No image ${image_name} to test. Exiting.${RST}"
     exit 1
+  fi
+  echo -e "${GRN}Using the existing image${RST} ${image_name}"
+else
+  docker build . \
+    --build-arg "build_flags=-cover" \
+    --build-arg "build_tags=${build_tags}" \
+    --build-arg "use_logos_storage=${USE_LOGOS_STORAGE}" \
+    --build-arg "use_torrent=${USE_TORRENT}" \
+    --build-arg "enable_go_cache=false" \
+    --tag "${image_name}"
+
+  if [[ $? -ne 0 ]]; then
+      echo -e "${RED}Docker build failed. Exiting.${RST}"
+      exit 1
+  fi
+fi
+
+if [[ "${FUNCTIONAL_TESTS_IMAGE_ONLY}" == "true" ]]; then
+  echo -e "${GRN}Built the image${RST} ${image_name}"
+  dump_compose_logs_done=1
+  exit 0
 fi
 
 # Run docker

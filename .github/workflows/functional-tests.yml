@@ -17,11 +17,59 @@ env:
   # The test clients name their containers after it.
   BUILD_ID: ${{ github.run_id }}
   FUNCTIONAL_TESTS_REPORT_CODECOV: false
+  # Built by the image job, loaded by the test jobs.
+  FUNCTIONAL_TESTS_DOCKER_IMAGE: status-backend-under-test
 jobs:
-  rpc:
-    name: rpc
+  # The status-backend image under test, built once for all the jobs that test it.
+  image:
+    name: image (${{ matrix.tests }})
     runs-on: ubuntu-24.04
-    timeout-minutes: 90
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # The same builds `make test-functional USE_LOGOS_STORAGE=true` and
+          # `make test-functional-compatibility` make.
+          - tests: rpc
+            logos-storage: true
+          - tests: rpc-compat
+            logos-storage: false
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Build the image
+        env:
+          FUNCTIONAL_TESTS_IMAGE_ONLY: true
+          USE_LOGOS_STORAGE: ${{ matrix.logos-storage }}
+        run: scripts/run_functional_tests.sh
+      - name: Save the image
+        run: docker save "$FUNCTIONAL_TESTS_DOCKER_IMAGE" | zstd -T0 -o "$RUNNER_TEMP/image.tar.zst"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: status-backend-image-${{ matrix.tests }}
+          path: ${{ runner.temp }}/image.tar.zst
+          if-no-files-found: error
+          # Already compressed.
+          compression-level: 0
+          retention-days: 1
+
+  # Starts Anvil and a Waku fleet with docker compose and runs pytest against the
+  # image. It needs docker on the host, so it does not go through the toolchain container.
+  rpc-tests:
+    name: rpc (${{ matrix.shard }})
+    needs: image
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        # Slices of the tests, see FUNCTIONAL_TESTS_SHARD in test/functional/conftest.py.
+        shard: ['1/3', '2/3', '3/3']
+    env:
+      FUNCTIONAL_TESTS_SHARD: ${{ matrix.shard }}
+      FUNCTIONAL_TESTS_SKIP_IMAGE_BUILD: true
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -29,7 +77,7 @@ jobs:
           fetch-depth: 0
           filter: blob:none
           persist-credentials: false
-      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version: '1.26.5'
           cache: false
@@ -37,9 +85,17 @@ jobs:
         with:
           version: '36.0'
           repo-token: ${{ secrets.GITHUB_TOKEN }}
-      # Builds the status-backend image, starts Anvil and a Waku fleet with docker
-      # compose, and runs pytest against them. It needs docker on the host, so it
-      # does not go through the toolchain container.
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: test/functional/requirements.txt
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: status-backend-image-rpc
+          path: ${{ runner.temp }}
+      - name: Load the image
+        run: zstd -dc "$RUNNER_TEMP/image.tar.zst" | docker load
       - name: Functional tests
         run: make test-functional USE_LOGOS_STORAGE=true
       # Log file names carry test parameters with characters artifacts do not allow.
@@ -50,7 +106,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: functional-test-reports-rpc
+          name: functional-test-reports-rpc-${{ strategy.job-index }}
           path: |
             test/functional/reports/*.xml
             test/functional/logs.tar.gz
@@ -58,23 +114,59 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
-  # The same tests against status-backend images of the two previous releases.
-  rpc-compat:
-    name: rpc-compat
+  # The releases the compatibility tests talk to: the latest patch of the two
+  # previous minor versions. The same choice scripts/run_functional_tests.sh makes.
+  peers:
+    name: peer releases
     runs-on: ubuntu-24.04
-    timeout-minutes: 120
-    env:
-      # The runner script picks the releases to test against from these.
-      CHANGE_TARGET: ${{ github.base_ref }}
-      BRANCH_NAME: ${{ github.ref_name }}
+    timeout-minutes: 10
+    outputs:
+      refs: ${{ steps.refs.outputs.refs }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          # The release tags pick the peers, and their sources are built here.
           fetch-depth: 0
           filter: blob:none
           persist-credentials: false
-      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff
+      - id: refs
+        env:
+          TARGET_BRANCH: ${{ github.base_ref || github.ref_name }}
+        run: |
+          own_minor="$(printf '%s' "$TARGET_BRANCH" | sed -nE 's|^release/([0-9]+)\.([0-9]+)\..*|v\1.\2|p')"
+          refs="$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' |
+            awk -F. -v own="$own_minor" '$1"."$2 != own && !seen[$1"."$2]++' | head -2 | jq -Rnc '[inputs]')"
+          echo "refs=$refs" >> "$GITHUB_OUTPUT"
+          echo "Peer releases: $refs"
+          [ "$refs" != '[]' ]
+
+  # The compatibility tests against one previous release each; within a job they run one by one.
+  rpc-compat-tests:
+    name: rpc-compat (${{ matrix.peer }})
+    needs: [image, peers]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        peer: ${{ fromJSON(needs.peers.outputs.refs) }}
+    env:
+      FUNCTIONAL_TESTS_SKIP_IMAGE_BUILD: true
+      PEER_REFS: ${{ matrix.peer }}
+      # A release never changes, so its image is built once and kept in the registry.
+      PEER_REGISTRY_IMAGE: ghcr.io/status-im/status-go-peer:${{ matrix.peer }}
+      # The name the runner script gives a peer image, and reuses when it is there.
+      PEER_LOCAL_IMAGE: statusgo-peer-${{ matrix.peer }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          # The sources of the release are built here when the registry has no image.
+          fetch-depth: 0
+          filter: blob:none
+          persist-credentials: false
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version: '1.26.5'
           cache: false
@@ -82,8 +174,39 @@ jobs:
         with:
           version: '36.0'
           repo-token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: test/functional/requirements.txt
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: status-backend-image-rpc-compat
+          path: ${{ runner.temp }}
+      - name: Load the image
+        run: zstd -dc "$RUNNER_TEMP/image.tar.zst" | docker load
+      - name: Pull the peer image
+        id: peer
+        env:
+          GHCR_TOKEN: ${{ github.token }}
+          GHCR_USER: ${{ github.actor }}
+        run: |
+          echo "$GHCR_TOKEN" | docker login ghcr.io --username "$GHCR_USER" --password-stdin || true
+          if docker pull --quiet "$PEER_REGISTRY_IMAGE"; then
+            docker tag "$PEER_REGISTRY_IMAGE" "$PEER_LOCAL_IMAGE"
+            echo "pulled=true" >> "$GITHUB_OUTPUT"
+          fi
       - name: Compatibility tests
         run: make test-functional-compatibility
+      # Forks and tokens without package access cannot publish; the next run builds it again.
+      - name: Publish the peer image
+        if: >-
+          always() && steps.peer.outputs.pulled != 'true' && github.repository == 'status-im/status-go' &&
+          (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        run: |
+          docker image inspect "$PEER_LOCAL_IMAGE" > /dev/null 2>&1 || exit 0
+          docker tag "$PEER_LOCAL_IMAGE" "$PEER_REGISTRY_IMAGE"
+          docker push "$PEER_REGISTRY_IMAGE" || echo "::warning::Could not publish $PEER_REGISTRY_IMAGE"
       - name: Pack the logs
         if: always()
         run: tar -czf test/functional/logs.tar.gz -C test/functional logs
@@ -91,9 +214,35 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: functional-test-reports-rpc-compat
+          name: functional-test-reports-rpc-compat-${{ matrix.peer }}
           path: |
             test/functional/reports/*.xml
             test/functional/logs.tar.gz
           if-no-files-found: ignore
           retention-days: 14
+
+  # One check name each for branch rules, whatever the number of jobs behind it.
+  rpc:
+    name: rpc
+    if: always()
+    needs: rpc-tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - env:
+          TESTS: ${{ needs.rpc-tests.result }}
+        run: |
+          echo "rpc tests: $TESTS"
+          [ "$TESTS" = success ]
+  rpc-compat:
+    name: rpc-compat
+    if: always()
+    needs: rpc-compat-tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - env:
+          TESTS: ${{ needs.rpc-compat-tests.result }}
+        run: |
+          echo "rpc-compat tests: $TESTS"
+          [ "$TESTS" = success ]
