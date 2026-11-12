@@ -1,0 +1,157 @@
+name: Build macOS
+on:
+  pull_request:
+  push:
+    branches:
+      - develop
+      - 'release/**'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: build-macos-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+jobs:
+  # One runner per library: the two builds do not wait for each other.
+  libraries:
+    name: macos/aarch64 (${{ matrix.library }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - library: static
+            target: statusgo-library
+            files: |
+              build/bin/libstatus.a
+              build/bin/libstatus.h
+          - library: shared
+            target: statusgo-shared-library
+            files: |
+              build/bin/libstatus.dylib
+              build/bin/libstatus.h
+              build/libsds.dylib
+    # No Nix: without the Status caches the dev shell fetches 2 GiB and builds
+    # 95 derivations on an empty runner. libsds and libtkl are built here instead.
+    # GitHub's macOS 15 runners are Apple Silicon.
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          # scripts/version.sh describes the commit from the nearest tag
+          fetch-depth: 0
+          filter: blob:none
+          persist-credentials: false
+      # Tool versions follow the toolchain stage of the root Dockerfile.
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version: '1.26.5'
+          cache: false
+      - name: Protocol buffer compiler
+        uses: arduino/setup-protoc@c65c819552d16ad3c9b72d9dfd5ba5237b9c906b # v3
+        with:
+          version: '36.0'
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+      # Prebuilt compilers: setup-nim-action builds Nim from source on macOS,
+      # about five minutes for each one.
+      - name: Nim and nimble
+        run: |
+          tools="$RUNNER_TEMP/toolchain"
+          nightlies=https://github.com/nim-lang/nightlies/releases/download
+          fetch() { # <directory> <sha256> <url> [tar options]
+            local dir="$1" sum="$2" url="$3"
+            shift 3
+            mkdir -p "$dir"
+            curl -sSfL --retry 5 --retry-all-errors -o "$RUNNER_TEMP/download" "$url"
+            echo "$sum  $RUNNER_TEMP/download" | shasum -a 256 -c -
+            tar -xf "$RUNNER_TEMP/download" -C "$dir" "$@"
+          }
+          # Nim 2.2.4
+          fetch "$tools/nim" 86391e69225feae2c8ea54eadf560307aaf35b9b8f0bf7df40ffa84fceb2ee74 \
+            "$nightlies/2025-04-22-version-2-2-f7145dd26efeeeb6eeae6fff649db244d81b212d/nim-2.2.4-macosx_arm64.tar.xz" \
+            --strip-components=1
+          # Nim 2.2.10, the compiler of the token library
+          fetch "$tools/nim-tkl" 9a3b012d0680d11d6163dd2f145470b090c1045f5e634f42daf119bea1cb2b5e \
+            "$nightlies/2026-04-24-version-2-2-bfeb3146d1638b39f69007a4ae5a23e23ae4e5ef/nim-2.2.10-macosx_arm64.tar.xz" \
+            --strip-components=1
+          # Nim 2.2.6, the compiler nim-sds pins. nimble asks nim-lang.org for it, gets
+          # a 404 and builds it from source unless it is already in its directory.
+          fetch "$HOME/.nimble/nimbinaries/nim-2.2.6" a62ff3c34a2eb3fc69866fcae05b32dc5c2b6668ecfb1d10d91ad72c0183fae5 \
+            "$nightlies/2025-10-31-version-2-2-ab00c56904e3126ad826bb520d243513a139436a/nim-2.2.6-macosx_arm64.tar.xz" \
+            --strip-components=1
+          # nimble 0.26.1
+          fetch "$tools/nimble/bin" ec27b85cd743dee9814b34811cece487b53cb19a3b696e72c06a9bc4c9a18c42 \
+            https://github.com/nim-lang/nimble/releases/download/v0.26.1/nimble-macosx_aarch64.tar.gz
+          echo "TKL_NIM=$tools/nim-tkl/bin/nim" >> "$GITHUB_ENV"
+          # Nim ships an older nimble next to the compiler; the path added last comes first.
+          echo "$tools/nim/bin" >> "$GITHUB_PATH"
+          echo "$tools/nimble/bin" >> "$GITHUB_PATH"
+      - name: Toolchain versions
+        run: |
+          go version
+          protoc --version
+          nim --version | head -n 1
+          "$TKL_NIM" --version | head -n 1
+          nimble --version | grep -F 'nimble v0.26.1'
+      # With libsds restored, nimble does not run: nothing to download or compile.
+      - name: Restore libsds
+        id: libsds
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            build/libsds.dylib
+            build/libsds.h
+          key: libsds-macos-aarch64-${{ hashFiles('status_go.nimble', 'Makefile', '.github/workflows/build-macos.yml') }}
+      - name: Nim dependencies and libsds
+        if: steps.libsds.outputs.cache-hit != 'true'
+        run: make build-libsds
+      - name: Use the restored libsds
+        if: steps.libsds.outputs.cache-hit == 'true'
+        run: |
+          echo "NIM_SDS_LIB_DIR=$GITHUB_WORKSPACE/build" >> "$GITHUB_ENV"
+          echo "NIM_SDS_INC_DIR=$GITHUB_WORKSPACE/build" >> "$GITHUB_ENV"
+      - name: Restore Go caches
+        id: go-cache
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            ~/Library/Caches/go-build
+            ~/go/pkg/mod
+          key: go-macos-aarch64-${{ hashFiles('go.sum') }}
+          restore-keys: go-macos-aarch64-
+      # The target generates the code itself, once.
+      - name: Library
+        run: make ${{ matrix.target }}
+      - name: Upload library
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: status-go-macos-aarch64-${{ matrix.library }}
+          path: ${{ matrix.files }}
+          if-no-files-found: error
+          retention-days: 7
+      # One job writes the cache, so the key has one owner. develop owns it; a pull
+      # request saves one only while there is nothing to restore.
+      - name: Save Go caches
+        if: >-
+          matrix.library == 'static' && steps.go-cache.outputs.cache-hit != 'true' &&
+          (github.ref == 'refs/heads/develop' || steps.go-cache.outputs.cache-matched-key == '')
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            ~/Library/Caches/go-build
+            ~/go/pkg/mod
+          key: go-macos-aarch64-${{ hashFiles('go.sum') }}
+
+  # One check name for branch rules.
+  macos:
+    name: macos/aarch64
+    if: always()
+    needs: libraries
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - env:
+          LIBRARIES: ${{ needs.libraries.result }}
+        run: |
+          echo "libraries: $LIBRARIES"
+          [ "$LIBRARIES" = success ]
