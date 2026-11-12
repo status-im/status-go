@@ -12,35 +12,54 @@ permissions:
 concurrency:
   group: unit-tests-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+env:
+  # Make arguments for a tree that uses the prebuilt libstorage.
+  MAKE_ARGS: >-
+    USE_LOGOS_STORAGE=true USE_TORRENT=true
+    LOGOS_STORAGE_LIB_DIR=${{ github.workspace }}/build/deps/logos-storage/build
+    LOGOS_STORAGE_INC_DIR=${{ github.workspace }}/build/deps/logos-storage/library
 jobs:
-  # Built once and handed to every test job.
-  libstorage:
-    name: libstorage
+  # Generated code and native libraries, built once and handed to every test job.
+  prepare:
+    name: prepare
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
+          # scripts/version.sh describes the commit from the nearest tag
+          fetch-depth: 0
+          filter: blob:none
           persist-credentials: false
       - uses: ./.github/actions/toolchain
       - name: Restore libstorage
         id: libstorage
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
-          path: |
-            ~/.cache/status-go-toolchain/logos-storage-nim/build/libstorage.so
-            ~/.cache/status-go-toolchain/logos-storage-nim/library
+          path: build/deps/logos-storage
           # The Makefile pins the logos-storage revision, the Dockerfile the compilers.
-          key: libstorage-linux-x86_64-${{ hashFiles('Makefile', 'Dockerfile') }}
+          key: libstorage-tree-linux-x86_64-${{ hashFiles('Makefile', 'Dockerfile') }}
       - name: Build libstorage
         if: steps.libstorage.outputs.cache-hit != 'true'
-        run: scripts/toolchain.sh make build-storage
+        run: |
+          scripts/toolchain.sh make build-storage
+          source=~/.cache/status-go-toolchain/logos-storage-nim
+          mkdir -p build/deps/logos-storage/build
+          cp "$source/build/libstorage.so" build/deps/logos-storage/build/
+          cp -R "$source/library" build/deps/logos-storage/
+      - name: Generate code, build libsds and libtkl
+        run: scripts/toolchain.sh make test-unit-prep build-libtkl $MAKE_ARGS
+      - name: Pack the prepared tree
+        run: |
+          {
+            git ls-files -z --others --ignored --exclude-standard -- . ':!build' ':!nimbledeps'
+            printf '%s\0' build/libsds.so build/libsds.h build/deps
+          } | tar --null --files-from=- -cf "$RUNNER_TEMP/prepared-tree.tar"
+          ls -lh "$RUNNER_TEMP/prepared-tree.tar"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: libstorage-linux-x86_64
-          path: |
-            ~/.cache/status-go-toolchain/logos-storage-nim/build/libstorage.so
-            ~/.cache/status-go-toolchain/logos-storage-nim/library
+          name: prepared-tree
+          path: ${{ runner.temp }}/prepared-tree.tar
           if-no-files-found: error
           retention-days: 1
 
@@ -59,7 +78,7 @@ jobs:
 
   tests:
     name: ${{ matrix.part }}
-    needs: libstorage
+    needs: prepare
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     strategy:
@@ -86,21 +105,18 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          # scripts/version.sh describes the commit from the nearest tag
           fetch-depth: 0
           filter: blob:none
           persist-credentials: false
       - uses: ./.github/actions/toolchain
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
-          name: libstorage-linux-x86_64
-          path: ~/.cache/status-go-toolchain/logos-storage-nim
-      # /cache is ~/.cache/status-go-toolchain inside the toolchain container.
+          name: prepared-tree
+          path: ${{ runner.temp }}
+      - name: Unpack the prepared tree
+        run: tar -xf "$RUNNER_TEMP/prepared-tree.tar"
       - name: Unit tests
-        run: >
-          scripts/toolchain.sh make test-unit V=1 USE_LOGOS_STORAGE=true USE_TORRENT=true
-          LOGOS_STORAGE_LIB_DIR=/cache/logos-storage-nim/build
-          LOGOS_STORAGE_INC_DIR=/cache/logos-storage-nim/library
+        run: scripts/toolchain.sh make test-unit-prepared V=1 $MAKE_ARGS
       # With CI=true the test output goes to files, not to the job log.
       - name: Show test logs
         if: failure()

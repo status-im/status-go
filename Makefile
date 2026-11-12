@@ -568,14 +568,16 @@ test-unit-prep: export UNIT_TEST_FAILFAST ?= true
 test-unit-prep: export UNIT_TEST_USE_DEVELOPMENT_LOGGER ?= true
 test-unit-prep: export UNIT_TEST_REPORT_CODECOV ?= false
 
-test-unit: test-unit-prep
-test-unit: export UNIT_TEST_RERUN_FAILS ?= true
-test-unit: export UNIT_TEST_PACKAGES ?= $(call sh, go list -tags '$(BUILD_TAGS)' ./... | \
+test-unit: test-unit-prep ##@tests Run unit and integration tests
+	$(MAKE) test-unit-prepared
+
+test-unit-prepared: export UNIT_TEST_RERUN_FAILS ?= true
+test-unit-prepared: export UNIT_TEST_PACKAGES ?= $(call sh, go list -tags '$(BUILD_TAGS)' ./... | \
 	grep -v /t/e2e | \
 	grep -v /t/benchmarks | \
 	grep -v /transactions/fake | \
 	grep -v /test/unit-network)
-test-unit: ##@tests Run unit and integration tests
+test-unit-prepared: ##@tests Run the same tests on a tree that test-unit-prep already prepared
 	LD_LIBRARY_PATH="$(RUNTIME_LIB_DIRS)" CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
 	$(TOKEN_ENV) ./scripts/run_unit_tests.sh
 
