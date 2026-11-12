@@ -5,6 +5,7 @@ on:
     branches:
       - develop
       - 'release/**'
+      - ab/issue-23128-gh-windows-build
   workflow_dispatch:
 permissions:
   contents: read
@@ -27,9 +28,15 @@ jobs:
       GIT_CONFIG_VALUE_0: 'true'
       GIT_CONFIG_KEY_1: core.autocrlf
       GIT_CONFIG_VALUE_1: 'false'
-      # Same versions as the toolchain stage of the Dockerfile.
+      # Versions and checksums of the scoop packages the Jenkins hosts built with
+      # (status-im/infra-scoop-bucket); nimble and protoc also match the Dockerfile.
+      WINLIBS_RELEASE: 15.2.0posix-13.0.0-ucrt-r5
+      WINLIBS_ARCHIVE: winlibs-x86_64-posix-seh-gcc-15.2.0-mingw-w64ucrt-13.0.0-r5.7z
+      WINLIBS_SHA256: 6b567e3c158a00c81ceb85298487c905ced3288fb5fb17636e2471cf8134927a
       NIMBLE_VERSION: '0.26.1'
+      NIMBLE_SHA256: e158b8e501f6b1055cc5d4fef742e1eb928b685d67842a7b4e384183079b42f3
       PROTOC_VERSION: '36.0'
+      PROTOC_SHA256: 510fb2369a4720adb457783768c5e1481a0e1137d9e7694478dfe9b8fe445dc1
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
@@ -47,29 +54,49 @@ jobs:
           # Outside the checkout, which the build fingerprints.
           parent-nim-install-directory: ${{ runner.temp }}
           repo-token: ${{ github.token }}
-      # MinGW compiles the cgo and Nim code; Go, Nim and Git come from the Windows PATH.
-      # The Makefile runs under MinGW make: MSYS make would hand it POSIX paths, which
-      # end up in cgo flags that the native Go and gcc cannot resolve. The token
-      # library's own Makefile still runs under MSYS make.
+      # MSYS2 only supplies the shell and its tools. Go, Nim, Git and the compiler
+      # come from the Windows PATH.
       - uses: msys2/setup-msys2@ec48f7c5447b3140e2b088413ae3a55687bccb6e # v2.33.0
         with:
-          msystem: MINGW64
+          msystem: MSYS
           path-type: inherit
-          install: mingw-w64-x86_64-gcc mingw-w64-x86_64-make make unzip
-      - name: Nimble and protoc
+          install: make unzip
+      - name: Compiler, nimble and protoc
         run: |
           tools="$(cygpath -u "$RUNNER_TEMP")/tools"
           mkdir -p "$tools"
-          curl -sSfL --retry 3 -o "$tools/nimble.zip" \
-            "https://github.com/nim-lang/nimble/releases/download/v$NIMBLE_VERSION/nimble-windows_x64.zip"
+          fetch() { # <url> <sha256> <file>
+            curl -sSfL --retry 3 -o "$3" "$1"
+            echo "$2  $3" | sha256sum -c -
+          }
+          fetch "https://github.com/brechtsanders/winlibs_mingw/releases/download/$WINLIBS_RELEASE/$WINLIBS_ARCHIVE" \
+            "$WINLIBS_SHA256" "$tools/winlibs.7z"
+          7z x -bso0 -bsp0 "-o$(cygpath -w "$tools")" "$(cygpath -w "$tools/winlibs.7z")"
+          rm "$tools/winlibs.7z"
+          fetch "https://github.com/nim-lang/nimble/releases/download/v$NIMBLE_VERSION/nimble-windows_x64.zip" \
+            "$NIMBLE_SHA256" "$tools/nimble.zip"
           unzip -q "$tools/nimble.zip" -d "$tools/nimble"
-          curl -sSfL --retry 3 -o "$tools/protoc.zip" \
-            "https://github.com/protocolbuffers/protobuf/releases/download/v$PROTOC_VERSION/protoc-$PROTOC_VERSION-win64.zip"
+          fetch "https://github.com/protocolbuffers/protobuf/releases/download/v$PROTOC_VERSION/protoc-$PROTOC_VERSION-win64.zip" \
+            "$PROTOC_SHA256" "$tools/protoc.zip"
           unzip -q "$tools/protoc.zip" -d "$tools/protoc"
-          ls -la "$tools/nimble" "$tools/protoc/bin"
+          # Ahead of the compilers the runner image ships.
+          cygpath -w "$tools/mingw64/bin" >> "$GITHUB_PATH"
           cygpath -w "$tools/protoc/bin" >> "$GITHUB_PATH"
           # Added last so that it precedes the nimble bundled with Nim.
           cygpath -w "$tools/nimble" >> "$GITHUB_PATH"
+          # Fixed places for the caches below; the Makefile would derive them from the MSYS home.
+          cache="$(cygpath -m "$USERPROFILE")/.cache/status-go"
+          echo "GOCACHE=$cache/go-build" >> "$GITHUB_ENV"
+          echo "GOMODCACHE=$cache/go-mod" >> "$GITHUB_ENV"
+      - name: Restore Go caches
+        id: cache
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            ~/.cache/status-go/go-build
+            ~/.cache/status-go/go-mod
+          key: toolchain-windows-x86_64-${{ hashFiles('go.sum') }}
+          restore-keys: toolchain-windows-x86_64-
       - name: Toolchain versions
         run: |
           # go-generate-fast prints "file.go: command" lines, which setup-go's matcher reports as errors.
@@ -84,6 +111,10 @@ jobs:
           mingw32-make --version | head -n 1
           protoc --version
           git --version
+          go env GOCACHE GOMODCACHE
+      # The Makefile runs under MinGW make: MSYS make would hand it POSIX paths, which
+      # end up in cgo flags that the native Go and gcc cannot resolve. The token
+      # library's own Makefile still runs under MSYS make.
       - name: Generate
         run: mingw32-make generate
       - name: Static library
@@ -101,3 +132,15 @@ jobs:
             build/libsds.dll
           if-no-files-found: error
           retention-days: 7
+      # develop owns the cache. A pull request saves one only while there is nothing
+      # to restore, so pull requests cannot fill the repository quota.
+      - name: Save Go caches
+        if: >-
+          steps.cache.outputs.cache-hit != 'true' &&
+          (github.ref == 'refs/heads/develop' || steps.cache.outputs.cache-matched-key == '')
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            ~/.cache/status-go/go-build
+            ~/.cache/status-go/go-mod
+          key: ${{ steps.cache.outputs.cache-primary-key }}
