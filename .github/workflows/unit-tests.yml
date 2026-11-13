@@ -83,7 +83,8 @@ jobs:
           name: prepared-tree
           path: ${{ runner.temp }}/prepared-tree.tar
           if-no-files-found: error
-          retention-days: 1
+          # Long enough to re-run failed jobs days later.
+          retention-days: 5
 
   coexistence:
     name: token library coexistence
@@ -138,7 +139,8 @@ jobs:
           name: protocol-tests
           path: ${{ env.UNIT_TEST_PROTOCOL_TESTS_FILE }}
           if-no-files-found: error
-          retention-days: 1
+          # Long enough to re-run failed jobs days later.
+          retention-days: 5
 
   # Slices of the suite, see UNIT_TEST_PART in scripts/run_unit_tests.sh.
   packages:

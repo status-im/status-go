@@ -77,7 +77,8 @@ jobs:
           if-no-files-found: error
           # Already compressed.
           compression-level: 0
-          retention-days: 1
+          # Long enough to re-run failed jobs days later.
+          retention-days: 5
 
   # Starts Anvil and a Waku fleet with docker compose and runs pytest against the
   # image. It needs docker on the host, so it does not go through the toolchain container.
