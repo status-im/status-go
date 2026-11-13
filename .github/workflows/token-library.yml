@@ -3,6 +3,7 @@ on:
   pull_request:
     paths:
       - '.github/workflows/token-library.yml'
+      - '.github/actions/nim/**'
       - '.gitattributes'
       - 'Makefile'
       - 'go.mod'
@@ -39,6 +40,11 @@ jobs:
       - name: Remove the Go problem matcher
         run: echo "::remove-matcher owner=go::"
       - uses: jiro4989/setup-nim-action@189b145833368cc92f1e7b3e166a25a3e057a693
+        if: runner.os != 'macOS'
+        with:
+          nim-version: '2.2.10'
+      - uses: ./.github/actions/nim
+        if: runner.os == 'macOS'
         with:
           nim-version: '2.2.10'
       - name: Dependency lifecycle and mandatory mobile integration
@@ -126,7 +132,7 @@ jobs:
         with:
           go-version: '1.26.5'
           cache: false
-      - uses: jiro4989/setup-nim-action@189b145833368cc92f1e7b3e166a25a3e057a693
+      - uses: ./.github/actions/nim
         with:
           nim-version: '2.2.10'
       - name: Cross-link device and simulator consumers
