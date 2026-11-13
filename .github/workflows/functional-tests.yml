@@ -16,7 +16,6 @@ env:
   WAKU_IMAGE: wakuorg/nwaku:v0.39.2
   # The test clients name their containers after it.
   BUILD_ID: ${{ github.run_id }}
-  FUNCTIONAL_TESTS_REPORT_CODECOV: false
   # Built by the image job, loaded by the test jobs.
   FUNCTIONAL_TESTS_DOCKER_IMAGE: status-backend-under-test
 jobs:
@@ -95,6 +94,12 @@ jobs:
     env:
       FUNCTIONAL_TESTS_SHARD: ${{ matrix.shard }}
       FUNCTIONAL_TESTS_SKIP_IMAGE_BUILD: true
+      # Coverage goes to Codecov once the repository has the token.
+      FUNCTIONAL_TESTS_REPORT_CODECOV: ${{ secrets.CODECOV_TOKEN != '' }}
+      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+      CODECOV_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      CODECOV_PR: ${{ github.event.pull_request.number }}
+      CODECOV_BRANCH: ${{ github.head_ref || github.ref_name }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -105,6 +110,8 @@ jobs:
       - uses: ./.github/actions/functional-tests
         with:
           image-artifact: status-backend-image-rpc
+          proxy-user: ${{ secrets.STATUS_BUILD_PROXY_USER }}
+          proxy-password: ${{ secrets.STATUS_BUILD_PROXY_PASSWORD }}
       - name: Functional tests
         run: make test-functional USE_LOGOS_STORAGE=true
       - uses: ./.github/actions/functional-tests/reports
@@ -168,6 +175,8 @@ jobs:
       - uses: ./.github/actions/functional-tests
         with:
           image-artifact: status-backend-image-rpc-compat
+          proxy-user: ${{ secrets.STATUS_BUILD_PROXY_USER }}
+          proxy-password: ${{ secrets.STATUS_BUILD_PROXY_PASSWORD }}
       - name: Pull the peer image
         id: peer
         env:

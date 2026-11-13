@@ -5,7 +5,8 @@ codecov:
   require_ci_to_pass: false
   notify:
     wait_for_ci: false
-    after_n_builds: 2
+    # One upload per test job: 13 unit test slices and 5 rpc slices.
+    after_n_builds: 18
 
 ignore:
   - "_.*"
