@@ -195,6 +195,14 @@ if [[ -n "${UNIT_TEST_PART}" ]]; then
   part_group="${BASH_REMATCH[1]}"
   part_index="${BASH_REMATCH[2]}"
   part_total="${BASH_REMATCH[3]}"
+  if (( part_index > part_total )); then
+    echo -e "${RED}Invalid UNIT_TEST_PART='${UNIT_TEST_PART}'${RST}, slice ${part_index} is past the last of ${part_total}" >&2
+    exit 2
+  fi
+  if [[ "${UNIT_TEST_COUNT}" -ne 1 ]]; then
+    echo -e "${RED}UNIT_TEST_PART needs UNIT_TEST_COUNT=1${RST}, it is ${UNIT_TEST_COUNT}" >&2
+    exit 2
+  fi
 fi
 
 bg_pids=()
@@ -261,6 +269,11 @@ else
           protocol_shard_filters[$shard_idx]="${protocol_shard_filters[$shard_idx]}|${protocol_test}"
         fi
       done < <(printf '%s\n' "${protocol_tests[@]}" | assign_protocol_shards "${protocol_shards}")
+
+      if [[ "${part_group}" == 'protocol' && -z "${protocol_shard_filters[$((part_index - 1))]}" ]]; then
+        echo -e "${RED}No protocol tests in slice ${part_index}/${part_total}${RST}: ${#protocol_tests[@]} tests for ${protocol_shards} slices" >&2
+        exit 2
+      fi
 
       protocol_iteration=1
       for ((i=0; i<protocol_shards; i++)); do
