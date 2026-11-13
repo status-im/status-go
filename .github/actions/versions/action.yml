@@ -1,0 +1,14 @@
+name: Tool versions
+description: Exports the versions the toolchain stage of the root Dockerfile pins, as GO_VERSION, PROTOC_VERSION, NIM_VERSION, TKL_NIM_VERSION and NIMBLE_VERSION. Needs a checkout.
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      run: |
+        versions="$(
+          sed -nE 's/^FROM golang:([0-9.]+)-.* AS toolchain$/GO_VERSION=\1/p' Dockerfile
+          sed -nE 's/^ARG (PROTOC|NIM|TKL_NIM|NIMBLE)_VERSION=(.+)$/\1_VERSION=\2/p' Dockerfile
+        )"
+        echo "$versions"
+        [ "$(echo "$versions" | wc -l)" -eq 5 ]
+        echo "$versions" >> "$GITHUB_ENV"

@@ -42,29 +42,28 @@ jobs:
           fetch-depth: 0
           filter: blob:none
           persist-credentials: false
-      # Tool versions follow the toolchain stage of the root Dockerfile.
+      - uses: ./.github/actions/versions
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
-          go-version: '1.26.5'
+          go-version: ${{ env.GO_VERSION }}
           cache: false
       - name: Protocol buffer compiler
         uses: arduino/setup-protoc@c65c819552d16ad3c9b72d9dfd5ba5237b9c906b # v3
         with:
-          version: '36.0'
+          version: ${{ env.PROTOC_VERSION }}
           repo-token: ${{ secrets.GITHUB_TOKEN }}
-      # Same compilers as the toolchain stage of the root Dockerfile.
       - uses: ./.github/actions/nim
         with:
-          nim-version: '2.2.4'
-          tkl-nim-version: '2.2.10'
-          nimble-version: '0.26.1'
+          nim-version: ${{ env.NIM_VERSION }}
+          tkl-nim-version: ${{ env.TKL_NIM_VERSION }}
+          nimble-version: ${{ env.NIMBLE_VERSION }}
       - name: Toolchain versions
         run: |
           go version
           protoc --version
           nim --version | head -n 1
           "$TKL_NIM" --version | head -n 1
-          nimble --version | grep -F 'nimble v0.26.1'
+          nimble --version | grep -F "nimble v$NIMBLE_VERSION"
       # With libsds restored, nimble does not run: nothing to download or compile.
       - name: Restore libsds
         id: libsds

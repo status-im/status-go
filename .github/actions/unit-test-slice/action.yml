@@ -20,7 +20,9 @@ runs:
       run: tar -xf "$RUNNER_TEMP/prepared-tree.tar"
     - name: Unit tests
       shell: bash
-      run: scripts/toolchain.sh make test-unit-prepared V=1 ${{ inputs.make-args }}
+      env:
+        MAKE_ARGS: ${{ inputs.make-args }}
+      run: scripts/toolchain.sh make test-unit-prepared V=1 $MAKE_ARGS
     # With CI=true the test output goes to files, not to the job log.
     - name: Show test logs
       if: failure()
