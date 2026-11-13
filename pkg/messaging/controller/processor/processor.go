@@ -8,6 +8,7 @@ import (
 
 	"github.com/golang/protobuf/proto"
 	"github.com/pkg/errors"
+	"github.com/waku-org/sds-go-bindings/sds"
 	otelattribute "go.opentelemetry.io/otel/attribute"
 	oteltrace "go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
@@ -113,7 +114,7 @@ type processMessageResponse struct {
 }
 
 type sdsLayerReliability interface {
-	UnwrapPayloadFromSDSWithMetadata([]byte) ([]byte, []byte, string, bool, error)
+	UnwrapPayloadFromSDSWithContext([]byte, []byte) ([]byte, []byte, string, bool, error)
 	RecordSDSMessageReceived(string, []byte) error
 	RecordSDSRetrievalHints(string, []byte, [][]byte) error
 }
@@ -180,6 +181,12 @@ func (r *Processor) processMessage(m *messagingtypes.ReceivedMessage) (*processM
 	// so fail the whole envelope instead: it must be retried, not marked processed.
 	err = r.processSDSLayer(responseMessage)
 	if err != nil {
+		if errors.Is(err, sds.ErrMessageRejected) {
+			logger.Debug("discarding unauthorized SDS message", zap.Error(err))
+			response.messages = nil
+			response.consumedEnvelopeHashes = hashes
+			return response, nil
+		}
 		logger.Error("failed to unwrap payload for SDS", zap.Error(err))
 		return nil, err
 	}
@@ -363,7 +370,9 @@ func (r *Processor) processSDSLayerWithReliability(msg *messagingtypes.Message, 
 		return nil
 	}
 
-	unwrappedPayload, sdsMessageID, channelID, isSDS, err := reliability.UnwrapPayloadFromSDSWithMetadata(msg.EncryptionLayer.Payload)
+	unwrappedPayload, sdsMessageID, channelID, isSDS, err := reliability.UnwrapPayloadFromSDSWithContext(
+		msg.EncryptionLayer.Payload, crypto.FromECDSAPub(msg.SigPubKey()),
+	)
 	if err != nil {
 		return err
 	}
