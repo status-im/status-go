@@ -43,14 +43,13 @@ jobs:
       GIT_CONFIG_VALUE_0: 'true'
       GIT_CONFIG_KEY_1: core.autocrlf
       GIT_CONFIG_VALUE_1: 'false'
-      # Versions and checksums of the scoop packages the Jenkins hosts built with
-      # (status-im/infra-scoop-bucket); nimble and protoc also match the Dockerfile.
+      # The compiler the Jenkins hosts built with (status-im/infra-scoop-bucket).
       WINLIBS_RELEASE: 15.2.0posix-13.0.0-ucrt-r5
       WINLIBS_ARCHIVE: winlibs-x86_64-posix-seh-gcc-15.2.0-mingw-w64ucrt-13.0.0-r5.7z
       WINLIBS_SHA256: 6b567e3c158a00c81ceb85298487c905ced3288fb5fb17636e2471cf8134927a
-      NIMBLE_VERSION: '0.26.1'
+      # Checksums of the Windows archives of the nimble and protoc versions the
+      # Dockerfile pins. A new version there fails the download check until these follow.
       NIMBLE_SHA256: e158b8e501f6b1055cc5d4fef742e1eb928b685d67842a7b4e384183079b42f3
-      PROTOC_VERSION: '36.0'
       PROTOC_SHA256: 510fb2369a4720adb457783768c5e1481a0e1137d9e7694478dfe9b8fe445dc1
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -59,12 +58,14 @@ jobs:
           fetch-depth: 0
           filter: blob:none
           persist-credentials: false
+      - uses: ./.github/actions/versions
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
         with:
-          go-version: '1.26.5'
+          go-version: ${{ env.GO_VERSION }}
           cache: false
       - uses: jiro4989/setup-nim-action@189b145833368cc92f1e7b3e166a25a3e057a693 # v2.3.1
         with:
+          # The Nim the Jenkins hosts built with, not the Dockerfile's.
           nim-version: '2.2.6'
           # Outside the checkout, which the build fingerprints.
           parent-nim-install-directory: ${{ runner.temp }}
@@ -118,8 +119,8 @@ jobs:
           path: |
             build/libsds.dll
             build/libsds.h
-          # status_go.nimble pins the revision, this file the compilers.
-          key: libsds-windows-x86_64-${{ hashFiles('status_go.nimble', 'Makefile', '.github/workflows/build-windows.yml') }}
+          # status_go.nimble pins the revision, this file and the Dockerfile the compilers.
+          key: libsds-windows-x86_64-${{ hashFiles('status_go.nimble', 'Makefile', 'Dockerfile', '.github/workflows/build-windows.yml') }}
       - name: Use the restored libsds
         if: steps.libsds.outputs.cache-hit == 'true'
         run: echo "MAKE_ARGS=NIM_SDS_LIB_DIR=$(pwd -W)/build NIM_SDS_INC_DIR=$(pwd -W)/build" >> "$GITHUB_ENV"
