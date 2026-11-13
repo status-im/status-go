@@ -3,6 +3,7 @@ package reliability
 import (
 	"bytes"
 	"testing"
+	"time"
 
 	mvdsnode "github.com/status-im/mvds/node"
 	mvdsmigrations "github.com/status-im/mvds/persistenceutil"
@@ -55,6 +56,83 @@ func TestSDSTickEnsuresChannels(t *testing.T) {
 	for _, event := range events {
 		require.Equal(t, channelID, event.ChannelID)
 	}
+}
+
+type testSDSValidatorFunc func(sds.ValidationMessage) (bool, error)
+
+func (f testSDSValidatorFunc) Validate(message sds.ValidationMessage) (bool, error) {
+	return f(message)
+}
+
+func TestSDSValidatorSurvivesManagerRestart(t *testing.T) {
+	r := newTestReliability(t)
+	t.Cleanup(r.Close)
+	wrapped, _, err := r.WrapPayloadForSDS([]byte("payload"), "channel")
+	require.NoError(t, err)
+	var context []byte
+	require.NoError(t, r.SetSDSValidator(testSDSValidatorFunc(func(message sds.ValidationMessage) (bool, error) {
+		context = message.ValidationContext
+		return false, nil
+	})))
+	for _, restart := range []bool{false, true} {
+		if restart {
+			r.Close()
+			require.NoError(t, r.Start(noopDispatch))
+		}
+		payload, _, _, _, err := r.UnwrapPayloadFromSDSWithContext(wrapped, []byte("sender"))
+		require.ErrorIs(t, err, sds.ErrMessageRejected)
+		require.Nil(t, payload)
+		require.Equal(t, []byte("sender"), context)
+	}
+	require.NoError(t, r.SetSDSValidator(nil))
+	payload, err := r.UnwrapPayloadFromSDS(wrapped)
+	require.NoError(t, err)
+	require.Equal(t, []byte("payload"), payload)
+}
+
+func TestSDSValidationRejectsBeforeReliabilityEvents(t *testing.T) {
+	receiver := newTestReliability(t)
+	t.Cleanup(receiver.Close)
+	peer := newTestReliability(t)
+	t.Cleanup(peer.Close)
+	pending, _, err := receiver.WrapPayloadForSDS([]byte("pending"), "channel")
+	require.NoError(t, err)
+	_, err = peer.UnwrapPayloadFromSDS(pending)
+	require.NoError(t, err)
+	_, _, err = peer.WrapPayloadForSDS([]byte("missing dependency"), "channel")
+	require.NoError(t, err)
+	wrapped, _, err := peer.WrapPayloadForSDS([]byte("unauthorized"), "channel")
+	require.NoError(t, err)
+
+	events := make(chan string, 8)
+	receiver.SetMissingDependenciesHandler(func(string, []MissingDependency, string) error {
+		events <- "missing dependencies"
+		return nil
+	})
+	receiver.SetMessageSentHandler(func(string) { events <- "message sent" })
+	require.NoError(t, receiver.SetSDSValidator(testSDSValidatorFunc(func(sds.ValidationMessage) (bool, error) {
+		return false, nil
+	})))
+	_, err = receiver.UnwrapPayloadFromSDS(wrapped)
+	require.ErrorIs(t, err, sds.ErrMessageRejected)
+	select {
+	case event := <-events:
+		t.Fatalf("rejected SDS metadata emitted %s", event)
+	case <-time.After(100 * time.Millisecond):
+	}
+
+	// Prove the same envelope would otherwise trigger dependency recovery.
+	require.NoError(t, receiver.SetSDSValidator(nil))
+	_, err = receiver.UnwrapPayloadFromSDS(wrapped)
+	require.NoError(t, err)
+	require.Eventually(t, func() bool {
+		select {
+		case event := <-events:
+			return event == "missing dependencies"
+		default:
+			return false
+		}
+	}, time.Second, time.Millisecond)
 }
 
 func TestSDSChannelRetrievalHintProvider(t *testing.T) {
