@@ -42,14 +42,6 @@ jobs:
       GIT_CONFIG_VALUE_0: 'true'
       GIT_CONFIG_KEY_1: core.autocrlf
       GIT_CONFIG_VALUE_1: 'false'
-      # The compiler the Jenkins hosts built with (status-im/infra-scoop-bucket).
-      WINLIBS_RELEASE: 15.2.0posix-13.0.0-ucrt-r5
-      WINLIBS_ARCHIVE: winlibs-x86_64-posix-seh-gcc-15.2.0-mingw-w64ucrt-13.0.0-r5.7z
-      WINLIBS_SHA256: 6b567e3c158a00c81ceb85298487c905ced3288fb5fb17636e2471cf8134927a
-      # Checksums of the Windows archives of the nimble and protoc versions the
-      # Dockerfile pins. A new version there fails the download check until these follow.
-      NIMBLE_SHA256: e158b8e501f6b1055cc5d4fef742e1eb928b685d67842a7b4e384183079b42f3
-      PROTOC_SHA256: 510fb2369a4720adb457783768c5e1481a0e1137d9e7694478dfe9b8fe445dc1
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
@@ -77,30 +69,7 @@ jobs:
           path-type: inherit
           install: make unzip
       - name: Compiler, nimble and protoc
-        run: |
-          tools="$(cygpath -u "$RUNNER_TEMP")/tools"
-          mkdir -p "$tools"
-          fetch() { # <url> <sha256> <file>
-            curl -sSfL --retry 3 -o "$3" "$1"
-            echo "$2  $3" | sha256sum -c -
-          }
-          fetch "https://github.com/brechtsanders/winlibs_mingw/releases/download/$WINLIBS_RELEASE/$WINLIBS_ARCHIVE" \
-            "$WINLIBS_SHA256" "$tools/winlibs.7z"
-          7z x -bso0 -bsp0 "-o$(cygpath -w "$tools")" "$(cygpath -w "$tools/winlibs.7z")"
-          rm "$tools/winlibs.7z"
-          fetch "https://github.com/nim-lang/nimble/releases/download/v$NIMBLE_VERSION/nimble-windows_x64.zip" \
-            "$NIMBLE_SHA256" "$tools/nimble.zip"
-          unzip -q "$tools/nimble.zip" -d "$tools/nimble"
-          fetch "https://github.com/protocolbuffers/protobuf/releases/download/v$PROTOC_VERSION/protoc-$PROTOC_VERSION-win64.zip" \
-            "$PROTOC_SHA256" "$tools/protoc.zip"
-          unzip -q "$tools/protoc.zip" -d "$tools/protoc"
-          # Ahead of the compilers the runner image ships.
-          cygpath -w "$tools/mingw64/bin" >> "$GITHUB_PATH"
-          cygpath -w "$tools/protoc/bin" >> "$GITHUB_PATH"
-          # Added last so that it precedes the nimble bundled with Nim.
-          cygpath -w "$tools/nimble" >> "$GITHUB_PATH"
-          # A fixed place for the cache below, on the runner's work disk.
-          echo "GO_GENERATE_FAST_DIR=$(cygpath -m "$RUNNER_TEMP")/status-go-cache/go-generate-fast" >> "$GITHUB_ENV"
+        run: .github/scripts/windows-toolchain.sh
       - uses: ./.github/actions/go-cache
         with:
           name: windows-x86_64
@@ -118,8 +87,8 @@ jobs:
           path: |
             build/libsds.dll
             build/libsds.h
-          # status_go.nimble pins the revision, this file and the Dockerfile the compilers.
-          key: libsds-windows-x86_64-${{ hashFiles('status_go.nimble', 'Makefile', 'Dockerfile', '.github/workflows/build-windows.yml') }}
+          # status_go.nimble pins the revision; this file, the script and the Dockerfile the compilers.
+          key: libsds-windows-x86_64-${{ hashFiles('status_go.nimble', 'Makefile', 'Dockerfile', '.github/workflows/build-windows.yml', '.github/scripts/windows-toolchain.sh') }}
       - name: Use the restored libsds
         if: steps.libsds.outputs.cache-hit == 'true'
         run: echo "MAKE_ARGS=NIM_SDS_LIB_DIR=$(pwd -W)/build NIM_SDS_INC_DIR=$(pwd -W)/build" >> "$GITHUB_ENV"

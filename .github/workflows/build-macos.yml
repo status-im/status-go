@@ -29,9 +29,6 @@ jobs:
               build/bin/libstatus.dylib
               build/bin/libstatus.h
               build/libsds.dylib
-    # No Nix: without the Status caches the dev shell fetches 2 GiB and builds
-    # 95 derivations on an empty runner. libsds and libtkl are built here instead.
-    # GitHub's macOS 15 runners are Apple Silicon.
     runs-on: macos-15
     timeout-minutes: 60
     steps:
@@ -71,7 +68,7 @@ jobs:
           path: |
             build/libsds.dylib
             build/libsds.h
-          key: libsds-macos-aarch64-${{ hashFiles('status_go.nimble', 'Makefile', '.github/actions/nim/action.yml') }}
+          key: libsds-macos-aarch64-${{ hashFiles('status_go.nimble', 'Makefile', '.github/actions/nim/**') }}
       - name: Nim dependencies and libsds
         if: steps.libsds.outputs.cache-hit != 'true'
         run: make build-libsds
