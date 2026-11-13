@@ -144,7 +144,7 @@ jobs:
     timeout-minutes: 90
     permissions:
       contents: read
-      packages: write
+      packages: read
     strategy:
       fail-fast: false
       matrix:
@@ -179,21 +179,70 @@ jobs:
             docker tag "$PEER_REGISTRY_IMAGE" "$PEER_LOCAL_IMAGE"
             echo "pulled=true" >> "$GITHUB_OUTPUT"
           fi
+          # The tests run code from the pull request; they get no registry credential.
+          docker logout ghcr.io
       - name: Compatibility tests
         run: make test-functional-compatibility
       # Pull requests only read the registry: an image published there is used by every later run.
-      - name: Publish the peer image
+      # The publish-peers job pushes it; this one cannot write to the registry.
+      - name: Save the peer image
+        id: save
         if: >-
           always() && steps.peer.outputs.pulled != 'true' && github.repository == 'status-im/status-go' &&
           github.event_name != 'pull_request'
+        env:
+          PEER: ${{ matrix.peer }}
         run: |
           docker image inspect "$PEER_LOCAL_IMAGE" > /dev/null 2>&1 || exit 0
-          docker tag "$PEER_LOCAL_IMAGE" "$PEER_REGISTRY_IMAGE"
-          docker push "$PEER_REGISTRY_IMAGE" || echo "::warning::Could not publish $PEER_REGISTRY_IMAGE"
+          mkdir -p "$RUNNER_TEMP/peer"
+          docker save "$PEER_LOCAL_IMAGE" | zstd -T0 -o "$RUNNER_TEMP/peer/$PEER.tar.zst"
+          echo "saved=true" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always() && steps.save.outputs.saved == 'true'
+        with:
+          name: peer-image-${{ matrix.peer }}-${{ strategy.job-index }}
+          path: ${{ runner.temp }}/peer
+          if-no-files-found: error
+          # Already compressed.
+          compression-level: 0
+          retention-days: 1
       - uses: ./.github/actions/functional-tests/reports
         if: always()
         with:
           name: functional-test-reports-rpc-compat-${{ strategy.job-index }}
+  # Pushes the peer images the test jobs had to build. It checks out nothing and
+  # runs no code from the repository, so the write token meets only docker.
+  publish-peers:
+    name: publish peer images
+    if: >-
+      always() && github.repository == 'status-im/status-go' && github.event_name != 'pull_request'
+    needs: rpc-compat-tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      packages: write
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: peer-image-*
+          path: ${{ runner.temp }}/peers
+      - name: Publish
+        env:
+          GHCR_TOKEN: ${{ github.token }}
+          GHCR_USER: ${{ github.actor }}
+        run: |
+          shopt -s nullglob globstar
+          echo "$GHCR_TOKEN" | docker login ghcr.io --username "$GHCR_USER" --password-stdin
+          for file in "$RUNNER_TEMP"/peers/**/*.tar.zst; do
+            peer="$(basename "$file" .tar.zst)"
+            # Each slice of a release saves the image it built; one is enough.
+            case " ${published:-} " in *" $peer "*) continue ;; esac
+            published="${published:-} $peer"
+            zstd -dc "$file" | docker load
+            docker tag "statusgo-peer-$peer" "ghcr.io/status-im/status-go-peer:$peer"
+            docker push "ghcr.io/status-im/status-go-peer:$peer" ||
+              echo "::warning::Could not publish the peer image of $peer"
+          done
   # One check name each for branch rules, whatever the number of jobs behind it.
   rpc:
     name: rpc
