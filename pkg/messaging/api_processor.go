@@ -3,10 +3,16 @@ package messaging
 import (
 	"crypto/ecdsa"
 
+	"github.com/waku-org/sds-go-bindings/sds"
+
 	"github.com/status-im/status-go/internal/connection"
 	adapters "github.com/status-im/status-go/pkg/messaging/adapters"
 	types "github.com/status-im/status-go/pkg/messaging/types"
 )
+
+func (a *API) SetSDSValidator(validator sds.Validator) error {
+	return a.core.stack.Reliability.SetSDSValidator(validator)
+}
 
 func (a *API) RetrieveRawAll() (map[types.ChatFilter][]*types.ReceivedMessage, error) {
 	filters, err := a.core.stack.Transport.RetrieveRawAll()

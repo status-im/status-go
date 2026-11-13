@@ -64,7 +64,7 @@ type metadataOnlySDSLayerStub struct {
 	hints     bool
 }
 
-func (s *metadataOnlySDSLayerStub) UnwrapPayloadFromSDSWithMetadata([]byte) ([]byte, []byte, string, bool, error) {
+func (s *metadataOnlySDSLayerStub) UnwrapPayloadFromSDSWithContext([]byte, []byte) ([]byte, []byte, string, bool, error) {
 	return nil, nil, s.channelID, true, nil
 }
 
@@ -140,6 +140,55 @@ func (s *ProcessorSuite) newStandaloneReliability(persistence ...sds.Persistence
 
 type failingSDSLoadPersistence struct {
 	loadError error
+}
+
+type processorSDSValidatorFunc func(sds.ValidationMessage) (bool, error)
+
+func (f processorSDSValidatorFunc) Validate(message sds.ValidationMessage) (bool, error) {
+	return f(message)
+}
+
+func (s *ProcessorSuite) TestSDSValidationStopsBeforeReceivedEvidence() {
+	for _, failure := range []bool{false, true} {
+		s.Run(fmt.Sprintf("validation-error=%t", failure), func() {
+			sender := s.newStandaloneReliability()
+			wrapped, messageID, err := sender.WrapPayloadForSDS(s.testPayload, "channel")
+			s.Require().NoError(err)
+			receiver := s.newStandaloneReliability()
+			store := &testSDSRetrievalHintPersistence{hints: make(map[string][][]byte)}
+			receiver.SetSDSRetrievalHintPersistence(store)
+			var context []byte
+			s.Require().NoError(receiver.SetSDSValidator(processorSDSValidatorFunc(func(message sds.ValidationMessage) (bool, error) {
+				context = message.ValidationContext
+				if failure {
+					return false, errors.New("permission lookup failed")
+				}
+				return false, nil
+			})))
+			s.processor.stack.Reliability = receiver
+			key, err := crypto.GenerateKey()
+			s.Require().NoError(err)
+			message := &types.ReceivedMessage{
+				Sig:     crypto.FromECDSAPub(&key.PublicKey),
+				Payload: wrapped,
+				Hash:    crypto.Keccak256(wrapped),
+			}
+			response, err := s.processor.ProcessMessage(message)
+			if failure {
+				s.Require().ErrorIs(err, sds.ErrValidationFailed)
+				s.Require().Nil(response)
+			} else {
+				s.Require().NoError(err)
+				s.Require().Empty(response.Messages)
+				s.Require().Equal([][]byte{message.Hash}, response.ConsumedEnvelopeHashes)
+			}
+			s.Require().Equal(message.Sig, context)
+			received, err := store.IsSDSMessageReceived("channel", cryptotypes.EncodeHex(messageID))
+			s.Require().NoError(err)
+			s.Require().False(received)
+			s.Require().Empty(store.hints)
+		})
+	}
 }
 
 func (*failingSDSLoadPersistence) SaveChannelMeta(string, []byte) error { return nil }

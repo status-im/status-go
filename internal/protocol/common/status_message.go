@@ -46,20 +46,31 @@ func NewStatusMessages(messages []*messagingtypes.Message) []*StatusMessage {
 }
 
 func processMessageApplicationLayer(m *StatusMessage) error {
-	message, err := protobuf.Unmarshal(m.EncryptionLayer.Payload)
+	layer, err := ParseApplicationLayer(m.EncryptionLayer.Payload)
 	if err != nil {
 		return err
+	}
+	m.ApplicationLayer = layer
+	return nil
+}
+
+// ParseApplicationLayer decodes the application envelope and recovers its signer
+// without processing the message.
+func ParseApplicationLayer(payload []byte) (ApplicationLayer, error) {
+	message, err := protobuf.Unmarshal(payload)
+	if err != nil {
+		return ApplicationLayer{}, err
 	}
 
 	recoveredKey, err := RecoverKey(message)
 	if err != nil {
-		return err
+		return ApplicationLayer{}, err
 	}
 
-	m.ApplicationLayer.SigPubKey = recoveredKey
-	// Calculate ID using the wrapped record
-	m.ApplicationLayer.ID = messagingtypes.MessageID(recoveredKey, m.EncryptionLayer.Payload)
-	m.ApplicationLayer.Payload = message.Payload
-	m.ApplicationLayer.Type = message.Type
-	return nil
+	return ApplicationLayer{
+		SigPubKey: recoveredKey,
+		ID:        messagingtypes.MessageID(recoveredKey, payload),
+		Payload:   message.Payload,
+		Type:      message.Type,
+	}, nil
 }

@@ -488,6 +488,9 @@ func NewMessenger(
 	}
 
 	communitiesManager.SetMemberProfileProvider(messenger.allContacts)
+	if err := messenger.messaging.SetSDSValidator(communitySDSValidator{messenger: messenger}); err != nil {
+		return nil, errors.Wrap(err, "failed to configure community SDS validation")
+	}
 	messenger.mentionsManager = NewMentionManager(messenger)
 	messenger.storeNodeRequestsManager = NewStoreNodeRequestManager(messenger)
 
