@@ -28,13 +28,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          # The same builds `make test-functional USE_LOGOS_STORAGE=true` and
-          # `make test-functional-compatibility` make.
-          - tests: rpc
-            logos-storage: true
-          - tests: rpc-compat
-            logos-storage: false
+        # The same builds `make test-functional USE_LOGOS_STORAGE=true` and
+        # `make test-functional-compatibility` make.
+        tests: [rpc, rpc-compat]
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -42,7 +38,7 @@ jobs:
       - name: Build the image
         env:
           FUNCTIONAL_TESTS_IMAGE_ONLY: true
-          USE_LOGOS_STORAGE: ${{ matrix.logos-storage }}
+          USE_LOGOS_STORAGE: ${{ matrix.tests == 'rpc' }}
         run: scripts/run_functional_tests.sh
       - name: Save the image
         run: docker save "$FUNCTIONAL_TESTS_DOCKER_IMAGE" | zstd -T0 -o "$RUNNER_TEMP/image.tar.zst"
@@ -113,7 +109,7 @@ jobs:
 
   # The compatibility tests against one previous release each; within a job they run one by one.
   rpc-compat-tests:
-    name: rpc-compat (${{ matrix.peer }})
+    name: rpc-compat (${{ matrix.peer }}, ${{ matrix.shard }})
     needs: [image, peers]
     runs-on: ubuntu-24.04
     timeout-minutes: 90
@@ -124,7 +120,9 @@ jobs:
       fail-fast: false
       matrix:
         peer: ${{ fromJSON(needs.peers.outputs.refs) }}
+        shard: ['1/2', '2/2']
     env:
+      FUNCTIONAL_TESTS_SHARD: ${{ matrix.shard }}
       FUNCTIONAL_TESTS_SKIP_IMAGE_BUILD: true
       PEER_REFS: ${{ matrix.peer }}
       # A release never changes, so its image is built once and kept in the registry.
@@ -166,7 +164,7 @@ jobs:
       - uses: ./.github/actions/functional-tests/reports
         if: always()
         with:
-          name: functional-test-reports-rpc-compat-${{ matrix.peer }}
+          name: functional-test-reports-rpc-compat-${{ strategy.job-index }}
   # One check name each for branch rules, whatever the number of jobs behind it.
   rpc:
     name: rpc
