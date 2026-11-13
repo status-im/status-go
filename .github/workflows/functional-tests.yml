@@ -154,11 +154,11 @@ jobs:
           fi
       - name: Compatibility tests
         run: make test-functional-compatibility
-      # Forks and tokens without package access cannot publish; the next run builds it again.
+      # Pull requests only read the registry: an image published there is used by every later run.
       - name: Publish the peer image
         if: >-
           always() && steps.peer.outputs.pulled != 'true' && github.repository == 'status-im/status-go' &&
-          (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+          github.event_name != 'pull_request'
         run: |
           docker image inspect "$PEER_LOCAL_IMAGE" > /dev/null 2>&1 || exit 0
           docker tag "$PEER_LOCAL_IMAGE" "$PEER_REGISTRY_IMAGE"
