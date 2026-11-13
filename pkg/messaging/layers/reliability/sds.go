@@ -35,7 +35,7 @@ func newSdsReliabilityManager(
 	persistence sds.PersistenceCallbacks,
 	onMessageSent func(messageId sds.MessageID, channelId string),
 	onMissingDependencies func(messageId sds.MessageID, missingDeps []sds.HistoryEntry, channelId string),
-	retrievalHintProvider func(messageId sds.MessageID) []byte,
+	retrievalHintProvider func(messageId sds.MessageID, channelId string) []byte,
 ) (*sds.ReliabilityManager, error) {
 	reliabilityManager, err := sdsManagerFactory(logger, persistence)
 	if err != nil {
@@ -69,14 +69,15 @@ func newSdsReliabilityManager(
 				zap.String("messageId", string(messageId)),
 				zap.String("channelId", channelId))
 		},
-		RetrievalHintProvider: func(messageId sds.MessageID) []byte {
+		ChannelRetrievalHintProvider: func(messageId sds.MessageID, channelId string) []byte {
 			if retrievalHintProvider == nil {
 				return nil
 			}
 
-			hint := retrievalHintProvider(messageId)
+			hint := retrievalHintProvider(messageId, channelId)
 			logger.Debug("resolved retrieval hint for sds message",
 				zap.String("messageId", string(messageId)),
+				zap.String("channelId", channelId),
 				zap.Int("hintLen", len(hint)))
 
 			return hint
@@ -89,8 +90,7 @@ func newSdsReliabilityManager(
 
 // Wrap message with SDS protocol https://github.com/vacp2p/rfc-index/blob/main/vac/raw/sds.md
 func (r *Reliability) WrapPayloadForSDS(payload []byte, channelID string) ([]byte, []byte, error) {
-	// SDS asks for retrieval hints during wrapping, but its callback has no
-	// channel argument. Serialize wraps so the callback can use this channel.
+	// Keep the channel set for legacy retrieval-hint providers that lack it.
 	r.sdsOpsMu.Lock()
 	defer r.sdsOpsMu.Unlock()
 
@@ -120,6 +120,28 @@ func (r *Reliability) WrapPayloadForSDS(payload []byte, channelID string) ([]byt
 	}
 
 	return sdsWrappedPayload, sdsMessageID, nil
+}
+
+// EnsureSDSChannel loads persisted state for a channel before it is ticked.
+func (r *Reliability) EnsureSDSChannel(channelID string) error {
+	r.sdsOpsMu.RLock()
+	defer r.sdsOpsMu.RUnlock()
+
+	if r.sdsManager == nil {
+		return ErrSDSManagerUnavailable
+	}
+	return r.sdsManager.EnsureChannel(channelID)
+}
+
+// TickSDS returns due sync payloads, with generation errors reported per channel.
+func (r *Reliability) TickSDS() ([]sds.TickEvent, error) {
+	r.sdsOpsMu.RLock()
+	defer r.sdsOpsMu.RUnlock()
+
+	if r.sdsManager == nil {
+		return nil, ErrSDSManagerUnavailable
+	}
+	return r.sdsManager.Tick()
 }
 
 func (r *Reliability) UnwrapPayloadFromSDS(wrappedPayload []byte) ([]byte, error) {
@@ -152,11 +174,16 @@ func (r *Reliability) UnwrapPayloadFromSDSWithMetadata(wrappedPayload []byte) (
 		return nil, nil, "", false, errors.Wrap(err, "failed to unwrap message with SDS")
 	}
 
-	if unwrappedMessage == nil || unwrappedMessage.Message == nil || *unwrappedMessage.Message == nil {
-		return nil, nil, "", false, errors.New("SDS unwrap returned no message")
+	if unwrappedMessage == nil {
+		return nil, nil, "", false, errors.New("SDS unwrap returned no result")
 	}
 	if unwrappedMessage.ChannelId == nil || *unwrappedMessage.ChannelId == "" {
 		return nil, nil, "", false, errors.New("SDS unwrap returned no channel ID")
+	}
+
+	channelID = *unwrappedMessage.ChannelId
+	if unwrappedMessage.Message == nil || *unwrappedMessage.Message == nil {
+		return nil, nil, channelID, true, nil
 	}
 
 	var missingDeps []sds.HistoryEntry
@@ -168,5 +195,5 @@ func (r *Reliability) UnwrapPayloadFromSDSWithMetadata(wrappedPayload []byte) (
 	}
 
 	payload = *unwrappedMessage.Message
-	return payload, crypto.Keccak256(payload), *unwrappedMessage.ChannelId, true, nil
+	return payload, crypto.Keccak256(payload), channelID, true, nil
 }

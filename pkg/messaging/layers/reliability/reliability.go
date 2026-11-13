@@ -1,6 +1,7 @@
 package reliability
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"sync"
 	"sync/atomic"
@@ -49,6 +50,10 @@ type MissingDependency struct {
 // SDS message ID.
 type RetrievalHintProvider func(messageID string) []byte
 
+// ChannelRetrievalHintProvider returns a transport-level retrieval hint for an
+// SDS message in a specific channel.
+type ChannelRetrievalHintProvider func(messageID, channelID string) []byte
+
 // MessageSentHandler is triggered when SDS confirms an outgoing message was
 // observed in an incoming message's bloom filter or causal history.
 type MessageSentHandler func(messageID string)
@@ -66,17 +71,22 @@ type Reliability struct {
 	// mu guards lifecycle transitions (Start/Stop/SetPaused/buildNode) so they
 	// don't interleave. The hot path (Unwrap / WrapAndQueue) never takes mu;
 	// datasync uses atomic loads and SDS uses sdsOpsMu.
-	mu       sync.Mutex
-	datasync atomic.Pointer[datasync.DataSync]
-	dispatch MessageDispatcher
-	paused   bool
-	tick     time.Duration // outbound-loop interval the active node was built with
+	mu          sync.Mutex
+	datasync    atomic.Pointer[datasync.DataSync]
+	dispatch    MessageDispatcher
+	paused      bool
+	tick        time.Duration // outbound-loop interval the active node was built with
+	syncContext context.Context
+	syncCancel  context.CancelFunc
 
 	missingDepsHandlerMu sync.RWMutex
 	missingDepsHandler   MissingDependenciesHandler
 
 	retrievalHintProviderMu sync.RWMutex
 	retrievalHintProvider   RetrievalHintProvider
+
+	channelRetrievalHintProviderMu sync.RWMutex
+	channelRetrievalHintProvider   ChannelRetrievalHintProvider
 
 	retrievalHintPersistenceMu sync.RWMutex
 	sdsChannelMu               sync.RWMutex
@@ -251,6 +261,13 @@ func (r *Reliability) SetRetrievalHintProvider(provider RetrievalHintProvider) {
 	r.retrievalHintProvider = provider
 }
 
+// SetChannelRetrievalHintProvider configures channel-aware SDS retrieval hints.
+func (r *Reliability) SetChannelRetrievalHintProvider(provider ChannelRetrievalHintProvider) {
+	r.channelRetrievalHintProviderMu.Lock()
+	defer r.channelRetrievalHintProviderMu.Unlock()
+	r.channelRetrievalHintProvider = provider
+}
+
 // SetMessageSentHandler configures the handler for outgoing SDS delivery
 // confirmations.
 func (r *Reliability) SetMessageSentHandler(handler MessageSentHandler) {
@@ -268,7 +285,14 @@ func (r *Reliability) handleSDSMessageSent(messageID sds.MessageID, _ string) {
 	}
 }
 
-func (r *Reliability) provideRetrievalHint(messageID sds.MessageID) []byte {
+func (r *Reliability) provideRetrievalHint(messageID sds.MessageID, channelID string) []byte {
+	r.channelRetrievalHintProviderMu.RLock()
+	channelProvider := r.channelRetrievalHintProvider
+	r.channelRetrievalHintProviderMu.RUnlock()
+	if channelProvider != nil {
+		return channelProvider(string(messageID), channelID)
+	}
+
 	r.retrievalHintProviderMu.RLock()
 	provider := r.retrievalHintProvider
 	r.retrievalHintProviderMu.RUnlock()
@@ -327,6 +351,9 @@ func (r *Reliability) handleMissingDependencies(messageID sds.MessageID, missing
 func (r *Reliability) Start(dispatch MessageDispatcher) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	if r.datasync.Load() != nil {
+		return nil
+	}
 	r.dispatch = dispatch
 	if r.sdsManager == nil {
 		if err := r.buildSdsManager(); err != nil {
@@ -337,7 +364,29 @@ func (r *Reliability) Start(dispatch MessageDispatcher) error {
 	if r.paused {
 		duration = pausedDuration
 	}
-	return r.buildNode(duration)
+	if err := r.buildNode(duration); err != nil {
+		return err
+	}
+	r.updateSyncContextLocked()
+	return nil
+}
+
+// PeriodicSyncContext is cancelled whenever sending is paused or stopped.
+func (r *Reliability) PeriodicSyncContext() context.Context {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.syncContext
+}
+
+func (r *Reliability) updateSyncContextLocked() {
+	if r.syncCancel != nil {
+		r.syncCancel()
+		r.syncCancel = nil
+		r.syncContext = nil
+	}
+	if !r.paused && r.datasync.Load() != nil {
+		r.syncContext, r.syncCancel = context.WithCancel(context.Background())
+	}
 }
 
 // buildNode (re)creates the mvds data-sync node with the given outbound-loop
@@ -421,6 +470,9 @@ func (r *Reliability) SetPaused(paused bool) error {
 		return nil
 	}
 	r.paused = paused
+	if paused {
+		r.updateSyncContextLocked()
+	}
 	old := r.datasync.Load()
 	if old == nil {
 		return nil // not started yet; Start will pick the right interval
@@ -437,8 +489,12 @@ func (r *Reliability) SetPaused(paused bool) error {
 	buildStart := time.Now()
 	if err := r.buildNode(duration); err != nil {
 		r.datasync.Store(nil)
+		r.updateSyncContextLocked()
 		r.logger.Error("reliability SetPaused: rebuild failed; data-sync node is down until next Start", zap.Error(err))
 		return err
+	}
+	if !paused {
+		r.updateSyncContextLocked()
 	}
 	r.logger.Info("reliability SetPaused",
 		zap.Bool("paused", paused),
@@ -458,7 +514,9 @@ func (r *Reliability) Stop() {
 }
 
 func (r *Reliability) stopLocked() {
-	if old := r.datasync.Swap(nil); old != nil {
+	old := r.datasync.Swap(nil)
+	r.updateSyncContextLocked()
+	if old != nil {
 		old.SetSendingEnabled(false)
 		old.Stop()
 	}

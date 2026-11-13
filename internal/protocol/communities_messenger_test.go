@@ -107,6 +107,60 @@ func (s *MessengerCommunitiesSuite) TestCreateCommunity() {
 	s.Require().Len(response.Chats(), 1)
 }
 
+func (s *MessengerCommunitiesSuite) TestSDSSyncUsesSeparateCommunityTopic() {
+	community, _ := s.createCommunity()
+	s.advertiseCommunityTo(community, s.owner, s.alice)
+	s.advertiseCommunityTo(community, s.owner, s.bob)
+	s.joinCommunity(community, s.owner, s.alice)
+	s.joinCommunity(community, s.owner, s.bob)
+
+	topic := communitySDSSyncTopic(community.IDString())
+	s.Require().NotNil(s.alice.messaging.ChatFilterByChatID(topic))
+	_, err := s.bob.messaging.RemoveFilterByChatID(topic)
+	s.Require().NoError(err)
+	s.Require().Nil(s.bob.messaging.ChatFilterByChatID(topic))
+	_, err = s.alice.messaging.RetrieveRawAll()
+	s.Require().NoError(err)
+	_, err = s.bob.messaging.RetrieveRawAll()
+	s.Require().NoError(err)
+	s.messagingEnv.SetConnectionState(messagingtypes.ConnectionStateConnected)
+	s.owner.startSDSPeriodicSync()
+
+	s.Require().Eventually(func() bool {
+		messages, err := s.alice.messaging.RetrieveRawAll()
+		if err != nil {
+			s.T().Error(err)
+			return false
+		}
+		for filter, envelopes := range messages {
+			if filter.ChatID() != topic {
+				continue
+			}
+			for _, envelope := range envelopes {
+				result, err := s.alice.messaging.HandleReceivedMessages(envelope)
+				s.Require().NoError(err)
+				if result != nil && len(result.ConsumedEnvelopeHashes) > 0 {
+					s.Require().Empty(result.Messages)
+					return true
+				}
+			}
+		}
+		return false
+	}, 10*time.Second, 100*time.Millisecond)
+	time.Sleep(500 * time.Millisecond)
+	oldPeerMessages, err := s.bob.messaging.RetrieveRawAll()
+	s.Require().NoError(err)
+	for _, envelopes := range oldPeerMessages {
+		for _, envelope := range envelopes {
+			result, err := s.bob.messaging.HandleReceivedMessages(envelope)
+			s.Require().NoError(err)
+			if result != nil {
+				s.Require().Empty(result.ConsumedEnvelopeHashes, "old peer received the sync")
+			}
+		}
+	}
+}
+
 func (s *MessengerCommunitiesSuite) TestCreateCommunity_WithoutDefaultChannel() {
 
 	description := &requests.CreateCommunity{
@@ -382,6 +436,9 @@ func (s *MessengerCommunitiesSuite) TestJoinCommunity() {
 	s.Require().Len(response.Communities(), 1)
 	s.Require().True(response.Communities()[0].Joined())
 	s.Require().True(response.Communities()[0].JoinedAt() > 0)
+	syncFilter := s.alice.messaging.ChatFilterByChatID(communitySDSSyncTopic(community.IDString()))
+	s.Require().NotNil(syncFilter)
+	s.Require().Equal(community.PubsubTopic(), syncFilter.PubsubTopic())
 	s.Require().Len(response.Chats(), 2)
 	s.Require().Len(response.Communities()[0].Categories(), 1)
 	s.Require().Len(response.notifications, 1)
@@ -474,6 +531,7 @@ func (s *MessengerCommunitiesSuite) TestJoinCommunity() {
 	s.Require().Len(response.Communities(), 1)
 	s.Require().False(response.Communities()[0].Joined())
 	s.Require().Len(response.RemovedChats(), 3)
+	s.Require().Nil(s.alice.messaging.ChatFilterByChatID(communitySDSSyncTopic(community.IDString())))
 }
 
 func (s *MessengerCommunitiesSuite) createCommunity() (*communities.Community, *Chat) {
