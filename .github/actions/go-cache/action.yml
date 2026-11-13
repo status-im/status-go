@@ -13,6 +13,9 @@ inputs:
 runs:
   using: composite
   steps:
+    # setup-go's pattern takes the code generator's progress lines for compile errors.
+    - shell: bash
+      run: echo "::remove-matcher owner=go::"
     # hashFiles is only available inside steps.
     - id: plan
       shell: bash

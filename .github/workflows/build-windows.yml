@@ -125,8 +125,6 @@ jobs:
         run: echo "MAKE_ARGS=NIM_SDS_LIB_DIR=$(pwd -W)/build NIM_SDS_INC_DIR=$(pwd -W)/build" >> "$GITHUB_ENV"
       - name: Toolchain versions
         run: |
-          # go-generate-fast prints "file.go: command" lines, which setup-go's matcher reports as errors.
-          echo "::remove-matcher owner=go::"
           for tool in go nim nimble gcc mingw32-make make protoc git sh; do
             echo "$tool: $(command -v "$tool" || echo missing)"
           done
@@ -165,8 +163,4 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
-      - env:
-          LIBRARIES: ${{ needs.libraries.result }}
-        run: |
-          echo "libraries: $LIBRARIES"
-          [ "$LIBRARIES" = success ]
+      - run: jq -e 'all(. == "success")' <<< '${{ toJSON(needs.*.result) }}'

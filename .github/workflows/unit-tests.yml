@@ -220,10 +220,4 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
-      - env:
-          COEXISTENCE: ${{ needs.coexistence.result }}
-          PACKAGES: ${{ needs.packages.result }}
-          PROTOCOL: ${{ needs.protocol.result }}
-        run: |
-          echo "coexistence: $COEXISTENCE, packages: $PACKAGES, protocol: $PROTOCOL"
-          [ "$COEXISTENCE" = success ] && [ "$PACKAGES" = success ] && [ "$PROTOCOL" = success ]
+      - run: jq -e 'all(. == "success")' <<< '${{ toJSON(needs.*.result) }}'
