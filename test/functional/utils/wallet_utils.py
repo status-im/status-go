@@ -1,7 +1,9 @@
 import json
 import logging
+import os
 import uuid as uuid_lib
 
+import pytest
 import resources.constants as constants
 from clients.signals import SignalType, WalletEventType
 from clients.wallet_pending_tx_status import WalletPendingTxStatus
@@ -33,6 +35,11 @@ def get_suggested_routes(rpc_client, **kwargs):
     for key in required_params:
         if key not in input_params:
             logging.info(f"Warning: The key '{key}' does not exist in the input_params parameters and will be ignored.")
+
+    # The router asks the market proxy for prices before it answers, and on a CI
+    # runner without the build credentials that request times out.
+    if os.environ.get("CI") and not os.environ.get("STATUS_BUILD_PROXY_USER"):
+        pytest.skip("suggested routes need prices from the market proxy")
 
     with rpc_client.expect_signal("wallet.suggested.routes") as exp:
         _ = rpc_client.wallet_service.get_suggested_routes_async(input_params)
