@@ -97,6 +97,7 @@ else
     --build-arg "use_logos_storage=${USE_LOGOS_STORAGE}" \
     --build-arg "use_torrent=${USE_TORRENT}" \
     --build-arg "enable_go_cache=false" \
+    --build-arg "prebuilt_libs=${FUNCTIONAL_TESTS_PREBUILT_LIBS:-}" \
     --tag "${image_name}"
 
   if [[ $? -ne 0 ]]; then

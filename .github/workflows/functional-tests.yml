@@ -35,9 +35,38 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
+      # The libraries the prepare job of unit-tests.yml builds and caches. Without
+      # them the image build makes its own, six to eight minutes longer.
+      - id: libsds
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            build/libsds.so
+            build/libsds.h
+          key: libsds-linux-x86_64-${{ hashFiles('status_go.nimble', 'Makefile', 'Dockerfile') }}
+      - id: libstorage
+        if: matrix.tests == 'rpc'
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: build/deps/logos-storage
+          key: libstorage-tree-linux-x86_64-${{ hashFiles('Makefile', 'Dockerfile') }}
+      # build/ is not part of the Docker build context.
+      - name: Hand the libraries to the image build
+        env:
+          SDS: ${{ steps.libsds.outputs.cache-hit }}
+          STORAGE: ${{ steps.libstorage.outputs.cache-hit }}
+        run: |
+          mkdir -p .prebuilt-libs
+          [ "$SDS" != true ] || cp build/libsds.so build/libsds.h .prebuilt-libs/
+          [ "$STORAGE" != true ] || {
+            cp build/deps/logos-storage/build/libstorage.so .prebuilt-libs/
+            cp -R build/deps/logos-storage/library .prebuilt-libs/
+          }
+          ls -la .prebuilt-libs
       - name: Build the image
         env:
           FUNCTIONAL_TESTS_IMAGE_ONLY: true
+          FUNCTIONAL_TESTS_PREBUILT_LIBS: .prebuilt-libs
           USE_LOGOS_STORAGE: ${{ matrix.tests == 'rpc' }}
         run: scripts/run_functional_tests.sh
       - name: Save the image
@@ -62,7 +91,7 @@ jobs:
       fail-fast: false
       matrix:
         # Slices of the tests, see FUNCTIONAL_TESTS_SHARD in test/functional/conftest.py.
-        shard: ['1/3', '2/3', '3/3']
+        shard: ['1/5', '2/5', '3/5', '4/5', '5/5']
     env:
       FUNCTIONAL_TESTS_SHARD: ${{ matrix.shard }}
       FUNCTIONAL_TESTS_SKIP_IMAGE_BUILD: true

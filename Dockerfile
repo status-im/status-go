@@ -114,15 +114,23 @@ RUN if [ "$enable_go_cache" = "true" ]; then \
     go env -w GOCACHE=/root/.cache/go-build; \
     fi
 ARG use_torrent=false
+# A directory of the build context with libraries built earlier in this toolchain:
+# libsds.so with libsds.h, libstorage.so with its library/ headers. What is
+# missing there is built here.
+ARG prebuilt_libs=''
 RUN --mount=type=cache,target="/root/.cache/go-build",id=statusgo-build-$cache_id \
-    make $build_target BUILD_TAGS="$build_tags" BUILD_FLAGS="$build_flags" USE_LOGOS_STORAGE="$use_logos_storage" USE_TORRENT="$use_torrent"
+    libs="$PWD/${prebuilt_libs:-none}"; \
+    [ ! -f "$libs/libsds.so" ] || sds="NIM_SDS_LIB_DIR=$libs NIM_SDS_INC_DIR=$libs"; \
+    [ ! -f "$libs/libstorage.so" ] || storage="LOGOS_STORAGE_LIB_DIR=$libs LOGOS_STORAGE_INC_DIR=$libs/library"; \
+    make $build_target BUILD_TAGS="$build_tags" BUILD_FLAGS="$build_flags" USE_LOGOS_STORAGE="$use_logos_storage" USE_TORRENT="$use_torrent" ${sds:-} ${storage:-}
 
 # Stage runtime shared libraries required by built binaries.
 RUN mkdir -p /tmp/status-runtime-libs \
-    && cp /go/src/github.com/status-im/status-go/build/libsds.so /tmp/status-runtime-libs/ \
-    && if [ -f /go/src/github.com/status-im/logos-storage-nim/build/libstorage.so ]; then \
-    cp /go/src/github.com/status-im/logos-storage-nim/build/libstorage.so /tmp/status-runtime-libs/; \
-    fi
+    && for lib in build/libsds.so ../logos-storage-nim/build/libstorage.so \
+        "${prebuilt_libs:-none}/libsds.so" "${prebuilt_libs:-none}/libstorage.so"; do \
+    if [ -f "$lib" ]; then cp "$lib" /tmp/status-runtime-libs/; fi; \
+    done \
+    && test -f /tmp/status-runtime-libs/libsds.so
 
 # Copy binaries to the second image
 FROM debian:trixie-slim
