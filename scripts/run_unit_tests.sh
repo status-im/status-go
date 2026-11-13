@@ -119,42 +119,30 @@ MIN_PROTOCOL_SHARDS=1
 MAX_PROTOCOL_SHARDS=5
 
 # Seconds the slow top-level `protocol` tests take, and one `default` line for
-# all the others; see scripts/protocol_test_seconds.py.
+# all the others.
 PROTOCOL_TEST_SECONDS_FILE="${GIT_ROOT}/scripts/protocol_test_seconds.txt"
 
 # Reads test names on stdin and prints "<shard> <test>" for each of them, shards
 # numbered from 0. The slowest tests are placed first, each into the shard with
 # the least work so far.
 assign_protocol_shards() {
-  local shards="$1"
-
-  awk -v shards="${shards}" -v seconds_file="${PROTOCOL_TEST_SECONDS_FILE}" '
+  awk -v seconds_file="${PROTOCOL_TEST_SECONDS_FILE}" '
     BEGIN {
+      seconds["default"] = 1
       while ((getline line < seconds_file) > 0) {
         split(line, field, " ")
         if (field[1] ~ /^[0-9]+$/) seconds[field[2]] = field[1]
       }
     }
-    { tests[++count] = $1 }
-    END {
-      other = ("default" in seconds) ? seconds["default"] : 1
-      for (i = 1; i <= count; i++) {
-        weight[i] = (tests[i] in seconds) ? seconds[tests[i]] : other
-        order[i] = i
+    { print (($1 in seconds) ? seconds[$1] : seconds["default"]), $1 }' |
+    sort -s -k1,1nr |
+    awk -v shards="$1" '{
+      lightest = 0
+      for (shard = 1; shard < shards; shard++) {
+        if (load[shard] < load[lightest]) lightest = shard
       }
-      for (i = 1; i <= count; i++) {
-        heaviest = i
-        for (j = i + 1; j <= count; j++) {
-          if (weight[order[j]] > weight[order[heaviest]]) heaviest = j
-        }
-        swap = order[i]; order[i] = order[heaviest]; order[heaviest] = swap
-        lightest = 0
-        for (shard = 1; shard < shards; shard++) {
-          if (load[shard] < load[lightest]) lightest = shard
-        }
-        load[lightest] += weight[order[i]]
-        print lightest, tests[order[i]]
-      }
+      load[lightest] += $1
+      print lightest, $2
     }'
 }
 
@@ -195,20 +183,13 @@ if [[ $(echo "${UNIT_TEST_PACKAGES}" | grep -E '\s?\S+protocol\s+') == "" ]]; th
 fi
 
 # UNIT_TEST_PART limits the run to one slice of the suite, so that CI can spread
-# it over several machines. Only for UNIT_TEST_COUNT=1.
+# it over several machines. Only for UNIT_TEST_COUNT=1 and the full package list.
 #   packages:<i>/<n>  slice i of n of every package except `protocol`
 #   protocol:<i>/<n>  slice i of n of the `protocol` tests
 part_group=""
-part_index=0
-part_total=0
 if [[ -n "${UNIT_TEST_PART}" ]]; then
-  if [[ ! "${UNIT_TEST_PART}" =~ ^(packages|protocol):([1-9][0-9]*)/([1-9][0-9]*)$ ]] ||
-     [[ "${BASH_REMATCH[2]}" -gt "${BASH_REMATCH[3]}" ]]; then
+  if [[ ! "${UNIT_TEST_PART}" =~ ^(packages|protocol):([1-9][0-9]*)/([1-9][0-9]*)$ ]]; then
     echo -e "${RED}Invalid UNIT_TEST_PART='${UNIT_TEST_PART}'${RST}, expected packages:<i>/<n> or protocol:<i>/<n>" >&2
-    exit 2
-  fi
-  if [[ $HAS_PROTOCOL_PACKAGE == 'false' || $UNIT_TEST_COUNT -ne 1 ]]; then
-    echo -e "${RED}UNIT_TEST_PART needs the full package list and UNIT_TEST_COUNT=1${RST}" >&2
     exit 2
   fi
   part_group="${BASH_REMATCH[1]}"

@@ -1,6 +1,6 @@
 # Seconds per top-level test of internal/protocol that takes 30 s or more,
 # measured on a GitHub runner; `default` is the average of all the others.
-# Regenerate: scripts/protocol_test_seconds.py report_*.xml > scripts/protocol_test_seconds.txt
+# The times are in the JUnit reports of a unit test run (report_*.xml).
 303 TestAdminCommunityEventsSuite
 300 TestMessengerCommunitiesSuite
 264 TestTokenMasterCommunityEventsSuite
