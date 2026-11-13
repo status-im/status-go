@@ -8,7 +8,7 @@ set -euo pipefail
 
 GIT_ROOT=$(cd "${BASH_SOURCE%/*}" && git rev-parse --show-toplevel)
 source "${GIT_ROOT}/scripts/colors.sh"
-source "${GIT_ROOT}/scripts/codecov.sh"
+source "${GIT_ROOT}/scripts/coverage.sh"
 
 : "${FUNCTIONAL_TESTS_BUILD_TAGS:=gowaku_no_rln}"
 : "${USE_LOGOS_STORAGE:=false}"

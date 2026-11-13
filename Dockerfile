@@ -92,19 +92,6 @@ RUN go install "gotest.tools/gotestsum@v${GOTESTSUM_VERSION}" && \
     go clean -cache -modcache && \
     gotestsum --version
 
-# Uploads coverage reports; the test scripts call it only when told to report.
-ARG CODECOV_VERSION=11.1.0
-RUN set -eu && \
-    case "$(dpkg --print-architecture)" in \
-    amd64) CODECOV_PLATFORM=linux CODECOV_SHA256=5cc89518864eaae49f3819e42ba353f9a3c676912d4472351d31970643f1a49a ;; \
-    arm64) CODECOV_PLATFORM=linux-arm64 CODECOV_SHA256=7b886ab1750cc4bf80c800c8bf50ae9e10c77a886e48a4d15edc5a0965e3daa8 ;; \
-    *) echo "ERROR: unsupported architecture" >&2; exit 1 ;; \
-    esac; \
-    curl -sSfL -o /usr/local/bin/codecov "https://cli.codecov.io/v${CODECOV_VERSION}/${CODECOV_PLATFORM}/codecov" && \
-    echo "${CODECOV_SHA256}  /usr/local/bin/codecov" | sha256sum -c - && \
-    chmod +x /usr/local/bin/codecov && \
-    codecov --version
-
 # Build status-go in the toolchain container
 FROM toolchain AS builder
 

@@ -4,10 +4,9 @@ set -o nounset
 
 GIT_ROOT=$(cd "${BASH_SOURCE%/*}" && git rev-parse --show-toplevel)
 source "${GIT_ROOT}/scripts/colors.sh"
-source "${GIT_ROOT}/scripts/codecov.sh"
+source "${GIT_ROOT}/scripts/coverage.sh"
 
 : "${FUNCTIONAL_TESTS_LOG_LEVEL:=INFO}"
-: "${FUNCTIONAL_TESTS_REPORT_CODECOV:=false}"
 : "${FUNCTIONAL_TESTS_BUILD_TAGS:=gowaku_no_rln}"
 : "${USE_LOGOS_STORAGE:=false}"
 : "${FUNCTIONAL_TESTS_MARKER:=rpc}"
@@ -233,7 +232,7 @@ pytest --reruns "${FUNCTIONAL_TESTS_RERUNS}" -m "${pytest_marker_expr}" -c "${ro
   --docker_project_name="${project_name}" \
   --docker-image=${image_name} \
   ${peer_image_args[@]+"${peer_image_args[@]}"} \
-  --codecov_dir="${binary_coverage_reports_path}" \
+  --coverage_dir="${binary_coverage_reports_path}" \
   --logs-dir="${logs_path}" \
   --junitxml="${test_results_path}/report.xml" \
   "${root_path}"
@@ -255,11 +254,6 @@ full_coverage_profile="${coverage_reports_path}/coverage.out"
 go tool covdata merge -i="${binary_coverage_reports_path}" -o="${merged_coverage_reports_path}"
 go tool covdata textfmt -i="${merged_coverage_reports_path}" -o="${full_coverage_profile}"
 convert_coverage_to_html "${full_coverage_profile}" "${coverage_reports_path}/coverage.html"
-
-# Upload reports to Codecov
-if [[ ${FUNCTIONAL_TESTS_REPORT_CODECOV} == 'true' ]]; then
-  report_to_codecov "${test_results_path}/*.xml" "${full_coverage_profile}" "functional"
-fi
 
 echo -e "${GRN}Testing finished${RST}"
 exit $exit_code

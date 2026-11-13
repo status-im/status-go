@@ -1,4 +1,4 @@
-[![Unit Tests](https://github.com/status-im/status-go/actions/workflows/unit-tests.yml/badge.svg?branch=develop)](https://github.com/status-im/status-go/actions/workflows/unit-tests.yml?query=branch%3Adevelop) [![Functional Tests](https://github.com/status-im/status-go/actions/workflows/functional-tests.yml/badge.svg?branch=develop)](https://github.com/status-im/status-go/actions/workflows/functional-tests.yml?query=branch%3Adevelop) [![codecov](https://codecov.io/github/status-im/status-go/graph/badge.svg?token=mQIkVPUdVv)](https://codecov.io/github/status-im/status-go)
+[![Unit Tests](https://github.com/status-im/status-go/actions/workflows/unit-tests.yml/badge.svg?branch=develop)](https://github.com/status-im/status-go/actions/workflows/unit-tests.yml?query=branch%3Adevelop) [![Functional Tests](https://github.com/status-im/status-go/actions/workflows/functional-tests.yml/badge.svg?branch=develop)](https://github.com/status-im/status-go/actions/workflows/functional-tests.yml?query=branch%3Adevelop)
 
 # status-go
 

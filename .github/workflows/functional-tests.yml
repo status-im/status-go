@@ -95,12 +95,6 @@ jobs:
     env:
       FUNCTIONAL_TESTS_SHARD: ${{ matrix.shard }}
       FUNCTIONAL_TESTS_SKIP_IMAGE_BUILD: true
-      # Coverage goes to Codecov once the repository has the token.
-      FUNCTIONAL_TESTS_REPORT_CODECOV: ${{ secrets.CODECOV_TOKEN != '' }}
-      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
-      CODECOV_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-      CODECOV_PR: ${{ github.event.pull_request.number }}
-      CODECOV_BRANCH: ${{ github.head_ref || github.ref_name }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:

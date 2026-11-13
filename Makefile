@@ -566,7 +566,6 @@ test-unit-prep: export UNIT_TEST_DRY_RUN ?= false
 test-unit-prep: export UNIT_TEST_COUNT ?= 1
 test-unit-prep: export UNIT_TEST_FAILFAST ?= true
 test-unit-prep: export UNIT_TEST_USE_DEVELOPMENT_LOGGER ?= true
-test-unit-prep: export UNIT_TEST_REPORT_CODECOV ?= false
 
 test-unit: test-unit-prep ##@tests Run unit and integration tests
 	$(MAKE) test-unit-prepared
@@ -596,7 +595,6 @@ test-unit-race: test-unit ##@tests Run unit and integration tests with -race fla
 
 test-functional: generate
 test-functional: export FUNCTIONAL_TESTS_DOCKER_UID ?= $(call sh, id -u)
-test-functional: export FUNCTIONAL_TESTS_REPORT_CODECOV ?= false
 test-functional: export USE_LOGOS_STORAGE := $(USE_LOGOS_STORAGE)
 test-functional: export USE_TORRENT := $(USE_TORRENT)
 test-functional:
@@ -604,7 +602,6 @@ test-functional:
 
 test-functional-compatibility: generate
 test-functional-compatibility: export FUNCTIONAL_TESTS_DOCKER_UID ?= $(call sh, id -u)
-test-functional-compatibility: export FUNCTIONAL_TESTS_REPORT_CODECOV ?= false
 test-functional-compatibility: export USE_LOGOS_STORAGE := $(USE_LOGOS_STORAGE)
 test-functional-compatibility: export FUNCTIONAL_TESTS_MARKER := compatibility
 test-functional-compatibility: export FUNCTIONAL_TESTS_RERUNS := 6
@@ -711,10 +708,6 @@ install-git-hooks:
 migration-protocol: DEFAULT_PROTOCOL_PATH := internal/protocol/migrations/sqlite
 migration-protocol:
 	touch $(DEFAULT_PROTOCOL_PATH)/$$(date +%s)_$(D).up.sql
-
-codecov-validate: SHELL := /bin/sh
-codecov-validate:
-	curl -X POST --data-binary @.codecov.yml https://codecov.io/validate
 
 .PHONY: pytest-lint
 pytest-lint:

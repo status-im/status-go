@@ -43,7 +43,7 @@ def pytest_addoption(parser):
         default=None,
     )
     parser.addoption(
-        "--codecov_dir",
+        "--coverage_dir",
         action="store",
         help="",
         default=None,
@@ -105,7 +105,7 @@ def pytest_configure(config):
     Config.docker_project_name = config.getoption("--docker_project_name")
     Config.docker_image = config.getoption("--docker-image")
     Config.peer_docker_images = config.getoption("--peer-docker-image") or []
-    Config.codecov_dir = config.getoption("--codecov_dir")
+    Config.coverage_dir = config.getoption("--coverage_dir")
     Config.logs_dir = config.getoption("--logs-dir")
     Config.benchmark_results_dir = config.getoption("--benchmark-results-dir")
     Config.logout = config.getoption("--logout")

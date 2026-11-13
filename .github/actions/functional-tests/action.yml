@@ -49,13 +49,3 @@ runs:
           echo "STATUS_BUILD_PROXY_USER=$PROXY_USER"
           echo "STATUS_BUILD_PROXY_PASSWORD=$PROXY_PASSWORD"
         } >> "$GITHUB_ENV"
-    # The toolchain image has it; these tests run on the runner itself.
-    - name: Codecov CLI
-      if: env.FUNCTIONAL_TESTS_REPORT_CODECOV == 'true'
-      shell: bash
-      run: |
-        mkdir -p "$RUNNER_TEMP/codecov"
-        curl -sSfL --retry 5 -o "$RUNNER_TEMP/codecov/codecov" "https://cli.codecov.io/v$CODECOV_VERSION/linux/codecov"
-        echo "$CODECOV_SHA256  $RUNNER_TEMP/codecov/codecov" | sha256sum -c -
-        chmod +x "$RUNNER_TEMP/codecov/codecov"
-        echo "$RUNNER_TEMP/codecov" >> "$GITHUB_PATH"

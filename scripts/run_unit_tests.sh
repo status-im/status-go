@@ -3,7 +3,7 @@ set -o pipefail
 
 GIT_ROOT=$(cd "${BASH_SOURCE%/*}" && git rev-parse --show-toplevel)
 source "${GIT_ROOT}/scripts/colors.sh"
-source "${GIT_ROOT}/scripts/codecov.sh"
+source "${GIT_ROOT}/scripts/coverage.sh"
 
 if [[ $UNIT_TEST_RERUN_FAILS == 'true' ]]; then
   GOTESTSUM_EXTRAFLAGS="${GOTESTSUM_EXTRAFLAGS} --rerun-fails"
@@ -351,10 +351,6 @@ echo $coverage_reports | xargs go tool gocovmerge > ${merged_coverage_report}
 
 # Generate HTML coverage report
 convert_coverage_to_html ${merged_coverage_report} "test-coverage.html"
-
-if [[ $UNIT_TEST_REPORT_CODECOV == 'true' ]]; then
-  report_to_codecov "report_*.xml" ${merged_coverage_report} "unit"
-fi
 
 # Generate report with test stats
 shopt -s globstar nullglob # Enable recursive globbing
