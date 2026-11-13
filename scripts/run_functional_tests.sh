@@ -138,6 +138,21 @@ fi
 
 echo -e "${GRN}wakufleet-scanner completed successfully${RST}"
 
+# A test that sends a transaction from the deployer account before the foundry
+# container has deployed every contract shifts the addresses of the rest.
+echo -e "${GRN}Waiting for the contracts to be deployed${RST}"
+foundry_container_id=$(docker compose -p ${project_name} ${all_compose_files} ps -aq foundry)
+contracts_deadline=$((SECONDS + 600))
+until docker exec "${foundry_container_id}" test -f /app/contracts/ens_addresses.json 2> /dev/null; do
+  if [[ "$(docker inspect -f '{{.State.Running}}' "${foundry_container_id}")" != "true" || ${SECONDS} -ge ${contracts_deadline} ]]; then
+    echo -e "${RED}The contracts were not deployed. See logs below:${RST}"
+    docker logs --tail 50 "${foundry_container_id}" || true
+    exit 1
+  fi
+  sleep 2
+done
+echo -e "${GRN}Contracts deployed${RST}"
+
 # Resolve peer (old) backend images for cross-version compatibility tests.
 peer_image_args=()
 if [[ "${FUNCTIONAL_TESTS_MARKER}" == "compatibility" ]]; then
