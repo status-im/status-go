@@ -10,7 +10,14 @@ import (
 
 func TestSkipSDS(t *testing.T) {
 	require.True(t, skipSDS(protobuf.ApplicationMetadataMessage_COMMUNITY_DESCRIPTION))
+	require.True(t, skipSDS(protobuf.ApplicationMetadataMessage_COMMUNITY_REQUEST_TO_JOIN))
+	require.True(t, skipSDS(protobuf.ApplicationMetadataMessage_COMMUNITY_REQUEST_TO_JOIN_RESPONSE))
+	require.True(t, skipSDS(protobuf.ApplicationMetadataMessage_COMMUNITY_REQUEST_TO_LEAVE))
+	require.True(t, skipSDS(protobuf.ApplicationMetadataMessage_COMMUNITY_EVENTS_MESSAGE))
 	require.False(t, skipSDS(protobuf.ApplicationMetadataMessage_CHAT_MESSAGE))
 	require.False(t, skipSDS(protobuf.ApplicationMetadataMessage_EMOJI_REACTION))
 	require.False(t, skipSDS(protobuf.ApplicationMetadataMessage_PIN_MESSAGE))
+	require.False(t, skipSDS(protobuf.ApplicationMetadataMessage_EDIT_MESSAGE))
+	require.False(t, skipSDS(protobuf.ApplicationMetadataMessage_DELETE_MESSAGE))
+	require.False(t, skipSDS(protobuf.ApplicationMetadataMessage_THREAD_METADATA))
 }

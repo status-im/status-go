@@ -156,6 +156,16 @@ func (r *Reliability) UnwrapPayloadFromSDSWithMetadata(wrappedPayload []byte) (
 	isSDS bool,
 	err error,
 ) {
+	return r.UnwrapPayloadFromSDSWithContext(wrappedPayload, nil)
+}
+
+func (r *Reliability) UnwrapPayloadFromSDSWithContext(wrappedPayload, validationContext []byte) (
+	payload []byte,
+	messageID []byte,
+	channelID string,
+	isSDS bool,
+	err error,
+) {
 	r.sdsOpsMu.RLock()
 	defer r.sdsOpsMu.RUnlock()
 
@@ -164,7 +174,7 @@ func (r *Reliability) UnwrapPayloadFromSDSWithMetadata(wrappedPayload []byte) (
 		return nil, nil, "", false, ErrSDSManagerUnavailable
 	}
 
-	unwrappedMessage, err := manager.UnwrapReceivedMessage(wrappedPayload)
+	unwrappedMessage, err := manager.UnwrapReceivedMessageWithContext(wrappedPayload, validationContext)
 	if err != nil {
 		r.logger.Debug("failed to unwrap received message with SDS", zap.Error(err))
 		if errors.Is(err, sds.ErrNotSDS) {

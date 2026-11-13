@@ -17,7 +17,7 @@ srcDir = "internal/nimble/src"
 requires "nim >= 2.2.6"
 
 # Pins the nim-sds revision whose C ABI matches the Go bindings in go.mod.
-requires "https://github.com/logos-messaging/nim-sds#c4dc3cdfb1d7ca6f043489d0d97f55b269e61644"
+requires "https://github.com/logos-messaging/nim-sds#3a5c3be12d43d42c12e981367bd6dfa804154675"
 
 # The untagged chronos commit nim-ffi needs; the libsds compile uses this tree.
 requires "chronos#0de7b335d0ad5557ad5ba71a4b7662f7b201750e"
