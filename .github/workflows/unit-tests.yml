@@ -40,11 +40,13 @@ jobs:
         with:
           path: build/deps/logos-storage
           # The Makefile pins the logos-storage revision, the Dockerfile the compilers.
-          key: libstorage-tree-linux-x86_64-${{ hashFiles('Makefile', 'Dockerfile') }}
+          key: libstorage-portable-linux-x86_64-${{ hashFiles('Makefile', 'Dockerfile') }}
       - name: Build libstorage
         if: steps.libstorage.outputs.cache-hit != 'true'
+        # The library is built on one runner and used on others. By default it is
+        # compiled for the CPU of the machine that builds it.
         run: |
-          scripts/toolchain.sh make build-storage
+          scripts/toolchain.sh make build-storage STORAGE_LIB_PARAMS=-d:disableMarchNative
           source=~/.cache/status-go-toolchain/logos-storage-nim
           mkdir -p build/deps/logos-storage/build
           cp "$source/build/libstorage.so" build/deps/logos-storage/build/

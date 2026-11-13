@@ -48,7 +48,7 @@ jobs:
         uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: build/deps/logos-storage
-          key: libstorage-tree-linux-x86_64-${{ hashFiles('Makefile', 'Dockerfile') }}
+          key: libstorage-portable-linux-x86_64-${{ hashFiles('Makefile', 'Dockerfile') }}
       # build/ is not part of the Docker build context.
       - name: Hand the libraries to the image build
         env:

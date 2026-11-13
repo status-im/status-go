@@ -131,11 +131,14 @@ ARG use_torrent=false
 # libsds.so with libsds.h, libstorage.so with its library/ headers. What is
 # missing there is built here.
 ARG prebuilt_libs=''
+# libstorage is built without -march=native: the image runs on other machines
+# than the one that builds it.
 RUN --mount=type=cache,target="/root/.cache/go-build",id=statusgo-build-$cache_id \
     libs="$PWD/${prebuilt_libs:-none}"; \
     [ ! -f "$libs/libsds.so" ] || sds="NIM_SDS_LIB_DIR=$libs NIM_SDS_INC_DIR=$libs"; \
     [ ! -f "$libs/libstorage.so" ] || storage="LOGOS_STORAGE_LIB_DIR=$libs LOGOS_STORAGE_INC_DIR=$libs/library"; \
-    make $build_target BUILD_TAGS="$build_tags" BUILD_FLAGS="$build_flags" USE_LOGOS_STORAGE="$use_logos_storage" USE_TORRENT="$use_torrent" ${sds:-} ${storage:-}
+    make $build_target BUILD_TAGS="$build_tags" BUILD_FLAGS="$build_flags" USE_LOGOS_STORAGE="$use_logos_storage" USE_TORRENT="$use_torrent" \
+    STORAGE_LIB_PARAMS=-d:disableMarchNative ${sds:-} ${storage:-}
 
 # Stage runtime shared libraries required by built binaries.
 RUN mkdir -p /tmp/status-runtime-libs \
