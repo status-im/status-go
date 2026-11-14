@@ -13,8 +13,9 @@ srcDir = "internal/nimble/src"
 
 
 ### Dependencies
-# Any newer Nim is fine; the bindings' lock picks the one that builds libsds.
-requires "nim >= 2.2.6"
+# The Nim the bindings' lock builds libsds with, so nimble fetches one compiler.
+# The Dockerfile's SDS_NIM_VERSION follows it.
+requires "nim == 2.2.6"
 
 # Pins the nim-sds revision whose C ABI the bindings match.
 requires "https://github.com/logos-messaging/sds-go-bindings#07931d32"
