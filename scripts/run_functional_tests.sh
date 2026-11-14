@@ -4,10 +4,9 @@ set -o nounset
 
 GIT_ROOT=$(cd "${BASH_SOURCE%/*}" && git rev-parse --show-toplevel)
 source "${GIT_ROOT}/scripts/colors.sh"
-source "${GIT_ROOT}/scripts/codecov.sh"
+source "${GIT_ROOT}/scripts/coverage.sh"
 
 : "${FUNCTIONAL_TESTS_LOG_LEVEL:=INFO}"
-: "${FUNCTIONAL_TESTS_REPORT_CODECOV:=false}"
 : "${FUNCTIONAL_TESTS_BUILD_TAGS:=gowaku_no_rln}"
 : "${USE_LOGOS_STORAGE:=false}"
 : "${FUNCTIONAL_TESTS_MARKER:=rpc}"
@@ -16,6 +15,11 @@ source "${GIT_ROOT}/scripts/codecov.sh"
 : "${PEER_IMAGES:=}"
 : "${PEER_REFS:=}"
 : "${USE_TORRENT:=false}"
+# CI builds the image in one job and tests it in others:
+#   FUNCTIONAL_TESTS_IMAGE_ONLY=true        build the status-go image and stop
+#   FUNCTIONAL_TESTS_SKIP_IMAGE_BUILD=true  test the image that is already there
+: "${FUNCTIONAL_TESTS_IMAGE_ONLY:=false}"
+: "${FUNCTIONAL_TESTS_SKIP_IMAGE_BUILD:=false}"
 
 if [[ "${USE_LOGOS_STORAGE}" == "true" ]]; then
   export WAKU_STORE_MESSAGE_RETENTION_SECONDS="${WAKU_STORE_MESSAGE_RETENTION_SECONDS:-60}"
@@ -44,7 +48,7 @@ mkdir -p "${logs_path}"
 all_compose_files="-f ${root_path}/docker-compose.anvil.yml -f ${root_path}/docker-compose.waku.yml"
 identifier=${FUNCTIONAL_TESTS_CONTAINER_PREFIX:-"status-go-func-tests-$(git rev-parse --short HEAD)"}
 project_name="${identifier,,}"
-image_name="statusgo-${identifier,,}"
+image_name="${FUNCTIONAL_TESTS_DOCKER_IMAGE:-statusgo-${identifier,,}}"
 
 dump_compose_logs_done=0
 dump_compose_logs() {
@@ -79,17 +83,32 @@ fi
 if [[ "${USE_TORRENT}" == "true" ]]; then
   build_tags="${build_tags} use_torrent"
 fi
-docker build . \
-  --build-arg "build_flags=-cover" \
-  --build-arg "build_tags=${build_tags}" \
-  --build-arg "use_logos_storage=${USE_LOGOS_STORAGE}" \
-  --build-arg "use_torrent=${USE_TORRENT}" \
-  --build-arg "enable_go_cache=false" \
-  --tag "${image_name}"
-
-if [[ $? -ne 0 ]]; then
-    echo -e "${RED}Docker build failed. Exiting.${RST}"
+if [[ "${FUNCTIONAL_TESTS_SKIP_IMAGE_BUILD}" == "true" ]]; then
+  if ! docker image inspect "${image_name}" > /dev/null 2>&1; then
+    echo -e "${RED}No image ${image_name} to test. Exiting.${RST}"
     exit 1
+  fi
+  echo -e "${GRN}Using the existing image${RST} ${image_name}"
+else
+  docker build . \
+    --build-arg "build_flags=-cover" \
+    --build-arg "build_tags=${build_tags}" \
+    --build-arg "use_logos_storage=${USE_LOGOS_STORAGE}" \
+    --build-arg "use_torrent=${USE_TORRENT}" \
+    --build-arg "enable_go_cache=false" \
+    --build-arg "prebuilt_libs=${FUNCTIONAL_TESTS_PREBUILT_LIBS:-}" \
+    --tag "${image_name}"
+
+  if [[ $? -ne 0 ]]; then
+      echo -e "${RED}Docker build failed. Exiting.${RST}"
+      exit 1
+  fi
+fi
+
+if [[ "${FUNCTIONAL_TESTS_IMAGE_ONLY}" == "true" ]]; then
+  echo -e "${GRN}Built the image${RST} ${image_name}"
+  dump_compose_logs_done=1
+  exit 0
 fi
 
 # Run docker
@@ -117,6 +136,21 @@ if [[ "${scanner_exit_code}" -ne 0 ]]; then
 fi
 
 echo -e "${GRN}wakufleet-scanner completed successfully${RST}"
+
+# A test that sends a transaction from the deployer account before the foundry
+# container has deployed every contract shifts the addresses of the rest.
+echo -e "${GRN}Waiting for the contracts to be deployed${RST}"
+foundry_container_id=$(docker compose -p ${project_name} ${all_compose_files} ps -aq foundry)
+contracts_deadline=$((SECONDS + 600))
+until docker exec "${foundry_container_id}" test -f /app/contracts/ens_addresses.json 2> /dev/null; do
+  if [[ "$(docker inspect -f '{{.State.Running}}' "${foundry_container_id}")" != "true" || ${SECONDS} -ge ${contracts_deadline} ]]; then
+    echo -e "${RED}The contracts were not deployed. See logs below:${RST}"
+    docker logs --tail 50 "${foundry_container_id}" || true
+    exit 1
+  fi
+  sleep 2
+done
+echo -e "${GRN}Contracts deployed${RST}"
 
 # Resolve peer (old) backend images for cross-version compatibility tests.
 peer_image_args=()
@@ -198,7 +232,7 @@ pytest --reruns "${FUNCTIONAL_TESTS_RERUNS}" -m "${pytest_marker_expr}" -c "${ro
   --docker_project_name="${project_name}" \
   --docker-image=${image_name} \
   ${peer_image_args[@]+"${peer_image_args[@]}"} \
-  --codecov_dir="${binary_coverage_reports_path}" \
+  --coverage_dir="${binary_coverage_reports_path}" \
   --logs-dir="${logs_path}" \
   --junitxml="${test_results_path}/report.xml" \
   "${root_path}"
@@ -220,11 +254,6 @@ full_coverage_profile="${coverage_reports_path}/coverage.out"
 go tool covdata merge -i="${binary_coverage_reports_path}" -o="${merged_coverage_reports_path}"
 go tool covdata textfmt -i="${merged_coverage_reports_path}" -o="${full_coverage_profile}"
 convert_coverage_to_html "${full_coverage_profile}" "${coverage_reports_path}/coverage.html"
-
-# Upload reports to Codecov
-if [[ ${FUNCTIONAL_TESTS_REPORT_CODECOV} == 'true' ]]; then
-  report_to_codecov "${test_results_path}/*.xml" "${full_coverage_profile}" "functional"
-fi
 
 echo -e "${GRN}Testing finished${RST}"
 exit $exit_code

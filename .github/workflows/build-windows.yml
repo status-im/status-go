@@ -1,0 +1,135 @@
+name: Build Windows
+on:
+  pull_request:
+  push:
+    branches:
+      - develop
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: build-windows-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+jobs:
+  # One runner per library: the two builds do not wait for each other.
+  libraries:
+    name: windows/x86_64 (${{ matrix.library }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - library: static
+            target: statusgo-library
+            files: |
+              build/bin/libstatus.a
+              build/bin/libstatus.h
+          - library: shared
+            target: statusgo-shared-library
+            files: |
+              build/bin/libstatus.dll
+              build/bin/libstatus.h
+              build/libsds.dll
+    runs-on: windows-2022
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: msys2 {0}
+    env:
+      # Nim dependency trees nest past MAX_PATH, and Bash needs the scripts with LF endings.
+      # Set through the environment so that the checkout and nimble's clones see it too.
+      GIT_CONFIG_COUNT: 2
+      GIT_CONFIG_KEY_0: core.longpaths
+      GIT_CONFIG_VALUE_0: 'true'
+      GIT_CONFIG_KEY_1: core.autocrlf
+      GIT_CONFIG_VALUE_1: 'false'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          # scripts/version.sh describes the commit from the nearest tag
+          fetch-depth: 0
+          filter: blob:none
+          persist-credentials: false
+      - uses: ./.github/actions/versions
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: false
+      - uses: jiro4989/setup-nim-action@189b145833368cc92f1e7b3e166a25a3e057a693 # v2.3.1
+        with:
+          # The Nim the Jenkins hosts built with, not the Dockerfile's.
+          nim-version: '2.2.6'
+          # Outside the checkout, which the build fingerprints.
+          parent-nim-install-directory: ${{ runner.temp }}
+          repo-token: ${{ github.token }}
+      # MSYS2 only supplies the shell and its tools. Go, Nim, Git and the compiler
+      # come from the Windows PATH.
+      - uses: msys2/setup-msys2@ec48f7c5447b3140e2b088413ae3a55687bccb6e # v2.33.0
+        with:
+          msystem: MSYS
+          path-type: inherit
+          install: make unzip
+      - name: Compiler, nimble and protoc
+        run: .github/scripts/windows-toolchain.sh
+      - uses: ./.github/actions/go-cache
+        with:
+          name: windows-x86_64
+      - name: Restore the code generation cache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ${{ runner.temp }}/status-go-cache/go-generate-fast
+          key: go-generate-fast-windows-x86_64-${{ hashFiles('**/*.go', '**/go.mod', '**/go.sum') }}
+          restore-keys: go-generate-fast-windows-x86_64-
+      # With libsds restored, nimble and the Nim dependencies are skipped.
+      - name: Restore libsds
+        id: libsds
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            build/libsds.dll
+            build/libsds.h
+          # status_go.nimble pins the revision; this file, the script and the Dockerfile the compilers.
+          key: libsds-windows-x86_64-${{ hashFiles('status_go.nimble', 'Makefile', 'Dockerfile', '.github/workflows/build-windows.yml', '.github/scripts/windows-toolchain.sh') }}
+      - name: Use the restored libsds
+        if: steps.libsds.outputs.cache-hit == 'true'
+        run: echo "MAKE_ARGS=NIM_SDS_LIB_DIR=$(pwd -W)/build NIM_SDS_INC_DIR=$(pwd -W)/build" >> "$GITHUB_ENV"
+      - name: Toolchain versions
+        run: |
+          for tool in go nim nimble gcc mingw32-make make protoc git sh; do
+            echo "$tool: $(command -v "$tool" || echo missing)"
+          done
+          go version
+          nim --version | head -n 1
+          nimble --version | head -n 1
+          gcc --version | head -n 1
+          mingw32-make --version | head -n 1
+          protoc --version
+          git --version
+          go env GOCACHE GOMODCACHE
+          echo "GO_GENERATE_FAST_DIR=$GO_GENERATE_FAST_DIR MAKE_ARGS=${MAKE_ARGS:-}"
+      # The Makefile runs under MinGW make: MSYS make would hand it POSIX paths, which
+      # end up in cgo flags that the native Go and gcc cannot resolve. The token
+      # library's own Makefile still runs under MSYS make.
+      - name: Generate
+        run: mingw32-make generate $MAKE_ARGS
+      - name: Library
+        run: mingw32-make ${{ matrix.target }} $MAKE_ARGS
+      - name: Upload library
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: status-go-windows-x86_64-${{ matrix.library }}
+          path: ${{ matrix.files }}
+          if-no-files-found: error
+          retention-days: 7
+      # One job writes the caches, so the key has one owner.
+      - uses: ./.github/actions/go-cache/save
+        if: matrix.library == 'static'
+
+  # One check name for branch rules.
+  windows:
+    name: windows/x86_64
+    if: always()
+    needs: libraries
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - run: jq -e 'all(. == "success")' <<< '${{ toJSON(needs.*.result) }}'

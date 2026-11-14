@@ -1,0 +1,23 @@
+# Seconds per top-level test of internal/protocol that takes 30 s or more,
+# measured on a GitHub runner; `default` is the average of all the others.
+# The times are in the JUnit reports of a unit test run (report_*.xml).
+303 TestAdminCommunityEventsSuite
+300 TestMessengerCommunitiesSuite
+264 TestTokenMasterCommunityEventsSuite
+235 TestOwnerWithoutCommunityKeyCommunityEventsSuite
+196 TestMessengerProfilePictureHandlerSuite
+146 TestMessengerCommunitiesSharedMemberAddressSuite
+133 TestMessengerCommunitiesTokenPermissionsSuite
+119 TestMessengerContactRequestSuite
+101 TestMessengerSuite
+98 TestMessengerThreadsSuite
+68 TestMessengerActivityCenterMessageSuite
+66 TestGroupChatSuite
+57 TestCommunityEventsEventualConsistencySuite
+57 TestMessengerPushNotificationSuite
+52 TestMessengerSyncKeypairsAutoApplyTest
+47 TestMessengerCommunitiesSignersSuite
+42 TestMessengerSyncActivityCenter
+35 TestMessengerRemoveMessageSuite
+34 TestMessengerPairingTest
+3 default

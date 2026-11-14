@@ -421,12 +421,13 @@ class TestWakuextThreadMute:
     async def receiver(self, async_backend_new_profile, waku_light_client):
         return await async_backend_new_profile("receiver", waku_light_client=waku_light_client)
 
-    async def test_muted_thread_skips_notifications_until_unmuted(self, sender, receiver):
+    async def test_muted_thread_silences_ordinary_messages_but_keeps_mentions(self, sender, receiver):
         sender_chat_id, receiver_chat_id, _ = await _open_shared_chat(sender, receiver, ChatKind.PRIVATE_GROUP)
+        # The sender writes the parent, so its thread messages aren't replies to the receiver.
         parent_text = f"parent-{uuid4()}"
-        parent_response = receiver.wakuext_service.send_chat_message(receiver_chat_id, parent_text)
+        parent_response = sender.wakuext_service.send_chat_message(sender_chat_id, parent_text)
         parent_id = _message_by_text(parent_response, parent_text)["id"]
-        await sender.wait_for_signal(SignalType.MESSAGES_NEW, pattern=parent_id, timeout=60, check_buffer=True)
+        await receiver.wait_for_signal(SignalType.MESSAGES_NEW, pattern=parent_id, timeout=60, check_buffer=True)
 
         sender.wakuext_service.create_thread(sender_chat_id, parent_id)
         _, audible_id = await _post_thread_mention(sender, receiver, sender_chat_id, parent_id, receiver.public_key)
@@ -443,21 +444,30 @@ class TestWakuextThreadMute:
         muted_thread = _thread(receiver.wakuext_service.chat_threads(receiver_chat_id), parent_id)
         assert muted_thread["muted"] is True
         assert receiver.wakuext_service.chat(receiver_chat_id).get("muted", False) is False
-        unread_before_muted_reply = muted_thread["unviewedMessagesCount"]
+        unread_before_muted_message = muted_thread["unviewedMessagesCount"]
+        mentions_before_muted_message = muted_thread["unviewedMentionsCount"]
+        chat_unread_before_muted_message = receiver.wakuext_service.chat(receiver_chat_id).get("unviewedMessagesCount")
 
-        silenced_text, silenced_id = await _post_thread_mention(
-            sender,
-            receiver,
-            sender_chat_id,
-            parent_id,
-            receiver.public_key,
-        )
+        silenced_text = f"ordinary-{uuid4()}"
+        silenced_id = _message_by_text(
+            sender.wakuext_service.send_chat_message(sender_chat_id, silenced_text, thread_id=parent_id),
+            silenced_text,
+        )["id"]
+        await receiver.wait_for_signal(SignalType.MESSAGES_NEW, pattern=silenced_id, timeout=60, check_buffer=True)
         assert silenced_text in _texts(
             receiver.wakuext_service.chat_messages_in_thread(receiver_chat_id, parent_id, limit=20),
         )
-        assert _thread(receiver.wakuext_service.chat_threads(receiver_chat_id), parent_id)["unviewedMessagesCount"] == (unread_before_muted_reply + 1)
-        assert receiver.wakuext_service.chat(receiver_chat_id).get("unviewedMessagesCount") == 0
+        silenced_thread = _thread(receiver.wakuext_service.chat_threads(receiver_chat_id), parent_id)
+        assert silenced_thread["unviewedMessagesCount"] == (unread_before_muted_message + 1)
+        assert silenced_thread["unviewedMentionsCount"] == mentions_before_muted_message
+        assert receiver.wakuext_service.chat(receiver_chat_id).get("unviewedMessagesCount") == chat_unread_before_muted_message
         assert _find_notification(receiver.wakuext_service.get_activity_center_notifications(), silenced_id) is None
+
+        _, muted_mention_id = await _post_thread_mention(sender, receiver, sender_chat_id, parent_id, receiver.public_key)
+        assert _mention_ac(receiver, muted_mention_id)["message"]["threadId"] == parent_id
+        assert _thread(receiver.wakuext_service.chat_threads(receiver_chat_id), parent_id)["unviewedMentionsCount"] == (
+            mentions_before_muted_message + 1
+        )
 
         channel_text = _mention(receiver.public_key)
         channel_id = _message_by_text(

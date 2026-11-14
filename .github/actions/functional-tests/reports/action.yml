@@ -1,0 +1,21 @@
+name: Functional test reports
+description: Uploads the reports and container logs of a functional test run. Call it in a step that always runs.
+inputs:
+  name:
+    description: Artifact name.
+    required: true
+runs:
+  using: composite
+  steps:
+    # Log file names carry test parameters with characters artifacts do not allow.
+    - shell: bash
+      run: tar -czf test/functional/logs.tar.gz -C test/functional logs
+    - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      with:
+        name: ${{ inputs.name }}
+        path: |
+          test/functional/reports/*.xml
+          test/functional/logs.tar.gz
+          test/functional/coverage/coverage.html
+        if-no-files-found: ignore
+        retention-days: 14

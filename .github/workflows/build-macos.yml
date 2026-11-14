@@ -1,0 +1,105 @@
+name: Build macOS
+on:
+  pull_request:
+  push:
+    branches:
+      - develop
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: build-macos-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+jobs:
+  # One runner per library: the two builds do not wait for each other.
+  libraries:
+    name: macos/aarch64 (${{ matrix.library }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - library: static
+            target: statusgo-library
+            files: |
+              build/bin/libstatus.a
+              build/bin/libstatus.h
+          - library: shared
+            target: statusgo-shared-library
+            files: |
+              build/bin/libstatus.dylib
+              build/bin/libstatus.h
+              build/libsds.dylib
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          # scripts/version.sh describes the commit from the nearest tag
+          fetch-depth: 0
+          filter: blob:none
+          persist-credentials: false
+      - uses: ./.github/actions/versions
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: false
+      - name: Protocol buffer compiler
+        uses: arduino/setup-protoc@c65c819552d16ad3c9b72d9dfd5ba5237b9c906b # v3
+        with:
+          version: ${{ env.PROTOC_VERSION }}
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: ./.github/actions/nim
+        with:
+          nim-version: ${{ env.NIM_VERSION }}
+          tkl-nim-version: ${{ env.TKL_NIM_VERSION }}
+          nimble-version: ${{ env.NIMBLE_VERSION }}
+      - name: Toolchain versions
+        run: |
+          go version
+          protoc --version
+          nim --version | head -n 1
+          "$TKL_NIM" --version | head -n 1
+          nimble --version | grep -F "nimble v$NIMBLE_VERSION"
+      # With libsds restored, nimble does not run: nothing to download or compile.
+      - name: Restore libsds
+        id: libsds
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            build/libsds.dylib
+            build/libsds.h
+          key: libsds-macos-aarch64-${{ hashFiles('status_go.nimble', 'Makefile', '.github/actions/nim/**') }}
+      - name: Nim dependencies and libsds
+        if: steps.libsds.outputs.cache-hit != 'true'
+        run: make build-libsds
+      - name: Use the restored libsds
+        if: steps.libsds.outputs.cache-hit == 'true'
+        run: |
+          echo "NIM_SDS_LIB_DIR=$GITHUB_WORKSPACE/build" >> "$GITHUB_ENV"
+          echo "NIM_SDS_INC_DIR=$GITHUB_WORKSPACE/build" >> "$GITHUB_ENV"
+      - uses: ./.github/actions/go-cache
+        with:
+          name: macos-aarch64
+      # The target generates the code itself, once.
+      - name: Library
+        run: make ${{ matrix.target }}
+      - name: Upload library
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: status-go-macos-aarch64-${{ matrix.library }}
+          path: ${{ matrix.files }}
+          if-no-files-found: error
+          retention-days: 7
+      # One job writes the caches, so the key has one owner.
+      - uses: ./.github/actions/go-cache/save
+        if: matrix.library == 'static'
+
+  # One check name for branch rules.
+  macos:
+    name: macos/aarch64
+    if: always()
+    needs: libraries
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - run: jq -e 'all(. == "success")' <<< '${{ toJSON(needs.*.result) }}'

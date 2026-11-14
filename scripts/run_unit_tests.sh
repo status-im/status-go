@@ -3,7 +3,7 @@ set -o pipefail
 
 GIT_ROOT=$(cd "${BASH_SOURCE%/*}" && git rev-parse --show-toplevel)
 source "${GIT_ROOT}/scripts/colors.sh"
-source "${GIT_ROOT}/scripts/codecov.sh"
+source "${GIT_ROOT}/scripts/coverage.sh"
 
 if [[ $UNIT_TEST_RERUN_FAILS == 'true' ]]; then
   GOTESTSUM_EXTRAFLAGS="${GOTESTSUM_EXTRAFLAGS} --rerun-fails"
@@ -118,6 +118,34 @@ DEFAULT_PROTOCOL_SHARDS=2
 MIN_PROTOCOL_SHARDS=1
 MAX_PROTOCOL_SHARDS=5
 
+# Seconds the slow top-level `protocol` tests take, and one `default` line for
+# all the others.
+PROTOCOL_TEST_SECONDS_FILE="${GIT_ROOT}/scripts/protocol_test_seconds.txt"
+
+# Reads test names on stdin and prints "<shard> <test>" for each of them, shards
+# numbered from 0. The slowest tests are placed first, each into the shard with
+# the least work so far.
+assign_protocol_shards() {
+  awk -v seconds_file="${PROTOCOL_TEST_SECONDS_FILE}" '
+    BEGIN {
+      seconds["default"] = 1
+      while ((getline line < seconds_file) > 0) {
+        split(line, field, " ")
+        if (field[1] ~ /^[0-9]+$/) seconds[field[2]] = field[1]
+      }
+    }
+    { print (($1 in seconds) ? seconds[$1] : seconds["default"]), $1 }' |
+    sort -s -k1,1nr |
+    awk -v shards="$1" '{
+      lightest = 0
+      for (shard = 1; shard < shards; shard++) {
+        if (load[shard] < load[lightest]) lightest = shard
+      }
+      load[lightest] += $1
+      print lightest, $2
+    }'
+}
+
 resolve_protocol_shards() {
   local shards
 
@@ -154,6 +182,29 @@ if [[ $(echo "${UNIT_TEST_PACKAGES}" | grep -E '\s?\S+protocol\s+') == "" ]]; th
   HAS_PROTOCOL_PACKAGE=false
 fi
 
+# UNIT_TEST_PART limits the run to one slice of the suite, so that CI can spread
+# it over several machines. Only for UNIT_TEST_COUNT=1 and the full package list.
+#   packages:<i>/<n>  slice i of n of every package except `protocol`
+#   protocol:<i>/<n>  slice i of n of the `protocol` tests
+part_group=""
+if [[ -n "${UNIT_TEST_PART}" ]]; then
+  if [[ ! "${UNIT_TEST_PART}" =~ ^(packages|protocol):([1-9][0-9]*)/([1-9][0-9]*)$ ]]; then
+    echo -e "${RED}Invalid UNIT_TEST_PART='${UNIT_TEST_PART}'${RST}, expected packages:<i>/<n> or protocol:<i>/<n>" >&2
+    exit 2
+  fi
+  part_group="${BASH_REMATCH[1]}"
+  part_index="${BASH_REMATCH[2]}"
+  part_total="${BASH_REMATCH[3]}"
+  if (( part_index > part_total )); then
+    echo -e "${RED}Invalid UNIT_TEST_PART='${UNIT_TEST_PART}'${RST}, slice ${part_index} is past the last of ${part_total}" >&2
+    exit 2
+  fi
+  if [[ "${UNIT_TEST_COUNT}" -ne 1 ]]; then
+    echo -e "${RED}UNIT_TEST_PART needs UNIT_TEST_COUNT=1${RST}, it is ${UNIT_TEST_COUNT}" >&2
+    exit 2
+  fi
+fi
+
 bg_pids=()
 
 if [[ $HAS_PROTOCOL_PACKAGE == 'false' ]]; then
@@ -162,12 +213,27 @@ if [[ $HAS_PROTOCOL_PACKAGE == 'false' ]]; then
   run_test_for_packages "${UNIT_TEST_PACKAGES}" "0" "${UNIT_TEST_COUNT}" "${DEFAULT_TIMEOUT_MINUTES}" "All packages"
 else
   # Spawn a process to test all packages except `protocol`
-  UNIT_TEST_PACKAGES_FILTERED=$(echo "${UNIT_TEST_PACKAGES}" | tr ' ' '\n' | grep -v '/protocol$' | tr '\n' ' ')
-  run_test_for_packages "${UNIT_TEST_PACKAGES_FILTERED}" "0" "${UNIT_TEST_COUNT}" "${DEFAULT_TIMEOUT_MINUTES}" "All packages except 'protocol'" &
-  bg_pids+=("$!")
+  if [[ "${part_group}" != 'protocol' ]]; then
+    UNIT_TEST_PACKAGES_FILTERED=$(echo "${UNIT_TEST_PACKAGES}" | tr ' ' '\n' | grep -v '/protocol$' | grep .)
+    packages_message="All packages except 'protocol'"
+    if [[ "${part_group}" == 'packages' ]]; then
+      UNIT_TEST_PACKAGES_FILTERED=$(echo "${UNIT_TEST_PACKAGES_FILTERED}" | awk -v i="${part_index}" -v n="${part_total}" '(NR - 1) % n == i - 1')
+      packages_message="${packages_message} (slice ${part_index}/${part_total})"
+    fi
+    UNIT_TEST_PACKAGES_FILTERED=$(echo "${UNIT_TEST_PACKAGES_FILTERED}" | tr '\n' ' ')
+    run_test_for_packages "${UNIT_TEST_PACKAGES_FILTERED}" "0" "${UNIT_TEST_COUNT}" "${DEFAULT_TIMEOUT_MINUTES}" "${packages_message}" &
+    bg_pids+=("$!")
+  fi
 
-  if [[ $UNIT_TEST_COUNT -eq 1 ]]; then
-    protocol_shards="$(resolve_protocol_shards)"
+  if [[ "${part_group}" == 'packages' ]]; then
+    : # the `protocol` package belongs to the protocol slices
+  elif [[ $UNIT_TEST_COUNT -eq 1 ]]; then
+    if [[ "${part_group}" == 'protocol' ]]; then
+      # One slice runs here, so the CPU limit on parallel shards does not apply.
+      protocol_shards="${part_total}"
+    else
+      protocol_shards="$(resolve_protocol_shards)"
+    fi
 
     protocol_list_cmd=(go test -list '^Test')
     if [[ -n "${BUILD_TAGS}" ]]; then
@@ -175,7 +241,16 @@ else
     fi
     protocol_list_cmd+=(github.com/status-im/status-go/internal/protocol)
 
-    mapfile -t protocol_tests < <("${protocol_list_cmd[@]}" | awk '/^Test/ { print $0 }' | sort -u)
+    # Listing the tests compiles the package. UNIT_TEST_PROTOCOL_TESTS_FILE keeps the
+    # list, so that machines sharing one prepared tree compile it once.
+    if [[ -n "${UNIT_TEST_PROTOCOL_TESTS_FILE}" && -s "${UNIT_TEST_PROTOCOL_TESTS_FILE}" ]]; then
+      mapfile -t protocol_tests < "${UNIT_TEST_PROTOCOL_TESTS_FILE}"
+    else
+      mapfile -t protocol_tests < <("${protocol_list_cmd[@]}" | awk '/^Test/ { print $0 }' | sort -u)
+      if [[ -n "${UNIT_TEST_PROTOCOL_TESTS_FILE}" && ${#protocol_tests[@]} -gt 0 ]]; then
+        printf '%s\n' "${protocol_tests[@]}" > "${UNIT_TEST_PROTOCOL_TESTS_FILE}"
+      fi
+    fi
     if [[ ${#protocol_tests[@]} -eq 0 ]]; then
       echo -e "${YLW}No protocol tests discovered, running package without sharding${RST}"
       run_test_for_packages github.com/status-im/status-go/internal/protocol "1" 1 "${PROTOCOL_TIMEOUT_MINUTES}" "Only 'protocol' package (fallback, no discovered tests)" &
@@ -187,18 +262,25 @@ else
         protocol_shard_filters[i]=""
       done
 
-      for ((i=0; i<${#protocol_tests[@]}; i++)); do
-        shard_idx=$((i % protocol_shards))
+      while read -r shard_idx protocol_test; do
         if [[ -z "${protocol_shard_filters[$shard_idx]}" ]]; then
-          protocol_shard_filters[$shard_idx]="${protocol_tests[$i]}"
+          protocol_shard_filters[$shard_idx]="${protocol_test}"
         else
-          protocol_shard_filters[$shard_idx]="${protocol_shard_filters[$shard_idx]}|${protocol_tests[$i]}"
+          protocol_shard_filters[$shard_idx]="${protocol_shard_filters[$shard_idx]}|${protocol_test}"
         fi
-      done
+      done < <(printf '%s\n' "${protocol_tests[@]}" | assign_protocol_shards "${protocol_shards}")
+
+      if [[ "${part_group}" == 'protocol' && -z "${protocol_shard_filters[$((part_index - 1))]}" ]]; then
+        echo -e "${RED}No protocol tests in slice ${part_index}/${part_total}${RST}: ${#protocol_tests[@]} tests for ${protocol_shards} slices" >&2
+        exit 2
+      fi
 
       protocol_iteration=1
       for ((i=0; i<protocol_shards; i++)); do
         if [[ -z "${protocol_shard_filters[$i]}" ]]; then
+          continue
+        fi
+        if [[ "${part_group}" == 'protocol' && $((i + 1)) -ne "${part_index}" ]]; then
           continue
         fi
         protocol_filter="^(${protocol_shard_filters[$i]})$"
@@ -269,10 +351,6 @@ echo $coverage_reports | xargs go tool gocovmerge > ${merged_coverage_report}
 
 # Generate HTML coverage report
 convert_coverage_to_html ${merged_coverage_report} "test-coverage.html"
-
-if [[ $UNIT_TEST_REPORT_CODECOV == 'true' ]]; then
-  report_to_codecov "report_*.xml" ${merged_coverage_report} "unit"
-fi
 
 # Generate report with test stats
 shopt -s globstar nullglob # Enable recursive globbing

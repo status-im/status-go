@@ -10,7 +10,7 @@ class Config:
     docker_project_name: str = ""
     docker_image: str = ""
     peer_docker_images: List[str] | None = None
-    codecov_dir: str = ""
+    coverage_dir: str = ""
     logs_dir: str = ""
     benchmark_results_dir: str = ""
     logout: bool = False

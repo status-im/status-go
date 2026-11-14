@@ -1,5 +1,6 @@
 import logging
 import os
+import zlib
 from typing import Iterator
 
 from utils.config import Config
@@ -42,7 +43,7 @@ def pytest_addoption(parser):
         default=None,
     )
     parser.addoption(
-        "--codecov_dir",
+        "--coverage_dir",
         action="store",
         help="",
         default=None,
@@ -104,7 +105,7 @@ def pytest_configure(config):
     Config.docker_project_name = config.getoption("--docker_project_name")
     Config.docker_image = config.getoption("--docker-image")
     Config.peer_docker_images = config.getoption("--peer-docker-image") or []
-    Config.codecov_dir = config.getoption("--codecov_dir")
+    Config.coverage_dir = config.getoption("--coverage_dir")
     Config.logs_dir = config.getoption("--logs-dir")
     Config.benchmark_results_dir = config.getoption("--benchmark-results-dir")
     Config.logout = config.getoption("--logout")
@@ -113,6 +114,23 @@ def pytest_configure(config):
     Config.push_fleets_config = config.getoption("--push-fleets-config")
     Config.disable_override_networks = config.getoption("--disable-override-networks")
     Config.base_dir = os.path.dirname(os.path.abspath(__file__))  # schemas directory
+
+
+def pytest_collection_modifyitems(config, items):
+    """FUNCTIONAL_TESTS_SHARD=<i>/<n> keeps one n-th of the tests, so CI can spread a run over machines."""
+    shard = os.environ.get("FUNCTIONAL_TESTS_SHARD")
+    if not shard:
+        return
+    index, total = (int(part) for part in shard.split("/"))
+    if not 1 <= index <= total:
+        raise ValueError(f"FUNCTIONAL_TESTS_SHARD={shard}: expected <i>/<n> with 1 <= i <= n")
+    selected, deselected = [], []
+    for item in items:
+        # crc32 is the same in every process, unlike hash(), so all xdist workers agree.
+        mine = zlib.crc32(item.nodeid.encode()) % total == index - 1
+        (selected if mine else deselected).append(item)
+    config.hook.pytest_deselected(items=deselected)
+    items[:] = selected
 
 
 def pytest_report_header(config):

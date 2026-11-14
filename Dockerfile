@@ -1,5 +1,6 @@
-# Build status-go in a Go builder container
-FROM golang:1.26.5-trixie AS builder
+# Toolchain for building and testing status-go: Go, clang, protoc, Nim, nimble.
+# CI publishes this stage on its own: docker build --target toolchain .
+FROM golang:1.26.5-trixie AS toolchain
 
 # Set environment variables to use Clang
 ENV CC=clang
@@ -85,6 +86,38 @@ RUN set -eu && \
 
 ENV PATH="/opt/nimble/bin:${PATH}"
 
+# On arm64 nimble downloads an x86_64 Nim, and no arm64 build of this version is
+# published. It is built from source here and left where nimble looks first.
+# scripts/toolchain.sh links it into the home directory it runs with; nimble
+# writes its metadata file next to the compiler, as whichever user it runs as.
+ARG SDS_NIM_VERSION=2.2.6
+ARG SDS_NIM_SHA256=657b0e3d5def788148d2a87fa6123fa755b2d92cad31ef60fd261e451785528b
+RUN set -eu && \
+    if [ "$(dpkg --print-architecture)" = arm64 ]; then \
+    curl -sSfL "https://nim-lang.org/download/nim-${SDS_NIM_VERSION}.tar.xz" -o /tmp/nim.tar.xz && \
+    echo "${SDS_NIM_SHA256}  /tmp/nim.tar.xz" | sha256sum -c - && \
+    mkdir -p /opt/nim-sds /root/.nimble/nimbinaries && \
+    tar -xJf /tmp/nim.tar.xz -C /opt/nim-sds --strip-components=1 && \
+    rm /tmp/nim.tar.xz && \
+    cd /opt/nim-sds && \
+    sh build.sh > /dev/null && \
+    bin/nim c --noNimblePath --skipUserCfg --skipParentCfg --hints:off koch && \
+    ./koch boot -d:release --skipUserCfg --skipParentCfg --hints:off && \
+    rm -rf c_code nimcache compiler/nimcache koch && \
+    bin/nim --version && \
+    chmod a+w /opt/nim-sds && \
+    ln -s /opt/nim-sds "/root/.nimble/nimbinaries/nim-${SDS_NIM_VERSION}"; \
+    fi
+
+# Test runner behind `make test-unit`
+ARG GOTESTSUM_VERSION=1.13.0
+RUN go install "gotest.tools/gotestsum@v${GOTESTSUM_VERSION}" && \
+    go clean -cache -modcache && \
+    gotestsum --version
+
+# Build status-go in the toolchain container
+FROM toolchain AS builder
+
 ARG build_tags='gowaku_no_rln'
 ARG build_flags=''
 ARG build_target='cmd'
@@ -104,15 +137,26 @@ RUN if [ "$enable_go_cache" = "true" ]; then \
     go env -w GOCACHE=/root/.cache/go-build; \
     fi
 ARG use_torrent=false
+# A directory of the build context with libraries built earlier in this toolchain:
+# libsds.so with libsds.h, libstorage.so with its library/ headers. What is
+# missing there is built here.
+ARG prebuilt_libs=''
+# libstorage is built without -march=native: the image runs on other machines
+# than the one that builds it.
 RUN --mount=type=cache,target="/root/.cache/go-build",id=statusgo-build-$cache_id \
-    make $build_target BUILD_TAGS="$build_tags" BUILD_FLAGS="$build_flags" USE_LOGOS_STORAGE="$use_logos_storage" USE_TORRENT="$use_torrent"
+    libs="$PWD/${prebuilt_libs:-none}"; \
+    [ ! -f "$libs/libsds.so" ] || sds="NIM_SDS_LIB_DIR=$libs NIM_SDS_INC_DIR=$libs"; \
+    [ ! -f "$libs/libstorage.so" ] || storage="LOGOS_STORAGE_LIB_DIR=$libs LOGOS_STORAGE_INC_DIR=$libs/library"; \
+    make $build_target BUILD_TAGS="$build_tags" BUILD_FLAGS="$build_flags" USE_LOGOS_STORAGE="$use_logos_storage" USE_TORRENT="$use_torrent" \
+    STORAGE_LIB_PARAMS=-d:disableMarchNative ${sds:-} ${storage:-}
 
 # Stage runtime shared libraries required by built binaries.
 RUN mkdir -p /tmp/status-runtime-libs \
-    && cp /go/src/github.com/status-im/status-go/build/libsds.so /tmp/status-runtime-libs/ \
-    && if [ -f /go/src/github.com/status-im/logos-storage-nim/build/libstorage.so ]; then \
-    cp /go/src/github.com/status-im/logos-storage-nim/build/libstorage.so /tmp/status-runtime-libs/; \
-    fi
+    && for lib in build/libsds.so ../logos-storage-nim/build/libstorage.so \
+        "${prebuilt_libs:-none}/libsds.so" "${prebuilt_libs:-none}/libstorage.so"; do \
+    if [ -f "$lib" ]; then cp "$lib" /tmp/status-runtime-libs/; fi; \
+    done \
+    && test -f /tmp/status-runtime-libs/libsds.so
 
 # Copy binaries to the second image
 FROM debian:trixie-slim

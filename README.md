@@ -1,4 +1,4 @@
-[![Unit Tests](https://ci.status.im/buildStatus/icon?subject=Unit%20Tests&job=status-go%2Ftests-develop)](https://ci.status.im/job/status-go/job/tests-develop/) [![Unit Tests](https://ci.status.im/buildStatus/icon?subject=Functional%20Tests&job=status-go%2Ftests-rpc-develop)](https://ci.status.im/job/status-go/job/tests-rpc-develop/) [![codecov](https://codecov.io/github/status-im/status-go/graph/badge.svg?token=mQIkVPUdVv)](https://codecov.io/github/status-im/status-go)
+[![Unit Tests](https://github.com/status-im/status-go/actions/workflows/unit-tests.yml/badge.svg?branch=develop)](https://github.com/status-im/status-go/actions/workflows/unit-tests.yml?query=branch%3Adevelop) [![Functional Tests](https://github.com/status-im/status-go/actions/workflows/functional-tests.yml/badge.svg?branch=develop)](https://github.com/status-im/status-go/actions/workflows/functional-tests.yml?query=branch%3Adevelop)
 
 # status-go
 

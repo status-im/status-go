@@ -1,0 +1,124 @@
+name: Build mobile
+on:
+  pull_request:
+  push:
+    branches:
+      - develop
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: build-mobile-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+jobs:
+  android:
+    name: android/arm64
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      NDK_VERSION: '27.2.12479018'
+      # nimble 0.26.1, linux_x64; update together with NIMBLE_VERSION in the Dockerfile.
+      NIMBLE_SHA256: 8610ad1758ffe46e4420a725142d4327d4a392a757c53aef14d764e8657f98d6
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          # scripts/version.sh describes the commit from the nearest tag
+          fetch-depth: 0
+          filter: blob:none
+          persist-credentials: false
+      # The mobile targets build everything with the token library's Nim.
+      - uses: ./.github/actions/versions
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: false
+      # Its pattern takes the generator's progress lines for compile errors.
+      - name: Remove the Go problem matcher
+        run: echo "::remove-matcher owner=go::"
+      - uses: jiro4989/setup-nim-action@189b145833368cc92f1e7b3e166a25a3e057a693 # v2.3.1
+        with:
+          nim-version: ${{ env.TKL_NIM_VERSION }}
+      # The nimble bundled with Nim cannot resolve nim-sds through the bindings.
+      - name: Install nimble
+        run: |
+          mkdir -p "$RUNNER_TEMP/nimble"
+          curl -sSfL --retry 5 --retry-all-errors -o "$RUNNER_TEMP/nimble.tar.gz" \
+            "https://github.com/nim-lang/nimble/releases/download/v$NIMBLE_VERSION/nimble-linux_x64.tar.gz"
+          echo "$NIMBLE_SHA256  $RUNNER_TEMP/nimble.tar.gz" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/nimble.tar.gz" -C "$RUNNER_TEMP/nimble"
+          echo "$RUNNER_TEMP/nimble" >> "$GITHUB_PATH"
+      - uses: arduino/setup-protoc@c65c819552d16ad3c9b72d9dfd5ba5237b9c906b # v3.0.0
+        with:
+          version: ${{ env.PROTOC_VERSION }}
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install NDK
+        run: |
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "ndk;$NDK_VERSION" < <(yes)
+          echo "ANDROID_NDK_ROOT=$ANDROID_HOME/ndk/$NDK_VERSION" >> "$GITHUB_ENV"
+      - name: Tool versions
+        run: |
+          go version
+          nim --version | head -n 1
+          nimble --version | head -n 1
+          protoc --version
+          cat "$ANDROID_NDK_ROOT/source.properties"
+      - name: Android library
+        run: make statusgo-android-library ARCH=arm64
+      - name: Upload library
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: status-go-android-arm64
+          path: |
+            build/bin/libstatus.so
+            build/bin/libstatus.h
+            build/libsds.so
+          if-no-files-found: error
+          retention-days: 7
+  ios:
+    name: ios/arm64
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          # scripts/version.sh describes the commit from the nearest tag
+          fetch-depth: 0
+          filter: blob:none
+          persist-credentials: false
+      # The mobile targets build everything with the token library's Nim.
+      - uses: ./.github/actions/versions
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: false
+      # Its pattern takes the generator's progress lines for compile errors.
+      - name: Remove the Go problem matcher
+        run: echo "::remove-matcher owner=go::"
+      - uses: ./.github/actions/nim
+        with:
+          nim-version: ${{ env.TKL_NIM_VERSION }}
+          nimble-version: ${{ env.NIMBLE_VERSION }}
+      - uses: arduino/setup-protoc@c65c819552d16ad3c9b72d9dfd5ba5237b9c906b # v3.0.0
+        with:
+          version: ${{ env.PROTOC_VERSION }}
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Tool versions
+        run: |
+          go version
+          nim --version | head -n 1
+          nimble --version | head -n 1
+          protoc --version
+          xcodebuild -version
+          xcrun --sdk iphoneos --show-sdk-version
+      - name: iOS library
+        run: make statusgo-ios-library ARCH=arm64 IPHONE_SDK=iphoneos
+      - name: Upload library
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: status-go-ios-arm64
+          path: |
+            build/bin/libstatus.a
+            build/bin/libstatus.h
+            build/libsds.a
+          if-no-files-found: error
+          retention-days: 7

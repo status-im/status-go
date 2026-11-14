@@ -268,11 +268,17 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
         return self.networks_service.add_ethereum_chain(network)
 
     def _set_proxy_credentials(self, data):
+        # These two proxies let a client in without the build credentials.
+        # Only their production stage is up.
+        data["StatusProxyStageName"] = "prod"
+        data["nftProxyStageName"] = "prod"
+        data["ethRpcProxyUsePuzzleAuth"] = True
+        data["nftProxyUsePuzzleAuth"] = True
+
         if "STATUS_BUILD_PROXY_USER" not in os.environ:
             return data
 
         data["StatusProxyEnabled"] = True
-        data["StatusProxyStageName"] = "test"
         return data
 
     def _set_wallet_secrets(self, data):

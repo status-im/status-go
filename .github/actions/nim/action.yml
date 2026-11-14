@@ -1,0 +1,27 @@
+name: Nim
+description: Puts prebuilt Nim compilers and nimble on PATH of an Apple Silicon runner. Every download is checked against a pinned checksum.
+inputs:
+  nim-version:
+    description: Nim on PATH.
+    default: '2.2.4'
+  tkl-nim-version:
+    description: A second Nim for the token library; TKL_NIM points at it. Empty for none.
+    default: ''
+  nimble-version:
+    description: nimble on PATH.
+    default: '0.26.1'
+runs:
+  using: composite
+  steps:
+    # setup-nim-action and nimble build Nim from source on macOS, about five
+    # minutes for each compiler.
+    - name: Nim and nimble
+      shell: bash
+      env:
+        NIM_VERSION: ${{ inputs.nim-version }}
+        TKL_NIM_VERSION: ${{ inputs.tkl-nim-version }}
+        NIMBLE_VERSION: ${{ inputs.nimble-version }}
+        # The compiler nim-sds pins. nimble looks for it only in its own directory
+        # and builds it from source when it is not there.
+        NIMBLE_NIM_VERSION: '2.2.6'
+      run: '"$GITHUB_ACTION_PATH/install.sh"'

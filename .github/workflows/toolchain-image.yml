@@ -1,0 +1,64 @@
+name: Toolchain image
+# Publishes the Dockerfile's toolchain stage. Jobs that find no published image
+# for their Dockerfile build it themselves, see scripts/toolchain.sh.
+on:
+  push:
+    branches:
+      - develop
+    paths:
+      - 'Dockerfile'
+      - 'scripts/toolchain.sh'
+      - '.github/workflows/toolchain-image.yml'
+  # A pull request that changes the toolchain publishes its image too, so its
+  # other jobs stop building it. Forks cannot push packages and are skipped.
+  pull_request:
+    paths:
+      - 'Dockerfile'
+      - 'scripts/toolchain.sh'
+      - '.github/workflows/toolchain-image.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: toolchain-image-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  publish:
+    if: >-
+      github.repository == 'status-im/status-go' &&
+      (github.event_name != 'pull_request' ||
+       github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Look for a published image
+        id: image
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          image="$(scripts/toolchain.sh --image)"
+          echo "image=$image" >> "$GITHUB_OUTPUT"
+          echo "$GITHUB_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+          if docker manifest inspect "$image" >/dev/null 2>&1; then
+            echo "published=true" >> "$GITHUB_OUTPUT"
+            echo "$image is already published"
+          fi
+      - name: Build
+        if: steps.image.outputs.published != 'true'
+        env:
+          IMAGE: ${{ steps.image.outputs.image }}
+        run: |
+          docker build --target toolchain --tag "$IMAGE" \
+            --label "org.opencontainers.image.source=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" .
+          docker run --rm "$IMAGE" sh -c 'go version && nim --version && nimble --version && protoc --version'
+      - name: Publish
+        if: steps.image.outputs.published != 'true'
+        env:
+          IMAGE: ${{ steps.image.outputs.image }}
+        run: docker push "$IMAGE"
