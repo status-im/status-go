@@ -47,7 +47,11 @@ case "$git_common" in
   "$repo"/*) ;;
   *) args+=(--volume "$git_common:$git_common:ro") ;;
 esac
-# The container runs as root and the checkout belongs to someone else.
-args+=(--env GIT_CONFIG_COUNT=1 --env GIT_CONFIG_KEY_0=safe.directory --env 'GIT_CONFIG_VALUE_0=*')
+# The container runs as root and the checkout belongs to someone else. Nix reads
+# git settings from a file only.
+gitconfig="$(mktemp)"
+trap 'rm -f "$gitconfig"' EXIT
+printf '[safe]\n\tdirectory = *\n' > "$gitconfig"
+args+=(--volume "$gitconfig:/root/.gitconfig:ro")
 
-exec docker run "${args[@]}" "$image" "$@"
+docker run "${args[@]}" "$image" "$@"
