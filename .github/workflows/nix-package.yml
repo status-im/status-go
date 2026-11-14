@@ -1,0 +1,40 @@
+name: Nix package
+# Builds status-go the way its Nix users do. Catches a Nix description that no
+# longer matches the code, a stale hash of the Go modules first of all.
+on:
+  pull_request:
+  push:
+    branches:
+      - develop
+      - ab/issue-23128-nix-probe
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: nix-package-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+jobs:
+  package:
+    name: linux/x86_64/package-nix
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    permissions:
+      contents: read
+      packages: read
+    env:
+      PACKAGE: '.?submodules=1#status-go-library'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      # Without access to the published image the script builds it instead.
+      - name: Nix image
+        env:
+          GHCR_TOKEN: ${{ github.token }}
+        run: |
+          echo "$GHCR_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin || true
+          scripts/nix-image.sh nix --version
+      - name: Build the package
+        run: |
+          scripts/nix-image.sh nix build --dry-run "$PACKAGE" 2>&1 | grep -E 'will be (built|fetched)|\.drv$' || true
+          time scripts/nix-image.sh nix build -L --no-link "$PACKAGE"

@@ -1,0 +1,82 @@
+name: Nix image
+# Publishes the image the Nix package job builds in. A job that finds no
+# published image for its flake builds it itself, see scripts/nix-image.sh.
+on:
+  push:
+    branches:
+      - develop
+      - ab/issue-23128-nix-probe
+    paths:
+      - 'flake.nix'
+      - 'flake.lock'
+      - 'nix/**'
+      - 'scripts/nix-image.sh'
+      - '.github/workflows/nix-image.yml'
+  # A pull request that changes the flake publishes its image too. Forks cannot
+  # push packages and are skipped.
+  pull_request:
+    paths:
+      - 'flake.nix'
+      - 'flake.lock'
+      - 'nix/**'
+      - 'scripts/nix-image.sh'
+      - '.github/workflows/nix-image.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: nix-image-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  publish:
+    if: >-
+      github.repository == 'status-im/status-go' &&
+      (github.event_name != 'pull_request' ||
+       github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Look for a published image
+        id: image
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          image="$(scripts/nix-image.sh --image)"
+          echo "image=$image" >> "$GITHUB_OUTPUT"
+          echo "$GITHUB_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+          if docker manifest inspect "$image" >/dev/null 2>&1; then
+            echo "published=true" >> "$GITHUB_OUTPUT"
+            echo "$image is already published"
+          fi
+      - name: Build
+        if: steps.image.outputs.published != 'true'
+        env:
+          IMAGE: ${{ steps.image.outputs.image }}
+        run: |
+          scripts/nix-image.sh --build \
+            --label "org.opencontainers.image.source=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY"
+          docker run --rm "$IMAGE" nix --version
+          docker image inspect --format 'Image size: {{.Size}} bytes' "$IMAGE"
+      - name: Publish
+        if: steps.image.outputs.published != 'true'
+        env:
+          IMAGE: ${{ steps.image.outputs.image }}
+        run: docker push "$IMAGE"
+      # Every change of the flake leaves an image of several GB behind.
+      - name: Delete all but the three newest images
+        if: steps.image.outputs.published != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSIONS: /orgs/status-im/packages/container/status-go-nix/versions
+        run: |
+          gh api --paginate "$VERSIONS" --jq '.[] | [.created_at, .id] | @tsv' |
+            sort -r | tail -n +4 | cut -f2 |
+            while read -r id; do
+              gh api -X DELETE "$VERSIONS/$id"
+            done

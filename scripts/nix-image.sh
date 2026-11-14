@@ -9,9 +9,11 @@ set -euo pipefail
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # What the image is built from. The hash of the Go modules changes with go.mod
 # and is not part of the image.
-context=(flake.nix flake.lock nix ':(exclude)nix/pkgs/status-go/library/vendorHash.sha256')
+vendor_hash=nix/pkgs/status-go/library/vendorHash.sha256
+context=(flake.nix flake.lock nix ":(exclude)$vendor_hash")
 # The tag follows these files, so a changed dependency never reuses an old image.
-tag="$(git -C "$repo" ls-tree -r HEAD -- "${context[@]}" | git hash-object --stdin | cut -c1-12)"
+tag="$(git -C "$repo" ls-tree -r HEAD -- flake.nix flake.lock nix | grep -v "$vendor_hash" |
+  git hash-object --stdin | cut -c1-12)"
 image="${STATUS_GO_NIX_IMAGE:-ghcr.io/status-im/status-go-nix:$tag}"
 platform=linux/amd64
 
