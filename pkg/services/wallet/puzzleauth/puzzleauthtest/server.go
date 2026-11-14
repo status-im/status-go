@@ -14,7 +14,7 @@ import (
 )
 
 // Token is the JWT the server issues for a solved puzzle.
-const Token = "test-jwt-token"
+const Token = "test-jwt-token" // #nosec G101 -- not a credential: the fake server hands it out
 
 // NewServer starts a server that plays both the auth service and the proxy
 // behind it: /auth/puzzle hands out a puzzle cheap enough to solve in a test,
