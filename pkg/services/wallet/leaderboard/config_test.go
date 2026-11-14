@@ -68,3 +68,8 @@ func TestServiceConfigValidate(t *testing.T) {
 		require.Equal(t, true, config.AllowETag)
 	}
 }
+
+func TestNewLeaderboardConfigPuzzleAuth(t *testing.T) {
+	require.False(t, NewLeaderboardConfig(params.MarketDataProxyConfig{}).UsePuzzleAuth)
+	require.True(t, NewLeaderboardConfig(params.MarketDataProxyConfig{UsePuzzleAuth: true}).UsePuzzleAuth)
+}
