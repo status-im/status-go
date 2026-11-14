@@ -210,6 +210,7 @@ func buildWalletConfig(walletRequest *requests.WalletConfig, request *requests.W
 	if !request.MarketDataProxyUrl.Empty() {
 		walletConfig.MarketDataProxyConfig.UrlOverride = request.MarketDataProxyUrl
 	}
+	walletConfig.MarketDataProxyConfig.UsePuzzleAuth = request.MarketDataProxyUsePuzzleAuth
 	if !request.CoingeckoAPIKey.Empty() {
 		walletConfig.CoingeckoAPIKey = request.CoingeckoAPIKey
 	}

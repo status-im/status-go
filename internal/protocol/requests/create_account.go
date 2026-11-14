@@ -131,9 +131,10 @@ type WalletSecretsConfig struct {
 
 	StatusProxyStageName string `json:"statusProxyStageName"`
 
-	MarketDataProxyUrl      security.SensitiveString `json:"marketDataProxyUrl"`
-	MarketDataProxyUser     security.SensitiveString `json:"marketDataProxyUser"`
-	MarketDataProxyPassword security.SensitiveString `json:"marketDataProxyPassword"`
+	MarketDataProxyUrl           security.SensitiveString `json:"marketDataProxyUrl"`
+	MarketDataProxyUser          security.SensitiveString `json:"marketDataProxyUser"`
+	MarketDataProxyPassword      security.SensitiveString `json:"marketDataProxyPassword"`
+	MarketDataProxyUsePuzzleAuth bool                     `json:"marketDataProxyUsePuzzleAuth"`
 
 	CoingeckoAPIKey     security.SensitiveString `json:"coingeckoApiKey"`
 	CoingeckoDemoAPIKey security.SensitiveString `json:"coingeckoDemoApiKey"`
