@@ -254,6 +254,7 @@ type MarketDataProxyConfig struct {
 	Password                security.SensitiveString `json:"Password"`
 	FullDataRefreshInterval int                      `json:"FullDataRefreshInterval"`
 	PriceRefreshInterval    int                      `json:"PriceRefreshInterval"`
+	UsePuzzleAuth           bool                     `json:"UsePuzzleAuth"`
 }
 
 type NftProxyConfig struct {

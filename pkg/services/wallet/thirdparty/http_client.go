@@ -22,6 +22,7 @@ import (
 	"github.com/status-im/status-go/internal/logutils"
 	"github.com/status-im/status-go/internal/traffic"
 	"github.com/status-im/status-go/pkg/security"
+	"github.com/status-im/status-go/pkg/services/wallet/puzzleauth"
 )
 
 const (
@@ -57,6 +58,9 @@ type HTTPClient struct {
 	maxRetries int
 	// traffic records what the client sends and receives.
 	traffic *httptraffic.Recorder
+	// puzzleAuthOrigin is the auth server whose puzzle JWT requests carry;
+	// empty when the client does not use puzzle auth.
+	puzzleAuthOrigin string
 }
 
 // Struct to hold request modifiers and data collectors
@@ -113,6 +117,16 @@ func WithTrafficRecorder(rec *httptraffic.Recorder) Option {
 	}
 }
 
+// WithPuzzleAuth sends every request with a proof-of-work (puzzle) JWT of the
+// auth server at origin (scheme://host), solving a puzzle when there is no live
+// token. The token replaces any Authorization header a request carries, basic
+// credentials included.
+func WithPuzzleAuth(origin string) Option {
+	return func(c *HTTPClient) {
+		c.puzzleAuthOrigin = origin
+	}
+}
+
 // WithMaxRetries sets the maximum number of retries for failed requests
 func WithMaxRetries(maxRetries int) Option {
 	return func(c *HTTPClient) {
@@ -157,6 +171,11 @@ func NewHTTPClient(opts ...Option) *HTTPClient {
 		client.client.Transport = traffic.Default.Instrument(client.client.Transport)
 	default:
 		client.client.Transport = client.traffic.Instrument(client.client.Transport)
+	}
+
+	if client.puzzleAuthOrigin != "" {
+		// Outermost, so that every attempt of the puzzle layer is recorded as traffic.
+		client.client.Transport = puzzleauth.NewTransport(client.puzzleAuthOrigin, client.client.Transport)
 	}
 
 	return client
