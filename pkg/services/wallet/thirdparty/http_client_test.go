@@ -18,6 +18,7 @@ import (
 	"github.com/status-im/go-wallet-sdk/pkg/httptraffic"
 
 	"github.com/status-im/status-go/pkg/security"
+	"github.com/status-im/status-go/pkg/services/wallet/puzzleauth/puzzleauthtest"
 )
 
 func TestHTTPClient_GetRequests(t *testing.T) {
@@ -494,4 +495,48 @@ func TestHTTPClient_RecordsCompressedTraffic(t *testing.T) {
 	require.Equal(t, uint64(len(payload)), stats.DecodedBodyBytes)
 	require.Less(t, stats.ResponseBytes, uint64(len(payload)), "the compressed size has to be counted")
 	require.Greater(t, stats.ResponseBytes, uint64(len(gzipped)))
+}
+
+func TestHTTPClient_WithPuzzleAuth(t *testing.T) {
+	var authorizations []string
+	server := puzzleauthtest.NewServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		authorizations = append(authorizations, r.Header.Get("Authorization"))
+		_, _ = w.Write([]byte("ok"))
+	}))
+	creds := &BasicCreds{
+		User:     security.NewSensitiveString("user"),
+		Password: security.NewSensitiveString("password"),
+	}
+	client := NewHTTPClient(WithPuzzleAuth(server.URL))
+
+	// The token replaces basic credentials of a GET...
+	body, err := client.DoGetRequestWithCredentials(context.Background(), server.URL+"/resource", nil, creds)
+	require.NoError(t, err)
+	require.Equal(t, "ok", string(body))
+
+	// ...and of a POST.
+	_, err = client.DoPostRequest(context.Background(), server.URL+"/resource", map[string]interface{}{"k": "v"}, creds)
+	require.NoError(t, err)
+
+	bearer := "Bearer " + puzzleauthtest.Token
+	require.Equal(t, []string{bearer, bearer}, authorizations)
+}
+
+func TestHTTPClient_WithPuzzleAuth_RecordsTraffic(t *testing.T) {
+	server := puzzleauthtest.NewServer(t, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte("ok"))
+	}))
+	rec := httptraffic.NewRecorder()
+	client := NewHTTPClient(WithTrafficRecorder(rec), WithPuzzleAuth(server.URL))
+
+	_, err := client.DoGetRequest(context.Background(), server.URL+"/resource", nil)
+	require.NoError(t, err)
+
+	var requests uint64
+	for _, e := range rec.Snapshot().Endpoints {
+		if e.Path == "/resource" {
+			requests = e.Requests
+		}
+	}
+	require.Equal(t, uint64(1), requests)
 }

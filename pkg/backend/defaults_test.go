@@ -51,3 +51,16 @@ func TestBuildWalletConfigRelayProvider(t *testing.T) {
 	require.False(t, walletConfig.EnableRelayProvider)
 	require.Equal(t, "relay-key", walletConfig.RelayAPIKey.Reveal())
 }
+
+func TestBuildWalletConfigMarketDataProxyPuzzleAuth(t *testing.T) {
+	walletConfig := buildWalletConfig(&requests.WalletConfig{}, &requests.WalletSecretsConfig{})
+	require.False(t, walletConfig.MarketDataProxyConfig.UsePuzzleAuth)
+
+	walletConfig = buildWalletConfig(&requests.WalletConfig{}, &requests.WalletSecretsConfig{
+		MarketDataProxyUsePuzzleAuth: true,
+	})
+	require.True(t, walletConfig.MarketDataProxyConfig.UsePuzzleAuth)
+	// The other proxies keep their own switches.
+	require.False(t, walletConfig.NftProxyConfig.UsePuzzleAuth)
+	require.False(t, walletConfig.EthRpcProxyUsePuzzleAuth)
+}
