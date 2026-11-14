@@ -56,6 +56,16 @@ func NewTransport(origin string, base http.RoundTripper) *Transport {
 	}
 }
 
+// Wrap returns a function that puts a [Transport] for the given auth server
+// origin in front of a round tripper, for HTTP clients that take transport
+// wrappers. The token replaces any Authorization header a request carries,
+// basic credentials included.
+func Wrap(origin string) func(http.RoundTripper) http.RoundTripper {
+	return func(base http.RoundTripper) http.RoundTripper {
+		return NewTransport(origin, base)
+	}
+}
+
 // NewHTTPClient returns an [*http.Client] with [Transport] set to [NewTransport](origin, nil) and a 60s timeout.
 func NewHTTPClient(origin string) *http.Client {
 	return &http.Client{

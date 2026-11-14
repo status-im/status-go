@@ -15,6 +15,7 @@ import (
 
 	"github.com/status-im/status-go/internal/logutils"
 	"github.com/status-im/status-go/internal/panics"
+	"github.com/status-im/status-go/pkg/services/wallet/puzzleauth"
 	"github.com/status-im/status-go/pkg/services/wallet/thirdparty"
 )
 
@@ -67,10 +68,15 @@ type ProxyFetcher struct {
 // NewProxyFetcher creates a new proxy data fetcher
 func NewProxyFetcher(config ServiceConfig, storage *DataStorage, subscriptionManager *SubscriptionManager) DataFetcher {
 	// Configure HTTP client with detailed timeouts
-	httpClient := thirdparty.NewHTTPClient(
-		thirdparty.WithTimeout(10*time.Second),
+	httpOptions := []thirdparty.Option{
+		thirdparty.WithTimeout(10 * time.Second),
 		thirdparty.WithMaxRetries(1),
-	)
+	}
+	if config.UsePuzzleAuth {
+		origin := GetMarketProxyHost(config.UrlOverride.Reveal(), config.StageName)
+		httpOptions = append(httpOptions, thirdparty.WithTransportWrapper(puzzleauth.Wrap(origin)))
+	}
+	httpClient := thirdparty.NewHTTPClient(httpOptions...)
 	return &ProxyFetcher{
 		client:                httpClient,
 		storage:               storage,

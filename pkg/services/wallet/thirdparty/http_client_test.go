@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -462,4 +463,56 @@ func TestHTTPClient_PostRequestOptions(t *testing.T) {
 	require.Equal(t, "secret", receivedHeader)
 	require.Equal(t, "application/json", receivedContentType)
 	require.JSONEq(t, `{"message":"bad","errorCode":"AMOUNT_TOO_LOW"}`, string(body))
+}
+
+func TestHTTPClient_WithTransportWrapper(t *testing.T) {
+	var seen []string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		seen = r.Header.Values("X-Wrapper")
+		_, _ = w.Write([]byte("ok"))
+	}))
+	defer server.Close()
+
+	// mark returns a wrapper that adds its name to the request on the way out.
+	mark := func(name string) func(http.RoundTripper) http.RoundTripper {
+		return func(base http.RoundTripper) http.RoundTripper {
+			return roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+				req = req.Clone(req.Context())
+				req.Header.Add("X-Wrapper", name)
+				return base.RoundTrip(req)
+			})
+		}
+	}
+
+	// The wrappers are given before an option that replaces the transport
+	// and still end up in front of it.
+	client := NewHTTPClient(
+		WithTransportWrapper(mark("first")),
+		WithTransportWrapper(mark("second")),
+		WithDetailedTimeouts(time.Second, time.Second, time.Second, time.Second),
+	)
+
+	body, err := client.DoGetRequest(context.Background(), server.URL, nil)
+	require.NoError(t, err)
+	require.Equal(t, "ok", string(body))
+
+	// The last wrapper sees the request first
+	require.Equal(t, []string{"second", "first"}, seen)
+}
+
+// A wrapper always gets a transport to send with, also when no option set one.
+func TestHTTPClient_WithTransportWrapper_BaseIsNeverNil(t *testing.T) {
+	var base http.RoundTripper
+	NewHTTPClient(WithTransportWrapper(func(rt http.RoundTripper) http.RoundTripper {
+		base = rt
+		return rt
+	}))
+
+	require.NotNil(t, base)
+}
+
+type roundTripperFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripperFunc) RoundTrip(req *http.Request) (*http.Response, error) {
+	return f(req)
 }

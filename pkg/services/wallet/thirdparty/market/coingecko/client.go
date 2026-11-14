@@ -14,6 +14,7 @@ import (
 
 	"github.com/status-im/status-go/pkg/security"
 	walletcommon "github.com/status-im/status-go/pkg/services/wallet/common"
+	"github.com/status-im/status-go/pkg/services/wallet/puzzleauth"
 	"github.com/status-im/status-go/pkg/services/wallet/thirdparty"
 	"github.com/status-im/status-go/pkg/services/wallet/thirdparty/utils"
 	tokentypes "github.com/status-im/status-go/pkg/services/wallet/token/types"
@@ -48,6 +49,10 @@ type Params struct {
 	// IsMarketProxy tells the client it talks to the Status market proxy
 	// rather than api.coingecko.com.
 	IsMarketProxy bool
+	// PuzzleAuthOrigin, if set, is the origin (scheme://host) of the auth
+	// server whose puzzle JWT every request carries. It takes precedence over
+	// User and Password.
+	PuzzleAuthOrigin string
 }
 
 func NewClientWithParams(params Params) *Client {
@@ -59,7 +64,7 @@ func NewClientWithParams(params Params) *Client {
 		}
 	}
 
-	httpClient := thirdparty.NewHTTPClient(
+	httpOptions := []thirdparty.Option{
 		thirdparty.WithDetailedTimeouts(
 			5*time.Second,  // dialTimeout
 			5*time.Second,  // tlsHandshakeTimeout
@@ -67,7 +72,11 @@ func NewClientWithParams(params Params) *Client {
 			20*time.Second, // requestTimeout
 		),
 		thirdparty.WithMaxRetries(5),
-	)
+	}
+	if params.PuzzleAuthOrigin != "" {
+		httpOptions = append(httpOptions, thirdparty.WithTransportWrapper(puzzleauth.Wrap(params.PuzzleAuthOrigin)))
+	}
+	httpClient := thirdparty.NewHTTPClient(httpOptions...)
 
 	// Ensure baseURL doesn't end with a slash
 	clientBaseURL := strings.TrimSuffix(params.URL, "/")

@@ -8,6 +8,9 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/status-im/status-go/pkg/security"
+	"github.com/status-im/status-go/pkg/services/wallet/puzzleauth/puzzleauthtest"
 )
 
 func TestCoinsMarketsCurrency(t *testing.T) {
@@ -116,4 +119,25 @@ func TestRequestsCarryConvertCurrency(t *testing.T) {
 	require.Equal(t, baseCurrency, query.Get("vs_currencies"))
 	require.Equal(t, "jpy", query.Get(convertCurrencyParam))
 	require.Equal(t, 150.0, prices["bitcoin"]["jpy"])
+}
+
+func TestMarketProxyRequestsCarryPuzzleToken(t *testing.T) {
+	var authorization string
+	server := puzzleauthtest.NewServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		authorization = r.Header.Get("Authorization")
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"bitcoin":{"usd":1}}`))
+	}))
+
+	client := NewClientWithParams(Params{
+		URL:              server.URL,
+		User:             security.NewSensitiveString("user"),
+		Password:         security.NewSensitiveString("password"),
+		IsMarketProxy:    true,
+		PuzzleAuthOrigin: server.URL,
+	})
+
+	_, err := client.FetchSimplePrice(context.Background(), []string{"bitcoin"}, []string{"usd"})
+	require.NoError(t, err)
+	require.Equal(t, "Bearer "+puzzleauthtest.Token, authorization)
 }
