@@ -8,9 +8,15 @@ set -euo pipefail
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # The tag follows the Dockerfile, so an edited toolchain never reuses an old image.
 tag="$(git -C "$repo" hash-object Dockerfile | cut -c1-12)"
+# The image runs natively; only the amd64 one is published.
+case "$(uname -m)" in
+  arm64 | aarch64)
+    platform=linux/arm64
+    tag="$tag-arm64"
+    ;;
+  *) platform=linux/amd64 ;;
+esac
 image="${STATUS_GO_TOOLCHAIN_IMAGE:-ghcr.io/status-im/status-go-toolchain:$tag}"
-# libsds does not build for linux/arm64.
-platform=linux/amd64
 
 if [ "${1:-}" = --image ]; then
   echo "$image"
@@ -58,4 +64,16 @@ if [ -t 0 ] && [ -t 1 ]; then
   args+=(--interactive --tty)
 fi
 
-exec docker run "${args[@]}" "$image" "$@"
+# nimble looks for a Nim under the home directory before it downloads one.
+# shellcheck disable=SC2016
+link_nim='if [ -d /opt/nim-sds ]; then
+  version="$(/opt/nim-sds/bin/nim --version | sed -nE "1s/.*Version ([0-9.]+).*/\1/p")"
+  link="$HOME/.nimble/nimbinaries/nim-$version"
+  mkdir -p "$HOME/.nimble/nimbinaries"
+  # A directory here is a Nim that nimble downloaded for the wrong architecture.
+  if [ -d "$link" ] && [ ! -L "$link" ]; then rm -rf "$link"; fi
+  ln -sfn /opt/nim-sds "$link"
+fi
+exec "$@"'
+
+exec docker run "${args[@]}" "$image" bash -c "$link_nim" toolchain "$@"

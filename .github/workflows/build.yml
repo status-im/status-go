@@ -13,9 +13,17 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   linux:
-    name: linux/x86_64
-    runs-on: ubuntu-24.04
+    name: linux/${{ matrix.arch }}
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            runner: ubuntu-24.04
+          - arch: aarch64
+            runner: ubuntu-24.04-arm
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -24,6 +32,8 @@ jobs:
           filter: blob:none
           persist-credentials: false
       - uses: ./.github/actions/toolchain
+        with:
+          cache-name: linux-${{ matrix.arch }}
       - name: Static library
         run: scripts/toolchain.sh make statusgo-library
       - name: Shared library
@@ -31,7 +41,7 @@ jobs:
       - name: Upload libraries
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: status-go-linux-x86_64
+          name: status-go-linux-${{ matrix.arch }}
           path: |
             build/bin/libstatus.a
             build/bin/libstatus.h
@@ -39,4 +49,6 @@ jobs:
             build/libsds.so
           if-no-files-found: error
           retention-days: 7
+      # The aarch64 caches are not kept: the repository's cache quota is nearly used.
       - uses: ./.github/actions/go-cache/save
+        if: matrix.arch == 'x86_64'

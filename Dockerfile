@@ -86,6 +86,29 @@ RUN set -eu && \
 
 ENV PATH="/opt/nimble/bin:${PATH}"
 
+# On arm64 nimble downloads an x86_64 Nim, and no arm64 build of this version is
+# published. It is built from source here and left where nimble looks first.
+# scripts/toolchain.sh links it into the home directory it runs with; nimble
+# writes its metadata file next to the compiler, as whichever user it runs as.
+ARG SDS_NIM_VERSION=2.2.6
+ARG SDS_NIM_SHA256=657b0e3d5def788148d2a87fa6123fa755b2d92cad31ef60fd261e451785528b
+RUN set -eu && \
+    if [ "$(dpkg --print-architecture)" = arm64 ]; then \
+    curl -sSfL "https://nim-lang.org/download/nim-${SDS_NIM_VERSION}.tar.xz" -o /tmp/nim.tar.xz && \
+    echo "${SDS_NIM_SHA256}  /tmp/nim.tar.xz" | sha256sum -c - && \
+    mkdir -p /opt/nim-sds /root/.nimble/nimbinaries && \
+    tar -xJf /tmp/nim.tar.xz -C /opt/nim-sds --strip-components=1 && \
+    rm /tmp/nim.tar.xz && \
+    cd /opt/nim-sds && \
+    sh build.sh > /dev/null && \
+    bin/nim c --noNimblePath --skipUserCfg --skipParentCfg --hints:off koch && \
+    ./koch boot -d:release --skipUserCfg --skipParentCfg --hints:off && \
+    rm -rf c_code nimcache compiler/nimcache koch && \
+    bin/nim --version && \
+    chmod a+w /opt/nim-sds && \
+    ln -s /opt/nim-sds "/root/.nimble/nimbinaries/nim-${SDS_NIM_VERSION}"; \
+    fi
+
 # Test runner behind `make test-unit`
 ARG GOTESTSUM_VERSION=1.13.0
 RUN go install "gotest.tools/gotestsum@v${GOTESTSUM_VERSION}" && \
