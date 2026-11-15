@@ -54,11 +54,25 @@ func rotateLogFileForNewSession(path string) error {
 	if !info.ModTime().Before(processStartTime) {
 		return nil
 	}
-	ts := info.ModTime().UTC().Format(sessionArchiveTimeFormat)
 	ext := filepath.Ext(path)
 	base := strings.TrimSuffix(path, ext)
-	archived := base + "-" + ts + ext
-	return os.Rename(path, archived)
+	for ts := info.ModTime().UTC(); ; ts = ts.Add(time.Millisecond) {
+		archived := base + "-" + ts.Format(sessionArchiveTimeFormat) + ext
+		occupied := false
+		// Keep both archive forms intact. Millisecond increments preserve
+		// lumberjack's naming format so cleanup still recognizes the file.
+		for _, candidate := range []string{archived, archived + ".gz"} {
+			if _, err := os.Lstat(candidate); err == nil {
+				occupied = true
+				break
+			} else if !os.IsNotExist(err) {
+				return err
+			}
+		}
+		if !occupied {
+			return os.Rename(path, archived)
+		}
+	}
 }
 
 // renameLegacySessionArchives renames legacy session archives created with the "...Z" timestamp suffix to sessionArchiveTimeFormat
