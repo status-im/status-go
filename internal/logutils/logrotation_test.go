@@ -54,6 +54,56 @@ func TestRotateLogFileForNewSessionKeepsActiveFile(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestRotateLogFileForNewSessionPreservesExistingArchives(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		archives []string
+		next     time.Duration
+	}{
+		{name: "uncompressed", archives: []string{"2020-01-02T03-04-59.999.log"}, next: time.Millisecond},
+		{name: "compressed", archives: []string{"2020-01-02T03-04-59.999.log.gz"}, next: time.Millisecond},
+		{
+			name: "consecutive collisions across a second boundary",
+			archives: []string{
+				"2020-01-02T03-04-59.999.log",
+				"2020-01-02T03-05-00.000.log.gz",
+				"2020-01-02T03-05-00.001.log",
+			},
+			next: 3 * time.Millisecond,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			file := filepath.Join(dir, "test.log")
+			old := time.Date(2020, time.January, 2, 3, 4, 59, 999000000, time.UTC)
+			for _, archive := range tc.archives {
+				require.NoError(t, os.WriteFile(filepath.Join(dir, "test-"+archive), []byte("ARCHIVE_FROM_PREVIOUS_SESSION"), 0600))
+			}
+			require.NoError(t, os.WriteFile(file, []byte("NEW_ACTIVE_LOG"), 0600))
+			require.NoError(t, os.Chtimes(file, old, old))
+
+			require.NoError(t, rotateLogFileForNewSession(file))
+
+			for _, archive := range tc.archives {
+				content, err := os.ReadFile(filepath.Join(dir, "test-"+archive))
+				require.NoError(t, err)
+				require.Equal(t, "ARCHIVE_FROM_PREVIOUS_SESSION", string(content))
+			}
+			ts := old.Add(tc.next).Format(sessionArchiveTimeFormat)
+			content, err := os.ReadFile(filepath.Join(dir, "test-"+ts+".log"))
+			require.NoError(t, err)
+			require.Equal(t, "NEW_ACTIVE_LOG", string(content))
+			_, err = time.Parse(sessionArchiveTimeFormat, ts)
+			require.NoError(t, err)
+			_, err = os.Stat(file)
+			require.True(t, os.IsNotExist(err))
+			entries, err := os.ReadDir(dir)
+			require.NoError(t, err)
+			require.Len(t, entries, len(tc.archives)+1)
+		})
+	}
+}
+
 func TestRenameLegacySessionArchives(t *testing.T) {
 	dir := t.TempDir()
 	file := filepath.Join(dir, "pre_login.log")
@@ -87,11 +137,16 @@ func TestRenameLegacySessionArchives(t *testing.T) {
 func TestSessionArchivesPrunedToDefaultMaxBackups(t *testing.T) {
 	dir := t.TempDir()
 	file := filepath.Join(dir, "test.log")
-	base := time.Now().Add(-24 * time.Hour).UTC()
-	for i := range DefaultLogMaxBackups + 5 {
-		ts := base.Add(time.Duration(i) * time.Minute).Format(sessionArchiveTimeFormat)
-		require.NoError(t, os.WriteFile(filepath.Join(dir, "test-"+ts+".log"), []byte("old"), 0600))
+	old := processStartTime.Add(-24 * time.Hour).Truncate(time.Millisecond)
+	for range DefaultLogMaxBackups + 5 {
+		require.NoError(t, os.WriteFile(file, []byte("old"), 0600))
+		require.NoError(t, os.Chtimes(file, old, old))
+		require.NoError(t, rotateLogFileForNewSession(file))
 	}
+	// All sessions must survive timestamp collisions and remain visible to cleanup.
+	matches, err := filepath.Glob(filepath.Join(dir, "test-*.log"))
+	require.NoError(t, err)
+	require.Len(t, matches, DefaultLogMaxBackups+5)
 
 	core := NewCore(
 		defaultEncoder(),
@@ -111,6 +166,6 @@ func TestSessionArchivesPrunedToDefaultMaxBackups(t *testing.T) {
 
 	require.Eventually(t, func() bool {
 		matches, err := filepath.Glob(filepath.Join(dir, "test-*.log"))
-		return err == nil && len(matches) <= DefaultLogMaxBackups
+		return err == nil && len(matches) == DefaultLogMaxBackups
 	}, 5*time.Second, 100*time.Millisecond)
 }
