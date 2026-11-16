@@ -198,5 +198,10 @@ func SendSectionUnreadCountsChanged() {
 }
 
 func LocalMessageBackupDone() {
-	send(EventLocalMessageBackupDone, interface{}(nil))
+	CurrentSession().LocalMessageBackupDone()
+}
+
+// LocalMessageBackupDone sends in the session s.
+func (s Session) LocalMessageBackupDone() {
+	s.send(EventLocalMessageBackupDone, interface{}(nil))
 }

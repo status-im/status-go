@@ -17,7 +17,6 @@ import (
 	"github.com/status-im/status-go/internal/protocol/common"
 	"github.com/status-im/status-go/internal/protocol/communities"
 	"github.com/status-im/status-go/internal/protocol/protobuf"
-	"github.com/status-im/status-go/internal/signal"
 	ensservice "github.com/status-im/status-go/pkg/services/ens"
 )
 
@@ -53,7 +52,7 @@ func (m *Messenger) handleLocalBackup(ctx context.Context, state *ReceivedMessag
 		}
 
 		if err == nil && threadErr == nil {
-			signal.LocalMessageBackupDone()
+			m.signalSession.LocalMessageBackupDone()
 		}
 	}
 

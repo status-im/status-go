@@ -2,6 +2,7 @@ package storagestats
 
 import (
 	"encoding/json"
+	"sync"
 	"testing"
 	"time"
 
@@ -211,10 +212,24 @@ func TestResultSentAfterLogoutKeepsItsSession(t *testing.T) {
 	appDB := setupAppDB(t)
 	seedAccount(t, appDB, setupWalletDB(t))
 
+	// The collection is held inside its first progress signal until the logout has
+	// advanced the epoch, so its result is always sent afterwards.
+	held := make(chan struct{})
+	release := make(chan struct{})
+	var holdOnce sync.Once
 	epochs := make(chan uint64, 8)
 	signal.SetHandler(func(data []byte) {
 		var e signal.Envelope
-		if err := json.Unmarshal(data, &e); err == nil && e.Type == signal.EventStorageStatsResult {
+		if err := json.Unmarshal(data, &e); err != nil {
+			return
+		}
+		switch e.Type {
+		case signal.EventStorageStatsProgress:
+			holdOnce.Do(func() {
+				close(held)
+				<-release
+			})
+		case signal.EventStorageStatsResult:
 			epochs <- e.Epoch
 		}
 	})
@@ -225,9 +240,16 @@ func TestResultSentAfterLogoutKeepsItsSession(t *testing.T) {
 	_, err := s.StartCollect()
 	require.NoError(t, err)
 
+	select {
+	case <-held:
+	case <-time.After(60 * time.Second):
+		t.Fatal("no storage-stats.progress signal arrived")
+	}
+
 	// The logout: the node stops its services, then the next session starts.
 	require.NoError(t, s.Stop())
 	signal.AdvanceEpoch()
+	close(release)
 
 	select {
 	case epoch := <-epochs:
