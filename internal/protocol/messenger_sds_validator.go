@@ -1,6 +1,7 @@
 package protocol
 
 import (
+	"crypto/ecdsa"
 	"fmt"
 	"strings"
 
@@ -9,6 +10,7 @@ import (
 
 	"github.com/status-im/status-go/internal/crypto"
 	"github.com/status-im/status-go/internal/protocol/common"
+	"github.com/status-im/status-go/internal/protocol/communities"
 	"github.com/status-im/status-go/internal/protocol/protobuf"
 	"github.com/status-im/status-go/pkg/messaging/layers/reliability"
 )
@@ -34,12 +36,11 @@ func (v communitySDSValidator) Validate(message sds.ValidationMessage) (bool, er
 		if topic != "" && topic != community.UniversalChatID() {
 			return false, nil
 		}
-		sender, err := crypto.UnmarshalPubkey(message.ValidationContext)
+		sender, err := authenticatedSDSTransportSender(message)
 		if err != nil {
-			return false, fmt.Errorf("invalid SDS sync sender: %w", err)
+			return false, err
 		}
-		return !community.IsBanned(sender) &&
-			(community.HasMember(sender) || crypto.IsPubKeyEqual(sender, community.ControlNode())), nil
+		return isAuthorizedSDSCommunitySender(community, sender), nil
 	}
 
 	application, err := common.ParseApplicationLayer(message.Content)
@@ -71,7 +72,11 @@ func (v communitySDSValidator) Validate(message sds.ValidationMessage) (bool, er
 			if application.SigPubKey == nil {
 				return false, fmt.Errorf("legacy SDS community control message has no application signature")
 			}
-			return true, nil
+			sender, err := authenticatedSDSTransportSender(message)
+			if err != nil {
+				return false, err
+			}
+			return crypto.IsPubKeyEqual(sender, application.SigPubKey), nil
 		}
 		return !communityChannel, nil
 	}
@@ -96,8 +101,31 @@ func (v communitySDSValidator) Validate(message sds.ValidationMessage) (bool, er
 		message.ChannelID != reliability.BuildChannelID(chat.CommunityID, community.UniversalChatID()) {
 		return false, nil
 	}
+	// ValidationContext is the Waku-authenticated signer of the full payload,
+	// including SDS IDs, dependencies, and acknowledgements. Require that signer
+	// to be a community participant, while allowing member repair forwarding.
+	transportSender, err := authenticatedSDSTransportSender(message)
+	if err != nil {
+		return false, err
+	}
+	if !isAuthorizedSDSCommunitySender(community, transportSender) {
+		return false, nil
+	}
 	if community.IsBanned(application.SigPubKey) {
 		return false, nil
 	}
 	return community.CanPost(application.SigPubKey, chat.CommunityChatID(), application.Type)
+}
+
+func authenticatedSDSTransportSender(message sds.ValidationMessage) (*ecdsa.PublicKey, error) {
+	sender, err := crypto.UnmarshalPubkey(message.ValidationContext)
+	if err != nil {
+		return nil, fmt.Errorf("invalid SDS transport sender: %w", err)
+	}
+	return sender, nil
+}
+
+func isAuthorizedSDSCommunitySender(community *communities.Community, sender *ecdsa.PublicKey) bool {
+	return !community.IsBanned(sender) &&
+		(community.HasMember(sender) || crypto.IsPubKeyEqual(sender, community.ControlNode()))
 }

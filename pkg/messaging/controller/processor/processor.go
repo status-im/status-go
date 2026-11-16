@@ -182,6 +182,9 @@ func (r *Processor) processMessage(m *messagingtypes.ReceivedMessage) (*processM
 	err = r.processSDSLayer(responseMessage)
 	if err != nil {
 		if errors.Is(err, sds.ErrMessageRejected) {
+			if completeErr := r.completeReconstructedMessage(responseMessage); completeErr != nil {
+				return nil, errors.Wrap(completeErr, "failed to complete rejected segmented message")
+			}
 			logger.Debug("discarding unauthorized SDS message", zap.Error(err))
 			response.messages = nil
 			response.consumedEnvelopeHashes = hashes
@@ -189,6 +192,9 @@ func (r *Processor) processMessage(m *messagingtypes.ReceivedMessage) (*processM
 		}
 		logger.Error("failed to unwrap payload for SDS", zap.Error(err))
 		return nil, err
+	}
+	if err := r.completeReconstructedMessage(responseMessage); err != nil {
+		return nil, errors.Wrap(err, "failed to complete processed segmented message")
 	}
 	if responseMessage.SDSSync {
 		response.messages = nil
@@ -207,6 +213,13 @@ func (r *Processor) processMessage(m *messagingtypes.ReceivedMessage) (*processM
 	}
 
 	return response, nil
+}
+
+func (r *Processor) completeReconstructedMessage(message *messagingtypes.Message) error {
+	if !message.SegmentationLayer.Segmented || !message.SegmentationLayer.Completed {
+		return nil
+	}
+	return r.stack.Segmentation.CompleteReconstruction(message.TransportLayer.Payload, message.SigPubKey())
 }
 
 func (r *Processor) processQueuedHashRatchetMessages(hashRatchetInfos []*messagingtypes.HashRatchetInfo) (*processMessageResponse, error) {
@@ -276,7 +289,7 @@ func processTransportLayer(m *messagingtypes.Message, receivedMessage *messaging
 }
 
 func (r *Processor) processSegmentationLayer(m *messagingtypes.Message) error {
-	reconstructedPayload, transportIDs, err := r.stack.Segmentation.Reconstruct(
+	reconstructedPayload, transportIDs, err := r.stack.Segmentation.ReconstructForProcessing(
 		m.TransportLayer.Payload,
 		m.TransportLayer.SigPubKey,
 		m.TransportLayer.Hash)

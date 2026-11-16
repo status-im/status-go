@@ -108,9 +108,9 @@ func (s *MessengerSDSProcessingSuite) TestSDSCommunityPostingPermissions() {
 				allowed, err := validator.Validate(sds.ValidationMessage{
 					ChannelID: channelID,
 					Content:   s.sdsApplication(message.body, message.kind, sender.key),
-					// Posting permission must use the application signer, not
-					// the relay's identity or untrusted SDS sender ID.
-					ValidationContext: crypto.FromECDSAPub(&member.PublicKey),
+					// The transport signer may relay a message, but the
+					// application signer determines its posting permission.
+					ValidationContext: crypto.FromECDSAPub(&viewer.PublicKey),
 					SenderID:          crypto.PubkeyToHex(&member.PublicKey),
 				})
 				s.Require().NoError(err)
@@ -135,9 +135,20 @@ func (s *MessengerSDSProcessingSuite) TestSDSCommunityPostingPermissions() {
 	)})
 	s.Require().NoError(err)
 	s.Require().False(allowed, "a non-community message type must not bypass the community gate")
-	allowed, err = validator.Validate(sds.ValidationMessage{ChannelID: channelID, Content: application})
+	allowed, err = validator.Validate(sds.ValidationMessage{
+		ChannelID: channelID, Content: application,
+		ValidationContext: crypto.FromECDSAPub(&viewer.PublicKey),
+		SenderID:          crypto.PubkeyToHex(&member.PublicKey),
+	})
 	s.Require().NoError(err)
-	s.Require().True(allowed, "repair forwarding does not require a transport signer for application messages")
+	s.Require().True(allowed, "a community member can relay another member's signed message")
+	allowed, err = validator.Validate(sds.ValidationMessage{
+		ChannelID: channelID, Content: application,
+		ValidationContext: crypto.FromECDSAPub(&outsider.PublicKey),
+		SenderID:          crypto.PubkeyToHex(&member.PublicKey),
+	})
+	s.Require().NoError(err)
+	s.Require().False(allowed, "untrusted SDS sender metadata cannot authorize a non-member transport sender")
 	envelope, err := protobuf.Unmarshal(application)
 	s.Require().NoError(err)
 	envelope.Signature = nil
@@ -156,12 +167,19 @@ func (s *MessengerSDSProcessingSuite) TestSDSCommunityPostingPermissions() {
 
 func (s *MessengerSDSProcessingSuite) TestSDSUnauthorizedMetadataDoesNotChangeState() {
 	community, chat := s.sdsCommunity()
+	poster, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+	_, err = community.AddMember(&poster.PublicKey, nil, 0)
+	s.Require().NoError(err)
+	_, err = community.AddMemberToChat(chat.CommunityChatID(), &poster.PublicKey, nil, protobuf.CommunityMember_CHANNEL_ROLE_POSTER)
+	s.Require().NoError(err)
+	s.Require().NoError(s.m.communitiesManager.SaveCommunity(community))
 	channelID := reliability.BuildChannelID(community.IDString(), community.UniversalChatID())
 	message := common.NewMessage()
 	message.ChatId = chat.ID
 	message.Text = "pending acknowledgement"
 	message.ContentType = protobuf.ChatMessage_TEXT_PLAIN
-	_, err := s.m.SendChatMessage(context.Background(), message)
+	_, err = s.m.SendChatMessage(context.Background(), message)
 	s.Require().NoError(err)
 	persistence := reliability.NewSQLitePersistence(s.m.database)
 	before, err := persistence.LoadChannel(channelID)
@@ -175,17 +193,17 @@ func (s *MessengerSDSProcessingSuite) TestSDSUnauthorizedMetadataDoesNotChangeSt
 	s.Require().NoError(err)
 	_, err = attacker.WrapOutgoingMessage([]byte("fake dependency"), "fake-dependency", channelID)
 	s.Require().NoError(err)
-	key, err := crypto.GenerateKey()
-	s.Require().NoError(err)
 	application := s.sdsApplication(&protobuf.ChatMessage{
 		ChatId: chat.ID, MessageType: protobuf.MessageType_COMMUNITY_CHAT, Text: "unauthorized",
-	}, protobuf.ApplicationMetadataMessage_CHAT_MESSAGE, key)
+	}, protobuf.ApplicationMetadataMessage_CHAT_MESSAGE, poster)
 	id := cryptotypes.EncodeHex(crypto.Keccak256(application))
 	wrapped, err := attacker.WrapOutgoingMessage(application, sds.MessageID(id), channelID)
 	s.Require().NoError(err)
+	attackerKey, err := crypto.GenerateKey()
+	s.Require().NoError(err)
 	hash := crypto.Keccak256(wrapped)
 	response, err := s.m.messaging.HandleReceivedMessages(&messagingtypes.ReceivedMessage{
-		Sig: crypto.FromECDSAPub(&key.PublicKey), Hash: hash, Payload: wrapped,
+		Sig: crypto.FromECDSAPub(&attackerKey.PublicKey), Hash: hash, Payload: wrapped,
 	})
 	s.Require().NoError(err)
 	s.Require().Empty(response.Messages)
@@ -236,6 +254,14 @@ func (s *MessengerSDSProcessingSuite) TestSDSLegacyControlChannelCompatibility()
 			}
 		})
 	}
+	relay, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+	allowed, err := (communitySDSValidator{messenger: s.m}).Validate(sds.ValidationMessage{
+		ChannelID: community.IDString(), Content: application,
+		ValidationContext: crypto.FromECDSAPub(&relay.PublicKey),
+	})
+	s.Require().NoError(err)
+	s.Require().False(allowed, "legacy control payloads cannot be rewrapped by another transport signer")
 }
 
 func (s *MessengerSDSProcessingSuite) TestSDSCommunityControlMessagesSkipHistory() {
