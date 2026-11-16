@@ -102,6 +102,23 @@ func OpenAndAdjustImage(inputImage CroppedImage, crop bool) ([]byte, error) {
 		defer os.Remove(imgPath) // Clean up the temporary file
 	}
 
+	// Images that already fit (e.g. prepared by the client) are sent as they are, minus metadata.
+	// Cropping always needs the pipeline.
+	if !crop {
+		data, err := os.ReadFile(imgPath)
+		if err != nil {
+			return nil, fmt.Errorf("error opening image file: %w", err)
+		}
+		if payload, ok := passThrough(data); ok {
+			return payload, nil
+		}
+		img, err := DecodeImageData(data, bytes.NewReader(data))
+		if err != nil {
+			return nil, fmt.Errorf("error decoding image: %w", err)
+		}
+		return AdjustImage(img, crop, inputImage)
+	}
+
 	// Decode the image
 	img, err := OpenAndDecodeImage(imgPath)
 	if err != nil {

@@ -105,7 +105,17 @@ func prepareFileForDecode(file *os.File) ([]byte, error) {
 func DecodeImageData(buf []byte, r io.Reader) (img image.Image, err error) {
 	switch GetType(buf) {
 	case JPEG:
-		img, err = jpeg.Decode(r)
+		// Read it whole: the EXIF orientation must be applied to the pixels, since
+		// re-encoding drops the tag (portrait photos would otherwise end up sideways).
+		var data []byte
+		data, err = io.ReadAll(r)
+		if err != nil {
+			return nil, err
+		}
+		img, err = jpeg.Decode(bytes.NewReader(data))
+		if err == nil {
+			img = applyOrientation(img, jpegOrientation(data))
+		}
 	case PNG:
 		img, err = png.Decode(r)
 	case GIF:
