@@ -834,3 +834,29 @@ func TestMessageJSONMentionedNames(t *testing.T) {
 	require.NoError(t, json.Unmarshal(rawJSON, &decoded))
 	require.NotContains(t, decoded, "mentionedNames")
 }
+
+func TestMarshalMessageJSONImageFormat(t *testing.T) {
+	newImageMessage := func(format protobuf.ImageFormat) *Message {
+		m := NewMessage()
+		m.ContentType = protobuf.ChatMessage_IMAGE
+		m.Payload = &protobuf.ChatMessage_Image{Image: &protobuf.ImageMessage{Format: format, Payload: []byte{1}}}
+		return m
+	}
+
+	for format, expected := range map[protobuf.ImageFormat]string{
+		protobuf.ImageFormat_GIF:  "gif",
+		protobuf.ImageFormat_WEBP: "webp",
+		protobuf.ImageFormat_JPEG: "jpeg",
+		protobuf.ImageFormat_PNG:  "png",
+	} {
+		data, err := json.Marshal(newImageMessage(format))
+		require.NoError(t, err)
+		var decoded map[string]interface{}
+		require.NoError(t, json.Unmarshal(data, &decoded))
+		require.Equal(t, expected, decoded["imageFormat"])
+	}
+
+	data, err := json.Marshal(newImageMessage(protobuf.ImageFormat_UNKNOWN_IMAGE_FORMAT))
+	require.NoError(t, err)
+	require.NotContains(t, string(data), "imageFormat")
+}
