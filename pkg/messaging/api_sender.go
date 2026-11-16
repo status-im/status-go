@@ -4,9 +4,10 @@ import (
 	"context"
 	"crypto/ecdsa"
 
+	"github.com/waku-org/sds-go-bindings/sds"
+
 	"github.com/status-im/status-go/pkg/messaging/layers/transport"
 	"github.com/status-im/status-go/pkg/messaging/types"
-	"github.com/waku-org/sds-go-bindings/sds"
 )
 
 func (a *API) SendPublic(ctx context.Context, params types.SendPublicParams) error {

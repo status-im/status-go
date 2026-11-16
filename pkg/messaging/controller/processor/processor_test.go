@@ -191,6 +191,66 @@ func (s *ProcessorSuite) TestSDSValidationStopsBeforeReceivedEvidence() {
 	}
 }
 
+func (s *ProcessorSuite) TestSegmentedSDSMessageCanRetryAfterValidationError() {
+	sender := s.newStandaloneReliability()
+	wrapped, messageID, err := sender.WrapPayloadForSDS([]byte("retry segmented SDS message"), "channel")
+	s.Require().NoError(err)
+	segments, err := s.processor.stack.Segmentation.Segment(wrapped, (len(wrapped)+1)/2)
+	s.Require().NoError(err)
+	s.Require().Len(segments, 2)
+
+	receiver := s.newStandaloneReliability()
+	store := &testSDSRetrievalHintPersistence{hints: make(map[string][][]byte)}
+	receiver.SetSDSRetrievalHintPersistence(store)
+	var validationCalls int
+	s.Require().NoError(receiver.SetSDSValidator(processorSDSValidatorFunc(func(sds.ValidationMessage) (bool, error) {
+		validationCalls++
+		if validationCalls == 1 {
+			return false, errors.New("temporary authorization lookup failure")
+		}
+		return true, nil
+	})))
+	s.processor.stack.Reliability = receiver
+
+	key, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+	lastSegment := segments[len(segments)-1]
+	var lastHash []byte
+	for i, segment := range segments {
+		lastHash = crypto.Keccak256(segment)
+		response, err := s.processor.ProcessMessage(&types.ReceivedMessage{
+			Sig: crypto.FromECDSAPub(&key.PublicKey), Hash: lastHash, Payload: segment,
+		})
+		if i == 0 {
+			s.Require().NoError(err)
+			s.Require().Nil(response)
+			continue
+		}
+		s.Require().ErrorIs(err, sds.ErrValidationFailed)
+		s.Require().Nil(response)
+	}
+
+	received, err := store.IsSDSMessageReceived("channel", cryptotypes.EncodeHex(messageID))
+	s.Require().NoError(err)
+	s.Require().False(received, "failed validation must not record received evidence")
+
+	response, err := s.processor.ProcessMessage(&types.ReceivedMessage{
+		Sig: crypto.FromECDSAPub(&key.PublicKey), Hash: lastHash, Payload: lastSegment,
+	})
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Equal(2, validationCalls)
+	received, err = store.IsSDSMessageReceived("channel", cryptotypes.EncodeHex(messageID))
+	s.Require().NoError(err)
+	s.Require().True(received, "the retained reconstruction must be retryable")
+
+	response, err = s.processor.ProcessMessage(&types.ReceivedMessage{
+		Sig: crypto.FromECDSAPub(&key.PublicKey), Hash: lastHash, Payload: lastSegment,
+	})
+	s.Require().NoError(err)
+	s.Require().Nil(response, "successfully processed segments must still be deduplicated")
+}
+
 func (*failingSDSLoadPersistence) SaveChannelMeta(string, []byte) error { return nil }
 func (*failingSDSLoadPersistence) UpdateHistory(string, sds.HistoryUpdate) error {
 	return nil
