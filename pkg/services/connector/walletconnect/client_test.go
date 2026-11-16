@@ -13,6 +13,7 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/status-im/status-go/internal/logutils"
+	"github.com/status-im/status-go/internal/signal"
 )
 
 // testSymKey is a 64-hex-char (32-byte) symmetric key used across tests.
@@ -79,7 +80,7 @@ func autoAckOnPublish(c *Client) func(string, string, int) {
 }
 
 func TestNewClient(t *testing.T) {
-	client, err := NewClient("test-project-id")
+	client, err := NewClient("test-project-id", signal.Session{})
 	require.NoError(t, err)
 	require.NotNil(t, client)
 	require.NotNil(t, client.relay)
@@ -92,7 +93,7 @@ func TestNewClient(t *testing.T) {
 
 func TestClient_SetHandlers(t *testing.T) {
 	t.Run("SessionProposal", func(t *testing.T) {
-		client, _ := NewClient("test")
+		client, _ := NewClient("test", signal.Session{})
 		called := false
 		client.SetSessionProposalHandler(func(string) { called = true })
 		client.mu.Lock()
@@ -103,7 +104,7 @@ func TestClient_SetHandlers(t *testing.T) {
 	})
 
 	t.Run("SessionRequest", func(t *testing.T) {
-		client, _ := NewClient("test")
+		client, _ := NewClient("test", signal.Session{})
 		called := false
 		client.SetSessionRequestHandler(func(_, _ string) { called = true })
 		client.mu.Lock()
@@ -114,7 +115,7 @@ func TestClient_SetHandlers(t *testing.T) {
 	})
 
 	t.Run("SessionUpdate", func(t *testing.T) {
-		client, _ := NewClient("test")
+		client, _ := NewClient("test", signal.Session{})
 		called := false
 		client.SetSessionUpdateHandler(func(_, _ string) { called = true })
 		client.mu.Lock()
@@ -125,7 +126,7 @@ func TestClient_SetHandlers(t *testing.T) {
 	})
 
 	t.Run("SessionDelete", func(t *testing.T) {
-		client, _ := NewClient("test")
+		client, _ := NewClient("test", signal.Session{})
 		called := false
 		client.SetSessionDeleteHandler(func(string) { called = true })
 		client.mu.Lock()
@@ -176,7 +177,7 @@ func TestClient_GetSymKeyForTopic(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			client, _ := NewClient("test")
+			client, _ := NewClient("test", signal.Session{})
 			client.mu.Lock()
 			for k, v := range tt.setupPairing {
 				client.pairingTopics[k] = v
@@ -193,7 +194,7 @@ func TestClient_GetSymKeyForTopic(t *testing.T) {
 }
 
 func TestClient_RemoveSession(t *testing.T) {
-	client, _ := NewClient("test")
+	client, _ := NewClient("test", signal.Session{})
 
 	client.mu.Lock()
 	client.activeSessions["topic1"] = "key1"
@@ -210,13 +211,13 @@ func TestClient_RemoveSession(t *testing.T) {
 }
 
 func TestClient_HandleRelayMessage_NoSymKey(t *testing.T) {
-	client, _ := NewClient("test")
+	client, _ := NewClient("test", signal.Session{})
 
 	client.handleRelayMessage("unknown-topic", "message", 1100)
 }
 
 func TestClient_HandleRelayMessage_InvalidEncryption(t *testing.T) {
-	client, _ := NewClient("test")
+	client, _ := NewClient("test", signal.Session{})
 
 	addPairingTopic(client, "topic", testSymKey)
 
@@ -224,7 +225,7 @@ func TestClient_HandleRelayMessage_InvalidEncryption(t *testing.T) {
 }
 
 func TestClient_HandleRelayMessage_SessionProposal(t *testing.T) {
-	client, _ := NewClient("test")
+	client, _ := NewClient("test", signal.Session{})
 
 	addPairingTopic(client, "topic", testSymKey)
 
@@ -257,7 +258,7 @@ func TestClient_HandleRelayMessage_SessionProposal(t *testing.T) {
 }
 
 func TestClient_HandleRelayMessage_SessionRequest(t *testing.T) {
-	client, _ := NewClient("test")
+	client, _ := NewClient("test", signal.Session{})
 
 	addActiveSession(client, "topic", testSymKey)
 
@@ -288,7 +289,7 @@ func TestClient_HandleRelayMessage_SessionRequest(t *testing.T) {
 }
 
 func TestClient_RejectSession_NotFound(t *testing.T) {
-	client, _ := NewClient("test")
+	client, _ := NewClient("test", signal.Session{})
 
 	err := client.RejectSession("nonexistent")
 	require.Error(t, err)
@@ -296,7 +297,7 @@ func TestClient_RejectSession_NotFound(t *testing.T) {
 }
 
 func TestClient_RespondToWCSessionRequest_NoSession(t *testing.T) {
-	client, _ := NewClient("test")
+	client, _ := NewClient("test", signal.Session{})
 
 	err := client.RespondToWCSessionRequest("unknown-topic", 123, "result")
 	require.Error(t, err)
@@ -304,7 +305,7 @@ func TestClient_RespondToWCSessionRequest_NoSession(t *testing.T) {
 }
 
 func TestClient_ApproveSession_NoProposal(t *testing.T) {
-	client, _ := NewClient("test")
+	client, _ := NewClient("test", signal.Session{})
 
 	meta := SessionMetadata{
 		Account: "0x1234",
@@ -347,7 +348,7 @@ func TestSentinelErrors(t *testing.T) {
 }
 
 func TestClient_RegisterPending_ResolvePending(t *testing.T) {
-	client, _ := NewClient("test")
+	client, _ := NewClient("test", signal.Session{})
 
 	ch := client.registerPending(12345)
 	require.NotNil(t, ch)
@@ -366,7 +367,7 @@ func TestClient_RegisterPending_ResolvePending(t *testing.T) {
 
 func TestClient_HandleRelayMessage_JSONRPCResponse(t *testing.T) {
 	t.Run("ResolvesPending", func(t *testing.T) {
-		client, _ := NewClient("test")
+		client, _ := NewClient("test", signal.Session{})
 		addActiveSession(client, "topic", testSymKey)
 
 		ch := client.registerPending(999)
@@ -387,7 +388,7 @@ func TestClient_HandleRelayMessage_JSONRPCResponse(t *testing.T) {
 	})
 
 	t.Run("WithError", func(t *testing.T) {
-		client, _ := NewClient("test")
+		client, _ := NewClient("test", signal.Session{})
 		addActiveSession(client, "topic", testSymKey)
 
 		ch := client.registerPending(777)
@@ -412,7 +413,7 @@ func TestClient_HandleRelayMessage_JSONRPCResponse(t *testing.T) {
 }
 
 func TestClient_HandleRelayMessage_SessionPing(t *testing.T) {
-	client, _ := NewClient("test")
+	client, _ := NewClient("test", signal.Session{})
 
 	addActiveSession(client, "topic", testSymKey)
 
@@ -432,7 +433,7 @@ func TestClient_HandleRelayMessage_SessionPing(t *testing.T) {
 }
 
 func TestClient_HandleRelayMessage_SessionUpdate(t *testing.T) {
-	client, _ := NewClient("test")
+	client, _ := NewClient("test", signal.Session{})
 
 	addActiveSession(client, "topic", testSymKey)
 
@@ -467,7 +468,7 @@ func TestClient_HandleRelayMessage_SessionUpdate(t *testing.T) {
 }
 
 func TestClient_HandleRelayMessage_SessionDelete(t *testing.T) {
-	client, _ := NewClient("test")
+	client, _ := NewClient("test", signal.Session{})
 
 	addActiveSession(client, "topic", testSymKey)
 
@@ -497,14 +498,14 @@ func TestClient_HandleRelayMessage_SessionDelete(t *testing.T) {
 }
 
 func TestClient_Close(t *testing.T) {
-	client, _ := NewClient("test")
+	client, _ := NewClient("test", signal.Session{})
 
 	err := client.Close()
 	require.NoError(t, err)
 }
 
 func TestClient_SendSessionEvent_NoSession(t *testing.T) {
-	client, _ := NewClient("test")
+	client, _ := NewClient("test", signal.Session{})
 
 	err := client.SendSessionEvent("unknown-topic", SessionEvent{Name: "accountsChanged", Data: []string{"0x123"}}, "eip155:1")
 	require.Error(t, err)
@@ -512,7 +513,7 @@ func TestClient_SendSessionEvent_NoSession(t *testing.T) {
 }
 
 func TestClient_RestoreSessions(t *testing.T) {
-	client, _ := NewClient("test")
+	client, _ := NewClient("test", signal.Session{})
 
 	sessions := []RestoredSession{
 		{Topic: "topic1", SymKey: "key1"},
@@ -1020,7 +1021,7 @@ func TestClient_sendAckResponse_PublishesSuccessfully(t *testing.T) {
 }
 
 func TestClient_HandleRelayMessage_InvalidID(t *testing.T) {
-	client, _ := NewClient("test")
+	client, _ := NewClient("test", signal.Session{})
 
 	addActiveSession(client, "topic", testSymKey)
 
@@ -1038,7 +1039,7 @@ func TestClient_HandleRelayMessage_InvalidID(t *testing.T) {
 }
 
 func TestClient_HandleRelayMessage_SessionProposal_MissingPublicKey(t *testing.T) {
-	client, _ := NewClient("test")
+	client, _ := NewClient("test", signal.Session{})
 
 	addPairingTopic(client, "topic", testSymKey)
 
@@ -1056,7 +1057,7 @@ func TestClient_HandleRelayMessage_SessionProposal_MissingPublicKey(t *testing.T
 }
 
 func TestClient_HandleRelayMessage_SessionProposal_NoHandler_UsesSignal(t *testing.T) {
-	client, _ := NewClient("test")
+	client, _ := NewClient("test", signal.Session{})
 
 	addPairingTopic(client, "topic", testSymKey)
 
@@ -1081,7 +1082,7 @@ func TestClient_HandleRelayMessage_SessionProposal_NoHandler_UsesSignal(t *testi
 }
 
 func TestClient_HandleRelayMessage_JSONRPCResponse_UnknownID(t *testing.T) {
-	client, _ := NewClient("test")
+	client, _ := NewClient("test", signal.Session{})
 
 	addActiveSession(client, "topic", testSymKey)
 
@@ -1095,7 +1096,7 @@ func TestClient_HandleRelayMessage_JSONRPCResponse_UnknownID(t *testing.T) {
 }
 
 func TestClient_HandleRelayMessage_SessionRequest_NoHandler_UsesSignal(t *testing.T) {
-	client, _ := NewClient("test")
+	client, _ := NewClient("test", signal.Session{})
 
 	addActiveSession(client, "topic", testSymKey)
 
@@ -1113,7 +1114,7 @@ func TestClient_HandleRelayMessage_SessionRequest_NoHandler_UsesSignal(t *testin
 }
 
 func TestClient_HandleRelayMessage_UnknownMethod(t *testing.T) {
-	client, _ := NewClient("test")
+	client, _ := NewClient("test", signal.Session{})
 
 	addActiveSession(client, "topic", testSymKey)
 
@@ -1131,7 +1132,7 @@ func TestClient_HandleRelayMessage_UnknownMethod(t *testing.T) {
 }
 
 func TestClient_HandleRelayMessage_InvalidJSON(t *testing.T) {
-	client, _ := NewClient("test")
+	client, _ := NewClient("test", signal.Session{})
 
 	addActiveSession(client, "topic", testSymKey)
 
@@ -1165,7 +1166,7 @@ func encryptMsg(t *testing.T, symKey string, method string, id int64, params any
 // --- wc_sessionPropose deduplication ---
 
 func TestClient_HandleRelayMessage_SessionProposal_Deduplicate(t *testing.T) {
-	client, _ := NewClient("test")
+	client, _ := NewClient("test", signal.Session{})
 
 	addPairingTopic(client, "topic", testSymKey)
 
@@ -1235,7 +1236,7 @@ func TestClient_HandleRelayMessage_SessionRequest_IgnoredAfterResponse(t *testin
 
 func TestClient_HandleRelayMessage_SessionRequest_Deduplication(t *testing.T) {
 	t.Run("DuplicateIDIgnored", func(t *testing.T) {
-		client, _ := NewClient("test")
+		client, _ := NewClient("test", signal.Session{})
 		addActiveSession(client, "topic", testSymKey)
 
 		callCount := 0
@@ -1259,7 +1260,7 @@ func TestClient_HandleRelayMessage_SessionRequest_Deduplication(t *testing.T) {
 	})
 
 	t.Run("DifferentIDsBothDelivered", func(t *testing.T) {
-		client, _ := NewClient("test")
+		client, _ := NewClient("test", signal.Session{})
 		addActiveSession(client, "topic", testSymKey)
 
 		callCount := 0
@@ -1278,7 +1279,7 @@ func TestClient_HandleRelayMessage_SessionRequest_Deduplication(t *testing.T) {
 // --- wc_sessionDelete deduplication ---
 
 func TestClient_HandleRelayMessage_SessionDelete_Deduplicate(t *testing.T) {
-	client, _ := NewClient("test")
+	client, _ := NewClient("test", signal.Session{})
 
 	// Register the key in both maps: pairingTopics keeps the symKey available for
 	// decryption even after activeSessions is cleared, so we can verify that the
@@ -1302,7 +1303,7 @@ func TestClient_HandleRelayMessage_SessionDelete_Deduplicate(t *testing.T) {
 }
 
 func TestClient_NewClient_InitializesPendingSessionRequests(t *testing.T) {
-	client, err := NewClient("test")
+	client, err := NewClient("test", signal.Session{})
 	require.NoError(t, err)
 	require.NotNil(t, client.pendingSessionRequests)
 }

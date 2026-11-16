@@ -52,6 +52,7 @@ func NewService(
 		feeManager:      feeManager,
 		nm:              nm,
 		config:          config,
+		signalSession:   signal.CurrentSession(),
 	}
 	s.api = NewAPI(s)
 	s.initWCClient()
@@ -79,6 +80,11 @@ type Service struct {
 	purgeEphemeralOnce sync.Once
 
 	wcClient atomic.Pointer[walletconnect.Client] // owned by Service; recreated after Pause/Resume or Stop
+
+	// signalSession is the backend session the service was created in. The WalletConnect
+	// client sends in it: its relay delivers on its own goroutines, which may still run
+	// after a logout.
+	signalSession signal.Session
 }
 
 func (s *Service) GetClient() *walletconnect.Client {
@@ -137,7 +143,7 @@ func (s *Service) initWCClient() {
 		return
 	}
 
-	wcClient, err := walletconnect.NewClient(s.config.ProjectID, walletconnect.WithRelayURL(s.config.RelayURL))
+	wcClient, err := walletconnect.NewClient(s.config.ProjectID, s.signalSession, walletconnect.WithRelayURL(s.config.RelayURL))
 	if err != nil {
 		s.logger.Error("failed to create WalletConnect client", zap.Error(err))
 		return
@@ -160,7 +166,7 @@ func (s *Service) initWCClient() {
 		} else {
 			s.logger.Info("WC session disconnected", zap.String("topic", topic), zap.String("dappURL", dappURL))
 		}
-		signal.SendWCSessionDelete(topic, dappURL)
+		s.signalSession.SendWCSessionDelete(topic, dappURL)
 	})
 
 	if !s.wcClient.CompareAndSwap(nil, wcClient) {

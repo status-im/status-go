@@ -60,6 +60,9 @@ type Client struct {
 	answeredRequests       map[int64]struct{}  // responded to or rejected; the relay may deliver them again
 	pairingTopics          map[string]string   // topic -> pairing symKey (hex), set on Pair()
 	activeSessions         map[string]string   // topic -> session symKey (hex), set on ApproveSession
+	// signalSession is the backend session the client was created in: the relay
+	// delivers on the client's own goroutines, which may still run after a logout.
+	signalSession signal.Session
 }
 
 type clientHandlers struct {
@@ -82,7 +85,7 @@ func WithRelayURL(url string) RelayOption {
 }
 
 // NewClient creates a new WalletConnect client.
-func NewClient(projectID string, opts ...RelayOption) (*Client, error) {
+func NewClient(projectID string, signalSession signal.Session, opts ...RelayOption) (*Client, error) {
 	relay, err := NewRelayClient(projectID)
 	if err != nil {
 		return nil, fmt.Errorf("create relay client: %w", err)
@@ -102,6 +105,7 @@ func NewClient(projectID string, opts ...RelayOption) (*Client, error) {
 		answeredRequests:       make(map[int64]struct{}),
 		pairingTopics:          make(map[string]string),
 		activeSessions:         make(map[string]string),
+		signalSession:          signalSession,
 	}
 
 	// Set reconnection handler to re-subscribe to all active sessions
@@ -351,7 +355,7 @@ func (c *Client) handleRelayMessage(topic, message string, tag int) {
 		if handler != nil {
 			handler(paramsStr)
 		} else {
-			signal.SendWCSessionProposal(requestID, "", paramsStr)
+			c.signalSession.SendWCSessionProposal(requestID, "", paramsStr)
 		}
 	case "wc_sessionRequest":
 		c.mu.Lock()
@@ -374,7 +378,7 @@ func (c *Client) handleRelayMessage(topic, message string, tag int) {
 		if handler != nil {
 			handler(topic, string(payload.Params))
 		} else {
-			signal.SendWCSessionRequest(topic, msgID, string(payload.Params))
+			c.signalSession.SendWCSessionRequest(topic, msgID, string(payload.Params))
 		}
 	case "wc_sessionPing":
 		if err := c.sendAckResponse(topic, symKey, msgID, tagSessionPingResponse); err != nil {

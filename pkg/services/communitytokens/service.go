@@ -53,6 +53,9 @@ type Service struct {
 	feeManager      *fees.FeeManager
 	ethClientGetter rpc.EthClientGetter
 	logger          *zap.Logger
+	// signalSession is the backend session the service was created in: wallet events
+	// reach it on the wallet feed's goroutine, which may still deliver after a logout.
+	signalSession signal.Session
 }
 
 // Returns a new Collectibles Service.
@@ -69,6 +72,7 @@ func NewService(rpcClient *rpc.Client, accountsManager *accsmanagement.AccountsM
 		feeManager:      fees.NewFeeManager(rpcClient, logger.Named("feeManager")),
 		ethClientGetter: rpcClient,
 		logger:          logger,
+		signalSession:   signal.CurrentSession(),
 	}
 }
 
@@ -144,7 +148,7 @@ func (s *Service) handleWalletEvent(event walletevent.Event) {
 			errorStr = tokenErr.Error()
 		}
 
-		signal.SendCommunityTokenTransactionStatusSignal(p.SendDetails.SendType, p.Status == ac.Success, txHash,
+		s.signalSession.SendCommunityTokenTransactionStatusSignal(p.SendDetails.SendType, p.Status == ac.Success, txHash,
 			communityToken, ownerToken, masterToken, errorStr)
 	}
 }
@@ -506,7 +510,7 @@ func (s *Service) ProcessCommunityTokenAction(message *protobuf.CommunityTokenAc
 		communityToken, _ = s.Messenger.GetCommunityTokenByChainAndAddress(int(message.ChainId), message.ContractAddress)
 	}
 
-	signal.SendCommunityTokenActionSignal(communityToken, message.ActionType)
+	s.signalSession.SendCommunityTokenActionSignal(communityToken, message.ActionType)
 
 	return nil
 }

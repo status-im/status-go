@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/status-im/status-go/internal/signal"
 )
 
 // --- BuildNamespaces tests ---
@@ -316,7 +318,7 @@ func TestBuildSessionObject_RequiredNamespacesExcludesAccounts(t *testing.T) {
 // --- performKeyExchange tests ---
 
 func TestPerformKeyExchange_InvalidHex(t *testing.T) {
-	client, err := NewClient("test")
+	client, err := NewClient("test", signal.Session{})
 	require.NoError(t, err)
 
 	_, err = client.performKeyExchange("not-valid-hex!!!")
@@ -325,7 +327,7 @@ func TestPerformKeyExchange_InvalidHex(t *testing.T) {
 }
 
 func TestPerformKeyExchange_WrongLength(t *testing.T) {
-	client, err := NewClient("test")
+	client, err := NewClient("test", signal.Session{})
 	require.NoError(t, err)
 
 	// 16 bytes = valid hex but wrong key length for X25519
@@ -336,7 +338,7 @@ func TestPerformKeyExchange_WrongLength(t *testing.T) {
 }
 
 func TestPerformKeyExchange_Valid(t *testing.T) {
-	client, err := NewClient("test")
+	client, err := NewClient("test", signal.Session{})
 	require.NoError(t, err)
 
 	_, proposerPub, err := GenerateX25519KeyPair()
@@ -355,7 +357,7 @@ func TestPerformKeyExchange_Valid(t *testing.T) {
 }
 
 func TestPerformKeyExchange_DifferentCallsProduceDifferentKeys(t *testing.T) {
-	client, err := NewClient("test")
+	client, err := NewClient("test", signal.Session{})
 	require.NoError(t, err)
 
 	_, proposerPub, err := GenerateX25519KeyPair()

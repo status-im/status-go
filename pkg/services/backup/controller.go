@@ -43,6 +43,9 @@ type Controller struct {
 	quit   chan struct{}
 	mutex  sync.Mutex
 	wg     *sync.WaitGroup
+	// signalSession is the backend session the controller was created in: a backup
+	// may still complete after a logout.
+	signalSession signal.Session
 }
 
 type CompletedEvent struct {
@@ -72,6 +75,8 @@ func NewController(config Config, logger *zap.Logger) (*Controller, error) {
 		logger: logger,
 		wg:     &sync.WaitGroup{},
 		quit:   make(chan struct{}),
+
+		signalSession: signal.CurrentSession(),
 	}, nil
 }
 
@@ -142,7 +147,7 @@ func (c *Controller) PerformBackup() (string, error) {
 		return "", err
 	}
 
-	signal.SendLocalBackUpCompleted(CompletedEvent{
+	c.signalSession.SendLocalBackUpCompleted(CompletedEvent{
 		FileName: fileName,
 	})
 

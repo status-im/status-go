@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/status-im/status-go/internal/signal"
 	persistence "github.com/status-im/status-go/pkg/services/connector/database"
 	"github.com/status-im/status-go/pkg/services/connector/walletconnect"
 )
@@ -68,7 +69,7 @@ func TestApproveWCSessionCommand_EmptyChains(t *testing.T) {
 	t.Cleanup(cleanup)
 
 	// Need a non-nil client to reach the chains validation (nil check comes before chains check)
-	client, err := walletconnect.NewClient("test")
+	client, err := walletconnect.NewClient("test", signal.Session{})
 	require.NoError(t, err)
 
 	cmd := NewApproveWCSessionCommand(db, func() *walletconnect.Client { return client })
@@ -91,7 +92,7 @@ func TestApproveWCSessionCommand_ProposalNotFound(t *testing.T) {
 	db, cleanup := createWalletDB(t)
 	t.Cleanup(cleanup)
 
-	client, err := walletconnect.NewClient("test")
+	client, err := walletconnect.NewClient("test", signal.Session{})
 	require.NoError(t, err)
 
 	cmd := NewApproveWCSessionCommand(db, func() *walletconnect.Client { return client })
@@ -110,7 +111,7 @@ func TestRejectWCSessionCommand_NilClient(t *testing.T) {
 }
 
 func TestRejectWCSessionCommand_ProposalNotFound(t *testing.T) {
-	client, err := walletconnect.NewClient("test")
+	client, err := walletconnect.NewClient("test", signal.Session{})
 	require.NoError(t, err)
 
 	cmd := NewRejectWCSessionCommand(func() *walletconnect.Client { return client })
@@ -129,7 +130,7 @@ func TestApproveWCSessionRequestCommand_NilClient(t *testing.T) {
 }
 
 func TestApproveWCSessionRequestCommand_InvalidRequestID(t *testing.T) {
-	client, err := walletconnect.NewClient("test")
+	client, err := walletconnect.NewClient("test", signal.Session{})
 	require.NoError(t, err)
 
 	cmd := NewApproveWCSessionRequestCommand(func() *walletconnect.Client { return client })
@@ -139,7 +140,7 @@ func TestApproveWCSessionRequestCommand_InvalidRequestID(t *testing.T) {
 }
 
 func TestApproveWCSessionRequestCommand_SessionNotFound(t *testing.T) {
-	client, err := walletconnect.NewClient("test")
+	client, err := walletconnect.NewClient("test", signal.Session{})
 	require.NoError(t, err)
 
 	cmd := NewApproveWCSessionRequestCommand(func() *walletconnect.Client { return client })
@@ -158,7 +159,7 @@ func TestRejectWCSessionRequestCommand_NilClient(t *testing.T) {
 }
 
 func TestRejectWCSessionRequestCommand_InvalidRequestID(t *testing.T) {
-	client, err := walletconnect.NewClient("test")
+	client, err := walletconnect.NewClient("test", signal.Session{})
 	require.NoError(t, err)
 
 	cmd := NewRejectWCSessionRequestCommand(func() *walletconnect.Client { return client })
@@ -168,7 +169,7 @@ func TestRejectWCSessionRequestCommand_InvalidRequestID(t *testing.T) {
 }
 
 func TestRejectWCSessionRequestCommand_SessionNotFound(t *testing.T) {
-	client, err := walletconnect.NewClient("test")
+	client, err := walletconnect.NewClient("test", signal.Session{})
 	require.NoError(t, err)
 
 	cmd := NewRejectWCSessionRequestCommand(func() *walletconnect.Client { return client })
@@ -180,7 +181,7 @@ func TestRejectWCSessionRequestCommand_SessionNotFound(t *testing.T) {
 // --- PairWCCommand tests ---
 
 func TestPairWCCommand_InvalidURI(t *testing.T) {
-	client, err := walletconnect.NewClient("test")
+	client, err := walletconnect.NewClient("test", signal.Session{})
 	require.NoError(t, err)
 
 	cmd := NewPairWCCommand(func() *walletconnect.Client { return client })

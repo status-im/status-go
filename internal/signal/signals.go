@@ -33,6 +33,15 @@ var logger = logutils.ZapLogger().Named("signal")
 // epoch identifies the backend session that produced a signal. It starts at 1 so
 // a client can treat a missing or zero epoch as invalid, and only advances when a
 // client explicitly logs out (see AdvanceEpoch).
+//
+// Client contract:
+//   - The epoch is per process and restarts at 1 when the backend process restarts
+//     (e.g. the Android service process), so a client must read it again (SignalEpoch)
+//     whenever it connects to a backend process.
+//   - Signals of the new epoch can arrive before the Logout response that carries it:
+//     the re-initialized backend emits during Logout (e.g. mediaserver.started). A
+//     client must drop only signals with an epoch lower than the one it holds, and
+//     keep signals with a higher one until the Logout response makes it current.
 var epoch atomic.Uint64
 
 func init() {
