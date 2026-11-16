@@ -2649,26 +2649,60 @@ func (b *StatusBackend) StartLocalNotifications() error {
 
 // Logout clears whisper identities.
 func (b *StatusBackend) Logout() error {
-	return b.logout(false)
+	_, err := b.logout(false)
+	return err
 }
 
-// LogoutAndAdvanceSignalEpoch is the client-requested logout: once the old node is
-// stopped it starts a new signal epoch, so the client can drop signals of the old
+// LogoutAndAdvanceSignalEpoch is the client-requested logout: once the old session is
+// torn down it starts a new signal epoch, so the client can drop signals of the old
 // session it receives late. Internal logouts (re-encryption, pairing) keep the epoch
 // because the client session continues across them.
+//
+// It returns the epoch this logout started, also when it fails: the teardown has begun
+// by then, so the old session's late signals must not pass as the next one's.
 func (b *StatusBackend) LogoutAndAdvanceSignalEpoch() (uint64, error) {
-	if err := b.logout(true); err != nil {
-		return signal.Epoch(), err
-	}
-	return signal.Epoch(), nil
+	return b.logout(true)
 }
 
-func (b *StatusBackend) logout(advanceSignalEpoch bool) error {
+// logout returns the signal epoch the backend continues in.
+func (b *StatusBackend) logout(advanceSignalEpoch bool) (uint64, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
 	b.logger.Debug("logging out")
 
+	// node.stopped is the old session's last signal; everything the re-initialized
+	// backend emits below belongs to the new epoch.
+	err := b.stopSession()
+	epoch := signal.Epoch()
+	if advanceSignalEpoch {
+		epoch = signal.AdvanceEpoch()
+	}
+	if err != nil {
+		return epoch, err
+	}
+
+	if err = b.switchToPreLoginLog(); err != nil {
+		return epoch, err
+	}
+
+	// re-initialize the node, at some point we should better manage the lifecycle
+	if err = b.initialize(); err != nil {
+		return epoch, err
+	}
+
+	err = b.statusNode.StartMediaServerWithoutDB()
+	if err != nil {
+		b.logger.Error("failed to start media server without app db", zap.Error(err))
+		return epoch, err
+	}
+
+	return epoch, nil
+}
+
+// stopSession tears down the logged-in session: the account, the node, the media
+// server and the databases. Called with b.mu held.
+func (b *StatusBackend) stopSession() error {
 	b.memRelease.stop()
 	b.AccountsManager().Logout()
 	b.account = nil
@@ -2686,36 +2720,13 @@ func (b *StatusBackend) logout(advanceSignalEpoch bool) error {
 		b.statusNode = nil
 	}
 
-	err := b.closeDBs()
-	if err != nil {
+	if err := b.closeDBs(); err != nil {
 		return err
 	}
 
 	if !b.LocalPairingStateManager.IsPairing() {
 		signal.SendNodeStopped()
 	}
-
-	// node.stopped is the old session's last signal; everything the re-initialized
-	// backend emits below belongs to the new epoch.
-	if advanceSignalEpoch {
-		signal.AdvanceEpoch()
-	}
-
-	if err = b.switchToPreLoginLog(); err != nil {
-		return err
-	}
-
-	// re-initialize the node, at some point we should better manage the lifecycle
-	if err = b.initialize(); err != nil {
-		return err
-	}
-
-	err = b.statusNode.StartMediaServerWithoutDB()
-	if err != nil {
-		b.logger.Error("failed to start media server without app db", zap.Error(err))
-		return err
-	}
-
 	return nil
 }
 
