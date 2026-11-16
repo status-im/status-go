@@ -17,5 +17,10 @@ func TestUnsupportedCollectibleChains_sorted(t *testing.T) {
 func TestIsUnsupportedCollectibleChain(t *testing.T) {
 	require.True(t, IsUnsupportedCollectibleChain(walletCommon.InkMainnet))
 	require.True(t, IsUnsupportedCollectibleChain(walletCommon.BSCMainnet))
+	// Alchemy has no NFT API host for these, so the NFT proxy cannot serve them
+	require.True(t, IsUnsupportedCollectibleChain(walletCommon.ScrollSepolia))
+	require.True(t, IsUnsupportedCollectibleChain(walletCommon.BlastMainnet))
+	require.True(t, IsUnsupportedCollectibleChain(walletCommon.BlastSepolia))
+	require.False(t, IsUnsupportedCollectibleChain(walletCommon.ScrollMainnet))
 	require.False(t, IsUnsupportedCollectibleChain(walletCommon.EthereumMainnet))
 }

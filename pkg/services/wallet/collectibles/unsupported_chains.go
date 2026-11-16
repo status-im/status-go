@@ -12,10 +12,13 @@ var UnsupportedCollectibleChains = []uint64{
 	walletCommon.BSCMainnet,
 	walletCommon.BSCTestnet,
 	walletCommon.InkMainnet,
+	walletCommon.BlastMainnet,
+	walletCommon.ScrollSepolia,
 	walletCommon.EthereumHoodi,
 	walletCommon.KatanaBokuto,
 	walletCommon.KatanaMainnet,
 	walletCommon.InkSepolia,
+	walletCommon.BlastSepolia,
 }
 
 // IsUnsupportedCollectibleChain reports whether chainID is intentionally excluded for collectibles.
