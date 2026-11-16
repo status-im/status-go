@@ -78,9 +78,11 @@ type EnvelopeEventsHandler interface {
 type Service struct {
 	pausable.PauseBroadcaster
 	messaging *messaging.API
-	// Read through currentMessenger() by work that runs on its own goroutines (the
-	// wallet's community and collectible info): Stop clears it while that work may
-	// still run, e.g. on logout.
+	// Written under messengerMu (Init, Stop). The service's own methods, the
+	// pause/resume hooks and work on other goroutines (the wallet's community and
+	// collectible info) read it through currentMessenger(), since Stop clears it while
+	// they may still run, e.g. on logout. The PublicAPI methods still read the field
+	// directly: they run as RPC calls of the logged-in session.
 	messenger       *protocol.Messenger
 	messengerMu     sync.RWMutex
 	cancelMessenger chan struct{}
@@ -140,8 +142,8 @@ func (s *Service) InitProtocol(params InitProtocolParams) error {
 	// If Messenger has been already set up, we need to shut it down
 	// before we init it again. Otherwise, it will lead to goroutines leakage
 	// due to not stopped filters.
-	if s.messenger != nil {
-		if err := s.messenger.Shutdown(); err != nil {
+	if m := s.currentMessenger(); m != nil {
+		if err := m.Shutdown(); err != nil {
 			return err
 		}
 	}
@@ -242,7 +244,7 @@ func (s *Service) InitProtocol(params InitProtocolParams) error {
 	// Be mindful of adding more initialization code, as it can easily
 	// impact login times for mobile users. For example, we avoid calling
 	// messenger.InitFilters here.
-	return s.messenger.InitInstallations()
+	return messenger.InitInstallations()
 }
 
 func (s *Service) StartMessenger() (*protocol.MessengerResponse, error) {
@@ -251,9 +253,14 @@ func (s *Service) StartMessenger() (*protocol.MessengerResponse, error) {
 		return nil, err
 	}
 
+	messenger, err := s.messengerOrErr()
+	if err != nil {
+		return nil, err
+	}
+
 	// Start a loop that retrieves all messages and propagates them to status-mobile.
 	s.cancelMessenger = make(chan struct{})
-	response, err := s.messenger.Start()
+	response, err := messenger.Start()
 	if err != nil {
 		return nil, err
 	}
@@ -263,26 +270,33 @@ func (s *Service) StartMessenger() (*protocol.MessengerResponse, error) {
 	s.connectionStateMu.Lock()
 	hasLastState := s.hasLastConnectionState
 	lastState := s.lastConnectionState
-	messenger := s.messenger
 	s.connectionStateMu.Unlock()
-	if hasLastState && messenger != nil {
+	if hasLastState {
 		messenger.ConnectionChanged(lastState)
 	}
 
 	s.MarkStarted()
-	s.messenger.StartRetrieveMessagesLoop(time.Second, s.cancelMessenger)
+	messenger.StartRetrieveMessagesLoop(time.Second, s.cancelMessenger)
 
 	return response, nil
 }
 
 func (s *Service) EnableInstallation(installationID string) error {
-	_, err := s.messenger.EnableInstallation(installationID)
+	messenger, err := s.messengerOrErr()
+	if err != nil {
+		return err
+	}
+	_, err = messenger.EnableInstallation(installationID)
 	return err
 }
 
 // DisableInstallation disables an installation for multi-device sync.
 func (s *Service) DisableInstallation(installationID string) error {
-	return s.messenger.DisableInstallation(installationID)
+	messenger, err := s.messengerOrErr()
+	if err != nil {
+		return err
+	}
+	return messenger.DisableInstallation(installationID)
 }
 
 // APIs returns a list of new APIs.
@@ -467,6 +481,12 @@ type communityInfoSource interface {
 }
 
 func (s *Service) communityInfoSource() (communityInfoSource, error) {
+	return s.messengerOrErr()
+}
+
+// messengerOrErr returns the messenger, or an error when there is none (before Init or
+// after Stop).
+func (s *Service) messengerOrErr() (*protocol.Messenger, error) {
 	messenger := s.currentMessenger()
 	if messenger == nil {
 		return nil, fmt.Errorf("messenger not ready")
