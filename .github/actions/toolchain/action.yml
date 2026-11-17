@@ -1,0 +1,20 @@
+name: Toolchain
+description: Restores the Go caches and gets the toolchain image for scripts/toolchain.sh. Needs a checkout.
+runs:
+  using: composite
+  steps:
+    # scripts/toolchain.sh mounts this directory and points Go at it inside the container.
+    - uses: ./.github/actions/go-cache
+      with:
+        name: linux-${{ runner.arch == 'ARM64' && 'aarch64' || 'x86_64' }}
+        directory: ~/.cache/status-go-toolchain
+    # Without access to the published image the script builds it instead.
+    - name: Toolchain image
+      shell: bash
+      env:
+        GHCR_TOKEN: ${{ github.token }}
+        GHCR_USER: ${{ github.actor }}
+      run: |
+        echo "$GHCR_TOKEN" | docker login ghcr.io --username "$GHCR_USER" --password-stdin ||
+          echo "::warning::GHCR login failed, so the toolchain image may be built in this job"
+        scripts/toolchain.sh go version
