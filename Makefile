@@ -687,7 +687,7 @@ NIM_DELIVERY_BUILD = rm -rf "$(NIM_LIB_DIR)/nimcache" && \
 	$(call NIM_SEAL,logosdelivery_,$(NIM_LIB_DIR)/link/liblogosdelivery.a) && \
 	cp "$(NIM_DELIVERY_LIBRARY)/liblogosdelivery.h" "$(NIM_LIB_DIR)/link/"
 
-build-liblogosdelivery build-liblogosdelivery-android build-liblogosdelivery-ios: NIM_POLICY = $(NIM_POLICY_TKL)
+build-liblogosdelivery build-liblogosdelivery-android build-liblogosdelivery-ios: NIM_PARAMS ?= $(NIM_POLICY_TKL)
 build-liblogosdelivery: NIM_LIB_DIR = $(NIM_DELIVERY_DIR)/desktop
 build-liblogosdelivery-android: NIM_LIB_DIR = $(NIM_DELIVERY_DIR)/android-$(NIM_ANDROID_CPU)
 build-liblogosdelivery-ios: NIM_LIB_DIR = $(NIM_DELIVERY_DIR)/$(NIM_IOS_SDK)-$(NIM_IOS_ARCH)
@@ -697,8 +697,11 @@ build-liblogosdelivery-android: NIM_SEAL_TOOLS = $(NIM_SEAL_TOOLS_ANDROID)
 build-liblogosdelivery-android: export PATH := $(NIM_ANDROID_BIN):$(PATH)
 build-liblogosdelivery-ios: NIM_FLAGS = $(NIM_FLAGS_IOS)
 
+# g++ on Linux gives C++ inline variables (BoringSSL's, libstdc++'s) the
+# unique binding, which GNU objcopy cannot make local: weak symbols instead.
+build-liblogosdelivery: NIM_DELIVERY_GCC = $(if $(filter Linux,$(detected_OS)),$(if $(findstring --cc:clang,$(NIM_PARAMS)),,--passC:-fno-gnu-unique))
 build-liblogosdelivery: | nimble.paths ##@build Build the sealed liblogosdelivery
-	$(call NIM_DELIVERY_BUILD,$(call NIM_DELIVERY_LEOPARD_X86,$(or $(ARCH),$(shell uname -m))),$(if $(filter Windows,$(detected_OS)),,--passC:-fPIC))
+	$(call NIM_DELIVERY_BUILD,$(call NIM_DELIVERY_LEOPARD_X86,$(or $(ARCH),$(shell uname -m))),$(if $(filter Windows,$(detected_OS)),,--passC:-fPIC) $(NIM_DELIVERY_GCC))
 
 build-liblogosdelivery-android: | nimble.paths
 	$(call NIM_DELIVERY_BUILD,-DCMAKE_SYSTEM_NAME=Linux -DCMAKE_C_COMPILER=$(NIM_ANDROID_CC) \

@@ -4,8 +4,9 @@
 # library's in one link: every object and archive the compile left in
 # <nimcache> (a fresh one) goes into one relocatable object in which only the
 # symbols starting with <prefix> stay global.
-# Mach-O is told by lipo; ELF and COFF use NIM_SEAL_LD, NIM_SEAL_OBJCOPY and
-# NIM_SEAL_AR (default ld, objcopy, ar), the target's tools for a cross build.
+# Mach-O is told by lipo; ELF and COFF use NIM_SEAL_LD, NIM_SEAL_OBJCOPY,
+# NIM_SEAL_AR and NIM_SEAL_NM (default ld, objcopy, ar, nm), the target's tools
+# for a cross build.
 set -euo pipefail
 prefix="$1"
 nimcache="$2"
@@ -23,8 +24,16 @@ if arch="$(lipo -archs "${objects[0]}" 2>/dev/null)"; then
   # globals must not be common symbols (-fno-common), which ld -r keeps global.
   list="$sealed.inputs"
   printf '%s\n' "${objects[@]}" "${archives[@]+"${archives[@]}"}" > "$list"
-  xcrun ld -r -arch "$arch" -exported_symbol "_${prefix}*" -filelist "$list" -o "$merged"
-  rm -f "$list"
+  # The API by name, not "_<prefix>*": that also matches the hidden symbols
+  # with the prefix (Nim's own copies of the API procs), which older linkers
+  # refuse to export.
+  exports="$sealed.exports"
+  tr '\n' '\0' < "$list" | xargs -0 xcrun nm -m 2>/dev/null |
+    awk -v api="_$prefix" '/ external / && !/private external|\(undefined\)/ && index($NF, api) == 1 {print $NF}' |
+    LC_ALL=C sort -u > "$exports"
+  [ -s "$exports" ] || { echo "seal_nim_lib.sh: no global ${prefix}* symbols in $nimcache" >&2; exit 1; }
+  xcrun ld -r -arch "$arch" -exported_symbols_list "$exports" -filelist "$list" -o "$merged"
+  rm -f "$list" "$exports"
   commons="$(nm "$merged" | grep ' C ' || true)"
   if [ -n "$commons" ]; then
     printf 'seal_nim_lib.sh: common symbols would stay global:\n%s\n' "$commons" >&2
@@ -39,6 +48,12 @@ else
   # Hidden symbols that match the prefix (Nim's own copies of the API procs)
   # go local too, as ld -r -exported_symbol drops them on Mach-O.
   "${NIM_SEAL_OBJCOPY:-objcopy}" --wildcard --keep-global-symbol="${prefix}*" --localize-hidden "$merged"
+  # GNU objcopy leaves g++'s unique symbols (C++ inline variables) global.
+  uniques="$("${NIM_SEAL_NM:-nm}" -g --defined-only "$merged" | awk '$2 == "u"')"
+  if [ -n "$uniques" ]; then
+    printf 'seal_nim_lib.sh: unique symbols stay global (compile with -fno-gnu-unique):\n%s\n' "$uniques" >&2
+    exit 1
+  fi
 fi
 "${NIM_SEAL_AR:-ar}" rcs "$sealed" "$merged"
 rm -f "$merged"
