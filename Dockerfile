@@ -1,5 +1,5 @@
-# Build status-go in a Go builder container
-FROM golang:1.26.5-trixie AS builder
+# Toolchain stage: Go, clang, protoc, Nim, nimble. CI publishes it with --target toolchain.
+FROM golang:1.26.5-trixie AS toolchain
 
 # Set environment variables to use Clang
 ENV CC=clang
@@ -47,6 +47,32 @@ RUN set -eu && \
     /opt/nim/bin/nim --version
 
 ENV PATH="/opt/nim/bin:${PATH}"
+
+# .github/actions/versions parses the FROM line and the ARG *_VERSION lines of this stage.
+ARG NIMBLE_VERSION=0.26.1
+RUN set -eu && \
+    case "$(dpkg --print-architecture)" in \
+    amd64) NIMBLE_ARCH="linux_x64" ;; \
+    arm64) NIMBLE_ARCH="linux_aarch64" ;; \
+    *) echo "ERROR: unsupported architecture" >&2; exit 1 ;; \
+    esac; \
+    mkdir -p /opt/nimble/bin && \
+    curl -sSfL -o /tmp/nimble.tar.gz \
+    "https://github.com/nim-lang/nimble/releases/download/v${NIMBLE_VERSION}/nimble-${NIMBLE_ARCH}.tar.gz" && \
+    tar -xzf /tmp/nimble.tar.gz -C /opt/nimble/bin && \
+    rm /tmp/nimble.tar.gz && \
+    chmod +x /opt/nimble/bin/nimble
+
+ENV PATH="/opt/nimble/bin:${PATH}"
+
+# Test runner behind `make test-unit`
+ARG GOTESTSUM_VERSION=1.13.0
+RUN go install "gotest.tools/gotestsum@v${GOTESTSUM_VERSION}" && \
+    go clean -cache -modcache && \
+    gotestsum --version
+
+# Build status-go in the toolchain container
+FROM toolchain AS builder
 
 ARG build_tags='gowaku_no_rln'
 ARG build_flags=''
