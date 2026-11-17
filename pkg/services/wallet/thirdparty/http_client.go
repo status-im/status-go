@@ -22,7 +22,6 @@ import (
 	"github.com/status-im/status-go/internal/logutils"
 	"github.com/status-im/status-go/internal/traffic"
 	"github.com/status-im/status-go/pkg/security"
-	"github.com/status-im/status-go/pkg/services/wallet/puzzleauth"
 )
 
 const (
@@ -58,9 +57,9 @@ type HTTPClient struct {
 	maxRetries int
 	// traffic records what the client sends and receives.
 	traffic *httptraffic.Recorder
-	// puzzleAuthOrigin is the auth server whose puzzle JWT requests carry;
-	// empty when the client does not use puzzle auth.
-	puzzleAuthOrigin string
+	// transportWrappers are put in front of the transport the other options
+	// leave, in the order they were given.
+	transportWrappers []func(http.RoundTripper) http.RoundTripper
 }
 
 // Struct to hold request modifiers and data collectors
@@ -117,13 +116,12 @@ func WithTrafficRecorder(rec *httptraffic.Recorder) Option {
 	}
 }
 
-// WithPuzzleAuth sends every request with a proof-of-work (puzzle) JWT of the
-// auth server at origin (scheme://host), solving a puzzle when there is no live
-// token. The token replaces any Authorization header a request carries, basic
-// credentials included.
-func WithPuzzleAuth(origin string) Option {
+// WithTransportWrapper puts wrap in front of the client's transport, for
+// example to authorize its requests. Wrappers are applied after all other
+// options, in the order given, so the last one sees a request first.
+func WithTransportWrapper(wrap func(http.RoundTripper) http.RoundTripper) Option {
 	return func(c *HTTPClient) {
-		c.puzzleAuthOrigin = origin
+		c.transportWrappers = append(c.transportWrappers, wrap)
 	}
 }
 
@@ -173,9 +171,14 @@ func NewHTTPClient(opts ...Option) *HTTPClient {
 		client.client.Transport = client.traffic.Instrument(client.client.Transport)
 	}
 
-	if client.puzzleAuthOrigin != "" {
-		// Outermost, so that every attempt of the puzzle layer is recorded as traffic.
-		client.client.Transport = puzzleauth.NewTransport(client.puzzleAuthOrigin, client.client.Transport)
+	// On top of the traffic recording, so that every attempt of a wrapper
+	// that retries is recorded.
+	for _, wrap := range client.transportWrappers {
+		base := client.client.Transport
+		if base == nil {
+			base = http.DefaultTransport
+		}
+		client.client.Transport = wrap(base)
 	}
 
 	return client

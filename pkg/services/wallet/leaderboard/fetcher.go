@@ -16,6 +16,7 @@ import (
 	"github.com/status-im/status-go/internal/logutils"
 	"github.com/status-im/status-go/internal/panics"
 	"github.com/status-im/status-go/internal/traffic"
+	"github.com/status-im/status-go/pkg/services/wallet/puzzleauth"
 	"github.com/status-im/status-go/pkg/services/wallet/thirdparty"
 )
 
@@ -98,7 +99,7 @@ func newMarketProxy(config ServiceConfig) marketProxy {
 		thirdparty.WithMaxRetries(1),
 	}
 	if config.UsePuzzleAuth {
-		httpOptions = append(httpOptions, thirdparty.WithPuzzleAuth(proxy.host))
+		httpOptions = append(httpOptions, thirdparty.WithTransportWrapper(puzzleauth.Wrap(proxy.host)))
 	} else {
 		proxy.creds = &thirdparty.BasicCreds{User: config.User, Password: config.Password}
 	}

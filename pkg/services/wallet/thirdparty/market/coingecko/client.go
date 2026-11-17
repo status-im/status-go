@@ -14,6 +14,7 @@ import (
 	"github.com/status-im/status-go/internal/traffic"
 	"github.com/status-im/status-go/pkg/security"
 	walletcommon "github.com/status-im/status-go/pkg/services/wallet/common"
+	"github.com/status-im/status-go/pkg/services/wallet/puzzleauth"
 	"github.com/status-im/status-go/pkg/services/wallet/thirdparty"
 	"github.com/status-im/status-go/pkg/services/wallet/thirdparty/utils"
 	tokentypes "github.com/status-im/status-go/pkg/services/wallet/token/types"
@@ -75,7 +76,7 @@ func NewClientWithParams(params Params) *Client {
 		thirdparty.WithMaxRetries(5),
 	}
 	if params.PuzzleAuthOrigin != "" {
-		httpOptions = append(httpOptions, thirdparty.WithPuzzleAuth(params.PuzzleAuthOrigin))
+		httpOptions = append(httpOptions, thirdparty.WithTransportWrapper(puzzleauth.Wrap(params.PuzzleAuthOrigin)))
 	}
 	httpClient := thirdparty.NewHTTPClient(httpOptions...)
 
