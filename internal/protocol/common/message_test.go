@@ -131,6 +131,35 @@ func TestPrepareSimplifiedText(t *testing.T) {
 	require.Equal(t, "hey "+canonicalName1+" "+canonicalName2, simplifiedText)
 }
 
+func TestSimplifiedTextKeepsLineAndBlockBreaks(t *testing.T) {
+	testCases := []struct {
+		name     string
+		text     string
+		expected string
+	}{
+		{"single line break", "a\nb", "a\nb"},
+		{"blank line between paragraphs", "**Welcome** 👋\n\nMeet the **bot**.\n\nThis bot", "Welcome 👋\n\nMeet the bot.\n\nThis bot"},
+		{"several blank lines read as one", "a\n\n\n\nb", "a\n\nb"},
+		{"trailing blank lines", "a\n\n", "a"},
+		{"hard break", "a  \nb", "a\nb"},
+		{"quote then paragraph", "> q1\n> q2\n\nb", "q1\nq2\n\nb"},
+		{"paragraph then quote", "a\n\n> q", "a\n\nq"},
+		{"code block between paragraphs", "a\n```\ncode\n```\nb", "a\n\ncode\n\nb"},
+		{"code block alone", "```\ncode\n```", "code"},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			message := NewMessage()
+			message.Text = tc.text
+
+			simplifiedText, err := message.GetSimplifiedText("", nil)
+			require.NoError(t, err)
+			require.Equal(t, tc.expected, simplifiedText)
+		})
+	}
+}
+
 func TestConvertLinkPreviewsToProto(t *testing.T) {
 	msg := Message{
 		LinkPreviews: []LinkPreview{
