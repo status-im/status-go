@@ -6,9 +6,6 @@ cd "$1"
 roots=/nix/var/nix/gcroots/ci
 mkdir -p "$roots"
 
-# The Go modules hash is left out, so the image survives a change of go.mod; evaluation still reads the file.
-printf 'sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=' > nix/pkgs/status-go/library/vendorHash.sha256
-
 # The package takes its version from the commit.
 git init -q .
 git add -A

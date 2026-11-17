@@ -52,7 +52,8 @@ jobs:
           cp -R "$source/library" build/deps/logos-storage/
       - name: Generate code and build libsds
         run: |
-          scripts/toolchain.sh make test-unit-prep $MAKE_ARGS
+          scripts/toolchain.sh make test-unit-prep $MAKE_ARGS \
+            'SDS_NIM_FLAGS=-d:noSignalHandler -d:disableMarchNative'
           mkdir -p build/deps/nim-sds/build
           cp build/nim-sds/build/libsds.so build/deps/nim-sds/build/
           cp -R build/nim-sds/library build/deps/nim-sds/
