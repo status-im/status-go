@@ -413,13 +413,7 @@ func (m *Manager) SetMediaServerProperties() {
 	m.mediaServer.SetCommunityImageVersionReader(func(communityID string) uint32 {
 		return m.communityImageVersions[communityID]
 	})
-	m.mediaServer.SetCommunityImageReader(func(communityID string) (map[string]*protobuf.IdentityImage, error) {
-		community, err := m.GetByIDString(communityID)
-		if err != nil {
-			return nil, err
-		}
-		return community.Images(), nil
-	})
+	m.mediaServer.SetCommunityImageReader(m.communityImages)
 	m.mediaServer.SetCommunityTokensReader(func(communityID string) ([]*protobuf.CommunityTokenMetadata, error) {
 		community, err := m.GetByIDString(communityID)
 		if err != nil {
@@ -427,6 +421,30 @@ func (m *Manager) SetMediaServerProperties() {
 		}
 		return community.CommunityTokensMetadata(), nil
 	})
+}
+
+// communityImages serves the media server. It reads the images straight from
+// the stored description and builds the community only when that is not
+// enough to tell them.
+func (m *Manager) communityImages(communityID string) (map[string]*protobuf.IdentityImage, error) {
+	id, err := cryptotypes.DecodeHex(communityID)
+	if err != nil {
+		return nil, err
+	}
+
+	images, found, pendingEvents, err := m.persistence.CommunityImages(id)
+	if err == nil && !found {
+		return nil, ErrOrgNotFound
+	}
+	if err == nil && !pendingEvents {
+		return images, nil
+	}
+
+	community, err := m.GetByID(id)
+	if err != nil {
+		return nil, err
+	}
+	return community.Images(), nil
 }
 
 type Subscription struct {
@@ -3982,6 +4000,18 @@ func (m *Manager) GetByID(id []byte) (*Community, error) {
 		return nil, ErrOrgNotFound
 	}
 	return community, nil
+}
+
+// CommunityClock returns the clock of the stored community description, and
+// whether the community is stored, without building the community.
+func (m *Manager) CommunityClock(id []byte) (clock uint64, stored bool, err error) {
+	return m.persistence.CommunityClock(id)
+}
+
+// CommunityExists tells whether the community is stored, without reading
+// its description.
+func (m *Manager) CommunityExists(id []byte) (bool, error) {
+	return m.persistence.CommunityExists(&m.identity.PublicKey, id)
 }
 
 func (m *Manager) GetByIDReadonly(id []byte) (ReadonlyCommunity, error) {

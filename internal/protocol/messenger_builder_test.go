@@ -235,6 +235,17 @@ func newTestMessenger(t *testing.T, messagingEnv *messaging.TestMessagingEnviron
 	return m, nil
 }
 
+// releaseTestMessenger ends the work of a messenger that was never started
+// and releases what its messaging stack holds.
+func releaseTestMessenger(t *testing.T, m *Messenger) {
+	if m == nil {
+		return
+	}
+	m.cancel()
+	m.shutdownWaitGroup.Wait()
+	require.NoError(t, m.messaging.Stop())
+}
+
 func newRunningTestMessenger(t *testing.T, messagingEnv *messaging.TestMessagingEnvironment, config testMessengerConfig) (*Messenger, error) {
 	m, err := newTestMessenger(t, messagingEnv, config)
 	require.NoError(t, err)
