@@ -6,11 +6,9 @@ import (
 	"net/http/httptest"
 	"sync/atomic"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/status-im/status-go/internal/circuitbreaker"
 	"github.com/status-im/status-go/pkg/security"
 	"github.com/status-im/status-go/pkg/services/wallet/puzzleauth/puzzleauthtest"
 )
@@ -126,33 +124,6 @@ func TestProxyFetcherAsksTheNextProxy(t *testing.T) {
 		require.NoError(t, fetcher.FetchPrices(context.Background()))
 
 		require.Equal(t, 2.0, storage.GetPriceData()["bitcoin"].Price)
-	})
-
-	t.Run("and leaves the failed one alone for a while", func(t *testing.T) {
-		main := newProxyStub(t, http.StatusInternalServerError, "down")
-		fallback := newProxyStub(t, http.StatusOK, fallbackPrices)
-		fetcher, _ := newFetcherWithProxies(t, main.URL, fallback.URL)
-		fetcher.circuitBreaker = circuitbreaker.NewCircuitBreaker(circuitbreaker.Config{
-			Timeout:                30000,
-			MaxConcurrentRequests:  10,
-			RequestVolumeThreshold: 1,
-			ErrorPercentThreshold:  50,
-			SleepWindow:            300,
-		})
-
-		require.NoError(t, fetcher.FetchPrices(context.Background()))
-		asked := main.requests.Load()
-		require.NotZero(t, asked)
-
-		// The next refreshes go straight to the next proxy...
-		require.NoError(t, fetcher.FetchPrices(context.Background()))
-		require.NoError(t, fetcher.FetchPrices(context.Background()))
-		require.Equal(t, asked, main.requests.Load())
-
-		// ...until the pause is over
-		time.Sleep(400 * time.Millisecond)
-		require.NoError(t, fetcher.FetchPrices(context.Background()))
-		require.Greater(t, main.requests.Load(), asked)
 	})
 
 	t.Run("not for a request the first one rejects as malformed", func(t *testing.T) {

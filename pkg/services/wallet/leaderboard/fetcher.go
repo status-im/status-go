@@ -13,7 +13,6 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/internal/circuitbreaker"
 	"github.com/status-im/status-go/internal/logutils"
 	"github.com/status-im/status-go/internal/panics"
 	"github.com/status-im/status-go/internal/traffic"
@@ -48,10 +47,8 @@ type DataFetcher interface {
 
 // ProxyFetcher implements DataFetcher interface using HTTP proxy
 type ProxyFetcher struct {
-	// proxies are asked in order until one answers. A proxy that failed is
-	// skipped by its circuit for a while; the last one is always asked.
-	proxies        []marketProxy
-	circuitBreaker *circuitbreaker.CircuitBreaker
+	// proxies are asked in order until one answers.
+	proxies []marketProxy
 
 	storage             *DataStorage
 	subscriptionManager *SubscriptionManager
@@ -78,14 +75,7 @@ func NewProxyFetcher(config ServiceConfig, storage *DataStorage, subscriptionMan
 	}
 
 	return &ProxyFetcher{
-		proxies: proxies,
-		circuitBreaker: circuitbreaker.NewCircuitBreaker(circuitbreaker.Config{
-			Timeout:                30000, // above the client's 10s per attempt, two attempts
-			MaxConcurrentRequests:  10,
-			RequestVolumeThreshold: 1,
-			ErrorPercentThreshold:  50,
-			SleepWindow:            60000, // a proxy that failed is asked again in a minute
-		}),
+		proxies:               proxies,
 		storage:               storage,
 		subscriptionManager:   subscriptionManager,
 		config:                config,
@@ -324,26 +314,18 @@ func (f *ProxyFetcher) fetchData(ctx context.Context, endpoint string, etag stri
 	return body, newEtag, true
 }
 
-// doFetch asks the proxies in order and returns the first answer.
-func (f *ProxyFetcher) doFetch(ctx context.Context, endpoint string, etag string, convertCurrency string) ([]byte, string, error) {
+// doFetch asks the proxies in order and returns the first answer. A request
+// a proxy rejects as malformed (400) is not repeated: the next one would
+// reject it too.
+func (f *ProxyFetcher) doFetch(ctx context.Context, endpoint string, etag string, convertCurrency string) (body []byte, newEtag string, err error) {
 	ctx = traffic.WithSource(ctx, traffic.MarketLeaderboard)
-	cmd := circuitbreaker.NewCommand(ctx, nil)
 	for _, proxy := range f.proxies {
-		cmd.Add(circuitbreaker.NewFunctor(func() ([]any, error) {
-			body, newEtag, err := f.doFetchFrom(ctx, proxy, endpoint, etag, convertCurrency)
-			if isBadRequest(err) {
-				// The next proxy would reject the request too.
-				cmd.Cancel()
-			}
-			return []any{body, newEtag}, err
-		}, "leaderboard:"+proxy.host, proxy.host))
+		body, newEtag, err = f.doFetchFrom(ctx, proxy, endpoint, etag, convertCurrency)
+		if err == nil || isBadRequest(err) || ctx.Err() != nil {
+			break
+		}
 	}
-
-	result := f.circuitBreaker.Execute(cmd)
-	if err := result.Error(); err != nil {
-		return nil, "", err
-	}
-	return result.Result()[0].([]byte), result.Result()[1].(string), nil
+	return body, newEtag, err
 }
 
 func (f *ProxyFetcher) doFetchFrom(ctx context.Context, proxy marketProxy, endpoint string, etag string, convertCurrency string) ([]byte, string, error) {
