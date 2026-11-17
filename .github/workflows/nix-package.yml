@@ -1,0 +1,92 @@
+name: Nix package
+# Builds status-go the way its Nix users do; catches a stale hash of the Go modules.
+on:
+  pull_request:
+  push:
+    branches:
+      - develop
+  workflow_dispatch:
+permissions:
+  contents: read
+# bash with pipefail, so a failed listing fails the clean-up.
+defaults:
+  run:
+    shell: bash
+jobs:
+  # Publishes the image the package is built in unless its tag is there already, see scripts/nix-image.sh.
+  image:
+    if: >-
+      github.repository == 'status-im/status-go' &&
+      (github.event_name != 'pull_request' ||
+       github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    permissions:
+      contents: read
+      packages: write
+    # A build is not cancelled by the next push, which waits and finds the image published.
+    concurrency:
+      group: nix-image-${{ github.ref }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Look for a published image
+        id: image
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          image="$(scripts/nix-image.sh --image)"
+          echo "image=$image" >> "$GITHUB_OUTPUT"
+          echo "$GITHUB_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+          if docker manifest inspect "$image" >/dev/null 2>&1; then
+            echo "published=true" >> "$GITHUB_OUTPUT"
+            echo "$image is already published"
+          fi
+      - name: Build
+        if: steps.image.outputs.published != 'true'
+        run: scripts/nix-image.sh --build
+      - name: Publish
+        if: steps.image.outputs.published != 'true'
+        env:
+          IMAGE: ${{ steps.image.outputs.image }}
+        run: docker push "$IMAGE"
+      # Not on pull requests: their images would push the one develop uses out of the newest three.
+      - name: Delete all but the three newest images
+        if: steps.image.outputs.published != 'true' && github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSIONS: /orgs/status-im/packages/container/status-go-nix/versions
+        run: |
+          gh api --paginate "$VERSIONS" --jq '.[] | [.created_at, .id] | @tsv' |
+            sort -r | tail -n +4 | cut -f2 |
+            while read -r id; do
+              gh api -X DELETE "$VERSIONS/$id"
+            done
+  package:
+    name: linux/x86_64/package-nix
+    needs: image
+    # A fork skips the image job; this one still runs and builds the image when it cannot pull it.
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    permissions:
+      contents: read
+      packages: read
+    concurrency:
+      group: nix-package-${{ github.event.pull_request.number || github.sha }}
+      cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Nix image
+        env:
+          GHCR_TOKEN: ${{ github.token }}
+        run: |
+          echo "$GHCR_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin ||
+            echo "::warning::GHCR login failed, so the Nix image may be built in this job"
+          scripts/nix-image.sh nix --version
+      - name: Build the package
+        run: scripts/nix-image.sh nix build -L --no-link '.?submodules=1#status-go-library'
