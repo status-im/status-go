@@ -22,6 +22,7 @@ import (
 	"github.com/status-im/status-go/internal/protocol/requests"
 	v1protocol "github.com/status-im/status-go/internal/protocol/v1"
 	"github.com/status-im/status-go/pkg/messaging/layers/reliability"
+	"github.com/status-im/status-go/pkg/messaging/layers/transport"
 	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
 )
 
@@ -31,6 +32,12 @@ func TestMessengerSDSProcessingSuite(t *testing.T) {
 
 type MessengerSDSProcessingSuite struct {
 	MessengerBaseTestSuite
+}
+
+type messengerSDSValidatorFunc func(sds.ValidationMessage) (bool, error)
+
+func (f messengerSDSValidatorFunc) Validate(message sds.ValidationMessage) (bool, error) {
+	return f(message)
 }
 
 func (s *MessengerSDSProcessingSuite) sdsCommunity() (*communities.Community, *Chat) {
@@ -208,6 +215,7 @@ func (s *MessengerSDSProcessingSuite) TestSDSUnauthorizedMetadataDoesNotChangeSt
 	s.Require().NoError(err)
 	s.Require().Empty(response.Messages)
 	s.Require().Equal([][]byte{hash}, response.ConsumedEnvelopeHashes)
+	s.Require().Equal([][]byte{hash}, response.RejectedEnvelopeHashes)
 	after, err := persistence.LoadChannel(channelID)
 	s.Require().NoError(err)
 	s.Require().Equal(before, after, "rejected history and acknowledgement metadata must not reach SDS")
@@ -215,6 +223,66 @@ func (s *MessengerSDSProcessingSuite) TestSDSUnauthorizedMetadataDoesNotChangeSt
 	received, err := store.IsSDSMessageReceived(channelID, id)
 	s.Require().NoError(err)
 	s.Require().False(received)
+
+	filter := messagingtypes.NewChatFilter(&messagingtypes.ChatFilterConfig{ChatID: chat.ID})
+	_, err = s.m.handleRetrievedMessages(map[messagingtypes.ChatFilter][]*messagingtypes.ReceivedMessage{
+		*filter: {{Sig: crypto.FromECDSAPub(&attackerKey.PublicKey), Hash: hash, Payload: wrapped}},
+	}, false, false)
+	s.Require().NoError(err)
+	cache := transport.NewSQLiteProcessedMessageIDsCachePersistence(s.m.database)
+	processed, err := cache.Hits([]string{cryptotypes.EncodeHex(hash)})
+	s.Require().NoError(err)
+	s.Require().True(processed[cryptotypes.EncodeHex(hash)], "rejected envelope must be deduplicated")
+	dependencyHits, err := cache.DependencyHits([]string{cryptotypes.EncodeHex(hash)})
+	s.Require().NoError(err)
+	s.Require().Empty(dependencyHits, "rejected envelope must not count as dependency evidence")
+}
+
+func (s *MessengerSDSProcessingSuite) TestSDSValidationFailureRetriesOnNextRetrieve() {
+	community, chat := s.sdsCommunity()
+	channelID := reliability.BuildChannelID(community.IDString(), community.UniversalChatID())
+	application := s.sdsApplication(&protobuf.ChatMessage{
+		ChatId: chat.ID, MessageType: protobuf.MessageType_COMMUNITY_CHAT, Text: "retry after authorization loads",
+	}, protobuf.ApplicationMetadataMessage_CHAT_MESSAGE, s.m.identity)
+	messageID := cryptotypes.EncodeHex(crypto.Keccak256(application))
+	sender, err := sds.NewReliabilityManager(zap.NewNop(), nil)
+	s.Require().NoError(err)
+	wrapped, err := sender.WrapOutgoingMessage(application, sds.MessageID(messageID), channelID)
+	s.Require().NoError(err)
+	s.Require().NoError(sender.Cleanup())
+
+	var validationCalls int
+	s.Require().NoError(s.m.messaging.SetSDSValidator(messengerSDSValidatorFunc(func(sds.ValidationMessage) (bool, error) {
+		validationCalls++
+		if validationCalls == 1 {
+			return false, fmt.Errorf("community description not loaded yet")
+		}
+		return true, nil
+	})))
+	hash := crypto.Keccak256(wrapped)
+	received := &messagingtypes.ReceivedMessage{
+		Sig: crypto.FromECDSAPub(&s.m.identity.PublicKey), Hash: hash, Payload: wrapped,
+	}
+	filter := messagingtypes.NewChatFilter(&messagingtypes.ChatFilterConfig{ChatID: chat.ID})
+	input := map[messagingtypes.ChatFilter][]*messagingtypes.ReceivedMessage{
+		*filter: {received},
+	}
+
+	_, err = s.m.handleRetrievedMessages(input, false, false)
+	s.Require().NoError(err)
+	s.Require().Equal(1, validationCalls)
+	s.Require().Len(s.m.sdsValidationRetries, 1)
+
+	_, err = s.m.handleRetrievedMessages(nil, false, false)
+	s.Require().NoError(err)
+	s.Require().Equal(2, validationCalls)
+	s.Require().Empty(s.m.sdsValidationRetries)
+	s.Require().Empty(s.m.sdsValidationRetrySince)
+
+	receivedMessage, err := reliability.NewSQLiteRetrievalHintPersistence(s.m.database).
+		IsSDSMessageReceived(channelID, messageID)
+	s.Require().NoError(err)
+	s.Require().True(receivedMessage, "the retried message must be recorded after successful validation")
 }
 
 func (s *MessengerSDSProcessingSuite) TestSDSLegacyControlChannelCompatibility() {

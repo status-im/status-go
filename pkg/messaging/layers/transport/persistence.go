@@ -8,7 +8,9 @@ type KeysPersistence interface {
 type ProcessedMessageIDsCachePersistence interface {
 	Clear() error
 	Hits(ids []string) (map[string]bool, error)
+	DependencyHits(ids []string) (map[string]bool, error)
 	Add(ids []string, timestamp uint64) error
+	AddRejected(ids []string, timestamp uint64) error
 	Clean(timestamp uint64) error
 }
 

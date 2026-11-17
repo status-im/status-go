@@ -71,6 +71,14 @@ func (c *SQLiteProcessedMessageIDsCachePersistence) Clear() error {
 }
 
 func (c *SQLiteProcessedMessageIDsCachePersistence) Hits(ids []string) (map[string]bool, error) {
+	return c.hits(ids, false)
+}
+
+func (c *SQLiteProcessedMessageIDsCachePersistence) DependencyHits(ids []string) (map[string]bool, error) {
+	return c.hits(ids, true)
+}
+
+func (c *SQLiteProcessedMessageIDsCachePersistence) hits(ids []string, excludeRejected bool) (map[string]bool, error) {
 	hits := make(map[string]bool)
 
 	// Split the results into batches of 999 items.
@@ -90,7 +98,11 @@ func (c *SQLiteProcessedMessageIDsCachePersistence) Hits(ids []string) (map[stri
 			idsArgs = append(idsArgs, id)
 		}
 
-		query := sqlutil.In("SELECT id FROM transport_message_cache WHERE id IN (%s)", len(currentBatch))
+		query := "SELECT id FROM transport_message_cache WHERE id IN (%s)"
+		if excludeRejected {
+			query = "SELECT id FROM transport_message_cache WHERE sds_rejected = 0 AND id IN (%s)"
+		}
+		query = sqlutil.In(query, len(currentBatch))
 
 		rows, err := c.db.Query(query, idsArgs...)
 		if err != nil {
@@ -106,12 +118,23 @@ func (c *SQLiteProcessedMessageIDsCachePersistence) Hits(ids []string) (map[stri
 			}
 			hits[id] = true
 		}
+		if err := rows.Err(); err != nil {
+			return nil, err
+		}
 	}
 
 	return hits, nil
 }
 
-func (c *SQLiteProcessedMessageIDsCachePersistence) Add(ids []string, timestamp uint64) (err error) {
+func (c *SQLiteProcessedMessageIDsCachePersistence) Add(ids []string, timestamp uint64) error {
+	return c.add(ids, timestamp, false)
+}
+
+func (c *SQLiteProcessedMessageIDsCachePersistence) AddRejected(ids []string, timestamp uint64) error {
+	return c.add(ids, timestamp, true)
+}
+
+func (c *SQLiteProcessedMessageIDsCachePersistence) add(ids []string, timestamp uint64, rejected bool) (err error) {
 	var tx *sql.Tx
 	tx, err = c.db.BeginTx(context.Background(), &sql.TxOptions{})
 	if err != nil {
@@ -127,15 +150,16 @@ func (c *SQLiteProcessedMessageIDsCachePersistence) Add(ids []string, timestamp 
 		_ = tx.Rollback()
 	}()
 
+	query := `INSERT INTO transport_message_cache(id, timestamp, sds_rejected)
+		VALUES (?, ?, 0)
+		ON CONFLICT(id) DO UPDATE SET timestamp = excluded.timestamp, sds_rejected = excluded.sds_rejected`
+	if rejected {
+		query = `INSERT INTO transport_message_cache(id, timestamp, sds_rejected)
+			VALUES (?, ?, 1)
+			ON CONFLICT(id) DO UPDATE SET timestamp = excluded.timestamp, sds_rejected = 1`
+	}
 	for _, id := range ids {
-
-		var stmt *sql.Stmt
-		stmt, err = tx.Prepare(`INSERT INTO transport_message_cache(id,timestamp) VALUES (?, ?)`)
-		if err != nil {
-			return
-		}
-
-		_, err = stmt.Exec(id, timestamp)
+		_, err = tx.Exec(query, id, timestamp)
 		if err != nil {
 			return
 		}

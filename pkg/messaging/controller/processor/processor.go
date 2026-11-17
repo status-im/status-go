@@ -98,12 +98,14 @@ func (r *Processor) ProcessMessage(msg *messagingtypes.ReceivedMessage) (*messag
 		response.messages = append(response.messages, queuedMessagesResponse.messages...)
 		response.ackedMessageIDs = append(response.ackedMessageIDs, queuedMessagesResponse.ackedMessageIDs...)
 		response.consumedEnvelopeHashes = append(response.consumedEnvelopeHashes, queuedMessagesResponse.consumedEnvelopeHashes...)
+		response.rejectedEnvelopeHashes = append(response.rejectedEnvelopeHashes, queuedMessagesResponse.rejectedEnvelopeHashes...)
 	}
 
 	return &messagingtypes.HandleMessageResponse{
 		Messages:               response.messages,
 		AckedMessageIDs:        response.ackedMessageIDs,
 		ConsumedEnvelopeHashes: response.consumedEnvelopeHashes,
+		RejectedEnvelopeHashes: response.rejectedEnvelopeHashes,
 	}, nil
 }
 
@@ -111,6 +113,7 @@ type processMessageResponse struct {
 	messages               []*messagingtypes.Message
 	ackedMessageIDs        []types.HexBytes
 	consumedEnvelopeHashes [][]byte
+	rejectedEnvelopeHashes [][]byte
 }
 
 type sdsLayerReliability interface {
@@ -188,6 +191,7 @@ func (r *Processor) processMessage(m *messagingtypes.ReceivedMessage) (*processM
 			logger.Debug("discarding unauthorized SDS message", zap.Error(err))
 			response.messages = nil
 			response.consumedEnvelopeHashes = hashes
+			response.rejectedEnvelopeHashes = hashes
 			return response, nil
 		}
 		logger.Error("failed to unwrap payload for SDS", zap.Error(err))
@@ -254,6 +258,7 @@ func (r *Processor) processQueuedHashRatchetMessages(hashRatchetInfos []*messagi
 			response.messages = append(response.messages, r.messages...)
 			response.ackedMessageIDs = append(response.ackedMessageIDs, r.ackedMessageIDs...)
 			response.consumedEnvelopeHashes = append(response.consumedEnvelopeHashes, r.consumedEnvelopeHashes...)
+			response.rejectedEnvelopeHashes = append(response.rejectedEnvelopeHashes, r.rejectedEnvelopeHashes...)
 		}
 
 		err = r.hashRatchetStorage.DeleteMessages(processedIds)
