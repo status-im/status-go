@@ -14,8 +14,6 @@ in pkgs.mkShell {
     libsds libstorage
   ] ++ lib.optionals (isDarwin) [
     pkgs.xcodeWrapper
-  ] ++ lib.optionals (!(stdenv.isLinux && isAarch64)) [
-    codecov-cli
   ];
 
   shellHook = ''

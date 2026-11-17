@@ -53,9 +53,6 @@ in rec {
     versions = ["16.0" "16.1" "16.2"];
   };
 
-  # Custom packages
-  codecov-cli = callPackage ./pkgs/codecov-cli { };
-
   # Not yet packaged in the pinned nixpkgs.
   protobuf_36 = callPackage "${prev.path}/pkgs/development/libraries/protobuf/generic.nix" {
     version = "36.0";
