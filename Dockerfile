@@ -48,26 +48,7 @@ RUN set -eu && \
 
 ENV PATH="/opt/nim/bin:${PATH}"
 
-# Keep the existing Nim toolchain for other dependencies. Token lists use the
-# compiler tested by the pinned library's CI.
-ARG TKL_NIM_VERSION=2.2.10
-RUN set -eu && \
-    case "$(dpkg --print-architecture)" in \
-    amd64) TKL_NIM_ARCH=x64 ;; \
-    arm64) TKL_NIM_ARCH=arm64 ;; \
-    *) echo "Unsupported token compiler architecture" >&2; exit 1 ;; \
-    esac && \
-    TKL_NIM_URL=$(curl -sSf https://nim-lang.org/releases.json \
-    | jq -er --arg ver "$TKL_NIM_VERSION" --arg arch "$TKL_NIM_ARCH" \
-    '.[$ver]["linux_" + $arch].github_url') && \
-    curl -sSfL "$TKL_NIM_URL" -o /tmp/tkl-nim.tar.xz && \
-    mkdir -p /opt/nim-tkl && \
-    tar -xJf /tmp/tkl-nim.tar.xz -C /opt/nim-tkl --strip-components=1 && \
-    rm /tmp/tkl-nim.tar.xz && \
-    /opt/nim-tkl/bin/nim --version
-ENV TKL_NIM=/opt/nim-tkl/bin/nim
-
-# Nimble builds nim-sds with the Nim installed below; the one above builds logos-storage.
+# Nimble builds the Nim libraries with the Nim installed below; the one above builds logos-storage.
 # .github/actions/versions parses the FROM line and the ARG *_VERSION lines of this stage.
 ARG NIMBLE_VERSION=0.26.1
 RUN set -eu && \
@@ -85,30 +66,23 @@ RUN set -eu && \
 
 ENV PATH="/opt/nimble/bin:${PATH}"
 
-# The Nim status_go.nimble requires for libsds, left where nimble looks first; arm64 has no published build.
-ARG SDS_NIM_VERSION=2.2.6
-ARG SDS_NIM_X64_SHA256=38b8407f87d78bd207390051e4c76f38a45d0a26983cb262017c899b56ad8d06
-ARG SDS_NIM_SOURCE_SHA256=657b0e3d5def788148d2a87fa6123fa755b2d92cad31ef60fd261e451785528b
+# The Nim status_go.nimble requires for libsds and libtkl, left where nimble looks first.
+ARG SDS_NIM_VERSION=2.2.10
+ARG SDS_NIM_X64_SHA256=0a3a38752e97e9d44aa479b3a7b37336dfe0176daf22ee5b5218ad0991ecd211
+ARG SDS_NIM_ARM64_SHA256=cd86a6e2bcbf029c4870aa51df5c0169345dbf9959889112fd15d403c13ae33a
 RUN set -eu && \
-    mkdir -p /opt/nim-sds /root/.nimble/nimbinaries && \
     case "$(dpkg --print-architecture)" in \
-    amd64) \
-    SDS_NIM_URL=$(curl -sSf https://nim-lang.org/releases.json \
-    | jq -er --arg ver "$SDS_NIM_VERSION" '.[$ver].linux_x64.github_url') && \
-    curl -sSfL "$SDS_NIM_URL" -o /tmp/nim.tar.xz && \
-    echo "${SDS_NIM_X64_SHA256}  /tmp/nim.tar.xz" | sha256sum -c - && \
-    tar -xJf /tmp/nim.tar.xz -C /opt/nim-sds --strip-components=1 ;; \
-    arm64) \
-    curl -sSfL "https://nim-lang.org/download/nim-${SDS_NIM_VERSION}.tar.xz" -o /tmp/nim.tar.xz && \
-    echo "${SDS_NIM_SOURCE_SHA256}  /tmp/nim.tar.xz" | sha256sum -c - && \
-    tar -xJf /tmp/nim.tar.xz -C /opt/nim-sds --strip-components=1 && \
-    cd /opt/nim-sds && \
-    sh build.sh > /dev/null && \
-    bin/nim c --noNimblePath --skipUserCfg --skipParentCfg --hints:off koch && \
-    ./koch boot -d:release --skipUserCfg --skipParentCfg --hints:off && \
-    rm -rf c_code nimcache compiler/nimcache koch ;; \
+    amd64) SDS_NIM_ARCH=x64; SDS_NIM_SHA256="$SDS_NIM_X64_SHA256" ;; \
+    arm64) SDS_NIM_ARCH=arm64; SDS_NIM_SHA256="$SDS_NIM_ARM64_SHA256" ;; \
     *) echo "ERROR: unsupported architecture" >&2; exit 1 ;; \
     esac && \
+    SDS_NIM_URL=$(curl -sSf https://nim-lang.org/releases.json \
+    | jq -er --arg ver "$SDS_NIM_VERSION" --arg arch "$SDS_NIM_ARCH" \
+    '.[$ver]["linux_" + $arch].github_url') && \
+    curl -sSfL "$SDS_NIM_URL" -o /tmp/nim.tar.xz && \
+    echo "${SDS_NIM_SHA256}  /tmp/nim.tar.xz" | sha256sum -c - && \
+    mkdir -p /opt/nim-sds /root/.nimble/nimbinaries && \
+    tar -xJf /tmp/nim.tar.xz -C /opt/nim-sds --strip-components=1 && \
     rm /tmp/nim.tar.xz && \
     /opt/nim-sds/bin/nim --version && \
     ln -s /opt/nim-sds "/root/.nimble/nimbinaries/nim-${SDS_NIM_VERSION}"

@@ -1,23 +1,19 @@
 name: Nim
-description: Puts prebuilt Nim compilers and nimble on PATH of an Apple Silicon runner. Every download is checked against a pinned checksum.
+description: Puts a prebuilt Nim compiler and nimble on PATH of an Apple Silicon runner. Every download is checked against a pinned checksum.
 inputs:
   nim-version:
-    description: Nim on PATH.
+    description: Nim on PATH, the one status_go.nimble pins.
     required: true
-  sds-nim-version:
-    description: The Nim status_go.nimble pins, put where nimble looks before it builds one from source. Empty for none.
-    default: ''
   nimble-version:
     description: nimble on PATH.
     default: '0.26.1'
 runs:
   using: composite
   steps:
-    # setup-nim-action and nimble build Nim from source on macOS, about five minutes per compiler.
+    # setup-nim-action and nimble build Nim from source on macOS, about five minutes.
     - name: Nim and nimble
       shell: bash
       env:
         NIM_VERSION: ${{ inputs.nim-version }}
-        SDS_NIM_VERSION: ${{ inputs.sds-nim-version }}
         NIMBLE_VERSION: ${{ inputs.nimble-version }}
       run: '"$GITHUB_ACTION_PATH/install.sh"'

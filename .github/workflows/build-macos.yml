@@ -48,11 +48,10 @@ jobs:
         with:
           version: ${{ env.PROTOC_VERSION }}
           repo-token: ${{ secrets.GITHUB_TOKEN }}
-      # The Nim on PATH builds the token library; nimble uses its own for libsds.
+      # The Nim status_go.nimble pins, which builds libsds and the token library.
       - uses: ./.github/actions/nim
         with:
-          nim-version: ${{ env.TKL_NIM_VERSION }}
-          sds-nim-version: ${{ env.SDS_NIM_VERSION }}
+          nim-version: ${{ env.SDS_NIM_VERSION }}
           nimble-version: ${{ env.NIMBLE_VERSION }}
       - name: Toolchain versions
         run: |
