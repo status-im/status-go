@@ -295,6 +295,10 @@ type storeNodeRequest struct {
 	manager       *StoreNodeRequestManager
 	subscriptions []storeNodeResponseSubscription
 	result        storeNodeRequestResult
+
+	// communityFound is set by the page check; the community itself is
+	// loaded once, when the request finishes.
+	communityFound bool
 }
 
 // storeNodeRequestResult contains result of a single storeNodeRequest
@@ -370,6 +374,7 @@ func (r *storeNodeRequest) shouldFetchNextPage(envelopesCount int) (bool, uint64
 			logger.Error("failed to decode community ID",
 				zap.String("communityID", r.requestID.DataID),
 				zap.Error(err))
+			r.communityFound = false
 			r.result = storeNodeRequestResult{
 				community: nil,
 				err:       fmt.Errorf("failed to decode community ID: %w", err),
@@ -383,6 +388,7 @@ func (r *storeNodeRequest) shouldFetchNextPage(envelopesCount int) (bool, uint64
 			logger.Error("failed to validate community by ID",
 				zap.String("communityID", r.requestID.DataID),
 				zap.Error(err))
+			r.communityFound = false
 			r.result = storeNodeRequestResult{
 				community: nil,
 				err:       fmt.Errorf("failed to validate community by ID: %w", err),
@@ -390,12 +396,12 @@ func (r *storeNodeRequest) shouldFetchNextPage(envelopesCount int) (bool, uint64
 			return false, 0 // failed to validate community, no sense to continue the procedure
 		}
 
-		community, err := r.manager.messenger.communitiesManager.GetByID(communityID)
-
-		if err != nil && err != communities.ErrOrgNotFound {
+		clock, stored, err := r.manager.messenger.communitiesManager.CommunityClock(communityID)
+		if err != nil {
 			logger.Error("failed to read community from database",
 				zap.String("communityID", r.requestID.DataID),
 				zap.Error(err))
+			r.communityFound = false
 			r.result = storeNodeRequestResult{
 				community: nil,
 				err:       fmt.Errorf("failed to read community from database: %w", err),
@@ -403,7 +409,7 @@ func (r *storeNodeRequest) shouldFetchNextPage(envelopesCount int) (bool, uint64
 			return false, 0 // failed to read from database, no sense to continue the procedure
 		}
 
-		if community == nil {
+		if !stored {
 			// community not found in the database, request next page
 			logger.Debug("community still not fetched")
 			return true, r.config.FurtherPageSize
@@ -415,18 +421,15 @@ func (r *storeNodeRequest) shouldFetchNextPage(envelopesCount int) (bool, uint64
 		// Would be perfect if we could track that the community was in these particular envelopes,
 		// but I don't think that's possible right now. We check if clock was updated instead.
 
-		if !r.hasFoundCommunityDescription(community.Clock()) {
+		if !r.hasFoundCommunityDescription(clock) {
 			logger.Debug("local community description is not newer than existing",
-				zap.Any("existingClock", community.Clock()),
+				zap.Any("existingClock", clock),
 				zap.Any("minimumDataClock", r.minimumDataClock),
 			)
 			return true, r.config.FurtherPageSize
 		}
 
-		logger.Debug("community found",
-			zap.String("displayName", community.Name()))
-
-		r.result.community = community
+		r.communityFound = true
 
 	case storeNodeContactRequest:
 		contact := r.manager.messenger.GetContactByID(r.requestID.DataID)
@@ -444,6 +447,28 @@ func (r *storeNodeRequest) shouldFetchNextPage(envelopesCount int) (bool, uint64
 	}
 
 	return !r.config.StopWhenDataFound, r.config.FurtherPageSize
+}
+
+func (r *storeNodeRequest) loadFoundCommunity() {
+	if !r.communityFound {
+		return
+	}
+
+	community, err := r.manager.messenger.communitiesManager.GetByIDString(r.requestID.DataID)
+	if err != nil {
+		r.manager.logger.Error("failed to read community from database",
+			zap.String("communityID", r.requestID.DataID),
+			zap.Error(err))
+		r.result = storeNodeRequestResult{
+			stats: r.result.stats,
+			err:   fmt.Errorf("failed to read community from database: %w", err),
+		}
+		return
+	}
+
+	r.manager.logger.Debug("community found",
+		zap.String("displayName", community.Name()))
+	r.result.community = community
 }
 
 func (r *storeNodeRequest) routine() {
@@ -464,16 +489,14 @@ func (r *storeNodeRequest) routine() {
 	}
 
 	defer func() {
+		r.loadFoundCommunity()
 		r.finalize()
 	}()
 
-	communityID := r.requestID.getCommunityID()
-
 	// Check if community already exists locally and get Clock.
 	if r.requestID.RequestType == storeNodeCommunityRequest {
-		localCommunity, _ := r.manager.messenger.communitiesManager.GetByIDString(communityID)
-		if localCommunity != nil {
-			r.minimumDataClock = localCommunity.Clock()
+		if communityID, err := cryptotypes.DecodeHex(r.requestID.getCommunityID()); err == nil {
+			r.minimumDataClock, _, _ = r.manager.messenger.communitiesManager.CommunityClock(communityID)
 		}
 	}
 

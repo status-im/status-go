@@ -373,17 +373,12 @@ func (p *Persistence) GetByID(memberIdentity *ecdsa.PublicKey, id []byte) (*Comm
 	return p.recordBundleToCommunity(r)
 }
 
-// CommunityExists checks if a community with the given ID exists in the database.
-// This is a lightweight alternative to GetByID when only existence checking is needed.
-func (p *Persistence) CommunityExists(memberIdentity *ecdsa.PublicKey, id []byte) (bool, error) {
-	r, err := p.getByID(id, memberIdentity)
-	if err == sql.ErrNoRows {
-		return false, nil
-	}
-	if err != nil {
-		return false, err
-	}
-	return r != nil, nil
+// CommunityExists checks if a community with the given ID exists in the database,
+// without reading its row.
+func (p *Persistence) CommunityExists(_ *ecdsa.PublicKey, id []byte) (bool, error) {
+	var exists bool
+	err := p.db.QueryRow(`SELECT EXISTS (SELECT 1 FROM communities_communities WHERE id = ?)`, id).Scan(&exists)
+	return exists, err
 }
 
 func (p *Persistence) SaveRequestToJoin(request *RequestToJoin) (err error) {
