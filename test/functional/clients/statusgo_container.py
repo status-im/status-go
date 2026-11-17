@@ -48,7 +48,7 @@ class StatusGoContainer:
         identifier = os.environ.get("BUILD_ID") if os.environ.get("CI") else git_commit
         image_name = image or Config.docker_image or f"statusgo-{identifier}:latest"
         self.container_name = f"{docker_project_name}-{identifier}{container_name_suffix}"
-        coverage_path = Config.codecov_dir if Config.codecov_dir else os.path.abspath("./coverage/binary")
+        coverage_path = Config.coverage_dir if Config.coverage_dir else os.path.abspath("./coverage/binary")
 
         # Run the container
         logging.debug(f"Creating status-go container from image '{image_name}'")
