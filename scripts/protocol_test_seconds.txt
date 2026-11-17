@@ -1,0 +1,21 @@
+# Seconds per internal/protocol test of 30 s or more, from the JUnit reports of a CI run; `default` covers the rest.
+303 TestAdminCommunityEventsSuite
+300 TestMessengerCommunitiesSuite
+264 TestTokenMasterCommunityEventsSuite
+235 TestOwnerWithoutCommunityKeyCommunityEventsSuite
+196 TestMessengerProfilePictureHandlerSuite
+146 TestMessengerCommunitiesSharedMemberAddressSuite
+133 TestMessengerCommunitiesTokenPermissionsSuite
+119 TestMessengerContactRequestSuite
+101 TestMessengerSuite
+98 TestMessengerThreadsSuite
+68 TestMessengerActivityCenterMessageSuite
+66 TestGroupChatSuite
+57 TestCommunityEventsEventualConsistencySuite
+57 TestMessengerPushNotificationSuite
+52 TestMessengerSyncKeypairsAutoApplyTest
+47 TestMessengerCommunitiesSignersSuite
+42 TestMessengerSyncActivityCenter
+35 TestMessengerRemoveMessageSuite
+34 TestMessengerPairingTest
+3 default

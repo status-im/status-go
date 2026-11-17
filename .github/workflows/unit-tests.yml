@@ -1,0 +1,115 @@
+name: Unit Tests
+on:
+  pull_request:
+  push:
+    branches:
+      - develop
+      - 'release/**'
+  workflow_dispatch:
+permissions:
+  contents: read
+  packages: read
+concurrency:
+  group: unit-tests-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+defaults:
+  run:
+    shell: bash
+env:
+  # Make arguments for a tree that uses the prebuilt libstorage.
+  MAKE_ARGS: >-
+    USE_LOGOS_STORAGE=true USE_TORRENT=true
+    LOGOS_STORAGE_LIB_DIR=${{ github.workspace }}/build/deps/logos-storage/build
+    LOGOS_STORAGE_INC_DIR=${{ github.workspace }}/build/deps/logos-storage/library
+jobs:
+  prepare:
+    name: prepare
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          # scripts/version.sh describes the commit from the nearest tag
+          fetch-depth: 0
+          filter: blob:none
+          persist-credentials: false
+      - uses: ./.github/actions/toolchain
+      - name: Restore libstorage
+        id: libstorage
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: build/deps/logos-storage
+          # The Makefile pins the logos-storage revision, the Dockerfile the compilers.
+          key: libstorage-portable-linux-x86_64-${{ hashFiles('Makefile', 'Dockerfile') }}
+      - name: Build libstorage
+        if: steps.libstorage.outputs.cache-hit != 'true'
+        # Built on one runner and used on others, so not compiled for the build machine's CPU.
+        run: |
+          scripts/toolchain.sh make build-storage STORAGE_LIB_PARAMS=-d:disableMarchNative
+          source=~/.cache/status-go-toolchain/logos-storage-nim
+          mkdir -p build/deps/logos-storage/build
+          cp "$source/build/libstorage.so" build/deps/logos-storage/build/
+          cp -R "$source/library" build/deps/logos-storage/
+      - name: Generate code and build libsds
+        run: |
+          scripts/toolchain.sh make test-unit-prep $MAKE_ARGS
+          mkdir -p build/deps/nim-sds/build
+          cp build/nim-sds/build/libsds.so build/deps/nim-sds/build/
+          cp -R build/nim-sds/library build/deps/nim-sds/
+      - name: Pack the prepared tree
+        run: |
+          # Generated files are the ignored ones; from build/ only the libraries are needed.
+          {
+            git ls-files -z --others --ignored --exclude-standard | grep -zvE '^(build|nimbledeps)/'
+            printf '%s\0' build/deps
+          } | tar --null --files-from=- -cf "$RUNNER_TEMP/prepared-tree.tar"
+          ls -lh "$RUNNER_TEMP/prepared-tree.tar"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: prepared-tree
+          path: ${{ runner.temp }}/prepared-tree.tar
+          if-no-files-found: error
+          # Long enough to re-run failed jobs days later.
+          retention-days: 5
+
+  # Slices of the suite, see UNIT_TEST_PART in scripts/run_unit_tests.sh.
+  tests:
+    name: ${{ matrix.part }}
+    needs: prepare
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        part:
+          - packages:1/3
+          - packages:2/3
+          - packages:3/3
+          - protocol:1/10
+          - protocol:2/10
+          - protocol:3/10
+          - protocol:4/10
+          - protocol:5/10
+          - protocol:6/10
+          - protocol:7/10
+          - protocol:8/10
+          - protocol:9/10
+          - protocol:10/10
+    env:
+      UNIT_TEST_PART: ${{ matrix.part }}
+      UNIT_TEST_USE_DEVELOPMENT_LOGGER: false
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/unit-test-slice
+
+  # One check name for branch rules, whatever the number of slices.
+  unit:
+    name: unit
+    if: always()
+    needs: [tests]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - run: jq -e 'all(. == "success")' <<< '${{ toJSON(needs.*.result) }}'
