@@ -74,11 +74,10 @@ func (m *StoreNodeRequestManager) FetchCommunity(ctx context.Context, communityI
 		zap.Any("config", cfg))
 
 	fetch := func() (*communities.Community, StoreNodeRequestStats, error) {
-		sub, err := m.subscribeToRequest(ctx, storeNodeCommunityRequest, communityID, messagingtypes.DefaultShard(), cfg)
+		res, err := m.requestCommunity(ctx, communityID, cfg)
 		if err != nil {
-			return nil, StoreNodeRequestStats{}, fmt.Errorf("failed to create a shard info request: %w", err)
+			return nil, StoreNodeRequestStats{}, err
 		}
-		res := <-sub
 		if res.community != nil {
 			return res.community, res.stats, res.err
 		}
@@ -97,6 +96,17 @@ func (m *StoreNodeRequestManager) FetchCommunity(ctx context.Context, communityI
 	}
 
 	return fetch()
+}
+
+// requestCommunity runs a store node request for the community, or joins the
+// one in flight, and returns its result. Unlike FetchCommunity it keeps the
+// error of a request that brought no community.
+func (m *StoreNodeRequestManager) requestCommunity(ctx context.Context, communityID string, cfg StoreNodeRequestConfig) (storeNodeRequestResult, error) {
+	sub, err := m.subscribeToRequest(ctx, storeNodeCommunityRequest, communityID, messagingtypes.DefaultShard(), cfg)
+	if err != nil {
+		return storeNodeRequestResult{}, fmt.Errorf("failed to create a shard info request: %w", err)
+	}
+	return <-sub, nil
 }
 
 // FetchContact - similar to FetchCommunity
@@ -518,7 +528,10 @@ func (r *storeNodeRequest) routine() {
 	// queries: the StoreClient selects and pins the store node itself (waiting up
 	// to storenodeAvailableTimeout for one), paginating with shouldFetchNextPage
 	// as the early-stop. It returns ErrStorenodeNotAvailable if none is reachable.
-	r.result.err = r.manager.messenger.processMailserverBatchWithOptions(batch, r.config.InitialPageSize, r.shouldFetchNextPage, true)
+	// A page check that failed has set the error of the request.
+	if err := r.manager.messenger.processMailserverBatchWithOptions(batch, r.config.InitialPageSize, r.shouldFetchNextPage, true); err != nil {
+		r.result.err = err
+	}
 }
 
 func (r *storeNodeRequest) start() {
