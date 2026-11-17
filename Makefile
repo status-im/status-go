@@ -325,6 +325,7 @@ $(GO_CMD_BUILDS): ##@build Build any Go project from cmd folder
 # When USE_SYSTEM_NIM=1 skips compiling Nim compiler locally and instead,
 # enforces to use system-installed Nim.
 USE_SYSTEM_NIM ?= 1
+SDS_NIM_FLAGS ?= -d:noSignalHandler
 
 # libsds targets
 
@@ -347,7 +348,7 @@ $(LIBSDS): clone-nim-sds
 ifeq ($(NIM_SDS_BUILD_FROM_SOURCE),true)
 	@echo "Building nim-sds: $(LIBSDS)"
 	$(MAKE) -C $(NIM_SDS_SOURCE_DIR) update USE_SYSTEM_NIM=$(USE_SYSTEM_NIM)
-	$(MAKE) -C $(NIM_SDS_SOURCE_DIR) libsds USE_SYSTEM_NIM=$(USE_SYSTEM_NIM) NIMFLAGS=-d:noSignalHandler SHELL=$(MAKE_SHELL)
+	$(MAKE) -C $(NIM_SDS_SOURCE_DIR) libsds USE_SYSTEM_NIM=$(USE_SYSTEM_NIM) NIMFLAGS="$(SDS_NIM_FLAGS)" SHELL=$(MAKE_SHELL)
 	@test -f $(LIBSDS) || (echo "Error: libsds not found at $(LIBSDS) after build" && exit 1)
 else
 	@test -f $(LIBSDS) || (echo "Error: libsds not found at $(LIBSDS)" && exit 1)
