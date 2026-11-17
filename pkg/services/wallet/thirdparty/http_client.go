@@ -172,13 +172,10 @@ func NewHTTPClient(opts ...Option) *HTTPClient {
 	}
 
 	// On top of the traffic recording, so that every attempt of a wrapper
-	// that retries is recorded.
+	// that retries is recorded. The recording above always sets a transport,
+	// so a wrapper never gets a nil one.
 	for _, wrap := range client.transportWrappers {
-		base := client.client.Transport
-		if base == nil {
-			base = http.DefaultTransport
-		}
-		client.client.Transport = wrap(base)
+		client.client.Transport = wrap(client.client.Transport)
 	}
 
 	return client
