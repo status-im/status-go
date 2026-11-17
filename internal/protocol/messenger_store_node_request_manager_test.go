@@ -186,6 +186,27 @@ func (s *StoreNodeRequestPageCheckSuite) TestReturnsNoCommunityWhenLaterPageFail
 	s.Require().Nil(community)
 }
 
+// The error of a failed page check is the error of the request, also when
+// the store node query itself ended well.
+func (s *StoreNodeRequestPageCheckSuite) TestKeepsPageCheckErrorWhenQuerySucceeds() {
+	s.messagingEnv.SetProcessMailserverBatchHook(func(ctx context.Context, batch wakutypes.MailserverBatch, pageLimit uint64, pageCheck func(int) (bool, uint64), processEnvelopes bool) error {
+		// The page check cannot tell whether the community awaits validation.
+		_, err := s.m.database.Exec("ALTER TABLE communities_validate_signer RENAME TO communities_validate_signer_gone")
+		s.NoError(err)
+		next, _ := pageCheck(1)
+		s.False(next)
+		return nil
+	})
+	s.T().Cleanup(func() {
+		s.messagingEnv.SetProcessMailserverBatchHook(nil)
+	})
+
+	result, err := s.m.storeNodeRequestsManager.requestCommunity(context.Background(), s.communityID(), defaultStoreNodeRequestConfig())
+	s.Require().NoError(err)
+	s.Require().Nil(result.community)
+	s.Require().ErrorContains(result.err, "failed to validate community by ID")
+}
+
 // A page that does not bring the awaited description must not cost a load of
 // the stored community.
 func (s *StoreNodeRequestPageCheckSuite) TestPageCheckDoesNotLoadStoredCommunity() {
