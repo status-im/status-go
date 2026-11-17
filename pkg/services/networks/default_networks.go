@@ -168,7 +168,7 @@ func BuildDefaultNetworks(walletConfig *params.WalletConfig, thirdpartyServicesE
 		defaultNetworks(proxyHost, thirdpartyServicesEnabled, walletConfig.EthRpcProxyUsePuzzleAuth),
 		walletConfig,
 	)
-	return withCommunitiesSupported(networks)
+	return withCommunitiesSupported(withFallbackProxy(networks, walletConfig))
 }
 
 func GetProxyChainAndNetworkName(chainID uint64) (string, string) {
