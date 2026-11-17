@@ -1,4 +1,4 @@
-[![Unit Tests](https://ci.status.im/buildStatus/icon?subject=Unit%20Tests&job=status-go%2Ftests-develop)](https://ci.status.im/job/status-go/job/tests-develop/) [![Unit Tests](https://ci.status.im/buildStatus/icon?subject=Functional%20Tests&job=status-go%2Ftests-rpc-develop)](https://ci.status.im/job/status-go/job/tests-rpc-develop/)
+[![Unit Tests](https://github.com/status-im/status-go/actions/workflows/unit-tests.yml/badge.svg?branch=develop)](https://github.com/status-im/status-go/actions/workflows/unit-tests.yml?query=branch%3Adevelop) [![Unit Tests](https://ci.status.im/buildStatus/icon?subject=Functional%20Tests&job=status-go%2Ftests-rpc-develop)](https://ci.status.im/job/status-go/job/tests-rpc-develop/)
 
 # status-go
 
@@ -94,9 +94,9 @@ consumers and DLL exports. `scripts/test_tkl_static.sh` links a C application to
 the bundled Go archive on Linux, macOS, iOS and Windows, checks private exports,
 and runs it on the native host. `make test-libtkl-coexistence` checks both Nim
 runtimes in one process, using the existing SDS directory overrides or building
-SDS through its normal Make prerequisite. Jenkins runs this target in its Nix
-test environment, which already provides SDS. Full application packaging and
-device runtime checks remain part of release validation.
+SDS through its normal Make prerequisite. The Unit Tests workflow runs this
+target in the toolchain image, with the SDS it built. Full application packaging
+and device runtime checks remain part of release validation.
 
 # License
 

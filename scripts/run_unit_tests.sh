@@ -118,6 +118,31 @@ DEFAULT_PROTOCOL_SHARDS=2
 MIN_PROTOCOL_SHARDS=1
 MAX_PROTOCOL_SHARDS=5
 
+# Seconds of the slow `protocol` tests, and one `default` line for the rest.
+PROTOCOL_TEST_SECONDS_FILE="${GIT_ROOT}/scripts/protocol_test_seconds.txt"
+
+# Prints "<shard> <test>" for each test name on stdin: slowest first, each into the lightest shard.
+assign_protocol_shards() {
+  awk -v seconds_file="${PROTOCOL_TEST_SECONDS_FILE}" '
+    BEGIN {
+      seconds["default"] = 1
+      while ((getline line < seconds_file) > 0) {
+        split(line, field, " ")
+        if (field[1] ~ /^[0-9]+$/) seconds[field[2]] = field[1]
+      }
+    }
+    { print (($1 in seconds) ? seconds[$1] : seconds["default"]), $1 }' |
+    sort -s -k1,1nr |
+    awk -v shards="$1" '{
+      lightest = 0
+      for (shard = 1; shard < shards; shard++) {
+        if (load[shard] < load[lightest]) lightest = shard
+      }
+      load[lightest] += $1
+      print lightest, $2
+    }'
+}
+
 resolve_protocol_shards() {
   local shards
 
@@ -154,6 +179,26 @@ if [[ $(echo "${UNIT_TEST_PACKAGES}" | grep -E '\s?\S+protocol\s+') == "" ]]; th
   HAS_PROTOCOL_PACKAGE=false
 fi
 
+# UNIT_TEST_PART=packages:<i>/<n> or protocol:<i>/<n> runs one slice; needs UNIT_TEST_COUNT=1 and the full package list.
+part_group=""
+if [[ -n "${UNIT_TEST_PART}" ]]; then
+  if [[ ! "${UNIT_TEST_PART}" =~ ^(packages|protocol):([1-9][0-9]*)/([1-9][0-9]*)$ ]]; then
+    echo -e "${RED}Invalid UNIT_TEST_PART='${UNIT_TEST_PART}'${RST}, expected packages:<i>/<n> or protocol:<i>/<n>" >&2
+    exit 2
+  fi
+  part_group="${BASH_REMATCH[1]}"
+  part_index="${BASH_REMATCH[2]}"
+  part_total="${BASH_REMATCH[3]}"
+  if (( part_index > part_total )); then
+    echo -e "${RED}Invalid UNIT_TEST_PART='${UNIT_TEST_PART}'${RST}, slice ${part_index} is past the last of ${part_total}" >&2
+    exit 2
+  fi
+  if [[ "${UNIT_TEST_COUNT}" -ne 1 || $HAS_PROTOCOL_PACKAGE == 'false' ]]; then
+    echo -e "${RED}UNIT_TEST_PART needs UNIT_TEST_COUNT=1 and the protocol package in UNIT_TEST_PACKAGES${RST}" >&2
+    exit 2
+  fi
+fi
+
 bg_pids=()
 
 if [[ $HAS_PROTOCOL_PACKAGE == 'false' ]]; then
@@ -162,21 +207,35 @@ if [[ $HAS_PROTOCOL_PACKAGE == 'false' ]]; then
   run_test_for_packages "${UNIT_TEST_PACKAGES}" "0" "${UNIT_TEST_COUNT}" "${DEFAULT_TIMEOUT_MINUTES}" "All packages"
 else
   # Spawn a process to test all packages except `protocol`
-  UNIT_TEST_PACKAGES_FILTERED=$(echo "${UNIT_TEST_PACKAGES}" | tr ' ' '\n' | grep -v '/protocol$' | tr '\n' ' ')
-  run_test_for_packages "${UNIT_TEST_PACKAGES_FILTERED}" "0" "${UNIT_TEST_COUNT}" "${DEFAULT_TIMEOUT_MINUTES}" "All packages except 'protocol'" &
-  bg_pids+=("$!")
-
-  if [[ $UNIT_TEST_COUNT -eq 1 ]]; then
-    protocol_shards="$(resolve_protocol_shards)"
-
-    protocol_list_cmd=(go test -list '^Test')
-    if [[ -n "${BUILD_TAGS}" ]]; then
-      protocol_list_cmd+=(-tags "${BUILD_TAGS}")
+  if [[ "${part_group}" != 'protocol' ]]; then
+    UNIT_TEST_PACKAGES_FILTERED=$(echo "${UNIT_TEST_PACKAGES}" | tr ' ' '\n' | grep -v '/protocol$' | grep .)
+    packages_message="All packages except 'protocol'"
+    if [[ "${part_group}" == 'packages' ]]; then
+      UNIT_TEST_PACKAGES_FILTERED=$(echo "${UNIT_TEST_PACKAGES_FILTERED}" | awk -v i="${part_index}" -v n="${part_total}" '(NR - 1) % n == i - 1')
+      packages_message="${packages_message} (slice ${part_index}/${part_total})"
+      if [[ -z "${UNIT_TEST_PACKAGES_FILTERED}" ]]; then
+        echo -e "${RED}No packages in slice ${part_index}/${part_total}${RST}" >&2
+        exit 2
+      fi
     fi
-    protocol_list_cmd+=(github.com/status-im/status-go/internal/protocol)
+    UNIT_TEST_PACKAGES_FILTERED=$(echo "${UNIT_TEST_PACKAGES_FILTERED}" | tr '\n' ' ')
+    run_test_for_packages "${UNIT_TEST_PACKAGES_FILTERED}" "0" "${UNIT_TEST_COUNT}" "${DEFAULT_TIMEOUT_MINUTES}" "${packages_message}" &
+    bg_pids+=("$!")
+  fi
 
-    mapfile -t protocol_tests < <("${protocol_list_cmd[@]}" | awk '/^Test/ { print $0 }' | sort -u)
-    if [[ ${#protocol_tests[@]} -eq 0 ]]; then
+  if [[ "${part_group}" == 'packages' ]]; then
+    : # the `protocol` package belongs to the protocol slices
+  elif [[ $UNIT_TEST_COUNT -eq 1 ]]; then
+    if [[ "${part_group}" == 'protocol' ]]; then
+      # One slice runs here, so the CPU limit on parallel shards does not apply.
+      protocol_shards="${part_total}"
+    else
+      protocol_shards="$(resolve_protocol_shards)"
+    fi
+
+    # Read from the sources: a test the build tags leave out is listed too and matches nothing in -run.
+    mapfile -t protocol_tests < <(sed -nE 's/^func (Test[^( ]*)\(.*/\1/p' "${GIT_ROOT}"/internal/protocol/*_test.go | LC_ALL=C sort -u)
+    if [[ ${#protocol_tests[@]} -eq 0 && -z "${part_group}" ]]; then
       echo -e "${YLW}No protocol tests discovered, running package without sharding${RST}"
       run_test_for_packages github.com/status-im/status-go/internal/protocol "1" 1 "${PROTOCOL_TIMEOUT_MINUTES}" "Only 'protocol' package (fallback, no discovered tests)" &
       bg_pids+=("$!")
@@ -187,18 +246,25 @@ else
         protocol_shard_filters[i]=""
       done
 
-      for ((i=0; i<${#protocol_tests[@]}; i++)); do
-        shard_idx=$((i % protocol_shards))
+      while read -r shard_idx protocol_test; do
         if [[ -z "${protocol_shard_filters[$shard_idx]}" ]]; then
-          protocol_shard_filters[$shard_idx]="${protocol_tests[$i]}"
+          protocol_shard_filters[$shard_idx]="${protocol_test}"
         else
-          protocol_shard_filters[$shard_idx]="${protocol_shard_filters[$shard_idx]}|${protocol_tests[$i]}"
+          protocol_shard_filters[$shard_idx]="${protocol_shard_filters[$shard_idx]}|${protocol_test}"
         fi
-      done
+      done < <(printf '%s\n' "${protocol_tests[@]}" | assign_protocol_shards "${protocol_shards}")
+
+      if [[ "${part_group}" == 'protocol' && -z "${protocol_shard_filters[$((part_index - 1))]}" ]]; then
+        echo -e "${RED}No protocol tests in slice ${part_index}/${part_total}${RST}: ${#protocol_tests[@]} tests for ${protocol_shards} slices" >&2
+        exit 2
+      fi
 
       protocol_iteration=1
       for ((i=0; i<protocol_shards; i++)); do
         if [[ -z "${protocol_shard_filters[$i]}" ]]; then
+          continue
+        fi
+        if [[ "${part_group}" == 'protocol' && $((i + 1)) -ne "${part_index}" ]]; then
           continue
         fi
         protocol_filter="^(${protocol_shard_filters[$i]})$"
