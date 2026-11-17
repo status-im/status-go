@@ -40,6 +40,32 @@ func TestNewTransport(t *testing.T) {
 	t.Cleanup(func() { _ = tr.Stop() })
 }
 
+func TestRejectedMessagesRemainProcessedButAreNotDependencyEvidence(t *testing.T) {
+	db, err := testutils.SetupTestMemorySQLDB(testutils.NewTestDBInitializer([]*bindata.AssetSource{
+		{Names: migrations.AssetNames(), AssetFunc: migrations.Asset},
+	}))
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, db.Close()) })
+
+	cache := NewSQLiteProcessedMessageIDsCachePersistence(db)
+	require.NoError(t, cache.Add([]string{"accepted"}, 1))
+	require.NoError(t, cache.AddRejected([]string{"rejected"}, 1))
+
+	processed, err := cache.Hits([]string{"accepted", "rejected"})
+	require.NoError(t, err)
+	require.Equal(t, map[string]bool{"accepted": true, "rejected": true}, processed)
+
+	dependencies, err := cache.DependencyHits([]string{"accepted", "rejected"})
+	require.NoError(t, err)
+	require.Equal(t, map[string]bool{"accepted": true}, dependencies)
+
+	// A later successful processing must clear the rejection classification.
+	require.NoError(t, cache.Add([]string{"rejected"}, 2))
+	dependencies, err = cache.DependencyHits([]string{"rejected"})
+	require.NoError(t, err)
+	require.Equal(t, map[string]bool{"rejected": true}, dependencies)
+}
+
 // TestReceivePushPath exercises the push receive pipeline end to end at the
 // transport boundary: a neutral ReceivedMessage is routed by content topic to
 // the matching filter, decoded via rfc26, and surfaced through RetrieveRawAll.

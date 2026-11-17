@@ -17,6 +17,7 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
+	"github.com/waku-org/sds-go-bindings/sds"
 	otelattribute "go.opentelemetry.io/otel/attribute"
 	oteltrace "go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
@@ -179,6 +180,11 @@ type Messenger struct {
 	mutex                     sync.Mutex
 	handleMessagesMutex       sync.Mutex
 	handleImportMessagesMutex sync.Mutex
+	// Accessed under handleMessagesMutex.
+	sdsValidationRetries     []pendingSDSValidationEnvelope
+	sdsValidationRetryHashes map[string]struct{}
+	sdsValidationRetrySince  map[string]time.Time
+	sdsValidationRetryBytes  int
 
 	// flag to disable checking #hasPairedDevices
 	localPairing bool
@@ -3430,7 +3436,10 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[types.ChatFilte
 		controlledCommunitiesChatIDs[chatID] = flag
 	}
 
+	chatWithMessages = m.takeSDSValidationRetries(chatWithMessages)
+
 	var processedMessages []string
+	var rejectedMessages []string
 	iterator := m.retrievedMessagesIteratorFactory(chatWithMessages)
 	for iterator.HasNext() {
 		filter, messages := iterator.Next()
@@ -3450,13 +3459,21 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[types.ChatFilte
 
 			handleMessagesResponse, err := m.messaging.HandleReceivedMessages(shhMessage)
 			if err != nil {
-				logger.Info("failed to decode messages", zap.Error(err))
+				if errors.Is(err, sds.ErrValidationFailed) {
+					m.enqueueSDSValidationRetry(&filter, shhMessage)
+					logger.Info("deferring SDS envelope until validation can be retried", zap.Error(err))
+				} else {
+					m.clearSDSValidationRetry(shhMessage)
+					logger.Info("failed to process received message", zap.Error(err))
+				}
 				continue
 			}
 
 			if handleMessagesResponse == nil {
+				m.clearSDSValidationRetry(shhMessage)
 				continue
 			}
+			m.clearSDSValidationRetry(shhMessage)
 
 			m.messaging.MetricsPushReceivedMessages(types.ReceivedMessages{
 				Filter:     filter,
@@ -3479,10 +3496,22 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[types.ChatFilte
 			m.processCommunityChanges(messageState)
 
 			if allMessagesProcessed {
-				processedMessages = append(processedMessages, cryptotypes.EncodeHex(shhMessage.Hash))
+				rejectedHashes := make(map[string]struct{}, len(handleMessagesResponse.RejectedEnvelopeHashes))
+				for _, hash := range handleMessagesResponse.RejectedEnvelopeHashes {
+					rejectedHashes[cryptotypes.EncodeHex(hash)] = struct{}{}
+				}
+				appendProcessed := func(hash []byte) {
+					encoded := cryptotypes.EncodeHex(hash)
+					if _, rejected := rejectedHashes[encoded]; rejected {
+						rejectedMessages = append(rejectedMessages, encoded)
+						return
+					}
+					processedMessages = append(processedMessages, encoded)
+				}
+				appendProcessed(shhMessage.Hash)
 				for _, hash := range handleMessagesResponse.ConsumedEnvelopeHashes {
 					if !bytes.Equal(hash, shhMessage.Hash) {
-						processedMessages = append(processedMessages, cryptotypes.EncodeHex(hash))
+						appendProcessed(hash)
 					}
 				}
 			}
@@ -3499,6 +3528,11 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[types.ChatFilte
 	if len(processedMessages) != 0 {
 		if err := m.messaging.ConfirmMessagesProcessed(processedMessages, m.getTimesource().GetCurrentTime()); err != nil {
 			logger.Warn("failed to confirm processed messages", zap.Error(err))
+		}
+	}
+	if len(rejectedMessages) != 0 {
+		if err := m.messaging.ConfirmRejectedMessagesProcessed(rejectedMessages, m.getTimesource().GetCurrentTime()); err != nil {
+			logger.Warn("failed to confirm rejected messages", zap.Error(err))
 		}
 	}
 	return response, nil

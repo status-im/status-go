@@ -828,8 +828,17 @@ func (t *Transport) ConfirmMessagesProcessed(ids []string, timestamp uint64) err
 	return t.cache.Add(ids, timestamp)
 }
 
+func (t *Transport) ConfirmRejectedMessagesProcessed(ids []string, timestamp uint64) error {
+	t.logger.Debug("confirming rejected message processed", zap.Any("ids", ids), zap.Any("timestamp", timestamp))
+	return t.cache.AddRejected(ids, timestamp)
+}
+
 func (t *Transport) AlreadyProcessed(ids []string) (map[string]bool, error) {
 	return t.cache.Hits(ids)
+}
+
+func (t *Transport) DependencyHits(ids []string) (map[string]bool, error) {
+	return t.cache.DependencyHits(ids)
 }
 
 // CleanMessagesProcessed clears the messages that are older than timestamp

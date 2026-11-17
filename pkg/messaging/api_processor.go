@@ -34,6 +34,10 @@ func (a *API) ConfirmMessagesProcessed(ids []string, timestamp uint64) error {
 	return a.core.stack.Transport.ConfirmMessagesProcessed(ids, timestamp)
 }
 
+func (a *API) ConfirmRejectedMessagesProcessed(ids []string, timestamp uint64) error {
+	return a.core.stack.Transport.ConfirmRejectedMessagesProcessed(ids, timestamp)
+}
+
 func (a *API) CleanMessagesProcessed(timestamp uint64) error {
 	return a.core.stack.Transport.CleanMessagesProcessed(timestamp)
 }
