@@ -1,9 +1,17 @@
 name: Go Lint
 on:
   pull_request:
+  # develop saves the Go caches that pull requests read.
+  push:
+    branches:
+      - develop
 
 permissions:
   contents: read # Keep permissions read-only. Required to provide `repo-token` for arduino/setup-protoc@v3 stage.
+
+concurrency:
+  group: go-lint-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   golangci:
@@ -12,21 +20,29 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: ./.github/actions/versions
+
       - uses: actions/setup-go@v5
         with:
-          go-version: 1.26
+          go-version: ${{ env.GO_VERSION }}
+          # Its own cache is saved again by every pull request.
+          cache: false
+
+      - uses: ./.github/actions/go-cache
+        with:
+          name: lint-linux-x86_64
 
       - name: Get dependencies
         run: go mod download
 
       - uses: jiro4989/setup-nim-action@189b145833368cc92f1e7b3e166a25a3e057a693
         with:
-          nim-version: '2.2.10'
+          nim-version: ${{ env.TKL_NIM_VERSION }}
 
       - name: Setup Protocol Buffer Compiler
         uses: arduino/setup-protoc@v3
         with:
-          version: '36.0'
+          version: ${{ env.PROTOC_VERSION }}
           repo-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Cache go-generate-fast
@@ -70,8 +86,12 @@ jobs:
       - name: go mod tidy
         run: go mod tidy && git diff --exit-code
 
+      - uses: ./.github/actions/go-cache/save
+
   migration-check:
     name: Check SQL migrations order
+    # Compares a pull request with its base branch.
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 10
 

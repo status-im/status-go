@@ -1,0 +1,12 @@
+name: Save Go caches
+description: Saves the caches ./.github/actions/go-cache restored, when its rule allows it. Run it after the build, in one job per cache name.
+runs:
+  using: composite
+  steps:
+    - if: env.GO_CACHE_SAVE == 'true'
+      uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+      with:
+        path: |
+          ${{ env.GO_CACHE_DIRECTORY }}/go-build
+          ${{ env.GO_CACHE_DIRECTORY }}/go-mod
+        key: ${{ env.GO_CACHE_KEY }}

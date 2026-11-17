@@ -1,5 +1,5 @@
-# Build status-go in a Go builder container
-FROM golang:1.26.5-trixie AS builder
+# Toolchain stage: Go, clang, protoc, Nim, nimble. CI publishes it with --target toolchain.
+FROM golang:1.26.5-trixie AS toolchain
 
 # Set environment variables to use Clang
 ENV CC=clang
@@ -67,8 +67,8 @@ RUN set -eu && \
     /opt/nim-tkl/bin/nim --version
 ENV TKL_NIM=/opt/nim-tkl/bin/nim
 
-# Nimble supplies nim-sds' pinned Nim; the one above builds logos-storage.
-# Must match NIMBLE_VERSION in ci-nimble.yml.
+# Nimble builds nim-sds with the Nim installed below; the one above builds logos-storage.
+# .github/actions/versions parses the FROM line and the ARG *_VERSION lines of this stage.
 ARG NIMBLE_VERSION=0.26.1
 RUN set -eu && \
     case "$(dpkg --print-architecture)" in \
@@ -84,6 +84,45 @@ RUN set -eu && \
     chmod +x /opt/nimble/bin/nimble
 
 ENV PATH="/opt/nimble/bin:${PATH}"
+
+# The Nim status_go.nimble requires for libsds, left where nimble looks first; arm64 has no published build.
+ARG SDS_NIM_VERSION=2.2.6
+ARG SDS_NIM_X64_SHA256=38b8407f87d78bd207390051e4c76f38a45d0a26983cb262017c899b56ad8d06
+ARG SDS_NIM_SOURCE_SHA256=657b0e3d5def788148d2a87fa6123fa755b2d92cad31ef60fd261e451785528b
+RUN set -eu && \
+    mkdir -p /opt/nim-sds /root/.nimble/nimbinaries && \
+    case "$(dpkg --print-architecture)" in \
+    amd64) \
+    SDS_NIM_URL=$(curl -sSf https://nim-lang.org/releases.json \
+    | jq -er --arg ver "$SDS_NIM_VERSION" '.[$ver].linux_x64.github_url') && \
+    curl -sSfL "$SDS_NIM_URL" -o /tmp/nim.tar.xz && \
+    echo "${SDS_NIM_X64_SHA256}  /tmp/nim.tar.xz" | sha256sum -c - && \
+    tar -xJf /tmp/nim.tar.xz -C /opt/nim-sds --strip-components=1 ;; \
+    arm64) \
+    curl -sSfL "https://nim-lang.org/download/nim-${SDS_NIM_VERSION}.tar.xz" -o /tmp/nim.tar.xz && \
+    echo "${SDS_NIM_SOURCE_SHA256}  /tmp/nim.tar.xz" | sha256sum -c - && \
+    tar -xJf /tmp/nim.tar.xz -C /opt/nim-sds --strip-components=1 && \
+    cd /opt/nim-sds && \
+    sh build.sh > /dev/null && \
+    bin/nim c --noNimblePath --skipUserCfg --skipParentCfg --hints:off koch && \
+    ./koch boot -d:release --skipUserCfg --skipParentCfg --hints:off && \
+    rm -rf c_code nimcache compiler/nimcache koch ;; \
+    *) echo "ERROR: unsupported architecture" >&2; exit 1 ;; \
+    esac && \
+    rm /tmp/nim.tar.xz && \
+    /opt/nim-sds/bin/nim --version && \
+    ln -s /opt/nim-sds "/root/.nimble/nimbinaries/nim-${SDS_NIM_VERSION}"
+# nimble writes its metadata next to the compiler, as the calling user.
+RUN chmod a+w /opt/nim-sds
+
+# Test runner behind `make test-unit`
+ARG GOTESTSUM_VERSION=1.13.0
+RUN go install "gotest.tools/gotestsum@v${GOTESTSUM_VERSION}" && \
+    go clean -cache -modcache && \
+    gotestsum --version
+
+# Build status-go in the toolchain container
+FROM toolchain AS builder
 
 ARG build_tags='gowaku_no_rln'
 ARG build_flags=''
