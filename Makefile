@@ -118,7 +118,7 @@ NIM_SDS_VERSION ?= v0.3.4
 # to guarantee a clean checkout on every build.
 NIM_SDS_SOURCE_DIR ?= $(GIT_ROOT)/../nim-sds
 # Normalize path separators for Windows (backslashes cause issues when passed through shells)
-ifeq ($(mkspecs),win32)
+ifeq ($(detected_OS),Windows)
 	NIM_SDS_SOURCE_DIR := $(subst \,/,$(NIM_SDS_SOURCE_DIR))
 endif
 
