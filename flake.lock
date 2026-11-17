@@ -27,8 +27,9 @@
         ]
       },
       "locked": {
+        "allRefs": true,
         "lastModified": 1785259017,
-        "narHash": "sha256-VBcjkXeEuVDjNYFuZ4a4JD8DG1cQpseLniJlRz1OjaA=",
+        "narHash": "sha256-K0Ai0Y9zUjlFlaF8hgQtwHJ36IOy4D1wYmG6h/pvpQE=",
         "ref": "refs/heads/master",
         "rev": "978c560aed6dc4cff6b602e94fc0fcc66fea6399",
         "revCount": 878,
@@ -37,6 +38,7 @@
         "url": "https://github.com/logos-storage/logos-storage-nim"
       },
       "original": {
+        "allRefs": true,
         "rev": "978c560aed6dc4cff6b602e94fc0fcc66fea6399",
         "submodules": true,
         "type": "git",
