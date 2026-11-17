@@ -7,7 +7,8 @@ NIMBLE ?= nimble
 NIMBLE_ROOT ?= $(CURDIR)
 # A resolved package's directory, from nimble.paths: `nimble path` lists every
 # installed version. Windows paths come with (escaped) backslashes and CRLF.
-NIM_PKG_DIR = $$(sed -n -E 's@[\\]+@/@g; s@^--path:"(.*/pkgs2/$(1)-[^/"]*)"[[:space:]]*$$@\1@p' "$(NIMBLE_ROOT)/nimble.paths" | head -n 1)
+NIM_PKG_DIR = $$(dir="$$(sed -n -E 's@[\\]+@/@g; s@^--path:"(.*/pkgs2/$(1)-[^/"]*)"[[:space:]]*$$@\1@p' "$(NIMBLE_ROOT)/nimble.paths" | head -n 1)"; \
+	[ -n "$$dir" ] || echo "Error: no $(1) package in $(NIMBLE_ROOT)/nimble.paths" >&2; printf '%s' "$$dir")
 
 ifeq ($(abspath $(NIMBLE_ROOT)),$(CURDIR))
 nimble.paths: status_go.nimble
@@ -60,9 +61,9 @@ NIM_FLAGS_IOS = --cpu:$(if $(filter x86_64,$(NIM_IOS_ARCH)),amd64,arm64) --os:io
 NIM_FLAGS = $(NIM_FLAGS_DESKTOP)
 
 # Builds a library's entry with plain nim c from this resolution, so it builds
-# from the resolution and not from its own lock. nimble shell puts the selected
-# Nim on PATH. nimble.paths has every --path, so parent configs (status-app's)
-# are skipped; the library's own config next to its entry is still read.
+# from the resolution and not from its own lock. nimble.paths has every --path,
+# so parent configs (status-app's) are skipped; the library's own config next
+# to its entry is still read.
 # eval: NIM_FLAGS, NIM_PARAMS and nimble.paths quote their arguments.
 # $(call NIM_COMPILE,<entry .nim>,<lib|staticlib>,<output file in NIM_LIB_DIR>[,<flags>])
 NIM_COMPILE = eval "env -u SDKROOT -u CPATH -u LIBRARY_PATH $(NIM) c --skipParentCfg \

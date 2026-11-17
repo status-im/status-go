@@ -15,7 +15,8 @@ runs:
       shell: bash
       run: |
         echo "REPORT_NAME=unit-test-reports-${UNIT_TEST_PART//[:\/]/-}" >> "$GITHUB_ENV"
-        scripts/toolchain.sh make test-unit-prepared $MAKE_ARGS
+        scripts/toolchain.sh make test-unit-prepared $MAKE_ARGS \
+          NIM_TKL_LIB_DIR="$PWD/build/deps/tkl" NIM_TKL_INC_DIR="$PWD/build/deps/tkl"
     # With CI=true the test output goes to files, not to the job log.
     - name: Show test logs
       if: failure()

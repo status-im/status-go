@@ -106,7 +106,8 @@ if ! "$mobile"; then
 fi
 out="$build_dir/$target"
 base_cgo_cflags="${TKL_BASE_CGO_CFLAGS-${CGO_CFLAGS:-}}"
-fingerprint="$(printf '%s\n' "$(cat "$repo/nimble.paths")" \
+# A consumer's resolution (NIMBLE_ROOT) and compiler (NIM) are part of the build.
+fingerprint="$(printf '%s\n' "$(cat "${NIMBLE_ROOT:-$repo}/nimble.paths")" "${NIM:-}" \
   "${cc_identity:-}" \
   "$target" "$sdk_identity" "${ANDROID_API:-28}" "${IOS_TARGET:-}" \
   "$base_cgo_cflags" "${MACOSX_DEPLOYMENT_TARGET:-}" "${TKL_LD:-}" "${TKL_OBJCOPY:-}" "${TKL_AR:-}" \

@@ -50,21 +50,11 @@ jobs:
           mkdir -p build/deps/logos-storage/build
           cp "$source/build/libstorage.so" build/deps/logos-storage/build/
           cp -R "$source/library" build/deps/logos-storage/
-      # With libsds restored, nimble is skipped.
-      - name: Restore libsds
-        id: libsds
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
-        with:
-          path: |
-            build/libsds.so
-            build/libsds.h
-          key: libsds-linux-x86_64-${{ hashFiles('status_go.nimble', 'Makefile', 'Dockerfile') }}
-      - name: Generate code, build libsds, fetch the token library sources
-        env:
-          PREBUILT_SDS: NIM_SDS_LIB_DIR=${{ github.workspace }}/build NIM_SDS_INC_DIR=${{ github.workspace }}/build
+      - name: Generate code, build libsds and the token library
         run: |
-          [ "${{ steps.libsds.outputs.cache-hit }}" = true ] || PREBUILT_SDS=
-          scripts/toolchain.sh make test-unit-prep build-libtkl $MAKE_ARGS $PREBUILT_SDS
+          scripts/toolchain.sh make test-unit-prep build-libtkl $MAKE_ARGS
+          # One target, one build: the other jobs take it prebuilt and skip nimble.
+          cp -R build/tkl/*/*/link build/deps/tkl
       - name: Pack the prepared tree
         run: |
           # Generated files are the ignored ones; from build/ only the libraries are needed.
@@ -95,10 +85,11 @@ jobs:
         with:
           name: prepared-tree
           path: ${{ runner.temp }}
-      # Uses the prepared libsds instead of building it through nimble.
+      # Uses the prepared libraries instead of building them through nimble.
       - run: |
           tar -xf "$RUNNER_TEMP/prepared-tree.tar"
-          scripts/toolchain.sh make test-libtkl-coexistence NIM_SDS_LIB_DIR="$PWD/build" NIM_SDS_INC_DIR="$PWD/build"
+          scripts/toolchain.sh make test-libtkl-coexistence NIM_SDS_LIB_DIR="$PWD/build" NIM_SDS_INC_DIR="$PWD/build" \
+            NIM_TKL_LIB_DIR="$PWD/build/deps/tkl" NIM_TKL_INC_DIR="$PWD/build/deps/tkl"
 
   # Slices of the suite, see UNIT_TEST_PART in scripts/run_unit_tests.sh.
   tests:
