@@ -542,21 +542,22 @@ test: test-unit ##@tests Run basic, short tests during development
 
 test-unit-prep: $(LOGOS_STORAGE_BUILD_DEPS) $(LIBSDS)
 test-unit-prep: generate
-test-unit-prep: export BUILD_TAGS ?=
-test-unit-prep: export UNIT_TEST_DRY_RUN ?= false
-test-unit-prep: export UNIT_TEST_COUNT ?= 1
-test-unit-prep: export UNIT_TEST_FAILFAST ?= true
-test-unit-prep: export UNIT_TEST_USE_DEVELOPMENT_LOGGER ?= true
+test-unit-prep test-unit-prepared: export BUILD_TAGS ?=
+test-unit-prep test-unit-prepared: export UNIT_TEST_DRY_RUN ?= false
+test-unit-prep test-unit-prepared: export UNIT_TEST_COUNT ?= 1
+test-unit-prep test-unit-prepared: export UNIT_TEST_FAILFAST ?= true
+test-unit-prep test-unit-prepared: export UNIT_TEST_USE_DEVELOPMENT_LOGGER ?= true
 
-test-unit: test-unit-prep
-test-unit: export UNIT_TEST_RERUN_FAILS ?= true
-test-unit: export UNIT_TEST_PACKAGES ?= $(call sh, go list -tags '$(BUILD_TAGS)' ./... | \
+test-unit: test-unit-prep ##@tests Run unit and integration tests
+test-unit-prepared: ##@tests Run the same tests on a tree that test-unit-prep already prepared
+test-unit test-unit-prepared: export UNIT_TEST_RERUN_FAILS ?= true
+test-unit test-unit-prepared: export UNIT_TEST_PACKAGES ?= $(call sh, go list -tags '$(BUILD_TAGS)' ./... | \
 	grep -v /t/e2e | \
 	grep -v /t/benchmarks | \
 	grep -v /transactions/fake | \
 	grep -v /test/unit-network)
-test-unit: ##@tests Run unit and integration tests
-	LD_LIBRARY_PATH="$(RUNTIME_LIB_DIRS)" CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
+test-unit test-unit-prepared:
+	BUILD_TAGS='$(BUILD_TAGS)' LD_LIBRARY_PATH="$(RUNTIME_LIB_DIRS)" CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
 	./scripts/run_unit_tests.sh
 
 test-single: test-unit-prep
