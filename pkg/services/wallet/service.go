@@ -176,6 +176,9 @@ func NewService(
 		marketProviders = []thirdparty.MarketDataProvider{
 			coingeckoProxy, coingeckoClient,
 		}
+		for _, fallbackConfig := range fallbackMarketProxyConfigs(config.WalletConfig.MarketDataProxyConfig) {
+			marketProviders = append(marketProviders, createCoingeckoProxyClient(fallbackConfig))
+		}
 
 		raribleClient := rarible.NewClient(config.WalletConfig.RaribleMainnetAPIKey, config.WalletConfig.RaribleTestnetAPIKey)
 		alchemyClient := alchemy.NewClient(config.WalletConfig.AlchemyAPIKey)
@@ -204,6 +207,14 @@ func NewService(
 			alchemyProxy,
 			raribleClient,
 			alchemyClient,
+		}
+
+		for _, fallbackConfig := range fallbackNftProxyConfigs(config.WalletConfig.NftProxyConfig) {
+			fallbackProxy := createAlchemyProxyClient(fallbackConfig)
+			contractOwnershipProviders = append(contractOwnershipProviders, fallbackProxy)
+			accountOwnershipProviders = append(accountOwnershipProviders, fallbackProxy)
+			collectibleDataProviders = append(collectibleDataProviders, fallbackProxy)
+			collectionDataProviders = append(collectionDataProviders, fallbackProxy)
 		}
 
 		collectibleSearchProviders := []thirdparty.CollectibleSearchProvider{

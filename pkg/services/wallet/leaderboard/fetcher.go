@@ -13,6 +13,7 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/status-im/status-go/internal/circuitbreaker"
 	"github.com/status-im/status-go/internal/logutils"
 	"github.com/status-im/status-go/internal/panics"
 	"github.com/status-im/status-go/internal/traffic"
@@ -47,7 +48,11 @@ type DataFetcher interface {
 
 // ProxyFetcher implements DataFetcher interface using HTTP proxy
 type ProxyFetcher struct {
-	client              *thirdparty.HTTPClient
+	// proxies are asked in order until one answers. A proxy that failed is
+	// skipped by its circuit for a while; the last one is always asked.
+	proxies        []marketProxy
+	circuitBreaker *circuitbreaker.CircuitBreaker
+
 	storage             *DataStorage
 	subscriptionManager *SubscriptionManager
 	config              ServiceConfig
@@ -67,23 +72,48 @@ type ProxyFetcher struct {
 
 // NewProxyFetcher creates a new proxy data fetcher
 func NewProxyFetcher(config ServiceConfig, storage *DataStorage, subscriptionManager *SubscriptionManager) DataFetcher {
-	// Configure HTTP client with detailed timeouts
-	httpOptions := []thirdparty.Option{
-		thirdparty.WithTimeout(10 * time.Second),
-		thirdparty.WithMaxRetries(1),
+	proxies := []marketProxy{newMarketProxy(config)}
+	for _, fallbackConfig := range fallbackProxyConfigs(config) {
+		proxies = append(proxies, newMarketProxy(fallbackConfig))
 	}
-	if config.UsePuzzleAuth {
-		origin := GetMarketProxyHost(config.UrlOverride.Reveal(), config.StageName)
-		httpOptions = append(httpOptions, thirdparty.WithPuzzleAuth(origin))
-	}
-	httpClient := thirdparty.NewHTTPClient(httpOptions...)
+
 	return &ProxyFetcher{
-		client:                httpClient,
+		proxies: proxies,
+		circuitBreaker: circuitbreaker.NewCircuitBreaker(circuitbreaker.Config{
+			Timeout:                30000, // above the client's 10s per attempt, two attempts
+			MaxConcurrentRequests:  10,
+			RequestVolumeThreshold: 1,
+			ErrorPercentThreshold:  50,
+			SleepWindow:            60000, // a proxy that failed is asked again in a minute
+		}),
 		storage:               storage,
 		subscriptionManager:   subscriptionManager,
 		config:                config,
 		unsupportedCurrencies: make(map[string]struct{}),
 	}
+}
+
+// marketProxy is a market proxy the fetcher asks: its address, the client
+// authorized for it, and the credentials sent when it does not use puzzle auth.
+type marketProxy struct {
+	host   string
+	client *thirdparty.HTTPClient
+	creds  *thirdparty.BasicCreds
+}
+
+func newMarketProxy(config ServiceConfig) marketProxy {
+	proxy := marketProxy{host: GetMarketProxyHost(config.UrlOverride.Reveal(), config.StageName)}
+	httpOptions := []thirdparty.Option{
+		thirdparty.WithTimeout(10 * time.Second),
+		thirdparty.WithMaxRetries(1),
+	}
+	if config.UsePuzzleAuth {
+		httpOptions = append(httpOptions, thirdparty.WithPuzzleAuth(proxy.host))
+	} else {
+		proxy.creds = &thirdparty.BasicCreds{User: config.User, Password: config.Password}
+	}
+	proxy.client = thirdparty.NewHTTPClient(httpOptions...)
+	return proxy
 }
 
 // Start begins the data refresh loops
@@ -294,10 +324,30 @@ func (f *ProxyFetcher) fetchData(ctx context.Context, endpoint string, etag stri
 	return body, newEtag, true
 }
 
+// doFetch asks the proxies in order and returns the first answer.
 func (f *ProxyFetcher) doFetch(ctx context.Context, endpoint string, etag string, convertCurrency string) ([]byte, string, error) {
 	ctx = traffic.WithSource(ctx, traffic.MarketLeaderboard)
-	baseUrl := GetMarketProxyHost(f.config.UrlOverride.Reveal(), f.config.StageName)
-	url := f.client.BuildURL(baseUrl, endpoint)
+	cmd := circuitbreaker.NewCommand(ctx, nil)
+	for _, proxy := range f.proxies {
+		cmd.Add(circuitbreaker.NewFunctor(func() ([]any, error) {
+			body, newEtag, err := f.doFetchFrom(ctx, proxy, endpoint, etag, convertCurrency)
+			if isBadRequest(err) {
+				// The next proxy would reject the request too.
+				cmd.Cancel()
+			}
+			return []any{body, newEtag}, err
+		}, "leaderboard:"+proxy.host, proxy.host))
+	}
+
+	result := f.circuitBreaker.Execute(cmd)
+	if err := result.Error(); err != nil {
+		return nil, "", err
+	}
+	return result.Result()[0].([]byte), result.Result()[1].(string), nil
+}
+
+func (f *ProxyFetcher) doFetchFrom(ctx context.Context, proxy marketProxy, endpoint string, etag string, convertCurrency string) ([]byte, string, error) {
+	url := proxy.client.BuildURL(proxy.host, endpoint)
 
 	var params netUrl.Values
 	if convertCurrency != "" {
@@ -313,12 +363,9 @@ func (f *ProxyFetcher) doFetch(ctx context.Context, endpoint string, etag string
 		options = append(options, thirdparty.WithEtag(etag))
 	}
 
-	options = append(options, thirdparty.WithCredentials(&thirdparty.BasicCreds{
-		User:     f.config.User,
-		Password: f.config.Password,
-	}))
+	options = append(options, thirdparty.WithCredentials(proxy.creds))
 
-	return f.client.DoGetRequestWithEtag(ctx, url, params, etag, options...)
+	return proxy.client.DoGetRequestWithEtag(ctx, url, params, etag, options...)
 }
 
 // convertCurrencyFor returns the value to send as convert_currency, or an
@@ -356,9 +403,12 @@ func (f *ProxyFetcher) markCurrencyUnsupported(currency string) {
 // `400 {"error":"unsupported convert_currency: xyz"}`.
 func isUnsupportedCurrencyError(err error) bool {
 	var statusErr *thirdparty.HTTPStatusError
-	if !errors.As(err, &statusErr) {
-		return false
-	}
-	return statusErr.StatusCode == http.StatusBadRequest &&
+	return isBadRequest(err) && errors.As(err, &statusErr) &&
 		strings.Contains(strings.ToLower(statusErr.Body), convertCurrencyParam)
+}
+
+// isBadRequest reports whether the proxy rejected the request itself (400).
+func isBadRequest(err error) bool {
+	var statusErr *thirdparty.HTTPStatusError
+	return errors.As(err, &statusErr) && statusErr.StatusCode == http.StatusBadRequest
 }
