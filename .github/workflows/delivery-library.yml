@@ -23,8 +23,8 @@ jobs:
         include:
           - { name: linux, runs-on: ubuntu-24.04, target: build-liblogosdelivery, dir: desktop }
           - { name: android, runs-on: ubuntu-24.04, target: build-liblogosdelivery-android ARCH=arm64 HOST_OS=linux, dir: android-arm64 }
-          - { name: ios-device, runs-on: macos-14, target: build-liblogosdelivery-ios IPHONE_SDK=iphoneos ARCH=arm64, dir: iphoneos-arm64 }
-          - { name: ios-simulator, runs-on: macos-14, target: build-liblogosdelivery-ios IPHONE_SDK=iphonesimulator ARCH=arm64 IOS_TARGET=14.0, dir: iphonesimulator-arm64 }
+          - { name: ios-device, runs-on: macos-15, target: build-liblogosdelivery-ios IPHONE_SDK=iphoneos ARCH=arm64, dir: iphoneos-arm64 }
+          - { name: ios-simulator, runs-on: macos-15, target: build-liblogosdelivery-ios IPHONE_SDK=iphonesimulator ARCH=arm64 IOS_TARGET=14.0, dir: iphonesimulator-arm64 }
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.runs-on }}
     timeout-minutes: 40
