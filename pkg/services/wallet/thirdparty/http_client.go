@@ -150,12 +150,13 @@ func NewHTTPClient(opts ...Option) *HTTPClient {
 		opt(client)
 	}
 
+	if client.client.Transport == nil {
+		client.client.Transport = http.DefaultTransport
+	}
+
+	// Wrappers go on top of the transport set above, which is never nil.
 	for _, wrap := range client.transportWrappers {
-		base := client.client.Transport
-		if base == nil {
-			base = http.DefaultTransport
-		}
-		client.client.Transport = wrap(base)
+		client.client.Transport = wrap(client.client.Transport)
 	}
 
 	return client
