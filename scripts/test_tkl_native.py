@@ -25,6 +25,7 @@ class NativeDependencyTest(unittest.TestCase):
         (self.repo / "nim.mk").write_text("")
         (self.repo / "Makefile").write_text(
             "nimble.paths:\n\tprintf -- '--noNimblePath\\n' > $@\n"
+            "nim-version:\n\t@echo '$(or $(NIM),fixture nim)'\n"
             "nim-libtkl:\n\tTKL_NIM_FLAGS='$(TKL_NIM_FLAGS)' TKL_PLATFORM='$(TKL_PLATFORM)' ARCH='$(ARCH)' "
             "bash scripts/fake_task.sh '$(NIM_LIB_DIR)'\n")
         # Names the output after the target it is asked for, as the real build would.
@@ -123,6 +124,14 @@ class NativeDependencyTest(unittest.TestCase):
     def test_changed_nim_params_rebuild(self):
         self.helper()
         self.helper(NIM_PARAMS="--mm:orc -d:release")
+        self.assertEqual(len(self.count.read_text().splitlines()), 2)
+
+    def test_changed_compiler_rebuilds_and_keeps_the_other_archive(self):
+        first = self.link()
+        second = self.link(NIM="another nim")
+        self.assertNotEqual(first, second)
+        self.assertEqual(self.link(), first)
+        self.assertEqual(self.link(NIM="another nim"), second)
         self.assertEqual(len(self.count.read_text().splitlines()), 2)
 
     def test_prebuilt_mode_does_not_build(self):

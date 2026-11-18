@@ -130,8 +130,6 @@ else
     NIM_SDS_LIB_DIR := $(CURDIR)/build
     NIM_SDS_INC_DIR := $(CURDIR)/build
     NIM_SDS_BUILD_FROM_SOURCE := true
-    # Nix builds have no Nimble on PATH.
-    NIMBLE_SETUP := nimble.paths
 endif
 
 include nim.mk

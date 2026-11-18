@@ -7,8 +7,7 @@ NIMBLE ?= nimble
 NIMBLE_ROOT ?= $(CURDIR)
 # A resolved package's directory, from nimble.paths: `nimble path` lists every
 # installed version. Windows paths come with (escaped) backslashes and CRLF.
-NIM_PKG_DIR = $$(dir="$$(sed -n -E 's@[\\]+@/@g; s@^--path:"(.*/pkgs2/$(1)-[^/"]*)"[[:space:]]*$$@\1@p' "$(NIMBLE_ROOT)/nimble.paths" | head -n 1)"; \
-	[ -n "$$dir" ] || echo "Error: no $(1) package in $(NIMBLE_ROOT)/nimble.paths" >&2; printf '%s' "$$dir")
+NIM_PKG_DIR = $$(sed -n -E 's@[\\]+@/@g; s@^--path:"(.*/pkgs2/$(1)-[^/"]*)"[[:space:]]*$$@\1@p' "$(NIMBLE_ROOT)/nimble.paths" | head -n 1)
 
 ifeq ($(abspath $(NIMBLE_ROOT)),$(CURDIR))
 nimble.paths: status_go.nimble
@@ -29,8 +28,12 @@ endif
 # The Nim nimble installed for this resolution, else the one on PATH.
 NIM ?= $(or $(firstword $(wildcard $(CURDIR)/nimbledeps/pkgs2/nim-*/bin/nim $(CURDIR)/nimbledeps/pkgs2/nim-*/bin/nim.exe)),nim)
 
-.PHONY: nimble-deps
+.PHONY: nimble-deps nim-version
 nimble-deps: nimble.paths ##@build Resolve the Nim dependencies
+
+# What a build fingerprint records of the compiler.
+nim-version:
+	@"$(NIM)" --version | head -n 1
 
 # The default policy of each target, which sets it with NIM_PARAMS ?=, so a
 # consumer's NIM_PARAMS replaces it.
@@ -38,7 +41,7 @@ NIM_POLICY_DESKTOP = --mm:refc --opt:size -d:chronicles_line_numbers --warning:D
 NIM_POLICY_ANDROID = --mm:refc --opt:size -d:chronicles_log_level=ERROR
 NIM_POLICY_IOS = --mm:refc --opt:size -d:useMalloc
 # libtkl runs on ORC with threads only (abi/libtkl.nim checks).
-NIM_POLICY_TKL = --mm:orc -d:useMalloc --threads:on -d:release
+NIM_POLICY_TKL = --mm:orc --threads:on -d:release
 
 NIM_MAC_ARCH = $(if $(filter x86_64 amd64,$(or $(ARCH),$(shell uname -m))),x86_64,arm64)
 NIM_MAC_FLAGS = -arch $(NIM_MAC_ARCH) -isysroot $$(xcrun --show-sdk-path)

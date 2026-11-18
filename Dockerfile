@@ -117,20 +117,19 @@ RUN if [ "$enable_go_cache" = "true" ]; then \
     go env -w GOCACHE=/root/.cache/go-build; \
     fi
 ARG use_torrent=false
-# A build-context directory with libsds and libstorage built earlier; what is missing is built here.
+# A build-context directory with a libstorage built earlier; without one it is built here.
 ARG prebuilt_libs=''
 # libstorage without -march=native: the image runs on other machines than the one that builds it.
 RUN --mount=type=cache,target="/root/.cache/go-build",id=statusgo-build-$cache_id \
     libs="$PWD/${prebuilt_libs:-none}"; \
-    [ ! -f "$libs/libsds.so" ] || sds="NIM_SDS_LIB_DIR=$libs NIM_SDS_INC_DIR=$libs"; \
     [ ! -f "$libs/libstorage.so" ] || storage="LOGOS_STORAGE_LIB_DIR=$libs LOGOS_STORAGE_INC_DIR=$libs/library"; \
     make $build_target BUILD_TAGS="$build_tags" BUILD_FLAGS="$build_flags" USE_LOGOS_STORAGE="$use_logos_storage" USE_TORRENT="$use_torrent" \
-    STORAGE_LIB_PARAMS=-d:disableMarchNative ${sds:-} ${storage:-}
+    STORAGE_LIB_PARAMS=-d:disableMarchNative ${storage:-}
 
 # Stage runtime shared libraries required by built binaries.
 RUN mkdir -p /tmp/status-runtime-libs \
     && for lib in build/libsds.so ../logos-storage-nim/build/libstorage.so \
-        "${prebuilt_libs:-none}/libsds.so" "${prebuilt_libs:-none}/libstorage.so"; do \
+        "${prebuilt_libs:-none}/libstorage.so"; do \
     if [ -f "$lib" ]; then cp "$lib" /tmp/status-runtime-libs/; fi; \
     done \
     && test -f /tmp/status-runtime-libs/libsds.so

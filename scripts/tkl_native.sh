@@ -102,14 +102,16 @@ if ! "$mobile"; then
 fi
 out="$build_dir/$target"
 base_cgo_cflags="${TKL_BASE_CGO_CFLAGS-${CGO_CFLAGS:-}}"
-# A consumer's resolution (NIMBLE_ROOT) and compiler (NIM) are part of the build.
-fingerprint="$(printf '%s\n' "$(cat "${NIMBLE_ROOT:-$repo}/nimble.paths")" "${NIM:-}" \
-  "${cc_identity:-}" \
-  "$target" "$sdk_identity" "${ANDROID_API:-28}" "${IOS_TARGET:-}" \
-  "$base_cgo_cflags" "${MACOSX_DEPLOYMENT_TARGET:-}" "${TKL_LD:-}" "${TKL_OBJCOPY:-}" "${TKL_AR:-}" \
+# A mobile build takes its compiler and flags from nim.mk, not from the caller.
+desktop_inputs=""
+"$mobile" || desktop_inputs="${cc_identity:-} $base_cgo_cflags ${MACOSX_DEPLOYMENT_TARGET:-} ${TKL_LD:-} ${TKL_OBJCOPY:-} ${TKL_AR:-}"
+# The resolution and the Nim that compiles it, a consumer's when it passes them.
+nim_identity="$(env -u MAKEFLAGS -u MFLAGS make --no-print-directory -s -C "$repo" nim-version)"
+fingerprint="$(printf '%s\n' "$(cat "${NIMBLE_ROOT:-$repo}/nimble.paths")" "$nim_identity" \
+  "$target" "$sdk_identity" "${ANDROID_API:-28}" "${IOS_TARGET:-}" "$desktop_inputs" \
   "${NIM_PARAMS-}" "$("${tkl_sha256[@]}" "$repo/scripts/tkl_native.sh" "$repo/nim.mk")" | "${tkl_sha256[@]}" | awk '{print $1}')"
 # Each build goes to its own directory and is published under its fingerprint,
-# so concurrent builds of one target cannot mix their outputs.
+# so builds with other inputs keep their archives and concurrent ones cannot mix.
 published="$out/$fingerprint"
 complete() {
   [ -f "$published/link/libtkl.a" ] && [ -f "$published/archive.sha256" ] &&
@@ -158,7 +160,4 @@ if ! complete; then
   if [ -d "$published" ]; then rm -r -- "$published"; fi
   mv "$build" "$published" 2>/dev/null || complete || fail "Could not publish $published"
 fi
-for old in "$out"/*; do
-  [ "$old" = "$published" ] || rm -r -- "$old"
-done
 printf '%s\n' "$published/link"
