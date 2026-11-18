@@ -11,6 +11,9 @@ type ReceivedMessage struct {
 	Hash         []byte       `json:"hash"`
 	Dst          []byte       `json:"recipientPublicKey,omitempty"`
 	ThirdPartyID string       `json:"thirdPartyId,omitempty"`
+	// FromHashRatchetQueue marks an in-memory replay that must be removed from
+	// hash-ratchet persistence after successful processing.
+	FromHashRatchetQueue bool `json:"-"`
 }
 
 type ReceivedMessages struct {

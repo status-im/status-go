@@ -641,6 +641,86 @@ func (s *ProcessorSuite) TestQueuedHashRatchetMessageStillMissingItsKeySurvivesR
 	s.Require().Len(msgs, 1)
 }
 
+func (s *ProcessorSuite) TestQueuedHashRatchetValidationFailureCanBeRetried() {
+	groupID := []byte("validation-retry-group")
+	senderKey, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+
+	senderReliability := s.newStandaloneReliability()
+	s.T().Cleanup(senderReliability.Close)
+	wrapped, _, err := senderReliability.WrapPayloadForSDS(s.testPayload, "channel")
+	s.Require().NoError(err)
+
+	senderDatabase, err := testutils.SetupTestMemorySQLDB(testutils.NewTestDBInitializer([]*bindata.AssetSource{
+		{Names: encryptionmigrations.AssetNames(), AssetFunc: encryptionmigrations.Asset},
+	}))
+	s.Require().NoError(err)
+	s.T().Cleanup(func() { s.Require().NoError(senderDatabase.Close()) })
+	senderEncryptionProtocol := encryption.New(
+		encryption.NewSQLitePersistence(senderDatabase),
+		"installation-2",
+		s.logger,
+		trace.NewNoopTracer(),
+	)
+	ratchet, err := senderEncryptionProtocol.GenerateHashRatchetKey(groupID)
+	s.Require().NoError(err)
+	keyID, err := ratchet.GetKeyID()
+	s.Require().NoError(err)
+
+	keyExchange, err := senderEncryptionProtocol.BuildHashRatchetKeyExchangeMessage(
+		context.Background(), senderKey, &s.processor.identity.PublicKey, groupID,
+		[]*encryption.HashRatchetKeyCompatibility{ratchet},
+	)
+	s.Require().NoError(err)
+	keyExchangePayload, err := proto.Marshal(keyExchange.Message)
+	s.Require().NoError(err)
+
+	dataMessage, err := senderEncryptionProtocol.BuildHashRatchetMessage(groupID, wrapped)
+	s.Require().NoError(err)
+	dataPayload, err := proto.Marshal(dataMessage.Message)
+	s.Require().NoError(err)
+
+	receiver := s.newStandaloneReliability()
+	s.T().Cleanup(receiver.Close)
+	var validationCalls int
+	s.Require().NoError(receiver.SetSDSValidator(processorSDSValidatorFunc(func(sds.ValidationMessage) (bool, error) {
+		validationCalls++
+		if validationCalls == 1 {
+			return false, errors.New("temporary authorization lookup failure")
+		}
+		return true, nil
+	})))
+	s.processor.stack.Reliability = receiver
+
+	queuedMessage := &types.ReceivedMessage{
+		Sig: crypto.FromECDSAPub(&senderKey.PublicKey), Hash: []byte{0x41}, Payload: dataPayload,
+	}
+	response, err := s.processor.ProcessMessage(queuedMessage)
+	s.Require().NoError(err)
+	s.Require().Nil(response, "the envelope waits for its hash-ratchet key")
+
+	response, err = s.processor.ProcessMessage(&types.ReceivedMessage{
+		Sig: crypto.FromECDSAPub(&senderKey.PublicKey), Hash: []byte{0x42}, Payload: keyExchangePayload,
+	})
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.RetryableMessages, 1)
+	s.Require().True(response.RetryableMessages[0].FromHashRatchetQueue)
+	s.Require().Equal(1, validationCalls)
+
+	stored, err := s.processor.hashRatchetStorage.GetMessages(keyID)
+	s.Require().NoError(err)
+	s.Require().Len(stored, 1, "failed validation must retain the stored envelope")
+
+	response, err = s.processor.ProcessMessage(response.RetryableMessages[0])
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Equal(2, validationCalls)
+	stored, err = s.processor.hashRatchetStorage.GetMessages(keyID)
+	s.Require().NoError(err)
+	s.Require().Empty(stored, "successful retry must remove the stored copy")
+}
+
 func (s *ProcessorSuite) TestHandleSegmentMessages() {
 	s.T().Skip("flaky test, tracked in https://github.com/status-im/status-go/issues/7791")
 

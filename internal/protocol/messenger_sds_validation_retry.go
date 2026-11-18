@@ -13,10 +13,12 @@ const (
 	maxSDSValidationRetryEnvelopes = 1000
 	maxSDSValidationRetryBytes     = 32 << 20
 	sdsValidationRetryTTL          = 24 * time.Hour
+	initialSDSValidationRetryDelay = time.Second
+	maxSDSValidationRetryDelay     = 30 * time.Second
 )
 
 type pendingSDSValidationEnvelope struct {
-	filter    *types.ChatFilter
+	filter    types.ChatFilter
 	message   *types.ReceivedMessage
 	hash      string
 	firstSeen time.Time
@@ -24,7 +26,7 @@ type pendingSDSValidationEnvelope struct {
 }
 
 func (m *Messenger) enqueueSDSValidationRetry(filter *types.ChatFilter, message *types.ReceivedMessage) {
-	if filter == nil || message == nil || len(message.Hash) == 0 {
+	if message == nil || len(message.Hash) == 0 {
 		m.logger.Warn("cannot retain SDS validation failure without envelope identity")
 		return
 	}
@@ -64,13 +66,21 @@ func (m *Messenger) enqueueSDSValidationRetry(filter *types.ChatFilter, message 
 	m.sdsValidationRetrySince[hash] = firstSeen
 	m.sdsValidationRetryHashes[hash] = struct{}{}
 	m.sdsValidationRetryBytes += size
+	var retryFilter types.ChatFilter
+	if filter != nil {
+		retryFilter = *filter
+	}
 	m.sdsValidationRetries = append(m.sdsValidationRetries, pendingSDSValidationEnvelope{
-		filter:    filter,
+		filter:    retryFilter,
 		message:   cloneReceivedMessage(message),
 		hash:      hash,
 		firstSeen: firstSeen,
 		size:      size,
 	})
+	select {
+	case m.sdsValidationRetryTrigger <- struct{}{}:
+	default:
+	}
 }
 
 func (m *Messenger) takeSDSValidationRetries(messages map[types.ChatFilter][]*types.ReceivedMessage) map[types.ChatFilter][]*types.ReceivedMessage {
@@ -91,13 +101,90 @@ func (m *Messenger) takeSDSValidationRetries(messages map[types.ChatFilter][]*ty
 			delete(m.sdsValidationRetrySince, pending.hash)
 			continue
 		}
-		if containsEnvelopeHash(messages[*pending.filter], pending.hash) {
+		if containsEnvelopeHash(messages, pending.hash) {
 			continue
 		}
-		messages[*pending.filter] = append(messages[*pending.filter], pending.message)
+		messages[pending.filter] = append(messages[pending.filter], pending.message)
 	}
 	m.sdsValidationRetries = nil
 	return messages
+}
+
+func (m *Messenger) hasSDSValidationRetries() bool {
+	m.handleMessagesMutex.Lock()
+	defer m.handleMessagesMutex.Unlock()
+	return len(m.sdsValidationRetries) != 0
+}
+
+func runSDSValidationRetryLoop(
+	trigger <-chan struct{},
+	cancel <-chan struct{},
+	quit <-chan struct{},
+	hasPending func() bool,
+	process func(),
+) {
+	runSDSValidationRetryLoopWithBackoff(
+		trigger, cancel, quit, hasPending, process,
+		initialSDSValidationRetryDelay, maxSDSValidationRetryDelay,
+	)
+}
+
+func runSDSValidationRetryLoopWithBackoff(
+	trigger <-chan struct{},
+	cancel <-chan struct{},
+	quit <-chan struct{},
+	hasPending func() bool,
+	process func(),
+	initialDelay time.Duration,
+	maxDelay time.Duration,
+) {
+	var timer *time.Timer
+	var timerCh <-chan time.Time
+	nextDelay := initialDelay
+	defer func() {
+		if timer != nil {
+			timer.Stop()
+		}
+	}()
+
+	schedule := func(delay time.Duration) {
+		if timer == nil {
+			timer = time.NewTimer(delay)
+		} else {
+			timer.Reset(delay)
+		}
+		timerCh = timer.C
+	}
+
+	for {
+		select {
+		case _, ok := <-trigger:
+			if !ok {
+				return
+			}
+			if timerCh == nil {
+				schedule(initialDelay)
+			}
+		case <-timerCh:
+			timerCh = nil
+			process()
+			if hasPending() {
+				schedule(nextDelay)
+				if nextDelay < maxDelay {
+					nextDelay *= 2
+					if nextDelay > maxDelay {
+						nextDelay = maxDelay
+					}
+				}
+			} else {
+				nextDelay = initialDelay
+			}
+		case <-cancel:
+			return
+		case <-quit:
+			return
+		}
+	}
 }
 
 func (m *Messenger) clearSDSValidationRetry(message *types.ReceivedMessage) {
@@ -107,10 +194,12 @@ func (m *Messenger) clearSDSValidationRetry(message *types.ReceivedMessage) {
 	delete(m.sdsValidationRetrySince, cryptotypes.EncodeHex(message.Hash))
 }
 
-func containsEnvelopeHash(messages []*types.ReceivedMessage, hash string) bool {
-	for _, message := range messages {
-		if cryptotypes.EncodeHex(message.Hash) == hash {
-			return true
+func containsEnvelopeHash(messages map[types.ChatFilter][]*types.ReceivedMessage, hash string) bool {
+	for _, filteredMessages := range messages {
+		for _, message := range filteredMessages {
+			if cryptotypes.EncodeHex(message.Hash) == hash {
+				return true
+			}
 		}
 	}
 	return false

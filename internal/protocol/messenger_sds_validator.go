@@ -65,6 +65,8 @@ func (v communitySDSValidator) Validate(message sds.ValidationMessage) (bool, er
 		chatMessage = &protobuf.DeleteMessage{}
 	case protobuf.ApplicationMetadataMessage_THREAD_METADATA:
 		chatMessage = &protobuf.ThreadMetadata{}
+	case protobuf.ApplicationMetadataMessage_DELETE_THREAD:
+		chatMessage = &protobuf.DeleteThread{}
 	default:
 		// Older clients wrap control traffic on the separate bare-ID channel.
 		// Never allow it to authorize metadata on the chat reliability channel.
