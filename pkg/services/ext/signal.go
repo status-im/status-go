@@ -156,6 +156,10 @@ func (m *MessengerSignalsHandler) SendBackedUpSettings(response *backupsync.Back
 	m.session.SendBackedUpSettings(response)
 }
 
-func (m *MessengerSignalsHandler) SendCuratedCommunitiesUpdate(response *communities.KnownCommunitiesResponse) {
-	m.session.SendCuratedCommunitiesUpdate(response)
+func (m *MessengerSignalsHandler) CuratedCommunitiesRefreshStarted(runID uint64, changed, directoryFailed bool) {
+	m.session.SendCuratedCommunitiesRefreshStarted(runID, changed, directoryFailed)
+}
+
+func (m *MessengerSignalsHandler) CuratedCommunitiesRefreshFinished(runID uint64, resolved, notFound, failed int, cancelled bool) {
+	m.session.SendCuratedCommunitiesRefreshFinished(runID, resolved, notFound, failed, cancelled)
 }

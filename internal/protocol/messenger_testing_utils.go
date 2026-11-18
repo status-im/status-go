@@ -53,6 +53,10 @@ type MessengerSignalsHandlerMock struct {
 func (m *MessengerSignalsHandlerMock) SendBackedUpProfile(*backupsync.BackedUpDataResponse)  {}
 func (m *MessengerSignalsHandlerMock) SendBackedUpSettings(*backupsync.BackedUpDataResponse) {}
 
+func (m *MessengerSignalsHandlerMock) CuratedCommunitiesRefreshStarted(uint64, bool, bool) {}
+func (m *MessengerSignalsHandlerMock) CuratedCommunitiesRefreshFinished(uint64, int, int, int, bool) {
+}
+
 func (m *MessengerSignalsHandlerMock) HistoryArchivesProtocolEnabled()           {}
 func (m *MessengerSignalsHandlerMock) HistoryArchivesProtocolDisabled()          {}
 func (m *MessengerSignalsHandlerMock) CreatingHistoryArchives(string)            {}
