@@ -194,7 +194,12 @@ func (s Session) SendNewMessages(obj json.Marshaler) {
 }
 
 func SendSectionUnreadCountsChanged() {
-	send(EventSectionUnreadCountsChanged, nil)
+	CurrentSession().SendSectionUnreadCountsChanged()
+}
+
+// SendSectionUnreadCountsChanged sends in the session s.
+func (s Session) SendSectionUnreadCountsChanged() {
+	s.send(EventSectionUnreadCountsChanged, nil)
 }
 
 func LocalMessageBackupDone() {
