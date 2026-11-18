@@ -24,7 +24,6 @@ tkl="$(sed -n 's|^requires "https://github.com/.*/nim-token-lists#\([0-9a-f]\{40
 
 has Dockerfile "ARG NIM_LIBS_VERSION=$nim"
 has nix/pkgs/libtkl/default.nix "version = \"$nim\";"
-has _assets/ci/Jenkinsfile.desktop "/nim/$nim/bin"
 has flake.nix "nim-sds?submodules=1&rev=$sds"
 has flake.nix "nim-token-lists?submodules=1&rev=$tkl"
 grep -Eq "github.com/status-im/nim-token-lists/go/tkl v[^[:space:]]*-${tkl:0:12}([[:space:]]|$)" "$repo/go.mod" ||
