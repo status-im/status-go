@@ -35,10 +35,6 @@ jobs:
       - name: Get dependencies
         run: go mod download
 
-      - uses: jiro4989/setup-nim-action@189b145833368cc92f1e7b3e166a25a3e057a693
-        with:
-          nim-version: ${{ env.NIM_LIBS_VERSION }}
-
       - name: Setup Protocol Buffer Compiler
         uses: arduino/setup-protoc@v3
         with:
@@ -59,12 +55,15 @@ jobs:
         run: |
           make generate
 
-      # Keep native linker flags out of the host-side code generators.
-      - name: Prepare native token catalogue
+      # Lint type-checks and links nothing: cgo needs the token library's
+      # header, at the revision status_go.nimble pins, and no Nim build.
+      # After the generators, which must not see the flag.
+      - name: Fetch the token library header
         run: |
-          source scripts/tkl_env.sh
-          printf '%s\n' "CGO_CFLAGS=$CGO_CFLAGS" "CGO_LDFLAGS=$CGO_LDFLAGS" \
-            "NIM_TKL_INC_DIR=$NIM_TKL_INC_DIR" "NIM_TKL_LIB_DIR=$NIM_TKL_LIB_DIR" >> "$GITHUB_ENV"
+          pin="$(sed -n 's|^requires "https://github.com/\(.*/nim-token-lists\)#\([0-9a-f]*\)"$|\1/\2|p' status_go.nimble)"
+          mkdir -p "$RUNNER_TEMP/tkl"
+          curl -sSfL "https://raw.githubusercontent.com/$pin/abi/tkl.h" -o "$RUNNER_TEMP/tkl/tkl.h"
+          echo "CGO_CFLAGS=-I$RUNNER_TEMP/tkl" >> "$GITHUB_ENV"
 
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v8
@@ -75,9 +74,10 @@ jobs:
       - name: lint-panics
         run: |
           # SDS/storage use stubs under the lint tag; keep Make from adding
-          # their runtime libraries to the host analyzer's linker flags.
+          # their runtime libraries to the host analyzer's linker flags, and
+          # from building the token library (TOKEN_ENV).
           make lint-panics USE_LOGOS_STORAGE=true USE_TORRENT=true \
-            CGO_CFLAGS="$CGO_CFLAGS" CGO_LDFLAGS="$CGO_LDFLAGS"
+            TOKEN_ENV= CGO_CFLAGS="$CGO_CFLAGS" CGO_LDFLAGS=
 
       - name: argon2 fork matches upstream
         run: |
