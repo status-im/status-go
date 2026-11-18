@@ -52,9 +52,9 @@ jobs:
           cp -R "$source/library" build/deps/logos-storage/
       - name: Generate code, build libsds and the token library
         run: |
-          scripts/toolchain.sh make test-unit-prep build-libtkl $MAKE_ARGS
+          scripts/toolchain.sh make test-unit-prep $MAKE_ARGS
           # One target, one build: the other jobs take it prebuilt and skip nimble.
-          cp -R build/tkl/*/*/link build/deps/tkl
+          cp -R "$(scripts/toolchain.sh make -s build-libtkl $MAKE_ARGS | tail -n 1)" build/deps/tkl
       - name: Pack the prepared tree
         run: |
           # Generated files are the ignored ones; from build/ only the libraries are needed.
