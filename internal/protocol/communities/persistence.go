@@ -1736,7 +1736,9 @@ func (p *Persistence) GetCuratedCommunities() (*CuratedCommunities, error) {
 	return result, nil
 }
 
-func (p *Persistence) SetCuratedCommunities(communities *CuratedCommunities) error {
+// SetCuratedCommunities replaces the stored curated communities. When it
+// fails the stored ones are left as they were.
+func (p *Persistence) SetCuratedCommunities(communities *CuratedCommunities) (err error) {
 	tx, err := p.db.BeginTx(context.Background(), &sql.TxOptions{})
 	if err != nil {
 		return err
@@ -1768,8 +1770,7 @@ func (p *Persistence) SetCuratedCommunities(communities *CuratedCommunities) err
 	}
 
 	for _, community := range communities.ContractCommunities {
-		_, err := stmt.Exec(community, featuredMap[community])
-		if err != nil {
+		if _, err = stmt.Exec(community, featuredMap[community]); err != nil {
 			return err
 		}
 	}

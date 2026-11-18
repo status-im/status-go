@@ -99,3 +99,24 @@ func TestZeroSessionSendsInTheCurrentSession(t *testing.T) {
 	require.NoError(t, json.Unmarshal(emitted, &envelope))
 	require.Equal(t, Epoch(), envelope.Epoch)
 }
+
+// The app reads these signals by name and by key.
+func TestCuratedCommunitiesRefreshSignals(t *testing.T) {
+	var emitted map[string]json.RawMessage
+	SetHandler(func(data []byte) {
+		emitted = nil
+		require.NoError(t, json.Unmarshal(data, &emitted))
+	})
+	defer ResetHandler()
+
+	SendCuratedCommunitiesRefreshStarted(7, true, false)
+	require.Equal(t, `"curated.communities.refresh.started"`, string(emitted["type"]))
+	require.JSONEq(t, `{"runId":7,"changed":true,"directoryFailed":false}`, string(emitted["event"]))
+
+	SendCuratedCommunitiesRefreshStarted(8, false, true)
+	require.JSONEq(t, `{"runId":8,"changed":false,"directoryFailed":true}`, string(emitted["event"]))
+
+	SendCuratedCommunitiesRefreshFinished(8, 6, 4, 3, true)
+	require.Equal(t, `"curated.communities.refresh.finished"`, string(emitted["type"]))
+	require.JSONEq(t, `{"runId":8,"resolved":6,"notFound":4,"failed":3,"cancelled":true}`, string(emitted["event"]))
+}
