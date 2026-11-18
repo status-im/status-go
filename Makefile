@@ -681,20 +681,18 @@ NIM_DELIVERY_LEOPARD = -DCMAKE_BUILD_TYPE=Release -DENABLE_OPENMP=off -DCOMPILER
 NIM_DELIVERY_LEOPARD_X86 = $(if $(filter x86_64 amd64,$(1)),-DCMAKE_CXX_FLAGS=-mssse3)
 # $(call NIM_DELIVERY_BUILD,<extra Leopard-RS CMake flags>,<extra flags>)
 NIM_DELIVERY_BUILD = rm -rf "$(NIM_LIB_DIR)/nimcache" && \
-	$(call NIM_COMPILE,$(NIM_DELIVERY_LIBRARY)/liblogosdelivery.nim,staticlib,liblogosdelivery.a,-d:disable_rln \
+	$(call NIM_COMPILE,$(NIM_DELIVERY_LIBRARY)/liblogosdelivery.nim,staticlib,liblogosdelivery.a,--noLinking -d:disable_rln \
 	-d:ffiOutputDir=\"$(NIM_LIB_DIR)/link/generated\" --passC:-fvisibility=hidden --passC:-fno-common \
 	-d:LeopardCmakeFlags=\"$(NIM_DELIVERY_LEOPARD) $(1)\" $(2)) && \
 	$(call NIM_SEAL,logosdelivery_,$(NIM_LIB_DIR)/link/liblogosdelivery.a) && \
 	cp "$(NIM_DELIVERY_LIBRARY)/liblogosdelivery.h" "$(NIM_LIB_DIR)/link/"
 
-build-liblogosdelivery build-liblogosdelivery-android build-liblogosdelivery-ios: NIM_PARAMS ?= $(NIM_POLICY_TKL)
+build-liblogosdelivery build-liblogosdelivery-android build-liblogosdelivery-ios: NIM_PARAMS ?= $(NIM_POLICY_TKL) -d:useMalloc
 build-liblogosdelivery: NIM_LIB_DIR = $(NIM_DELIVERY_DIR)/desktop
 build-liblogosdelivery-android: NIM_LIB_DIR = $(NIM_DELIVERY_DIR)/android-$(NIM_ANDROID_CPU)
 build-liblogosdelivery-ios: NIM_LIB_DIR = $(NIM_DELIVERY_DIR)/$(NIM_IOS_SDK)-$(NIM_IOS_ARCH)
 build-liblogosdelivery-android: NIM_FLAGS = $(NIM_FLAGS_ANDROID) --passC:-fPIC
 build-liblogosdelivery-android: NIM_SEAL_TOOLS = $(NIM_SEAL_TOOLS_ANDROID)
-# Nim archives with its host's command (llvm-ar on Linux): the NDK's tools first.
-build-liblogosdelivery-android: export PATH := $(NIM_ANDROID_BIN):$(PATH)
 build-liblogosdelivery-ios: NIM_FLAGS = $(NIM_FLAGS_IOS)
 
 # g++ on Linux gives C++ inline variables (BoringSSL's, libstdc++'s) the
