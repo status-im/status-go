@@ -71,13 +71,11 @@ class TestCommunityLevelPermissions:
         foundry_client,
         anvil_client,
     ):
-        """Membership requires 1000 SNT; an admin token bypasses it; raising the bar removes Member B."""
         member_a = member_backend
         member_b = community_tokens.create_member_b_profile(
             backend_new_profile, snt_token_overrides, multicall3_deployer, self.community_token_deployer
         )
 
-        # Given the Owner has created a community requiring 1000 SNT to become a member
         community_id = community_tokens.create_token_gated_community(
             owner_backend,
             self.snt_address,
@@ -88,7 +86,6 @@ class TestCommunityLevelPermissions:
         community_tokens.wait_until_member_sees_permissions(member_a, community_id, CommunityTokenPermissionType.BECOME_MEMBER)
         community_tokens.wait_until_member_sees_permissions(member_b, community_id, CommunityTokenPermissionType.BECOME_MEMBER)
 
-        # When Member A attempts to join with 0 SNT, they cannot join
         member_a_wallet = messenger.wallet_address(member_a)
         permissions = member_a.wakuext_service.check_permissions_to_join_community(community_id)
         assert not permissions.get("satisfied")
@@ -96,7 +93,6 @@ class TestCommunityLevelPermissions:
             community_tokens.request_to_join_with_signatures(member_a, community_id, [member_a_wallet])
         assert member_a.public_key not in messenger.community_members(owner_backend, community_id)
 
-        # When Member B attempts to join with 1000 SNT, they can join
         member_b_wallet = community_tokens.fund_backend_account_with_tokens(
             member_b, foundry_client, self.snt_controller_address, self.snt_address, amount=1000
         )
@@ -106,7 +102,6 @@ class TestCommunityLevelPermissions:
         assert member_b.public_key in members
         assert CommunityRoles.ROLE_ADMIN.value not in members[member_b.public_key].get("roles", [])
 
-        # When the Owner mints the owner token and airdrops the admin token to Member A
         community_tokens.fund_native_balance(owner_backend, anvil_client)
         owner_backend.wallet_service.restart_wallet_reload_timer()
         tokens = community_token_deploy.deploy_owner_and_master_tokens(
@@ -152,9 +147,7 @@ class TestCommunityLevelPermissions:
             ),
         )
 
-        # When Member A attempts to join again, they can join regardless of SNT balance.
-        # The admin token is stored from community metadata asynchronously, so the balance
-        # read is retried until the wallet knows the contract.
+        # The admin token arrives with community metadata asynchronously.
         _wait_until_live_community_has_permission(member_a, community_id, CommunityTokenPermissionType.BECOME_ADMIN)
         admin_token_key = f"{member_a.network_id}-{admin_token_address.lower()}"
         balance_error = None
@@ -177,7 +170,6 @@ class TestCommunityLevelPermissions:
             CommunityRoles.ROLE_ADMIN.value,
         )
 
-        # When the Owner changes the requirement to 10000 SNT, Member B is removed
         owner_community = next(
             (c for c in messenger.communities_list(owner_backend.wakuext_service.communities()) if c.get("id") == community_id),
             None,
