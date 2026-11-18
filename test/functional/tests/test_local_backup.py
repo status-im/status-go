@@ -11,6 +11,13 @@ from utils import fake
 test_one_to_one_chat_id = (
     "0x043329fc08727f15c4ec9a17bf7d6a3dc44e9d0d8f782a55804f3660b28827194a365dc1765cf96b6fa5cd666b9ee5298e8ac82f51f7952c4110cbf321d4f63864"
 )
+test_contacts = {"zQ3shnZxb3McGZqKgKYBioaRUzJACqoes1m2ivYPBRAWEnVR2", "zQ3shVMbHwBhLapryZRYhJh6Temcpd3sqZH2X8zXkCsoHjFjK"}
+
+
+def contact_keys(contacts):
+    # The node also lists whoever it received a message from: users of tests
+    # that run in parallel on the same network. Only the keys are compared.
+    return {contact["compressedKey"] for contact in contacts}
 
 
 @pytest.mark.rpc
@@ -66,8 +73,8 @@ class TestLocalBackup:
         )
 
         # Add contacts
-        backend_client.wakuext_service.send_contact_request("zQ3shnZxb3McGZqKgKYBioaRUzJACqoes1m2ivYPBRAWEnVR2", "Test message")
-        backend_client.wakuext_service.send_contact_request("zQ3shVMbHwBhLapryZRYhJh6Temcpd3sqZH2X8zXkCsoHjFjK", "Test message")
+        for contact in sorted(test_contacts):
+            backend_client.wakuext_service.send_contact_request(contact, "Test message")
 
         # Create a community
         backend_client.wakuext_service.create_community_from_payload(
@@ -183,7 +190,7 @@ class TestLocalBackup:
         # Validate contacts
         result = backend_client.wakuext_service.get_contacts()
         assert result is not None, "Contacts were not restored"
-        assert len(result) == 2, "Contacts were not restored"
+        assert test_contacts <= contact_keys(result), "Contacts were not restored"
 
         # Validate communities
         result = backend_client.wakuext_service.communities()
@@ -308,7 +315,7 @@ class TestLocalBackup:
         # Validate contacts
         result = backend_client2.wakuext_service.get_contacts()
         assert result is not None, "Contacts were not restored"
-        assert len(result) == 2, "Contacts were not restored correctly"
+        assert test_contacts <= contact_keys(result), "Contacts were not restored correctly"
 
         # Validate communities
         result = backend_client2.wakuext_service.joined_communities()
@@ -406,7 +413,7 @@ class TestLocalBackup:
         # Validate contacts
         result = backend_client.wakuext_service.get_contacts()
         assert result is not None, "Contacts were not restored"
-        assert len(result) == 2, "Contacts were not restored correctly"
+        assert test_contacts <= contact_keys(result), "Contacts were not restored correctly"
 
         # Validate communities
         result = backend_client.wakuext_service.joined_communities()
