@@ -329,12 +329,23 @@ NIM_SDS_LIBRARY = $(call NIM_PKG_DIR,sds)/library
 NIM_SDS_BUILD = $(call NIM_COMPILE,$(NIM_SDS_LIBRARY)/libsds.nim,$(1),$(2),-d:ffiOutputDir=\"$(NIM_LIB_DIR)/generated\" $(3)) && \
 	cp "$(NIM_SDS_LIBRARY)/libsds.h" "$(NIM_LIB_DIR)/"
 
-$(LIBSDS): NIM_LIB_DIR = $(NIM_SDS_LIB_DIR)
-$(LIBSDS): NIM_PARAMS ?= $(NIM_POLICY_DESKTOP)
+# Each target builds in its own directory, with its own nimcache, and rebuilds
+# only when something changed. The result is copied to NIM_SDS_LIB_DIR, where
+# the Go build and status-app take it.
+NIM_SDS_TARGETS_DIR = $(NIM_SDS_LIB_DIR)/sds
+NIM_SDS_DESKTOP_OS = $(if $(filter Darwin,$(detected_OS)),macos,$(if $(filter Windows,$(detected_OS)),windows,linux))
+NIM_SDS_DESKTOP_DIR = $(NIM_SDS_TARGETS_DIR)/$(NIM_SDS_DESKTOP_OS)-$(or $(ARCH),$(shell uname -m))
+# Named before ARCH is checked, which the build itself does.
+NIM_SDS_ANDROID_DIR = $(NIM_SDS_TARGETS_DIR)/android-$(or $(ARCH),unset)
+NIM_SDS_IOS_DIR = $(NIM_SDS_TARGETS_DIR)/$(NIM_IOS_SDK)-$(NIM_IOS_ARCH)
+# $(call NIM_SDS_PUBLISH,<library file>)
+NIM_SDS_PUBLISH = { cmp -s "$(1)" "$(NIM_SDS_LIB_DIR)/$(notdir $(1))" || cp "$(1)" "$(NIM_SDS_LIB_DIR)/"; } && \
+	cp "$(dir $(1))libsds.h" "$(NIM_SDS_LIB_DIR)/" && mkdir -p "$(NIM_SDS_LIB_DIR)/generated" && \
+	cp "$(dir $(1))generated/"*.h "$(NIM_SDS_LIB_DIR)/generated/"
+
 ifeq ($(NIM_SDS_BUILD_FROM_SOURCE),true)
-$(LIBSDS): nimble.paths FORCE
-	@$(call NIM_BUILD_IF_CHANGED,$@,echo "Building nim-sds: $@" && $(call NIM_SDS_BUILD,lib,$(notdir $@)))
-	@test -f $(LIBSDS) || (echo "Error: libsds not found at $(LIBSDS) after build" && exit 1)
+$(LIBSDS): $(NIM_SDS_DESKTOP_DIR)/libsds.$(LIB_EXT)
+	@$(call NIM_SDS_PUBLISH,$<)
 else
 $(LIBSDS):
 	@test -f $(LIBSDS) || (echo "Error: libsds not found at $(LIBSDS)" && exit 1)
@@ -342,31 +353,24 @@ endif
 
 build-libsds: $(LIBSDS)
 
-# Each mobile target builds in its own directory, with its own nimcache, and
-# rebuilds only when something changed. The result is copied to NIM_SDS_LIB_DIR,
-# where the Go build and status-app take it.
-NIM_SDS_TARGETS_DIR = $(NIM_SDS_LIB_DIR)/sds
-# Named before ARCH is checked, which the build itself does.
-NIM_SDS_ANDROID_DIR = $(NIM_SDS_TARGETS_DIR)/android-$(or $(ARCH),unset)
-NIM_SDS_IOS_DIR = $(NIM_SDS_TARGETS_DIR)/$(NIM_IOS_SDK)-$(NIM_IOS_ARCH)
-# $(call NIM_SDS_PUBLISH,<library file>)
-NIM_SDS_PUBLISH = cmp -s "$(1)" "$(NIM_SDS_LIB_DIR)/$(notdir $(1))" || cp "$(1)" "$(NIM_SDS_LIB_DIR)/"; \
-	cp "$(dir $(1))libsds.h" "$(NIM_SDS_LIB_DIR)/" && mkdir -p "$(NIM_SDS_LIB_DIR)/generated" && \
-	cp "$(dir $(1))generated/"*.h "$(NIM_SDS_LIB_DIR)/generated/"
-
 $(NIM_SDS_TARGETS_DIR)/%: NIM_LIB_DIR = $(patsubst %/,%,$(dir $@))
+$(NIM_SDS_DESKTOP_DIR)/%: NIM_PARAMS ?= $(NIM_POLICY_DESKTOP)
 $(NIM_SDS_TARGETS_DIR)/android-%: NIM_FLAGS = $(NIM_FLAGS_ANDROID)
 $(NIM_SDS_TARGETS_DIR)/android-%: NIM_PARAMS ?= $(NIM_POLICY_ANDROID)
 $(NIM_SDS_TARGETS_DIR)/iphone%: NIM_FLAGS = $(NIM_FLAGS_IOS)
 $(NIM_SDS_TARGETS_DIR)/iphone%: NIM_PARAMS ?= $(NIM_POLICY_IOS)
 
+$(NIM_SDS_DESKTOP_DIR)/libsds.$(LIB_EXT): nimble.paths FORCE
+	@$(call NIM_BUILD_IF_CHANGED,$@,echo "Building nim-sds: $@" && $(call NIM_SDS_BUILD,lib,$(notdir $@)))
+
 $(NIM_SDS_TARGETS_DIR)/android-%/libsds.so: nimble.paths FORCE
 	@$(call NIM_BUILD_IF_CHANGED,$@,$(call NIM_SDS_BUILD,lib,libsds.so))
 
-# Static, next to other Nim runtimes in one image: sealed, from a fresh nimcache.
+# Static, next to other Nim runtimes in one image: sealed, from the objects of
+# a fresh nimcache.
 $(NIM_SDS_TARGETS_DIR)/iphone%/libsds.a: nimble.paths FORCE
 	@$(call NIM_BUILD_IF_CHANGED,$@,rm -rf "$(NIM_LIB_DIR)/nimcache" && \
-		$(call NIM_SDS_BUILD,staticlib,libsds.a,--passC:-fvisibility=hidden --passC:-fno-common) && \
+		$(call NIM_SDS_BUILD,staticlib,libsds.a,--noLinking --passC:-fvisibility=hidden --passC:-fno-common) && \
 		$(call NIM_SEAL,sds_,$@))
 
 build-libsds-android: $(NIM_SDS_ANDROID_DIR)/libsds.so
@@ -377,7 +381,7 @@ build-libsds-ios: $(NIM_SDS_IOS_DIR)/libsds.a
 
 clean-libsds:
 	@echo "Removing libsds"
-	rm -rf $(LIBSDS) $(LIBSDS).command $(NIM_SDS_TARGETS_DIR)
+	rm -rf $(LIBSDS) $(NIM_SDS_TARGETS_DIR)
 
 rebuild-libsds: | clean-libsds $(LIBSDS)
 
@@ -656,12 +660,11 @@ build-libtkl: ##@build Prepare the pinned native token library
 NIM_TKL_ABI = $(call NIM_PKG_DIR,tokenlists)/abi
 nim-libtkl: NIM_FLAGS = $(if $(filter ANDROID,$(TKL_PLATFORM)),$(NIM_FLAGS_ANDROID) --passC:-fPIC,$(if $(filter IOS,$(TKL_PLATFORM)),$(NIM_FLAGS_IOS),$(TKL_NIM_FLAGS)))
 nim-libtkl: NIM_SEAL_TOOLS = $(if $(filter ANDROID,$(TKL_PLATFORM)),$(NIM_SEAL_TOOLS_ANDROID))
-# Nim archives with its host's command (llvm-ar on Linux): the NDK's tools first.
-nim-libtkl: export PATH := $(if $(filter ANDROID,$(TKL_PLATFORM)),$(NIM_ANDROID_BIN):)$(PATH)
 nim-libtkl: NIM_PARAMS ?= $(NIM_POLICY_TKL)
 nim-libtkl: | nimble.paths
+	@test -n "$(NIM_LIB_DIR)" || { echo "Error: nim-libtkl needs NIM_LIB_DIR; run make build-libtkl" >&2; exit 1; }
 	rm -rf "$(NIM_LIB_DIR)/nimcache"
-	$(call NIM_COMPILE,$(NIM_TKL_ABI)/libtkl.nim,staticlib,libtkl.a)
+	$(call NIM_COMPILE,$(NIM_TKL_ABI)/libtkl.nim,staticlib,libtkl.a,--noLinking)
 	$(call NIM_SEAL,tkl_,$(NIM_LIB_DIR)/link/libtkl.a)
 	cp "$(NIM_TKL_ABI)/tkl.h" "$(NIM_LIB_DIR)/link/"
 

@@ -72,8 +72,9 @@ NIM_COMPILE = eval "env -u SDKROOT -u CPATH -u LIBRARY_PATH $(NIM) c --skipParen
 	$(NIM_FLAGS) $(subst ",\",$(NIM_PARAMS)) $$(tr '\r\n' '  ' < "$(NIMBLE_ROOT)/nimble.paths") \
 	--app:$(2) $(4) --nimcache:\"$(NIM_LIB_DIR)/nimcache\" -o:\"$(NIM_LIB_DIR)/$(3)\" \"$(1)\""
 
-# Seals a static library built into a fresh NIM_LIB_DIR/nimcache: only its C
-# API (<prefix>*) stays global, so its Nim runtime can't clash with another's.
+# Seals a static library compiled with --noLinking into a fresh
+# NIM_LIB_DIR/nimcache: the archive is made here, from the objects, and only its
+# C API (<prefix>*) stays global, so its Nim runtime can't clash with another's.
 # A cross build seals with the target's tools (NIM_SEAL_TOOLS), e.g. the NDK's.
 # $(call NIM_SEAL,<C API prefix>,<sealed archive>)
 NIM_SEAL_TOOLS_ANDROID = NIM_SEAL_LD="$(NIM_ANDROID_BIN)/ld.lld" NIM_SEAL_OBJCOPY="$(NIM_ANDROID_BIN)/llvm-objcopy" NIM_SEAL_AR="$(NIM_ANDROID_BIN)/llvm-ar"
