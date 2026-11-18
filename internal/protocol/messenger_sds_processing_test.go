@@ -353,6 +353,85 @@ func (s *MessengerSDSProcessingSuite) TestSDSValidationFailureRetriesWithoutNewT
 	s.Require().Empty(s.m.sdsValidationRetries)
 }
 
+func (s *MessengerSDSProcessingSuite) TestSDSRetryPreservesOriginalProcessingContext() {
+	for _, fromArchive := range []bool{true, false} {
+		name := "live retried by archive batch"
+		if fromArchive {
+			name = "archive import retried by live batch"
+		}
+		s.Run(name, func() {
+			community, chat := s.sdsCommunity()
+			member, err := crypto.GenerateKey()
+			s.Require().NoError(err)
+			_, err = community.AddMember(&member.PublicKey, nil, 0)
+			s.Require().NoError(err)
+			_, err = community.AddMemberToChat(chat.CommunityChatID(), &member.PublicKey, nil, protobuf.CommunityMember_CHANNEL_ROLE_POSTER)
+			s.Require().NoError(err)
+			s.Require().NoError(s.m.communitiesManager.SaveCommunity(community))
+
+			now := time.Now()
+			application := s.sdsApplication(&protobuf.ChatMessage{
+				ChatId: chat.ID, MessageType: protobuf.MessageType_COMMUNITY_CHAT,
+				Text: name, Clock: uint64(now.UnixMilli()), Timestamp: uint64(now.UnixMilli()),
+				ContentType: protobuf.ChatMessage_TEXT_PLAIN,
+			}, protobuf.ApplicationMetadataMessage_CHAT_MESSAGE, member)
+			channelID := reliability.BuildChannelID(community.IDString(), community.UniversalChatID())
+			sender, err := sds.NewReliabilityManager(zap.NewNop(), nil)
+			s.Require().NoError(err)
+			wrapped, err := sender.WrapOutgoingMessage(application, sds.MessageID(cryptotypes.EncodeHex(crypto.Keccak256(application))), channelID)
+			s.Require().NoError(err)
+			s.Require().NoError(sender.Cleanup())
+
+			var validationCalls int
+			s.Require().NoError(s.m.messaging.SetSDSValidator(messengerSDSValidatorFunc(func(sds.ValidationMessage) (bool, error) {
+				validationCalls++
+				if validationCalls <= 2 {
+					return false, fmt.Errorf("community description not loaded yet")
+				}
+				return true, nil
+			})))
+			hash := crypto.Keccak256(wrapped)
+			received := &messagingtypes.ReceivedMessage{
+				Sig: crypto.FromECDSAPub(&member.PublicKey), Timestamp: uint32(now.Unix()), Hash: hash, Payload: wrapped, Padding: []byte{},
+			}
+			filter := messagingtypes.NewChatFilter(&messagingtypes.ChatFilterConfig{ChatID: chat.ID})
+			input := map[messagingtypes.ChatFilter][]*messagingtypes.ReceivedMessage{*filter: {received}}
+
+			if fromArchive {
+				received.ThirdPartyID = "imported message"
+				s.Require().NoError(s.m.handleImportedMessages(input))
+			} else {
+				_, err = s.m.handleRetrievedMessages(input, true, false)
+				s.Require().NoError(err)
+			}
+			s.Require().Len(s.m.sdsValidationRetries, 1)
+
+			// Remove any first-attempt Waku row so the assertion measures retry storage.
+			wakuHash := cryptotypes.Bytes2Hex(hash)
+			_, err = s.m.database.Exec("DELETE FROM waku_messages WHERE hash = ?", wakuHash)
+			s.Require().NoError(err)
+			duplicate := *received
+			duplicate.ThirdPartyID = ""
+			_, err = s.m.handleRetrievedMessages(map[messagingtypes.ChatFilter][]*messagingtypes.ReceivedMessage{
+				*filter: {&duplicate},
+			}, fromArchive, !fromArchive)
+			s.Require().NoError(err)
+			s.Require().Equal(2, validationCalls)
+			s.Require().Len(s.m.sdsValidationRetries, 1)
+
+			response, err := s.m.handleRetrievedMessages(nil, fromArchive, !fromArchive)
+			s.Require().NoError(err)
+			s.Require().Equal(3, validationCalls)
+			s.Require().Empty(s.m.sdsValidationRetries)
+			s.Require().Len(response.Messages(), 1)
+			s.Require().Equal(fromArchive, response.Messages()[0].Seen)
+			var stored bool
+			s.Require().NoError(s.m.database.QueryRow("SELECT EXISTS(SELECT 1 FROM waku_messages WHERE hash = ?)", wakuHash).Scan(&stored))
+			s.Require().Equal(!fromArchive, stored)
+		})
+	}
+}
+
 func (s *MessengerSDSProcessingSuite) TestSDSLegacyControlChannelCompatibility() {
 	community, _ := s.sdsCommunity()
 	key, err := crypto.GenerateKey()

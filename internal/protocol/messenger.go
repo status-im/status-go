@@ -3299,8 +3299,10 @@ func (m *Messenger) handleImportedMessages(messagesToHandle map[types.ChatFilter
 		}
 	}()
 
+	archiveContext := &types.ReceivedMessageProcessingContext{FromArchive: true}
 	for filter, messages := range messagesToHandle {
 		for _, shhMessage := range messages {
+			shhMessage := withReceivedMessageContext(shhMessage, archiveContext)
 
 			handleMessageResponse, err := m.messaging.HandleReceivedMessages(shhMessage)
 			if err != nil {
@@ -3314,8 +3316,15 @@ func (m *Messenger) handleImportedMessages(messagesToHandle map[types.ChatFilter
 				}
 				continue
 			}
+			if handleMessageResponse == nil {
+				continue
+			}
 			for _, retryMessage := range handleMessageResponse.RetryableMessages {
-				retryMessages = append(retryMessages, retryEnvelope{message: retryMessage})
+				entry := retryEnvelope{message: retryMessage}
+				if retryFilter := m.messaging.ChatFilterByTopic(retryMessage.Topic.Bytes()); retryFilter != nil {
+					entry.filter = *retryFilter
+				}
+				retryMessages = append(retryMessages, entry)
 			}
 
 			statusMessages := common.NewStatusMessages(handleMessageResponse.Messages)
@@ -3484,6 +3493,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[types.ChatFilte
 
 	chatWithMessages = m.takeSDSValidationRetries(chatWithMessages)
 
+	batchContext := &types.ReceivedMessageProcessingContext{FromArchive: fromArchive, StoreWakuMessages: storeWakuMessages}
 	var processedMessages []string
 	var rejectedMessages []string
 	iterator := m.retrievedMessagesIteratorFactory(chatWithMessages)
@@ -3491,11 +3501,12 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[types.ChatFilte
 		filter, messages := iterator.Next()
 
 		for _, shhMessage := range messages {
+			shhMessage := withReceivedMessageContext(shhMessage, batchContext)
 			logger := logger.With(zap.String("hash", cryptotypes.EncodeHex(shhMessage.Hash)))
 			// Indicates tha all messages in the batch have been processed correctly
 			allMessagesProcessed := true
 
-			if controlledCommunitiesChatIDs[filter.ChatID()] && storeWakuMessages {
+			if controlledCommunitiesChatIDs[filter.ChatID()] && shhMessage.ProcessingContext.StoreWakuMessages {
 				logger.Debug("storing waku message")
 				err := m.communitiesManager.StoreWakuMessage(shhMessage)
 				if err != nil {
@@ -3520,7 +3531,8 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[types.ChatFilte
 				continue
 			}
 			for _, retryMessage := range handleMessagesResponse.RetryableMessages {
-				m.enqueueSDSValidationRetry(nil, retryMessage)
+				retryFilter := m.messaging.ChatFilterByTopic(retryMessage.Topic.Bytes())
+				m.enqueueSDSValidationRetry(retryFilter, retryMessage)
 			}
 			m.clearSDSValidationRetry(shhMessage)
 
@@ -3535,7 +3547,11 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[types.ChatFilte
 			statusMessages := common.NewStatusMessages(handleMessagesResponse.Messages)
 			logger.Debug("processing messages further", zap.Int("count", len(statusMessages)))
 			for _, msg := range statusMessages {
-				err := m.processStatusMessage(shhMessage.Hash, messageState, msg, filter, fromArchive, logger)
+				archive := shhMessage.ProcessingContext.FromArchive
+				if envelope := msg.TransportLayer.Message; envelope != nil && envelope.ProcessingContext != nil {
+					archive = envelope.ProcessingContext.FromArchive
+				}
+				err := m.processStatusMessage(shhMessage.Hash, messageState, msg, filter, archive, logger)
 				if err != nil {
 					logger.Warn("failed to process application message", zap.Error(err))
 					allMessagesProcessed = false
