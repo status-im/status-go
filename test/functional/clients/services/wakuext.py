@@ -1084,7 +1084,7 @@ class WakuextService(Service):
             }
         ]
         if chat_ids:
-            params[0]["chatIds"] = chat_ids
+            params[0]["chat_ids"] = chat_ids
         response = self.rpc_request("createCommunityTokenPermission", params)
         return response
 
