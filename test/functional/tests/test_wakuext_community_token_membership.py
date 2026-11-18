@@ -95,17 +95,12 @@ class TestCommunityTokenMembership:
             membership=CommunityPermissionsAccess.MANUAL_ACCEPT,
         )
 
-        response = community_tokens.wait_until_member_sees_permissions(
+        community_tokens.wait_until_member_sees_permissions(
             member_with_snt_backend,
             community_id,
             CommunityTokenPermissionType.BECOME_MEMBER,
             CommunityTokenPermissionType.BECOME_ADMIN,
         )
-        assert response["tokenPermissions"], "No token permissions found"
-        assert len(response["tokenPermissions"]) == 2, "Unexpected number of token permissions"
-        perm_types = community_tokens.community_permission_types(response)
-        assert CommunityTokenPermissionType.BECOME_MEMBER.value in perm_types
-        assert CommunityTokenPermissionType.BECOME_ADMIN.value in perm_types
 
         member_with_snt_backend.wallet_service.restart_wallet_reload_timer()
         community_tokens.join_token_gated_community_as_member(owner_backend, member_with_snt_backend, community_id, member_address)

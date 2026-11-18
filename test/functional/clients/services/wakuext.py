@@ -1099,15 +1099,13 @@ class WakuextService(Service):
         params = [
             {
                 "permissionId": permission_id,
-                "createCommunityTokenPermission": {
-                    "communityId": community_id,
-                    "type": permission_type.value,
-                    "tokenCriteria": token_criteria,
-                },
+                "communityId": community_id,
+                "type": permission_type.value,
+                "tokenCriteria": token_criteria,
             }
         ]
         if chat_ids:
-            params[0]["createCommunityTokenPermission"]["chatIds"] = chat_ids
+            params[0]["chat_ids"] = chat_ids
         response = self.rpc_request("editCommunityTokenPermission", params)
         return response
 
