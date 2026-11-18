@@ -57,6 +57,21 @@ func (s *ClientSuite) SetupTest() {
 	s.client = New(s.persistence, config, nil, nil, nil)
 }
 
+// Register adds the default servers before it has built the registration: a
+// registration loop started then would send the previous one.
+func (s *ClientSuite) TestAddDefaultServersDoesNotStartRegistration() {
+	serverKey, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+	s.client.config.DefaultServers = []*ecdsa.PublicKey{&serverKey.PublicKey}
+
+	s.Require().NoError(s.client.addDefaultServers())
+
+	servers, err := s.persistence.GetServers()
+	s.Require().NoError(err)
+	s.Require().Len(servers, 1)
+	s.Require().Nil(s.client.registrationLoopQuitChan)
+}
+
 func (s *ClientSuite) TestBuildPushNotificationRegisterMessage() {
 	mutedChatList := []string{"a", "b"}
 	blockedChatList := []string{"c", "d"}

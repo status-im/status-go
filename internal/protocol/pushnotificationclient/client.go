@@ -358,14 +358,12 @@ func (c *Client) pickDefaultServers(servers []*ecdsa.PublicKey) []*ecdsa.PublicK
 	return shuffledServers[:min]
 }
 
-// Register registers with all the servers
-func (c *Client) Register(deviceToken, apnTopic string, tokenType protobuf.PushNotificationRegistration_TokenType, options *RegistrationOptions) error {
-	// stop registration loop
-	c.stopRegistrationLoop()
-
-	c.config.RemoteNotificationsEnabled = true
-
-	// check if we need to fallback on default servers
+// addDefaultServers falls back on the default servers when there are none.
+// It does not start the registration loop: Register calls it before it has
+// built the registration, so the loop would send the previous one (an empty
+// one, version 0, on a first registration), which the server rejects, and the
+// retry backoff of that attempt would then delay the real registration.
+func (c *Client) addDefaultServers() error {
 	currentServers, err := c.persistence.GetServers()
 	if err != nil {
 		return err
@@ -373,11 +371,25 @@ func (c *Client) Register(deviceToken, apnTopic string, tokenType protobuf.PushN
 	if len(currentServers) == 0 && len(c.config.DefaultServers) != 0 {
 		c.config.Logger.Debug("servers empty, checking default servers")
 		for _, s := range c.pickDefaultServers(c.config.DefaultServers) {
-			err = c.AddPushNotificationsServer(s, ServerTypeDefault)
+			err = c.addServer(s, ServerTypeDefault)
 			if err != nil {
 				return err
 			}
 		}
+	}
+	return nil
+}
+
+// Register registers with all the servers
+func (c *Client) Register(deviceToken, apnTopic string, tokenType protobuf.PushNotificationRegistration_TokenType, options *RegistrationOptions) error {
+	// stop registration loop
+	c.stopRegistrationLoop()
+
+	c.config.RemoteNotificationsEnabled = true
+
+	err := c.addDefaultServers()
+	if err != nil {
+		return err
 	}
 
 	// reset servers
@@ -589,6 +601,18 @@ func (c *Client) RemovePushNotificationServer(publicKey *ecdsa.PublicKey) error 
 }
 
 func (c *Client) AddPushNotificationsServer(publicKey *ecdsa.PublicKey, serverType ServerType) error {
+	err := c.addServer(publicKey, serverType)
+	if err != nil {
+		return err
+	}
+
+	if c.config.RemoteNotificationsEnabled {
+		c.startRegistrationLoop()
+	}
+	return nil
+}
+
+func (c *Client) addServer(publicKey *ecdsa.PublicKey, serverType ServerType) error {
 	c.config.Logger.Debug("adding push notifications server",
 		zap.String("publicKey", types.EncodeHex(crypto.CompressPubkey(publicKey))),
 	)
@@ -603,18 +627,10 @@ func (c *Client) AddPushNotificationsServer(publicKey *ecdsa.PublicKey, serverTy
 		}
 	}
 
-	err = c.persistence.UpsertServer(&PushNotificationServer{
+	return c.persistence.UpsertServer(&PushNotificationServer{
 		PublicKey: publicKey,
 		Type:      serverType,
 	})
-	if err != nil {
-		return err
-	}
-
-	if c.config.RemoteNotificationsEnabled {
-		c.startRegistrationLoop()
-	}
-	return nil
 }
 
 func (c *Client) GetPushNotificationInfo(publicKey *ecdsa.PublicKey, installationIDs []string) ([]*PushNotificationInfo, error) {
