@@ -50,6 +50,10 @@ compatible: the bindings require the native `sds_set_persistence_callback` and
 `sds_set_validator` exports. Both Nimble and Nix build the native library directly, without patches.
 SDS-R repair remains disabled.
 
+For local builds, the Makefile uses the SDS package resolved in `nimble.paths`,
+avoiding older same-version packages in the global Nimble cache. After changing
+SDS pins, rebuild the native library with `make build-libsds`.
+
 ### Build a library for the current platform
 
 ```shell

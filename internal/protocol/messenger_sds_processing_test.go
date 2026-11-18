@@ -5,6 +5,7 @@ import (
 	"crypto/ecdsa"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/golang/protobuf/proto"
 	"github.com/stretchr/testify/require"
@@ -16,6 +17,7 @@ import (
 
 	"github.com/status-im/status-go/internal/crypto"
 	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
+	"github.com/status-im/status-go/internal/panics"
 	"github.com/status-im/status-go/internal/protocol/common"
 	"github.com/status-im/status-go/internal/protocol/communities"
 	"github.com/status-im/status-go/internal/protocol/protobuf"
@@ -99,6 +101,7 @@ func (s *MessengerSDSProcessingSuite) TestSDSCommunityPostingPermissions() {
 		{protobuf.ApplicationMetadataMessage_EDIT_MESSAGE, &protobuf.EditMessage{ChatId: chat.ID, MessageType: protobuf.MessageType_COMMUNITY_CHAT}},
 		{protobuf.ApplicationMetadataMessage_DELETE_MESSAGE, &protobuf.DeleteMessage{ChatId: chat.ID, MessageType: protobuf.MessageType_COMMUNITY_CHAT}},
 		{protobuf.ApplicationMetadataMessage_THREAD_METADATA, &protobuf.ThreadMetadata{ChatId: chat.ID, MessageType: protobuf.MessageType_COMMUNITY_CHAT}},
+		{protobuf.ApplicationMetadataMessage_DELETE_THREAD, &protobuf.DeleteThread{ChatId: chat.ID, MessageType: protobuf.MessageType_COMMUNITY_CHAT}},
 	} {
 		for _, sender := range []struct {
 			name    string
@@ -109,7 +112,7 @@ func (s *MessengerSDSProcessingSuite) TestSDSCommunityPostingPermissions() {
 			{"poster", member, message.kind != protobuf.ApplicationMetadataMessage_PIN_MESSAGE},
 			{"non-member", outsider, false},
 			{"banned", banned, false},
-			{"viewer", viewer, message.kind == protobuf.ApplicationMetadataMessage_EMOJI_REACTION || message.kind == protobuf.ApplicationMetadataMessage_THREAD_METADATA},
+			{"viewer", viewer, message.kind == protobuf.ApplicationMetadataMessage_EMOJI_REACTION || message.kind == protobuf.ApplicationMetadataMessage_THREAD_METADATA || message.kind == protobuf.ApplicationMetadataMessage_DELETE_THREAD},
 		} {
 			s.Run(message.kind.String()+"/"+sender.name, func() {
 				allowed, err := validator.Validate(sds.ValidationMessage{
@@ -283,6 +286,71 @@ func (s *MessengerSDSProcessingSuite) TestSDSValidationFailureRetriesOnNextRetri
 		IsSDSMessageReceived(channelID, messageID)
 	s.Require().NoError(err)
 	s.Require().True(receivedMessage, "the retried message must be recorded after successful validation")
+}
+
+func (s *MessengerSDSProcessingSuite) TestSDSValidationFailureRetriesWithoutNewTraffic() {
+	community, chat := s.sdsCommunity()
+	channelID := reliability.BuildChannelID(community.IDString(), community.UniversalChatID())
+	application := s.sdsApplication(&protobuf.ChatMessage{
+		ChatId: chat.ID, MessageType: protobuf.MessageType_COMMUNITY_CHAT, Text: "retry without new traffic",
+	}, protobuf.ApplicationMetadataMessage_CHAT_MESSAGE, s.m.identity)
+	messageID := cryptotypes.EncodeHex(crypto.Keccak256(application))
+	sender, err := sds.NewReliabilityManager(zap.NewNop(), nil)
+	s.Require().NoError(err)
+	wrapped, err := sender.WrapOutgoingMessage(application, sds.MessageID(messageID), channelID)
+	s.Require().NoError(err)
+	s.Require().NoError(sender.Cleanup())
+
+	var validationCalls int
+	s.Require().NoError(s.m.messaging.SetSDSValidator(messengerSDSValidatorFunc(func(sds.ValidationMessage) (bool, error) {
+		validationCalls++
+		if validationCalls <= 2 {
+			return false, fmt.Errorf("community description not loaded yet")
+		}
+		return true, nil
+	})))
+	hash := crypto.Keccak256(wrapped)
+	received := &messagingtypes.ReceivedMessage{
+		Sig: crypto.FromECDSAPub(&s.m.identity.PublicKey), Hash: hash, Payload: wrapped,
+	}
+	filter := messagingtypes.NewChatFilter(&messagingtypes.ChatFilterConfig{ChatID: chat.ID})
+	_, err = s.m.handleRetrievedMessages(map[messagingtypes.ChatFilter][]*messagingtypes.ReceivedMessage{
+		*filter: {received},
+	}, false, false)
+	s.Require().NoError(err)
+	s.Require().Equal(1, validationCalls)
+
+	cancel := make(chan struct{})
+	quit := make(chan struct{})
+	retried := make(chan error, 1)
+	go func() {
+		defer panics.LogOnPanic()
+		runSDSValidationRetryLoopWithBackoff(
+			s.m.sdsValidationRetryTrigger, cancel, quit,
+			s.m.hasSDSValidationRetries,
+			func() {
+				_, processErr := s.m.handleRetrievedMessages(nil, false, false)
+				if processErr != nil {
+					retried <- processErr
+					return
+				}
+				if validationCalls == 3 {
+					retried <- nil
+				}
+			},
+			10*time.Millisecond, 40*time.Millisecond,
+		)
+	}()
+	defer close(cancel)
+
+	select {
+	case err := <-retried:
+		s.Require().NoError(err)
+	case <-time.After(time.Second):
+		s.FailNow("queued SDS envelope was not retried without new traffic")
+	}
+	s.Require().Equal(3, validationCalls)
+	s.Require().Empty(s.m.sdsValidationRetries)
 }
 
 func (s *MessengerSDSProcessingSuite) TestSDSLegacyControlChannelCompatibility() {
@@ -588,6 +656,6 @@ func (s *MessengerSDSProcessingSuite) TestInvalidApplicationMessageRemainsRetrya
 		s.Require().NoError(err)
 		s.Require().Empty(response.Messages())
 	}
-	s.Require().Equal(2, logs.FilterMessage("failed to decode messages").Len(),
+	s.Require().Equal(2, logs.FilterMessage("deferring SDS envelope until validation can be retried").Len(),
 		"the malformed envelope must not be transport-confirmed after its first delivery")
 }

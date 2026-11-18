@@ -181,10 +181,11 @@ type Messenger struct {
 	handleMessagesMutex       sync.Mutex
 	handleImportMessagesMutex sync.Mutex
 	// Accessed under handleMessagesMutex.
-	sdsValidationRetries     []pendingSDSValidationEnvelope
-	sdsValidationRetryHashes map[string]struct{}
-	sdsValidationRetrySince  map[string]time.Time
-	sdsValidationRetryBytes  int
+	sdsValidationRetries      []pendingSDSValidationEnvelope
+	sdsValidationRetryHashes  map[string]struct{}
+	sdsValidationRetrySince   map[string]time.Time
+	sdsValidationRetryBytes   int
+	sdsValidationRetryTrigger chan struct{}
 
 	// flag to disable checking #hasPairedDevices
 	localPairing bool
@@ -464,6 +465,7 @@ func NewMessenger(
 		account:                                 c.account,
 		quit:                                    make(chan struct{}),
 		historicSyncTrigger:                     make(chan struct{}, 1),
+		sdsValidationRetryTrigger:               make(chan struct{}, 1),
 		ctx:                                     ctx,
 		cancel:                                  cancel,
 		importingCommunities:                    make(map[string]bool),
@@ -2919,7 +2921,7 @@ func (m *Messenger) RetrieveAll() (*MessengerResponse, error) {
 }
 
 func (m *Messenger) StartRetrieveMessagesLoop(_ time.Duration, cancel <-chan struct{}) {
-	m.shutdownWaitGroup.Add(1)
+	m.shutdownWaitGroup.Add(2)
 	go func() {
 		defer panics.LogOnPanic()
 		defer m.shutdownWaitGroup.Done()
@@ -2928,6 +2930,14 @@ func (m *Messenger) StartRetrieveMessagesLoop(_ time.Duration, cancel <-chan str
 		defer m.messaging.UnsubscribeFilterMatched(matchedCh)
 
 		runRetrieveMessagesLoop(matchedCh, cancel, m.quit, m.ProcessAllMessages)
+	}()
+
+	go func() {
+		defer panics.LogOnPanic()
+		defer m.shutdownWaitGroup.Done()
+
+		runSDSValidationRetryLoop(m.sdsValidationRetryTrigger, cancel, m.quit,
+			m.hasSDSValidationRetries, m.ProcessAllMessages)
 	}()
 }
 
@@ -3263,14 +3273,40 @@ func (m *Messenger) handleImportedMessages(messagesToHandle map[types.ChatFilter
 	messageState := m.buildMessageState()
 
 	logger := m.logger.With(zap.String("site", "handleImportedMessages"))
+	type retryEnvelope struct {
+		filter  types.ChatFilter
+		message *types.ReceivedMessage
+	}
+	var retryMessages []retryEnvelope
+	defer func() {
+		if len(retryMessages) == 0 {
+			return
+		}
+		m.handleMessagesMutex.Lock()
+		defer m.handleMessagesMutex.Unlock()
+		for _, retryMessage := range retryMessages {
+			filter := retryMessage.filter
+			m.enqueueSDSValidationRetry(&filter, retryMessage.message)
+		}
+	}()
 
 	for filter, messages := range messagesToHandle {
 		for _, shhMessage := range messages {
 
 			handleMessageResponse, err := m.messaging.HandleReceivedMessages(shhMessage)
 			if err != nil {
-				logger.Info("failed to decode messages", zap.Error(err))
+				if errors.Is(err, sds.ErrValidationFailed) {
+					retryMessages = append(retryMessages, retryEnvelope{
+						filter: filter, message: shhMessage,
+					})
+					logger.Info("deferring SDS envelope until validation can be retried", zap.Error(err))
+				} else {
+					logger.Info("failed to decode messages", zap.Error(err))
+				}
 				continue
+			}
+			for _, retryMessage := range handleMessageResponse.RetryableMessages {
+				retryMessages = append(retryMessages, retryEnvelope{message: retryMessage})
 			}
 
 			statusMessages := common.NewStatusMessages(handleMessageResponse.Messages)
@@ -3472,6 +3508,9 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[types.ChatFilte
 			if handleMessagesResponse == nil {
 				m.clearSDSValidationRetry(shhMessage)
 				continue
+			}
+			for _, retryMessage := range handleMessagesResponse.RetryableMessages {
+				m.enqueueSDSValidationRetry(nil, retryMessage)
 			}
 			m.clearSDSValidationRetry(shhMessage)
 

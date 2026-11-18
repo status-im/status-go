@@ -99,6 +99,13 @@ func (r *Processor) ProcessMessage(msg *messagingtypes.ReceivedMessage) (*messag
 		response.ackedMessageIDs = append(response.ackedMessageIDs, queuedMessagesResponse.ackedMessageIDs...)
 		response.consumedEnvelopeHashes = append(response.consumedEnvelopeHashes, queuedMessagesResponse.consumedEnvelopeHashes...)
 		response.rejectedEnvelopeHashes = append(response.rejectedEnvelopeHashes, queuedMessagesResponse.rejectedEnvelopeHashes...)
+		response.retryableMessages = append(response.retryableMessages, queuedMessagesResponse.retryableMessages...)
+	}
+
+	if msg.FromHashRatchetQueue {
+		if err := r.hashRatchetStorage.DeleteMessages([][]byte{msg.Hash}); err != nil {
+			return nil, errors.Wrap(err, "failed to delete retried hash ratchet message")
+		}
 	}
 
 	return &messagingtypes.HandleMessageResponse{
@@ -106,6 +113,7 @@ func (r *Processor) ProcessMessage(msg *messagingtypes.ReceivedMessage) (*messag
 		AckedMessageIDs:        response.ackedMessageIDs,
 		ConsumedEnvelopeHashes: response.consumedEnvelopeHashes,
 		RejectedEnvelopeHashes: response.rejectedEnvelopeHashes,
+		RetryableMessages:      response.retryableMessages,
 	}, nil
 }
 
@@ -114,6 +122,7 @@ type processMessageResponse struct {
 	ackedMessageIDs        []types.HexBytes
 	consumedEnvelopeHashes [][]byte
 	rejectedEnvelopeHashes [][]byte
+	retryableMessages      []*messagingtypes.ReceivedMessage
 }
 
 type sdsLayerReliability interface {
@@ -245,6 +254,11 @@ func (r *Processor) processQueuedHashRatchetMessages(hashRatchetInfos []*messagi
 
 			r, err := r.processMessage(message)
 			if err != nil {
+				if errors.Is(err, sds.ErrValidationFailed) {
+					retryMessage := *message
+					retryMessage.FromHashRatchetQueue = true
+					response.retryableMessages = append(response.retryableMessages, &retryMessage)
+				}
 				continue
 			}
 			if r == nil {
@@ -259,6 +273,7 @@ func (r *Processor) processQueuedHashRatchetMessages(hashRatchetInfos []*messagi
 			response.ackedMessageIDs = append(response.ackedMessageIDs, r.ackedMessageIDs...)
 			response.consumedEnvelopeHashes = append(response.consumedEnvelopeHashes, r.consumedEnvelopeHashes...)
 			response.rejectedEnvelopeHashes = append(response.rejectedEnvelopeHashes, r.rejectedEnvelopeHashes...)
+			response.retryableMessages = append(response.retryableMessages, r.retryableMessages...)
 		}
 
 		err = r.hashRatchetStorage.DeleteMessages(processedIds)

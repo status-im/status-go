@@ -157,7 +157,7 @@ func (s *Segmenter) reconstruct(payload []byte, sigPubKey *ecdsa.PublicKey, tran
 		zap.Uint32("ParitySegmentIndex", segmentMessage.ParitySegmentIndex),
 		zap.Uint32("ParitySegmentsCount", segmentMessage.ParitySegmentsCount))
 
-	alreadyCompleted, err := s.persistence.IsMessageAlreadyCompleted(segmentMessage.EntireMessageHash)
+	alreadyCompleted, err := s.persistence.IsMessageAlreadyCompleted(segmentMessage.EntireMessageHash, sigPubKey)
 	if err != nil {
 		return nil, nil, err
 	}
