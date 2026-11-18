@@ -4187,7 +4187,7 @@ func (m *Messenger) DeleteMessage(id string) error {
 	if err := m.persistence.DeleteMessage(id); err != nil {
 		return err
 	}
-	signal.SendSectionUnreadCountsChanged()
+	m.signalSession.SendSectionUnreadCountsChanged()
 	return nil
 }
 
@@ -4195,7 +4195,7 @@ func (m *Messenger) DeleteMessagesByChatID(id string) error {
 	if err := m.persistence.DeleteMessagesByChatID(id); err != nil {
 		return err
 	}
-	signal.SendSectionUnreadCountsChanged()
+	m.signalSession.SendSectionUnreadCountsChanged()
 	return nil
 }
 
@@ -4205,7 +4205,7 @@ func (m *Messenger) markMessageAsUnreadImpl(chatID string, messageID string) (ui
 	if err != nil {
 		return 0, 0, err
 	}
-	defer signal.SendSectionUnreadCountsChanged()
+	defer m.signalSession.SendSectionUnreadCountsChanged()
 
 	chat, err := m.persistence.Chat(chatID)
 	if err != nil {
@@ -4259,7 +4259,7 @@ func (m *Messenger) markMessagesSeenImpl(chatID string, ids []string) (uint64, u
 	if err != nil {
 		return 0, 0, nil, err
 	}
-	defer signal.SendSectionUnreadCountsChanged()
+	defer m.signalSession.SendSectionUnreadCountsChanged()
 	chat, err := m.persistence.Chat(chatID)
 	if err != nil {
 		return 0, 0, nil, err
@@ -4401,7 +4401,7 @@ func (m *Messenger) markAllRead(chatID string, clock uint64, shouldBeSynced bool
 	if err != nil {
 		return err
 	}
-	defer signal.SendSectionUnreadCountsChanged()
+	defer m.signalSession.SendSectionUnreadCountsChanged()
 
 	if shouldBeSynced {
 		err := m.syncChatMessagesRead(context.Background(), chatID, clock, m.dispatchMessage)
@@ -4430,7 +4430,7 @@ func (m *Messenger) markThreadRead(chatID, threadID string, clock uint64, should
 	if err != nil {
 		return err
 	}
-	defer signal.SendSectionUnreadCountsChanged()
+	defer m.signalSession.SendSectionUnreadCountsChanged()
 
 	if shouldBeSynced {
 		return m.syncThreadMessagesRead(context.Background(), chatID, threadID, clock, m.dispatchMessage)
@@ -4514,7 +4514,7 @@ func (m *Messenger) MarkAllReadInCommunity(ctx context.Context, communityID stri
 	if err != nil {
 		return nil, err
 	}
-	defer signal.SendSectionUnreadCountsChanged()
+	defer m.signalSession.SendSectionUnreadCountsChanged()
 
 	threads, err := m.persistence.ThreadsByChatIDs(chatIDs)
 	if err != nil {
@@ -4618,7 +4618,7 @@ func (m *Messenger) muteChat(chat *Chat, contact *contacts.Contact, mutedTill ti
 	if err != nil {
 		return time.Time{}, err
 	}
-	defer signal.SendSectionUnreadCountsChanged()
+	defer m.signalSession.SendSectionUnreadCountsChanged()
 
 	chat.Muted = true
 	chat.MuteTill = mutedTill
@@ -4664,7 +4664,7 @@ func (m *Messenger) unmuteChat(chat *Chat, contact *contacts.Contact) error {
 	if err != nil {
 		return err
 	}
-	defer signal.SendSectionUnreadCountsChanged()
+	defer m.signalSession.SendSectionUnreadCountsChanged()
 
 	chat.Muted = false
 	chat.MuteTill = time.Time{}

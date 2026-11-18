@@ -1268,7 +1268,7 @@ func (m *Messenger) SetMuted(request *requests.MuteCommunity) error {
 	if err := m.communitiesManager.SetMuted(request.CommunityID, request.MutedType != Unmuted); err != nil {
 		return err
 	}
-	signal.SendSectionUnreadCountsChanged()
+	m.signalSession.SendSectionUnreadCountsChanged()
 	return nil
 }
 
