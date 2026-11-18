@@ -33,7 +33,6 @@ if [ -n "${NIM_TKL_LIB_DIR:-}${NIM_TKL_INC_DIR:-}" ]; then
   exit 0
 fi
 
-pin="$(sed -n 's|^requires "https://github.com/.*/nim-token-lists#\([0-9a-f]*\)"$|\1|p' "$repo/status_go.nimble")"
 if command -v sha256sum >/dev/null 2>&1; then
   tkl_sha256=(sha256sum)
 elif command -v shasum >/dev/null 2>&1; then
@@ -41,9 +40,6 @@ elif command -v shasum >/dev/null 2>&1; then
 else
   fail "Install sha256sum or shasum for SHA-256 checksums"
 fi
-[[ "$pin" =~ ^[0-9a-f]{40}$ ]] || fail "Invalid native revision pin"
-grep -Eq "github.com/status-im/nim-token-lists/go/tkl v[^[:space:]]*-${pin:0:12}([[:space:]]|$)" "$repo/go.mod" ||
-  fail "Go wrapper and native revision pins disagree"
 case "$goarch" in
   arm64) arch=arm64 ;;
   amd64) arch=x86_64 ;;

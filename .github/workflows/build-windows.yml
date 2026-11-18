@@ -56,7 +56,7 @@ jobs:
       - uses: jiro4989/setup-nim-action@189b145833368cc92f1e7b3e166a25a3e057a693 # v2.3.1
         with:
           # The Nim status_go.nimble pins, which builds libsds and the token library.
-          nim-version: ${{ env.SDS_NIM_VERSION }}
+          nim-version: ${{ env.NIM_LIBS_VERSION }}
           # Outside the checkout, which the build fingerprints.
           parent-nim-install-directory: ${{ runner.temp }}
       # MSYS2 supplies only the shell; Go, Nim, Git and the compiler come from the Windows PATH.

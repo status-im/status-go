@@ -37,7 +37,7 @@ jobs:
 
       - uses: jiro4989/setup-nim-action@189b145833368cc92f1e7b3e166a25a3e057a693
         with:
-          nim-version: ${{ env.SDS_NIM_VERSION }}
+          nim-version: ${{ env.NIM_LIBS_VERSION }}
 
       - name: Setup Protocol Buffer Compiler
         uses: arduino/setup-protoc@v3
@@ -82,6 +82,9 @@ jobs:
       - name: argon2 fork matches upstream
         run: |
           make lint-argon2-fork
+
+      - name: Nim pins match status_go.nimble
+        run: make lint-nim-pins
 
       - name: go mod tidy
         run: go mod tidy && git diff --exit-code

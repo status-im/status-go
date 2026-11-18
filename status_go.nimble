@@ -10,13 +10,14 @@ srcDir = "internal/nimble/src"
 
 
 ### Dependencies
-# The Nim that builds the libraries; the Dockerfile's SDS_NIM_VERSION follows it.
+# This file pins the Nim that builds the libraries and their revisions.
+# scripts/check_nim_pins.sh holds every other copy, and a consumer's resolution, to it.
 requires "nim == 2.2.10"
 
 # nim-sds, whose C ABI go.mod's sds-go-bindings must match.
 requires "https://github.com/logos-messaging/nim-sds#8f7fee08f0256c1788089e756182c8be0a621930"
 
-# The native token library, v0.2.0; go.mod pins its Go wrapper at the same commit.
+# The native token library, v0.2.0, whose Go wrapper go.mod pins at this commit.
 requires "https://github.com/status-im/nim-token-lists#4df3308a32b0f3da18ef0d37d26fa9f1195f8b9e"
 
 # The untagged chronos commit nim-ffi needs; the libsds compile uses this tree.

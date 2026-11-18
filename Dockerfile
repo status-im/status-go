@@ -67,27 +67,27 @@ RUN set -eu && \
 ENV PATH="/opt/nimble/bin:${PATH}"
 
 # The Nim status_go.nimble requires for libsds and libtkl, left where nimble looks first.
-ARG SDS_NIM_VERSION=2.2.10
-ARG SDS_NIM_X64_SHA256=0a3a38752e97e9d44aa479b3a7b37336dfe0176daf22ee5b5218ad0991ecd211
-ARG SDS_NIM_ARM64_SHA256=cd86a6e2bcbf029c4870aa51df5c0169345dbf9959889112fd15d403c13ae33a
+ARG NIM_LIBS_VERSION=2.2.10
+ARG NIM_LIBS_X64_SHA256=0a3a38752e97e9d44aa479b3a7b37336dfe0176daf22ee5b5218ad0991ecd211
+ARG NIM_LIBS_ARM64_SHA256=cd86a6e2bcbf029c4870aa51df5c0169345dbf9959889112fd15d403c13ae33a
 RUN set -eu && \
     case "$(dpkg --print-architecture)" in \
-    amd64) SDS_NIM_ARCH=x64; SDS_NIM_SHA256="$SDS_NIM_X64_SHA256" ;; \
-    arm64) SDS_NIM_ARCH=arm64; SDS_NIM_SHA256="$SDS_NIM_ARM64_SHA256" ;; \
+    amd64) NIM_LIBS_ARCH=x64; NIM_LIBS_SHA256="$NIM_LIBS_X64_SHA256" ;; \
+    arm64) NIM_LIBS_ARCH=arm64; NIM_LIBS_SHA256="$NIM_LIBS_ARM64_SHA256" ;; \
     *) echo "ERROR: unsupported architecture" >&2; exit 1 ;; \
     esac && \
-    SDS_NIM_URL=$(curl -sSf https://nim-lang.org/releases.json \
-    | jq -er --arg ver "$SDS_NIM_VERSION" --arg arch "$SDS_NIM_ARCH" \
+    NIM_LIBS_URL=$(curl -sSf https://nim-lang.org/releases.json \
+    | jq -er --arg ver "$NIM_LIBS_VERSION" --arg arch "$NIM_LIBS_ARCH" \
     '.[$ver]["linux_" + $arch].github_url') && \
-    curl -sSfL "$SDS_NIM_URL" -o /tmp/nim.tar.xz && \
-    echo "${SDS_NIM_SHA256}  /tmp/nim.tar.xz" | sha256sum -c - && \
-    mkdir -p /opt/nim-sds /root/.nimble/nimbinaries && \
-    tar -xJf /tmp/nim.tar.xz -C /opt/nim-sds --strip-components=1 && \
+    curl -sSfL "$NIM_LIBS_URL" -o /tmp/nim.tar.xz && \
+    echo "${NIM_LIBS_SHA256}  /tmp/nim.tar.xz" | sha256sum -c - && \
+    mkdir -p /opt/nim-libs /root/.nimble/nimbinaries && \
+    tar -xJf /tmp/nim.tar.xz -C /opt/nim-libs --strip-components=1 && \
     rm /tmp/nim.tar.xz && \
-    /opt/nim-sds/bin/nim --version && \
-    ln -s /opt/nim-sds "/root/.nimble/nimbinaries/nim-${SDS_NIM_VERSION}"
+    /opt/nim-libs/bin/nim --version && \
+    ln -s /opt/nim-libs "/root/.nimble/nimbinaries/nim-${NIM_LIBS_VERSION}"
 # nimble writes its metadata next to the compiler, as the calling user.
-RUN chmod a+w /opt/nim-sds
+RUN chmod a+w /opt/nim-libs
 
 # Test runner behind `make test-unit`
 ARG GOTESTSUM_VERSION=1.13.0

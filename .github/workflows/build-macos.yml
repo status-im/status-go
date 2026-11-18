@@ -51,7 +51,7 @@ jobs:
       # The Nim status_go.nimble pins, which builds libsds and the token library.
       - uses: ./.github/actions/nim
         with:
-          nim-version: ${{ env.SDS_NIM_VERSION }}
+          nim-version: ${{ env.NIM_LIBS_VERSION }}
           nimble-version: ${{ env.NIMBLE_VERSION }}
       - name: Toolchain versions
         run: |

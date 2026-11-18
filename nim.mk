@@ -15,14 +15,16 @@ nimble.paths: status_go.nimble
 	# nimble path lists every installed version, so keep only this resolution's.
 	rm -rf nimbledeps
 	env -u SDKROOT -u CPATH -u LIBRARY_PATH $(NIMBLE) setup --localdeps -y
+	bash scripts/check_nim_pins.sh "$(NIMBLE_ROOT)"
 else
 ifeq ($(origin NIM),undefined)
     $(error NIMBLE_ROOT is set, so pass its compiler as NIM)
 endif
-# The consumer resolves its own root.
+# The consumer resolves its own root, with the revisions status_go.nimble pins.
 .PHONY: nimble.paths
 nimble.paths:
 	@test -f "$(NIMBLE_ROOT)/nimble.paths" || { echo "Error: $(NIMBLE_ROOT)/nimble.paths not found" >&2; exit 1; }
+	@bash scripts/check_nim_pins.sh "$(NIMBLE_ROOT)"
 endif
 # The Nim nimble installed for this resolution, else the one on PATH.
 NIM ?= $(or $(firstword $(wildcard $(CURDIR)/nimbledeps/pkgs2/nim-*/bin/nim $(CURDIR)/nimbledeps/pkgs2/nim-*/bin/nim.exe)),nim)
