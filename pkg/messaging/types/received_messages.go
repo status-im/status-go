@@ -11,9 +11,16 @@ type ReceivedMessage struct {
 	Hash         []byte       `json:"hash"`
 	Dst          []byte       `json:"recipientPublicKey,omitempty"`
 	ThirdPartyID string       `json:"thirdPartyId,omitempty"`
+	// ProcessingContext records the original receipt policy across deferred processing.
+	ProcessingContext *ReceivedMessageProcessingContext `json:"-"`
 	// FromHashRatchetQueue marks an in-memory replay that must be removed from
 	// hash-ratchet persistence after successful processing.
 	FromHashRatchetQueue bool `json:"-"`
+}
+
+type ReceivedMessageProcessingContext struct {
+	FromArchive       bool
+	StoreWakuMessages bool
 }
 
 type ReceivedMessages struct {

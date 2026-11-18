@@ -693,6 +693,7 @@ func (s *ProcessorSuite) TestQueuedHashRatchetValidationFailureCanBeRetried() {
 
 	queuedMessage := &types.ReceivedMessage{
 		Sig: crypto.FromECDSAPub(&senderKey.PublicKey), Hash: []byte{0x41}, Payload: dataPayload,
+		ProcessingContext: &types.ReceivedMessageProcessingContext{FromArchive: true},
 	}
 	response, err := s.processor.ProcessMessage(queuedMessage)
 	s.Require().NoError(err)
@@ -700,11 +701,13 @@ func (s *ProcessorSuite) TestQueuedHashRatchetValidationFailureCanBeRetried() {
 
 	response, err = s.processor.ProcessMessage(&types.ReceivedMessage{
 		Sig: crypto.FromECDSAPub(&senderKey.PublicKey), Hash: []byte{0x42}, Payload: keyExchangePayload,
+		ProcessingContext: &types.ReceivedMessageProcessingContext{StoreWakuMessages: true},
 	})
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 	s.Require().Len(response.RetryableMessages, 1)
 	s.Require().True(response.RetryableMessages[0].FromHashRatchetQueue)
+	s.Require().Equal(queuedMessage.ProcessingContext, response.RetryableMessages[0].ProcessingContext)
 	s.Require().Equal(1, validationCalls)
 
 	stored, err := s.processor.hashRatchetStorage.GetMessages(keyID)

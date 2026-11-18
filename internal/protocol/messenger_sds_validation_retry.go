@@ -87,12 +87,13 @@ func (m *Messenger) takeSDSValidationRetries(messages map[types.ChatFilter][]*ty
 	if len(m.sdsValidationRetries) == 0 {
 		return messages
 	}
-	if messages == nil {
-		messages = make(map[types.ChatFilter][]*types.ReceivedMessage)
-	}
 
 	now := time.Now()
-	for _, pending := range m.sdsValidationRetries {
+	pendingEnvelopes := m.sdsValidationRetries
+	m.sdsValidationRetries = nil
+	validRetries := pendingEnvelopes[:0]
+	retryHashes := make(map[string]struct{}, len(pendingEnvelopes))
+	for _, pending := range pendingEnvelopes {
 		delete(m.sdsValidationRetryHashes, pending.hash)
 		m.sdsValidationRetryBytes -= pending.size
 		if now.Sub(pending.firstSeen) > sdsValidationRetryTTL {
@@ -101,13 +102,25 @@ func (m *Messenger) takeSDSValidationRetries(messages map[types.ChatFilter][]*ty
 			delete(m.sdsValidationRetrySince, pending.hash)
 			continue
 		}
-		if containsEnvelopeHash(messages, pending.hash) {
-			continue
-		}
-		messages[pending.filter] = append(messages[pending.filter], pending.message)
+		retryHashes[pending.hash] = struct{}{}
+		validRetries = append(validRetries, pending)
 	}
-	m.sdsValidationRetries = nil
-	return messages
+	if len(retryHashes) == 0 {
+		return messages
+	}
+	// Prefer the queued envelope and its original context over a fresh duplicate.
+	merged := make(map[types.ChatFilter][]*types.ReceivedMessage, len(messages))
+	for filter, batch := range messages {
+		for _, message := range batch {
+			if _, queued := retryHashes[cryptotypes.EncodeHex(message.Hash)]; !queued {
+				merged[filter] = append(merged[filter], message)
+			}
+		}
+	}
+	for _, pending := range validRetries {
+		merged[pending.filter] = append(merged[pending.filter], pending.message)
+	}
+	return merged
 }
 
 func (m *Messenger) hasSDSValidationRetries() bool {
@@ -194,15 +207,13 @@ func (m *Messenger) clearSDSValidationRetry(message *types.ReceivedMessage) {
 	delete(m.sdsValidationRetrySince, cryptotypes.EncodeHex(message.Hash))
 }
 
-func containsEnvelopeHash(messages map[types.ChatFilter][]*types.ReceivedMessage, hash string) bool {
-	for _, filteredMessages := range messages {
-		for _, message := range filteredMessages {
-			if cryptotypes.EncodeHex(message.Hash) == hash {
-				return true
-			}
-		}
+func withReceivedMessageContext(message *types.ReceivedMessage, context *types.ReceivedMessageProcessingContext) *types.ReceivedMessage {
+	if message.ProcessingContext != nil {
+		return message
 	}
-	return false
+	envelope := *message
+	envelope.ProcessingContext = context
+	return &envelope
 }
 
 func cloneReceivedMessage(message *types.ReceivedMessage) *types.ReceivedMessage {
