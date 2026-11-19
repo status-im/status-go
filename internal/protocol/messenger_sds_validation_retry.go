@@ -4,9 +4,10 @@ import (
 	"bytes"
 	"time"
 
+	"go.uber.org/zap"
+
 	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/pkg/messaging/types"
-	"go.uber.org/zap"
 )
 
 const (

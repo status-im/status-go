@@ -38,30 +38,6 @@ func skipSDS(rawMessage *RawMessage) bool {
 		!shouldCommunityMessageBeEncrypted(rawMessage.MessageType)
 }
 
-func IsCommunityControlMessage(messageType protobuf.ApplicationMetadataMessage_Type) bool {
-	switch messageType {
-	case protobuf.ApplicationMetadataMessage_COMMUNITY_DESCRIPTION,
-		protobuf.ApplicationMetadataMessage_COMMUNITY_REQUEST_TO_JOIN,
-		protobuf.ApplicationMetadataMessage_COMMUNITY_MESSAGE_ARCHIVE_LINK,
-		protobuf.ApplicationMetadataMessage_COMMUNITY_REQUEST_TO_JOIN_RESPONSE,
-		protobuf.ApplicationMetadataMessage_COMMUNITY_REQUEST_TO_LEAVE,
-		protobuf.ApplicationMetadataMessage_COMMUNITY_CANCEL_REQUEST_TO_JOIN,
-		protobuf.ApplicationMetadataMessage_COMMUNITY_EVENTS_MESSAGE,
-		protobuf.ApplicationMetadataMessage_COMMUNITY_EDIT_SHARED_ADDRESSES,
-		protobuf.ApplicationMetadataMessage_COMMUNITY_PRIVILEGED_USER_SYNC_MESSAGE,
-		protobuf.ApplicationMetadataMessage_COMMUNITY_USER_KICKED,
-		protobuf.ApplicationMetadataMessage_COMMUNITY_REEVALUATE_PERMISSIONS_REQUEST,
-		protobuf.ApplicationMetadataMessage_COMMUNITY_UPDATE_GRANT,
-		protobuf.ApplicationMetadataMessage_COMMUNITY_ENCRYPTION_KEYS_REQUEST,
-		protobuf.ApplicationMetadataMessage_COMMUNITY_TOKEN_ACTION,
-		protobuf.ApplicationMetadataMessage_COMMUNITY_SHARED_ADDRESSES_REQUEST,
-		protobuf.ApplicationMetadataMessage_COMMUNITY_SHARED_ADDRESSES_RESPONSE:
-		return true
-	default:
-		return false
-	}
-}
-
 type MessageSender struct {
 	identity  *ecdsa.PrivateKey
 	messaging *messaging.API

@@ -254,7 +254,7 @@ func (r *Processor) processQueuedHashRatchetMessages(hashRatchetInfos []*messagi
 
 			r, err := r.processMessage(message)
 			if err != nil {
-				if errors.Is(err, sds.ErrValidationFailed) {
+				if errors.Is(err, sds.ErrAuthorizationFailed) {
 					retryMessage := *message
 					retryMessage.FromHashRatchetQueue = true
 					response.retryableMessages = append(response.retryableMessages, &retryMessage)

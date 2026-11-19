@@ -66,7 +66,7 @@ type Reliability struct {
 	mvdsStatusChangeEvent chan mvdsnode.PeerStatusChangeEvent
 	peerActivity          peerActivity
 	sdsManager            *sds.ReliabilityManager
-	sdsValidator          sds.Validator
+	sdsAuthorizer         sds.Authorizer
 	logger                *zap.Logger
 
 	// mu guards lifecycle transitions (Start/Stop/SetPaused/buildNode) so they
@@ -247,29 +247,29 @@ func (r *Reliability) buildSdsManager() error {
 
 	r.sdsOpsMu.Lock()
 	defer r.sdsOpsMu.Unlock()
-	if r.sdsValidator != nil {
-		if err := manager.SetValidator(r.sdsValidator); err != nil {
+	if r.sdsAuthorizer != nil {
+		if err := manager.SetAuthorizer(r.sdsAuthorizer); err != nil {
 			if cleanupErr := manager.Cleanup(); cleanupErr != nil {
-				r.logger.Error("failed to cleanup SDS manager after validator registration failure", zap.Error(cleanupErr))
+				r.logger.Error("failed to cleanup SDS manager after authorizer registration failure", zap.Error(cleanupErr))
 			}
-			return errors.Wrap(err, "failed to restore SDS validator")
+			return errors.Wrap(err, "failed to restore SDS authorizer")
 		}
 	}
 	r.sdsManager = manager
 	return nil
 }
 
-// SetSDSValidator configures authorization and preserves it across manager restarts.
-func (r *Reliability) SetSDSValidator(validator sds.Validator) error {
+// SetSDSAuthorizer configures authorization and preserves it across manager restarts.
+func (r *Reliability) SetSDSAuthorizer(authorizer sds.Authorizer) error {
 	r.sdsOpsMu.Lock()
 	defer r.sdsOpsMu.Unlock()
 	if r.sdsManager == nil {
 		return ErrSDSManagerUnavailable
 	}
-	if err := r.sdsManager.SetValidator(validator); err != nil {
-		return errors.Wrap(err, "failed to register SDS validator")
+	if err := r.sdsManager.SetAuthorizer(authorizer); err != nil {
+		return errors.Wrap(err, "failed to register SDS authorizer")
 	}
-	r.sdsValidator = validator
+	r.sdsAuthorizer = authorizer
 	return nil
 }
 

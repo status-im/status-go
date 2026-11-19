@@ -143,15 +143,15 @@ type failingSDSLoadPersistence struct {
 	loadError error
 }
 
-type processorSDSValidatorFunc func(sds.ValidationMessage) (bool, error)
+type processorSDSAuthorizerFunc func(sds.AuthorizationMessage) (bool, error)
 
-func (f processorSDSValidatorFunc) Validate(message sds.ValidationMessage) (bool, error) {
+func (f processorSDSAuthorizerFunc) Authorize(message sds.AuthorizationMessage) (bool, error) {
 	return f(message)
 }
 
-func (s *ProcessorSuite) TestSDSValidationStopsBeforeReceivedEvidence() {
+func (s *ProcessorSuite) TestSDSAuthorizationStopsBeforeReceivedEvidence() {
 	for _, failure := range []bool{false, true} {
-		s.Run(fmt.Sprintf("validation-error=%t", failure), func() {
+		s.Run(fmt.Sprintf("authorization-error=%t", failure), func() {
 			sender := s.newStandaloneReliability()
 			wrapped, messageID, err := sender.WrapPayloadForSDS(s.testPayload, "channel")
 			s.Require().NoError(err)
@@ -159,8 +159,8 @@ func (s *ProcessorSuite) TestSDSValidationStopsBeforeReceivedEvidence() {
 			store := &testSDSRetrievalHintPersistence{hints: make(map[string][][]byte)}
 			receiver.SetSDSRetrievalHintPersistence(store)
 			var context []byte
-			s.Require().NoError(receiver.SetSDSValidator(processorSDSValidatorFunc(func(message sds.ValidationMessage) (bool, error) {
-				context = message.ValidationContext
+			s.Require().NoError(receiver.SetSDSAuthorizer(processorSDSAuthorizerFunc(func(message sds.AuthorizationMessage) (bool, error) {
+				context = message.AuthorizationContext
 				if failure {
 					return false, errors.New("permission lookup failed")
 				}
@@ -176,7 +176,7 @@ func (s *ProcessorSuite) TestSDSValidationStopsBeforeReceivedEvidence() {
 			}
 			response, err := s.processor.ProcessMessage(message)
 			if failure {
-				s.Require().ErrorIs(err, sds.ErrValidationFailed)
+				s.Require().ErrorIs(err, sds.ErrAuthorizationFailed)
 				s.Require().Nil(response)
 			} else {
 				s.Require().NoError(err)
@@ -192,7 +192,7 @@ func (s *ProcessorSuite) TestSDSValidationStopsBeforeReceivedEvidence() {
 	}
 }
 
-func (s *ProcessorSuite) TestSegmentedSDSMessageCanRetryAfterValidationError() {
+func (s *ProcessorSuite) TestSegmentedSDSMessageCanRetryAfterAuthorizationError() {
 	sender := s.newStandaloneReliability()
 	wrapped, messageID, err := sender.WrapPayloadForSDS([]byte("retry segmented SDS message"), "channel")
 	s.Require().NoError(err)
@@ -203,10 +203,10 @@ func (s *ProcessorSuite) TestSegmentedSDSMessageCanRetryAfterValidationError() {
 	receiver := s.newStandaloneReliability()
 	store := &testSDSRetrievalHintPersistence{hints: make(map[string][][]byte)}
 	receiver.SetSDSRetrievalHintPersistence(store)
-	var validationCalls int
-	s.Require().NoError(receiver.SetSDSValidator(processorSDSValidatorFunc(func(sds.ValidationMessage) (bool, error) {
-		validationCalls++
-		if validationCalls == 1 {
+	var authorizationCalls int
+	s.Require().NoError(receiver.SetSDSAuthorizer(processorSDSAuthorizerFunc(func(sds.AuthorizationMessage) (bool, error) {
+		authorizationCalls++
+		if authorizationCalls == 1 {
 			return false, errors.New("temporary authorization lookup failure")
 		}
 		return true, nil
@@ -227,20 +227,20 @@ func (s *ProcessorSuite) TestSegmentedSDSMessageCanRetryAfterValidationError() {
 			s.Require().Nil(response)
 			continue
 		}
-		s.Require().ErrorIs(err, sds.ErrValidationFailed)
+		s.Require().ErrorIs(err, sds.ErrAuthorizationFailed)
 		s.Require().Nil(response)
 	}
 
 	received, err := store.IsSDSMessageReceived("channel", cryptotypes.EncodeHex(messageID))
 	s.Require().NoError(err)
-	s.Require().False(received, "failed validation must not record received evidence")
+	s.Require().False(received, "failed authorization must not record received evidence")
 
 	response, err := s.processor.ProcessMessage(&types.ReceivedMessage{
 		Sig: crypto.FromECDSAPub(&key.PublicKey), Hash: lastHash, Payload: lastSegment,
 	})
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
-	s.Require().Equal(2, validationCalls)
+	s.Require().Equal(2, authorizationCalls)
 	received, err = store.IsSDSMessageReceived("channel", cryptotypes.EncodeHex(messageID))
 	s.Require().NoError(err)
 	s.Require().True(received, "the retained reconstruction must be retryable")
@@ -682,10 +682,10 @@ func (s *ProcessorSuite) TestQueuedHashRatchetValidationFailureCanBeRetried() {
 
 	receiver := s.newStandaloneReliability()
 	s.T().Cleanup(receiver.Close)
-	var validationCalls int
-	s.Require().NoError(receiver.SetSDSValidator(processorSDSValidatorFunc(func(sds.ValidationMessage) (bool, error) {
-		validationCalls++
-		if validationCalls == 1 {
+	var authorizationCalls int
+	s.Require().NoError(receiver.SetSDSAuthorizer(processorSDSAuthorizerFunc(func(sds.AuthorizationMessage) (bool, error) {
+		authorizationCalls++
+		if authorizationCalls == 1 {
 			return false, errors.New("temporary authorization lookup failure")
 		}
 		return true, nil
@@ -709,16 +709,16 @@ func (s *ProcessorSuite) TestQueuedHashRatchetValidationFailureCanBeRetried() {
 	s.Require().Len(response.RetryableMessages, 1)
 	s.Require().True(response.RetryableMessages[0].FromHashRatchetQueue)
 	s.Require().Equal(queuedMessage.ProcessingContext, response.RetryableMessages[0].ProcessingContext)
-	s.Require().Equal(1, validationCalls)
+	s.Require().Equal(1, authorizationCalls)
 
 	stored, err := s.processor.hashRatchetStorage.GetMessages(keyID)
 	s.Require().NoError(err)
-	s.Require().Len(stored, 1, "failed validation must retain the stored envelope")
+	s.Require().Len(stored, 1, "failed authorization must retain the stored envelope")
 
 	response, err = s.processor.ProcessMessage(response.RetryableMessages[0])
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
-	s.Require().Equal(2, validationCalls)
+	s.Require().Equal(2, authorizationCalls)
 	stored, err = s.processor.hashRatchetStorage.GetMessages(keyID)
 	s.Require().NoError(err)
 	s.Require().Empty(stored, "successful retry must remove the stored copy")

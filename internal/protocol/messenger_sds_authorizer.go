@@ -15,13 +15,13 @@ import (
 	"github.com/status-im/status-go/pkg/messaging/layers/reliability"
 )
 
-type communitySDSValidator struct {
+type communitySDSAuthorizer struct {
 	messenger *Messenger
 }
 
-func (v communitySDSValidator) Validate(message sds.ValidationMessage) (bool, error) {
+func (v communitySDSAuthorizer) Authorize(message sds.AuthorizationMessage) (bool, error) {
 	m := v.messenger
-	communityID, topic, _ := strings.Cut(message.ChannelID, ":")
+	communityID, _, _ := strings.Cut(message.ChannelID, ":")
 	// Community IDs are 0x-prefixed, hex-encoded compressed public keys.
 	communityChannel := strings.HasPrefix(communityID, "0x") && len(communityID) == 68
 
@@ -29,12 +29,12 @@ func (v communitySDSValidator) Validate(message sds.ValidationMessage) (bool, er
 		if !communityChannel {
 			return true, nil
 		}
+		if message.ChannelID != reliability.BuildChannelID(communityID) {
+			return false, nil
+		}
 		community, err := m.communitiesManager.GetByIDString(communityID)
 		if err != nil {
 			return false, err
-		}
-		if topic != "" && topic != community.UniversalChatID() {
-			return false, nil
 		}
 		sender, err := authenticatedSDSTransportSender(message)
 		if err != nil {
@@ -68,18 +68,7 @@ func (v communitySDSValidator) Validate(message sds.ValidationMessage) (bool, er
 	case protobuf.ApplicationMetadataMessage_DELETE_THREAD:
 		chatMessage = &protobuf.DeleteThread{}
 	default:
-		// Older clients wrap control traffic on the separate bare-ID channel.
-		// Never allow it to authorize metadata on the chat reliability channel.
-		if communityChannel && topic == "" && common.IsCommunityControlMessage(application.Type) {
-			if application.SigPubKey == nil {
-				return false, fmt.Errorf("legacy SDS community control message has no application signature")
-			}
-			sender, err := authenticatedSDSTransportSender(message)
-			if err != nil {
-				return false, err
-			}
-			return crypto.IsPubKeyEqual(sender, application.SigPubKey), nil
-		}
+		// Control messages use their own authorization outside SDS.
 		return !communityChannel, nil
 	}
 	if err := proto.Unmarshal(application.Payload, chatMessage); err != nil {
@@ -95,15 +84,14 @@ func (v communitySDSValidator) Validate(message sds.ValidationMessage) (bool, er
 	if !ok || chat.ChatType != ChatTypeCommunityChat || chat.CommunityID == "" {
 		return false, fmt.Errorf("SDS community message targets an unknown community chat")
 	}
+	if message.ChannelID != reliability.BuildChannelID(chat.CommunityID) {
+		return false, nil
+	}
 	community, err := m.communitiesManager.GetByIDString(chat.CommunityID)
 	if err != nil {
 		return false, err
 	}
-	if message.ChannelID != chat.CommunityID &&
-		message.ChannelID != reliability.BuildChannelID(chat.CommunityID, community.UniversalChatID()) {
-		return false, nil
-	}
-	// ValidationContext is the Waku-authenticated signer of the full payload,
+	// AuthorizationContext is the Waku-authenticated signer of the full payload,
 	// including SDS IDs, dependencies, and acknowledgements. Require that signer
 	// to be a community participant, while allowing member repair forwarding.
 	transportSender, err := authenticatedSDSTransportSender(message)
@@ -119,8 +107,8 @@ func (v communitySDSValidator) Validate(message sds.ValidationMessage) (bool, er
 	return community.CanPost(application.SigPubKey, chat.CommunityChatID(), application.Type)
 }
 
-func authenticatedSDSTransportSender(message sds.ValidationMessage) (*ecdsa.PublicKey, error) {
-	sender, err := crypto.UnmarshalPubkey(message.ValidationContext)
+func authenticatedSDSTransportSender(message sds.AuthorizationMessage) (*ecdsa.PublicKey, error) {
+	sender, err := crypto.UnmarshalPubkey(message.AuthorizationContext)
 	if err != nil {
 		return nil, fmt.Errorf("invalid SDS transport sender: %w", err)
 	}
