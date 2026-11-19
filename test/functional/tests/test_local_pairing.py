@@ -186,6 +186,7 @@ async def login_paired_device(backend: AsyncStatusBackend, key_uid, password):
 @pytest.mark.asyncio
 class TestLocalPairing:
 
+    @pytest.mark.spec("SC-THRD-36")
     @pytest.mark.parametrize("message_sync_enabled", [False, True])
     async def test_pairing_threads(self, async_backend_new_profile, async_backend_factory, message_sync_enabled):
         alice, bob, bob_second_device = await asyncio.gather(
