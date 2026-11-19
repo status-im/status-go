@@ -22,3 +22,9 @@ requires "https://github.com/status-im/nim-token-lists#4df3308a32b0f3da18ef0d37d
 
 # The untagged chronos commit nim-ffi needs; the libsds compile uses this tree.
 requires "chronos#0de7b335d0ad5557ad5ba71a4b7662f7b201750e"
+
+# Leopard-RS (via nim-segmentation) at the revision logos-delivery locks,
+# which configures it without its test executables.
+requires "https://github.com/logos-storage/nim-leopard#3a24aa1f4b7ce227e8d30c51357ae241cf6b478d"
+# liblogosdelivery, which a caller builds with plain nim c.
+requires "https://github.com/logos-messaging/logos-delivery#e03b9754af7f639283a953bc3f9f6c79064211ee"
