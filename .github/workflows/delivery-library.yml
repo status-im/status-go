@@ -15,7 +15,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   # Builds the sealed liblogosdelivery each platform links, and checks that
-  # only its C API (logosdelivery_*) stays global.
+  # only its C API (logosdelivery_*) and kernel API (waku_*) stay global.
   build:
     strategy:
       fail-fast: false
@@ -44,14 +44,14 @@ jobs:
           echo "ANDROID_NDK_ROOT=$ANDROID_HOME/ndk/27.2.12479018" >> "$GITHUB_ENV"
       - name: Build
         run: make ${{ matrix.target }}
-      - name: Only the C API is global
+      - name: Only the C and kernel APIs are global
         run: |
           archive="build/delivery/${{ matrix.dir }}/link/liblogosdelivery.a"
           nm=nm
           [ "${{ matrix.name }}" != android ] || nm="$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-nm"
           globals="$("$nm" -g --defined-only "$archive" | awk 'NF == 3 {print $3}' | sed 's/^_//')"
           api="$(grep -c '^logosdelivery_' <<< "$globals" || true)"
-          others="$(grep -v '^logosdelivery_' <<< "$globals" || true)"
+          others="$(grep -v -E '^(logosdelivery|waku)_' <<< "$globals" || true)"
           echo "logosdelivery_* globals: $api"
           [ "$api" -gt 0 ] || { echo "no logosdelivery_* symbols in $archive" >&2; exit 1; }
-          [ -z "$others" ] || { printf 'globals outside the C API:\n%s\n' "$others" >&2; exit 1; }
+          [ -z "$others" ] || { printf 'globals outside the C and kernel APIs:\n%s\n' "$others" >&2; exit 1; }

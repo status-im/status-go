@@ -27,4 +27,4 @@ requires "chronos#0de7b335d0ad5557ad5ba71a4b7662f7b201750e"
 # which configures it without its test executables.
 requires "https://github.com/logos-storage/nim-leopard#3a24aa1f4b7ce227e8d30c51357ae241cf6b478d"
 # liblogosdelivery, which a caller builds with plain nim c.
-requires "https://github.com/logos-messaging/logos-delivery#e03b9754af7f639283a953bc3f9f6c79064211ee"
+requires "https://github.com/logos-messaging/logos-delivery#546debf794736fa5de0d64087f21fa8581d4c9ef"

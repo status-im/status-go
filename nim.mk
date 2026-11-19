@@ -79,9 +79,9 @@ NIM_COMPILE = eval "env -u SDKROOT -u CPATH -u LIBRARY_PATH $(NIM) c --skipParen
 # NIM_LIB_DIR/nimcache: the archive is made here, from the objects, and only its
 # C API (<prefix>*) stays global, so its Nim runtime can't clash with another's.
 # A cross build seals with the target's tools (NIM_SEAL_TOOLS), e.g. the NDK's.
-# $(call NIM_SEAL,<C API prefix>,<sealed archive>)
+# $(call NIM_SEAL,<C API prefixes>,<sealed archive>)
 NIM_SEAL_TOOLS_ANDROID = NIM_SEAL_LD="$(NIM_ANDROID_BIN)/ld.lld" NIM_SEAL_OBJCOPY="$(NIM_ANDROID_BIN)/llvm-objcopy" NIM_SEAL_AR="$(NIM_ANDROID_BIN)/llvm-ar" NIM_SEAL_NM="$(NIM_ANDROID_BIN)/llvm-nm"
-NIM_SEAL = $(NIM_SEAL_TOOLS) bash scripts/seal_nim_lib.sh $(1) "$(NIM_LIB_DIR)/nimcache" "$(2)"
+NIM_SEAL = $(NIM_SEAL_TOOLS) bash scripts/seal_nim_lib.sh "$(1)" "$(NIM_LIB_DIR)/nimcache" "$(2)"
 
 # Runs <build> unless <output> exists and was built by the same command line
 # from the same resolution, which <output>.command records. By content, not
