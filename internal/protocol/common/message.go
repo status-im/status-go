@@ -705,6 +705,32 @@ func (m *Message) GetProtobuf() proto.Message {
 	return m.ChatMessage
 }
 
+func IsSystemMessageContentType(contentType protobuf.ChatMessage_ContentType) bool {
+	switch contentType {
+	case protobuf.ChatMessage_SYSTEM_MESSAGE_CONTENT_PRIVATE_GROUP,
+		protobuf.ChatMessage_SYSTEM_MESSAGE_GAP,
+		protobuf.ChatMessage_SYSTEM_MESSAGE_PINNED_MESSAGE:
+		return true
+	default:
+		return IsMutualStateEventContentType(contentType)
+	}
+}
+
+func IsMutualStateEventContentType(contentType protobuf.ChatMessage_ContentType) bool {
+	switch contentType {
+	case protobuf.ChatMessage_SYSTEM_MESSAGE_MUTUAL_EVENT_SENT,
+		protobuf.ChatMessage_SYSTEM_MESSAGE_MUTUAL_EVENT_ACCEPTED,
+		protobuf.ChatMessage_SYSTEM_MESSAGE_MUTUAL_EVENT_REMOVED:
+		return true
+	default:
+		return false
+	}
+}
+
+func (m *Message) CanBeReplyTargetIn(chatID string) bool {
+	return m != nil && m.LocalChatID == chatID && !IsSystemMessageContentType(m.GetContentType())
+}
+
 // SetMessageType a setter for the MessageType field
 // this function is required to implement the ChatEntity interface
 func (m *Message) SetMessageType(messageType protobuf.MessageType) {

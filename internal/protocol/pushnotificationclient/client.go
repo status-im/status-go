@@ -934,7 +934,7 @@ func (c *Client) handlePublicMessageSent(sentMessage *messagingevents.SentMessag
 		if err != nil {
 			c.config.Logger.Error("could not retrieve message", zap.Error(err))
 		}
-		if reply != nil {
+		if reply.CanBeReplyTargetIn(message.LocalChatID) {
 			pkString := reply.From
 			c.config.Logger.Debug("handling mention", zap.String("publickey", pkString))
 			pubkeyBytes, err := types.DecodeHex(pkString)

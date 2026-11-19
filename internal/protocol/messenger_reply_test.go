@@ -7,6 +7,8 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/status-im/status-go/internal/db/multiaccounts"
+	"github.com/status-im/status-go/internal/protocol/common"
+	"github.com/status-im/status-go/internal/protocol/protobuf"
 )
 
 func TestMessengerReplySuite(t *testing.T) {
@@ -101,4 +103,85 @@ func (s *MessengerReplySuite) TestSendReplyToNonExistentMessage() {
 	replyMessage.ResponseTo = "non-existent-message-id"
 	_, err = alice.SendChatMessage(context.Background(), replyMessage)
 	s.Require().ErrorIs(err, ErrInvalidResponseTo)
+}
+
+func (s *MessengerReplySuite) TestSendRejectsInvalidReplyTargets() {
+	chat := CreateOneToOneChat("DM", &s.newMessenger().identity.PublicKey, s.m.getTimesource())
+	s.Require().NoError(s.m.SaveChat(chat))
+
+	for _, tt := range []struct {
+		name        string
+		localChatID string
+		contentType protobuf.ChatMessage_ContentType
+	}{
+		{"other chat", "group-chat", protobuf.ChatMessage_TEXT_PLAIN},
+		{"system message", chat.ID, protobuf.ChatMessage_SYSTEM_MESSAGE_PINNED_MESSAGE},
+	} {
+		s.Run(tt.name, func() {
+			target := buildTestMessage(*chat)
+			target.ID = tt.name
+			target.LocalChatID = tt.localChatID
+			target.ContentType = tt.contentType
+			s.Require().NoError(s.m.persistence.SaveMessages([]*common.Message{target}))
+
+			reply := buildTestMessage(*chat)
+			reply.ResponseTo = target.ID
+			_, err := s.m.SendChatMessage(context.Background(), reply)
+			s.Require().ErrorIs(err, ErrInvalidResponseTo)
+		})
+	}
+}
+
+func (s *MessengerReplySuite) TestHistoryDoesNotResolveInvalidReplyTargets() {
+	chat := CreatePublicChat(statusChatID, s.m.getTimesource())
+	for _, tt := range []struct {
+		name        string
+		localChatID string
+		contentType protobuf.ChatMessage_ContentType
+	}{
+		{"other chat", "other-chat", protobuf.ChatMessage_TEXT_PLAIN},
+		{"system message", chat.ID, protobuf.ChatMessage_SYSTEM_MESSAGE_CONTENT_PRIVATE_GROUP},
+	} {
+		s.Run(tt.name, func() {
+			target := buildTestMessage(*chat)
+			target.ID = tt.name + "-target"
+			target.LocalChatID = tt.localChatID
+			target.ContentType = tt.contentType
+
+			reply := buildTestMessage(*chat)
+			reply.ID = tt.name + "-reply"
+			reply.ResponseTo = target.ID
+			reply.Replied = true
+			s.Require().NoError(s.m.persistence.SaveMessages([]*common.Message{target, reply}))
+
+			messages, err := s.m.pullMessagesAndResponsesFromDB([]*common.Message{reply})
+			s.Require().NoError(err)
+			s.Require().Len(messages, 1)
+			s.Require().Equal(reply.ID, messages[0].ID)
+			s.Require().Equal(reply.Text, messages[0].Text)
+			s.Require().Nil(messages[0].QuotedMessage)
+			s.Require().False(messages[0].Replied)
+		})
+	}
+}
+
+func (s *MessengerReplySuite) TestHistoryResolvesTargetThatArrivedLater() {
+	chat := CreatePublicChat(statusChatID, s.m.getTimesource())
+	reply := buildTestMessage(*chat)
+	reply.ID = "reply"
+	reply.ResponseTo = "original"
+	s.Require().NoError(s.m.persistence.SaveMessages([]*common.Message{reply}))
+
+	stored, err := s.m.persistence.MessageByID(reply.ID)
+	s.Require().NoError(err)
+	s.Require().Nil(stored.QuotedMessage)
+
+	target := buildTestMessage(*chat)
+	target.ID = reply.ResponseTo
+	s.Require().NoError(s.m.persistence.SaveMessages([]*common.Message{target}))
+
+	stored, err = s.m.persistence.MessageByID(reply.ID)
+	s.Require().NoError(err)
+	s.Require().NotNil(stored.QuotedMessage)
+	s.Require().Equal(target.ID, stored.QuotedMessage.ID)
 }

@@ -3,7 +3,6 @@ package protocol
 import (
 	"context"
 	"crypto/ecdsa"
-	"database/sql"
 	"encoding/hex"
 	"fmt"
 	"maps"
@@ -1838,9 +1837,8 @@ func (m *Messenger) handleEditMessage(state *ReceivedMessageState, editMessage E
 		chat.LastMessage = editedMessage
 		needToSaveChat = true
 	}
-	responseTo, err := m.persistence.MessageByID(editedMessage.ResponseTo)
-
-	if err != nil && err != common.ErrRecordNotFound {
+	responseTo, err := m.persistence.replyTarget(editedMessage.LocalChatID, editedMessage.ResponseTo)
+	if err != nil {
 		return err
 	}
 
@@ -2319,18 +2317,6 @@ func (m *Messenger) handleChatMessage(ctx context.Context, state *ReceivedMessag
 		return fmt.Errorf("failed to prepare message content: %v", err)
 	}
 
-	// If the message is a reply, we check if it's a reply to one of own own messages
-	if receivedMessage.ResponseTo != "" {
-		repliedTo, err := m.persistence.MessageByID(receivedMessage.ResponseTo)
-		if err != nil && (err == sql.ErrNoRows || err == common.ErrRecordNotFound) {
-			logger.Error("failed to get quoted message", zap.Error(err))
-		} else if err != nil {
-			return err
-		} else if repliedTo.From == m.myHexIdentity() {
-			receivedMessage.Replied = true
-		}
-	}
-
 	chat, err := m.matchChatEntity(receivedMessage, protobuf.ApplicationMetadataMessage_CHAT_MESSAGE)
 	if err != nil {
 		return err // matchChatEntity returns a descriptive error message
@@ -2382,6 +2368,13 @@ func (m *Messenger) handleChatMessage(ctx context.Context, state *ReceivedMessag
 	if !allowed {
 		return ErrMessageNotAllowed
 	}
+
+	// Keep unresolved references: the target may arrive after the reply.
+	repliedTo, err := m.persistence.replyTarget(chat.ID, receivedMessage.ResponseTo)
+	if err != nil {
+		return err
+	}
+	receivedMessage.Replied = repliedTo != nil && repliedTo.From == m.myHexIdentity()
 
 	var communityChatAccessible = true
 	if chat.ChatType == ChatTypeCommunityChat {
