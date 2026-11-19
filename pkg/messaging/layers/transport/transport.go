@@ -21,6 +21,7 @@ import (
 	"github.com/status-im/status-go/internal/pausable"
 	"github.com/status-im/status-go/pkg/messaging/layers/transport/rfc26"
 	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
+	"github.com/status-im/status-go/pkg/messaging/waku"
 	wakutypes "github.com/status-im/status-go/pkg/messaging/waku/types"
 	"github.com/status-im/status-go/pkg/pubsub"
 )
@@ -270,7 +271,11 @@ func (t *Transport) handleReceivedMessage(msg *wakutypes.ReceivedMessage) {
 			continue
 		}
 
-		for _, filter := range group.filters {
+		filters := group.filters
+		if msg.PubsubTopic == "" {
+			filters = onOnePubsubTopic(filters)
+		}
+		for _, filter := range filters {
 			t.bufferMessage(filter.FilterID, toMessage(decoded, filter, msg, group.privKey))
 		}
 		t.markRouted(msg.Hash)
@@ -281,6 +286,36 @@ func (t *Transport) handleReceivedMessage(msg *wakutypes.ReceivedMessage) {
 	if matched {
 		t.matchedPublisher.Publish(struct{}{})
 	}
+}
+
+// onOnePubsubTopic keeps the filters of one pubsub topic, the default shard
+// when any filter is on it. A message without a pubsub topic matches a chat
+// registered on several pubsub topics once per topic; this delivers it once.
+func onOnePubsubTopic(filters []*Filter) []*Filter {
+	pubsubOf := func(filter *Filter) string {
+		if filter.PubsubTopic == "" {
+			return waku.DefaultShardPubsubTopic()
+		}
+		return filter.PubsubTopic
+	}
+	chosen := ""
+	for _, filter := range filters {
+		pubsubTopic := pubsubOf(filter)
+		if pubsubTopic == waku.DefaultShardPubsubTopic() {
+			chosen = pubsubTopic
+			break
+		}
+		if chosen == "" || pubsubTopic < chosen {
+			chosen = pubsubTopic
+		}
+	}
+	res := make([]*Filter, 0, len(filters))
+	for _, filter := range filters {
+		if pubsubOf(filter) == chosen {
+			res = append(res, filter)
+		}
+	}
+	return res
 }
 
 // bufferMessage stores a decoded message in the per-filter receive buffer,
