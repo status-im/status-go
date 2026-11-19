@@ -21,7 +21,7 @@ func TestDeliveryConfigUsesTheFleetPreset(t *testing.T) {
 
 		require.Equal(t, preset, cfg.Preset)
 		require.Equal(t, bindings.ModeEdge, cfg.Mode)
-		require.Equal(t, bindings.Overrides{"reliability": false, "backfill-enabled": false, "local-storage-path": "/data"}, cfg.MessagingOverrides)
+		require.Equal(t, bindings.Overrides{"reliability": false, "backfill-enabled": false, "configured-store-nodes-only": true, "local-storage-path": "/data"}, cfg.MessagingOverrides)
 	}
 }
 
