@@ -320,10 +320,12 @@ Send a text message to a chat/channel.
   "chatId": "<chatId>",
   "text": "Hello!",
   "contentType": 1,
+  "responseTo": "<replyTargetMessageId-optional>",
   "threadId": "<parentMessageId-optional>"
 }]
 ```
 
+- `responseTo` is optional. When provided, it must identify a locally stored message in the destination chat. System messages, such as group membership events and pin notices, cannot be reply targets.
 - `threadId` is optional.
 - Use `threadId` to send a message into an existing thread.
 - If `threadId` points to a parent that is not yet known locally, the backend still creates thread metadata and backfills the name when the parent arrives.
