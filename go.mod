@@ -14,6 +14,7 @@ tool (
 	github.com/wadey/gocovmerge
 	go.uber.org/mock/mockgen
 	google.golang.org/protobuf/cmd/protoc-gen-go
+	gotest.tools/gotestsum
 )
 
 replace github.com/rjeczalik/notify => github.com/status-im/notify v1.0.2-status
