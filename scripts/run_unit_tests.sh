@@ -84,7 +84,7 @@ run_test_for_packages() {
     test_extra_flags="${test_extra_flags} -run ${run_filter}"
   fi
 
-  gotestsum --packages="${packages}" ${gotestsum_flags} --raw-command -- \
+  go tool gotestsum --packages="${packages}" ${gotestsum_flags} --raw-command -- \
     ./scripts/test_with_coverage.sh \
     ${test_extra_flags} \
     -timeout "${timeout}" \

@@ -22,7 +22,6 @@ in pkgs.buildGoModule {
   NIM_TKL_LIB_DIR = "${pkgs.libtkl}/lib";
 
   nativeBuildInputs = with pkgs; [
-    mockgen
     protobuf_36
   ] ++ lib.optionals stdenv.isDarwin [ darwin.cctools ];
 

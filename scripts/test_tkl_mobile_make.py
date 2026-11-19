@@ -65,7 +65,7 @@ class MobileBuildTest(unittest.TestCase):
                 commands = [line for line in result.stdout.splitlines() if "gotestsum" in line]
                 self.assertTrue(commands)
                 for command in commands:
-                    self.assertIn("bash scripts/tkl_env.sh gotestsum", command)
+                    self.assertIn("bash scripts/tkl_env.sh go tool gotestsum", command)
                     if target == "test-storage":
                         self.assertIn("-lstorage", command)
 
