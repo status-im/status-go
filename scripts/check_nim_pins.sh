@@ -18,8 +18,9 @@ has() { grep -qF -- "$2" "$repo/$1" || miss "$1" "$2"; }
 nim="$(sed -n 's|^requires "nim == \([0-9.]*\)"$|\1|p' "$repo/status_go.nimble")"
 sds="$(sed -n 's|^requires "https://github.com/.*/nim-sds#\([0-9a-f]\{40\}\)"$|\1|p' "$repo/status_go.nimble")"
 tkl="$(sed -n 's|^requires "https://github.com/.*/nim-token-lists#\([0-9a-f]\{40\}\)"$|\1|p' "$repo/status_go.nimble")"
-[ -n "$nim" ] && [ -n "$sds" ] && [ -n "$tkl" ] || {
-  echo "check_nim_pins.sh: status_go.nimble must pin nim, nim-sds and nim-token-lists" >&2
+delivery="$(sed -n 's|^requires "https://github.com/.*/logos-delivery#\([0-9a-f]\{40\}\)"$|\1|p' "$repo/status_go.nimble")"
+[ -n "$nim" ] && [ -n "$sds" ] && [ -n "$tkl" ] && [ -n "$delivery" ] || {
+  echo "check_nim_pins.sh: status_go.nimble must pin nim, nim-sds, nim-token-lists and logos-delivery" >&2
   exit 1
 }
 
@@ -28,6 +29,7 @@ if [ "$#" -eq 0 ]; then
   has nix/pkgs/libtkl/default.nix "version = \"$nim\";"
   has flake.nix "nim-sds?submodules=1&rev=$sds"
   has flake.nix "nim-token-lists?submodules=1&rev=$tkl"
+  has flake.nix "logos-delivery?submodules=1&rev=$delivery"
   grep -Eq "github.com/status-im/nim-token-lists/go/tkl v[^[:space:]]*-${tkl:0:12}([[:space:]]|$)" "$repo/go.mod" ||
     miss go.mod "nim-token-lists ${tkl:0:12}"
 else
@@ -42,5 +44,6 @@ else
   }
   resolved sds "$sds"
   resolved tokenlists "$tkl"
+  resolved logos_delivery "$delivery"
 fi
 exit "$failed"
