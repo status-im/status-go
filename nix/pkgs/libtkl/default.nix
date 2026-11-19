@@ -3,10 +3,10 @@ let
   # Match the public library's CI compiler without changing any SDS toolchain.
   compiler = nim.override {
     nim-unwrapped-2_2 = nim-unwrapped-2_2.overrideAttrs (old: {
-      version = "2.2.10";
+      version = "2.2.12";
       src = fetchurl {
-        url = "https://nim-lang.org/download/nim-2.2.10.tar.xz";
-        hash = "sha256-eVe37QBCBrzxC8xPO0dEFTh45i8kMVUqmo6dP0Do1dU=";
+        url = "https://nim-lang.org/download/nim-2.2.12.tar.xz";
+        hash = "sha256-Jjmgal6np/z1ffHn4e9NGyvuWMesm9ANvSqlvqHlpWo=";
       };
       # This optional store-path shortening patch targets older compiler code.
       patches = builtins.filter (p: builtins.baseNameOf p != "extra-mangling-2.patch") old.patches;

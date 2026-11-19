@@ -35,9 +35,11 @@
     nim-sds.url = "git+https://github.com/logos-messaging/nim-sds?submodules=1&rev=8f7fee08f0256c1788089e756182c8be0a621930";
     # nimble 0.20.1 in the nixpkgs above cannot resolve nim-sds through the bindings.
     nixpkgs-nimble.url = "github:NixOS/nixpkgs/34ab99075ac4f7e40cf037eef32cb1c360bb85e9";
+    # Its own nixpkgs: it builds the Nim its lock pins.
+    logos-delivery.url = "git+https://github.com/logos-messaging/logos-delivery?submodules=1&rev=eca8ce5c90c1247a4e0b42ceb3094425c2c97fd0";
   };
 
-  outputs = { self, nixpkgs, logos-storage-nim, nim-sds, nim-token-lists, nixpkgs-nimble }:
+  outputs = { self, nixpkgs, logos-storage-nim, nim-sds, nim-token-lists, nixpkgs-nimble, logos-delivery }:
   let
     stableSystems = [
       "x86_64-linux" "aarch64-linux"
@@ -64,6 +66,15 @@
             libtkl = final.callPackage ./nix/pkgs/libtkl { src = nim-token-lists; };
             libsds     = useTmpdirForNimCache nim-sds.packages.${system}.libsds;
             libstorage = useTmpdirForNimCache logos-storage-nim.packages.${system}.libstorage;
+            # No libpq dlopen, and no bundled librln.so shadowing go-waku's rln.
+            liblogosdelivery = let
+              full = logos-delivery.packages.${system}.liblogosdelivery.override {
+                enablePostgres = false;
+              };
+            in final.runCommand full.name { } ''
+              mkdir -p $out/lib
+              ln -s ${full}/lib/liblogosdelivery.* $out/lib/
+            '';
             nimble = nixpkgs-nimble.legacyPackages.${system}.nimble.overrideAttrs (_: {
               version = "0.26.1";
               src = final.fetchFromGitHub {

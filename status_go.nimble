@@ -12,7 +12,7 @@ srcDir = "internal/nimble/src"
 ### Dependencies
 # This file pins the Nim that builds the libraries and their revisions.
 # scripts/check_nim_pins.sh holds every other copy, and a consumer's resolution, to it.
-requires "nim == 2.2.10"
+requires "nim == 2.2.12"
 
 # nim-sds, whose C ABI go.mod's sds-go-bindings must match.
 requires "https://github.com/logos-messaging/nim-sds#8f7fee08f0256c1788089e756182c8be0a621930"
@@ -27,4 +27,4 @@ requires "chronos#0de7b335d0ad5557ad5ba71a4b7662f7b201750e"
 # which configures it without its test executables.
 requires "https://github.com/logos-storage/nim-leopard#3a24aa1f4b7ce227e8d30c51357ae241cf6b478d"
 # liblogosdelivery, which a caller builds with plain nim c.
-requires "https://github.com/logos-messaging/logos-delivery#e03b9754af7f639283a953bc3f9f6c79064211ee"
+requires "https://github.com/logos-messaging/logos-delivery#eca8ce5c90c1247a4e0b42ceb3094425c2c97fd0"
