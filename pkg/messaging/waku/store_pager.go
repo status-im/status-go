@@ -28,8 +28,8 @@ const (
 	storeRequestTimeout        = 30 * time.Second
 )
 
-// envelopeProcessor consumes messages fetched from a storenode.
-type envelopeProcessor interface {
+// EnvelopeProcessor consumes messages fetched from a storenode.
+type EnvelopeProcessor interface {
 	OnEnvelope(env *protocol.Envelope, processEnvelopes bool) error
 }
 
@@ -39,8 +39,8 @@ type envelopeProcessor interface {
 // shouldProcessNextPage says so. The storenode is fixed for the whole run, so
 // cursors stay valid.
 type storePager struct {
-	requestor storeRequestor
-	processor envelopeProcessor
+	requestor StoreRequestor
+	processor EnvelopeProcessor
 	logger    *zap.Logger
 
 	// sem bounds concurrent store requests across all run calls (a single pager
@@ -48,7 +48,7 @@ type storePager struct {
 	sem chan struct{}
 }
 
-func newStorePager(requestor storeRequestor, processor envelopeProcessor, logger *zap.Logger) *storePager {
+func newStorePager(requestor StoreRequestor, processor EnvelopeProcessor, logger *zap.Logger) *storePager {
 	return &storePager{
 		requestor: requestor,
 		processor: processor,
@@ -177,7 +177,7 @@ func (p *storePager) fetchChunk(
 			}
 
 			reqCtx, reqCancel := context.WithTimeout(ctx, storeRequestTimeout)
-			messages, nextCursor, err := p.requestor.query(reqCtx, peerInfo, request)
+			messages, nextCursor, err := p.requestor.Query(reqCtx, peerInfo, request)
 			reqCancel()
 			if err != nil {
 				return err
