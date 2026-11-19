@@ -56,8 +56,11 @@ func stripMetadata(data []byte, t ImageType) ([]byte, error) {
 	}
 }
 
-// stripJpegMetadata drops APPn segments other than JFIF (APP0), ICC profiles (APP2) and
-// Adobe colour info (APP14), and COM segments. Everything from the first SOS on is kept as is.
+// jfifHeaderLen is the APP0 JFIF payload up to and including the thumbnail dimensions.
+const jfifHeaderLen = 14
+
+// stripJpegMetadata drops APPn segments other than JFIF (APP0, without its thumbnail), ICC
+// profiles (APP2) and Adobe colour info (APP14), COM segments, and anything after EOI.
 func stripJpegMetadata(data []byte) ([]byte, error) {
 	if !IsJpeg(data) {
 		return nil, errMalformedImage
@@ -75,7 +78,7 @@ func stripJpegMetadata(data []byte) ([]byte, error) {
 			i++
 			continue
 		case marker == 0xD9: // EOI
-			return append(out, data[i:]...), nil
+			return append(out, 0xFF, 0xD9), nil
 		case marker == 0x01 || (marker >= 0xD0 && marker <= 0xD7): // no length
 			out = append(out, data[i:i+2]...)
 			i += 2
@@ -88,15 +91,29 @@ func stripJpegMetadata(data []byte) ([]byte, error) {
 		if segEnd < i+4 || segEnd > len(data) {
 			return nil, errMalformedImage
 		}
-		if marker == 0xDA { // SOS: the entropy-coded data and the rest of the file follow
-			return append(out, data[i:]...), nil
+		if marker == 0xDA { // SOS: keep the header and the entropy-coded data up to the next marker
+			scanEnd, err := jpegScanEnd(data, segEnd)
+			if err != nil {
+				return nil, err
+			}
+			out = append(out, data[i:scanEnd]...)
+			i = scanEnd
+			continue
 		}
 		seg := data[i+4 : segEnd]
 		keep := true
 		switch {
 		case marker == 0xFE: // COM
 			keep = false
-		case marker == 0xE0: // JFIF / JFXX
+		case marker == 0xE0:
+			if !bytes.HasPrefix(seg, []byte("JFIF\x00")) || len(seg) < jfifHeaderLen { // JFXX: thumbnail
+				keep = false
+			} else if len(seg) > jfifHeaderLen {
+				out = append(out, 0xFF, 0xE0, 0, jfifHeaderLen+2)
+				out = append(out, seg[:jfifHeaderLen-2]...)
+				out = append(out, 0, 0)
+				keep = false
+			}
 		case marker == 0xE2:
 			keep = bytes.HasPrefix(seg, []byte("ICC_PROFILE\x00"))
 		case marker == 0xEE:
@@ -109,6 +126,21 @@ func stripJpegMetadata(data []byte) ([]byte, error) {
 		}
 		i = segEnd
 	}
+}
+
+// jpegScanEnd returns the index of the first marker after the entropy-coded data starting at i,
+// skipping stuffed 0xFF00 bytes and RSTn markers.
+func jpegScanEnd(data []byte, i int) (int, error) {
+	for ; i+1 < len(data); i++ {
+		if data[i] != 0xFF {
+			continue
+		}
+		next := data[i+1]
+		if next != 0x00 && next != 0xFF && (next < 0xD0 || next > 0xD7) {
+			return i, nil
+		}
+	}
+	return 0, errMalformedImage
 }
 
 var pngMetadataChunks = map[string]bool{"tEXt": true, "zTXt": true, "iTXt": true, "eXIf": true, "tIME": true}
@@ -136,10 +168,10 @@ func stripPngMetadata(data []byte) ([]byte, error) {
 		}
 		i = end
 		if typ == "IEND" {
-			break
+			return out, nil
 		}
 	}
-	return out, nil
+	return nil, errMalformedImage // no IEND
 }
 
 // stripGifMetadata drops comment extensions and application extensions other than the

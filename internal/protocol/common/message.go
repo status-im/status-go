@@ -329,7 +329,8 @@ func (m *Message) MarshalJSON() ([]byte, error) {
 		item.ImageHeight = image.Height
 		item.AlbumImagesCount = image.AlbumImagesCount
 		// lets clients tell e.g. an animated GIF/WebP apart from a still image without fetching it
-		if image.Format != protobuf.ImageFormat_UNKNOWN_IMAGE_FORMAT {
+		switch image.Format {
+		case protobuf.ImageFormat_JPEG, protobuf.ImageFormat_PNG, protobuf.ImageFormat_GIF, protobuf.ImageFormat_WEBP:
 			item.ImageFormat = strings.ToLower(image.Format.String())
 		}
 	}

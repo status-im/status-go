@@ -251,6 +251,50 @@ func TestOpenAndAdjustImagePassesSmallJpegThroughWithoutMetadata(t *testing.T) {
 	require.False(t, bytes.Contains(out, []byte("secret")))
 }
 
+func jpegSegment(marker byte, payload []byte) []byte {
+	seg := []byte{0xFF, marker}
+	seg = binary.BigEndian.AppendUint16(seg, uint16(len(payload)+2)) //nolint:gosec // small test segment
+	return append(seg, payload...)
+}
+
+func TestOpenAndAdjustImageDropsJpegDataAfterEOI(t *testing.T) {
+	jpg := encodeJpeg(t, noiseImage(300, 200, 9, 60), 85)
+	src := append(append([]byte{}, jpg...), []byte("trailing GPS 46.7712N secret")...)
+
+	out, err := OpenAndAdjustImage(CroppedImage{ImagePath: writeTemp(t, "a.jpg", src)}, false)
+	require.NoError(t, err)
+	require.Equal(t, jpg, out)
+}
+
+func TestStripJpegMetadataDropsSegmentsAfterTheFirstScan(t *testing.T) {
+	jpg := encodeJpeg(t, halvesImage(8, 8), 80)
+	eoi := len(jpg) - 2
+	src := append([]byte{}, jpg[:eoi]...)
+	src = append(src, jpegSegment(0xFE, []byte("secret comment"))...)
+	src = append(src, jpegSegment(0xE1, []byte("Exif\x00\x00secret"))...)
+	src = append(src, jpg[eoi:]...)
+
+	out, err := stripJpegMetadata(src)
+	require.NoError(t, err)
+	require.Equal(t, jpg, out)
+}
+
+func TestStripJpegMetadataDropsThumbnails(t *testing.T) {
+	jpg := encodeJpeg(t, halvesImage(8, 8), 80)
+	jfifHeader := []byte("JFIF\x00\x01\x02\x00\x00\x01\x00\x01")
+	jfifWithThumb := append(append([]byte{}, jfifHeader...), 1, 1, 's', 'e', 'c')
+	jfxx := append([]byte("JFXX\x00\x13"), []byte("secret thumbnail")...)
+	src := withSegment(jpg, jpegSegment(0xE0, jfxx))
+	src = withSegment(src, jpegSegment(0xE0, jfifWithThumb))
+
+	out, err := stripJpegMetadata(src)
+	require.NoError(t, err)
+	want := withSegment(jpg, jpegSegment(0xE0, append(append([]byte{}, jfifHeader...), 0, 0)))
+	require.Equal(t, want, out)
+	_, err = jpeg.Decode(bytes.NewReader(out))
+	require.NoError(t, err)
+}
+
 func TestOpenAndAdjustImageRotatesInsteadOfPassingThroughOrientedJpeg(t *testing.T) {
 	src := withSegment(encodeJpeg(t, halvesImage(40, 20), 95), exifSegment(6, false))
 
@@ -351,6 +395,8 @@ func TestStripMetadataRejectsMalformedData(t *testing.T) {
 	}{
 		{"jpeg", JPEG, jpg[:len(jpg)/2]},
 		{"png", PNG, pngBuf.Bytes()[:20]},
+		{"png without IEND", PNG, pngBuf.Bytes()[:pngBuf.Len()-12]},
+		{"jpeg without EOI", JPEG, jpg[:len(jpg)-2]},
 		{"gif", GIF, gifData[:len(gifData)/2]},
 		{"webp", WEBP, webpData[:30]},
 		{"unknown", UNKNOWN, []byte("x")},

@@ -856,7 +856,9 @@ func TestMarshalMessageJSONImageFormat(t *testing.T) {
 		require.Equal(t, expected, decoded["imageFormat"])
 	}
 
-	data, err := json.Marshal(newImageMessage(protobuf.ImageFormat_UNKNOWN_IMAGE_FORMAT))
-	require.NoError(t, err)
-	require.NotContains(t, string(data), "imageFormat")
+	for _, format := range []protobuf.ImageFormat{protobuf.ImageFormat_UNKNOWN_IMAGE_FORMAT, protobuf.ImageFormat(99)} {
+		data, err := json.Marshal(newImageMessage(format))
+		require.NoError(t, err)
+		require.NotContains(t, string(data), "imageFormat", "format %d", format)
+	}
 }
