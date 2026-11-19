@@ -34,10 +34,10 @@ jobs:
       # Its pattern takes the generator's progress lines for compile errors.
       - name: Remove the Go problem matcher
         run: echo "::remove-matcher owner=go::"
-      # The Nim on PATH builds the token library; nimble uses its own for libsds.
+      # The Nim status_go.nimble pins, which builds libsds and the token library.
       - uses: jiro4989/setup-nim-action@189b145833368cc92f1e7b3e166a25a3e057a693 # v2.3.1
         with:
-          nim-version: ${{ env.TKL_NIM_VERSION }}
+          nim-version: ${{ env.NIM_LIBS_VERSION }}
       # The nimble bundled with Nim cannot resolve nim-sds through the bindings.
       - name: Install nimble
         run: |
@@ -94,11 +94,10 @@ jobs:
       # Its pattern takes the generator's progress lines for compile errors.
       - name: Remove the Go problem matcher
         run: echo "::remove-matcher owner=go::"
-      # The Nim on PATH builds the token library; nimble uses its own for libsds.
+      # The Nim status_go.nimble pins, which builds libsds and the token library.
       - uses: ./.github/actions/nim
         with:
-          nim-version: ${{ env.TKL_NIM_VERSION }}
-          sds-nim-version: ${{ env.SDS_NIM_VERSION }}
+          nim-version: ${{ env.NIM_LIBS_VERSION }}
           nimble-version: ${{ env.NIMBLE_VERSION }}
       - uses: arduino/setup-protoc@c65c819552d16ad3c9b72d9dfd5ba5237b9c906b # v3.0.0
         with:

@@ -4,14 +4,19 @@ on:
     paths:
       - '.github/workflows/token-library.yml'
       - '.github/actions/nim/**'
+      - '.github/actions/versions/**'
       - '.gitattributes'
+      - 'Dockerfile'
       - 'Makefile'
+      - 'nim.mk'
+      - 'status_go.nimble'
       - 'go.mod'
       - 'go.sum'
       - 'flake.nix'
       - 'flake.lock'
       - 'nix/pkgs/libtkl/**'
       - 'scripts/*tkl*'
+      - 'scripts/seal_nim_lib.sh'
       - 'scripts/testdata/tkl-*/**'
       - 'scripts/testdata/tkl-*'
       - 'internal/tklbuild/**'
@@ -32,9 +37,10 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: ./.github/actions/versions
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff
         with:
-          go-version: '1.26.5'
+          go-version: ${{ env.GO_VERSION }}
           cache: false
       # Its pattern takes the generator's progress lines for compile errors.
       - name: Remove the Go problem matcher
@@ -42,11 +48,12 @@ jobs:
       - uses: jiro4989/setup-nim-action@189b145833368cc92f1e7b3e166a25a3e057a693
         if: runner.os != 'macOS'
         with:
-          nim-version: '2.2.10'
+          nim-version: ${{ env.NIM_LIBS_VERSION }}
       - uses: ./.github/actions/nim
         if: runner.os == 'macOS'
         with:
-          nim-version: '2.2.10'
+          nim-version: ${{ env.NIM_LIBS_VERSION }}
+          nimble-version: ${{ env.NIMBLE_VERSION }}
       - name: Dependency lifecycle and mandatory mobile integration
         run: |
           python3 scripts/test_tkl_native.py
@@ -60,7 +67,7 @@ jobs:
       - name: Setup Protocol Buffer Compiler
         uses: arduino/setup-protoc@v3
         with:
-          version: '36.0'
+          version: ${{ env.PROTOC_VERSION }}
           repo-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Generate metadata, migrations and mocks
         run: make generate
@@ -77,13 +84,14 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: ./.github/actions/versions
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff
         with:
-          go-version: '1.26.5'
+          go-version: ${{ env.GO_VERSION }}
           cache: false
       - uses: jiro4989/setup-nim-action@189b145833368cc92f1e7b3e166a25a3e057a693
         with:
-          nim-version: '2.2.10'
+          nim-version: ${{ env.NIM_LIBS_VERSION }}
       - uses: msys2/setup-msys2@ec48f7c5447b3140e2b088413ae3a55687bccb6e
         with:
           msystem: MINGW64
@@ -102,13 +110,14 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: ./.github/actions/versions
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff
         with:
-          go-version: '1.26.5'
+          go-version: ${{ env.GO_VERSION }}
           cache: false
       - uses: jiro4989/setup-nim-action@189b145833368cc92f1e7b3e166a25a3e057a693
         with:
-          nim-version: '2.2.10'
+          nim-version: ${{ env.NIM_LIBS_VERSION }}
       - name: Install NDK
         run: |
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'ndk;27.2.12479018' < <(yes)
@@ -128,13 +137,15 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: ./.github/actions/versions
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff
         with:
-          go-version: '1.26.5'
+          go-version: ${{ env.GO_VERSION }}
           cache: false
       - uses: ./.github/actions/nim
         with:
-          nim-version: '2.2.10'
+          nim-version: ${{ env.NIM_LIBS_VERSION }}
+          nimble-version: ${{ env.NIMBLE_VERSION }}
       - name: Cross-link device and simulator consumers
         run: |
           export CGO_ENABLED=1 GOOS=ios

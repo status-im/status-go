@@ -48,11 +48,10 @@ jobs:
         with:
           version: ${{ env.PROTOC_VERSION }}
           repo-token: ${{ secrets.GITHUB_TOKEN }}
-      # The Nim on PATH builds the token library; nimble uses its own for libsds.
+      # The Nim status_go.nimble pins, which builds libsds and the token library.
       - uses: ./.github/actions/nim
         with:
-          nim-version: ${{ env.TKL_NIM_VERSION }}
-          sds-nim-version: ${{ env.SDS_NIM_VERSION }}
+          nim-version: ${{ env.NIM_LIBS_VERSION }}
           nimble-version: ${{ env.NIMBLE_VERSION }}
       - name: Toolchain versions
         run: |
@@ -61,20 +60,6 @@ jobs:
           nim --version | head -n 1
           nimble --version | grep -F "nimble v$NIMBLE_VERSION"
           git describe --tags
-      # With libsds restored, nimble does not run: nothing to download or compile.
-      - name: Restore libsds
-        id: libsds
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
-        with:
-          path: |
-            build/libsds.dylib
-            build/libsds.h
-          key: libsds-macos-aarch64-${{ hashFiles('status_go.nimble', 'Makefile', '.github/actions/nim/**') }}
-      - name: Use the restored libsds
-        if: steps.libsds.outputs.cache-hit == 'true'
-        run: |
-          echo "NIM_SDS_LIB_DIR=$GITHUB_WORKSPACE/build" >> "$GITHUB_ENV"
-          echo "NIM_SDS_INC_DIR=$GITHUB_WORKSPACE/build" >> "$GITHUB_ENV"
       - uses: ./.github/actions/go-cache
         with:
           name: macos-aarch64

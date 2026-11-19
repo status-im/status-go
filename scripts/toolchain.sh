@@ -75,9 +75,9 @@ fi
 
 # nimble looks for a Nim under the home directory before it downloads one.
 # shellcheck disable=SC2016
-link_nim='version="$(/opt/nim-sds/bin/nim --version | sed -nE "1s/.*Version ([0-9.]+).*/\1/p")"
+link_nim='version="$(/opt/nim-libs/bin/nim --version | sed -nE "1s/.*Version ([0-9.]+).*/\1/p")"
 mkdir -p "$HOME/.nimble/nimbinaries"
-ln -sfn /opt/nim-sds "$HOME/.nimble/nimbinaries/nim-$version"
+ln -sfn /opt/nim-libs "$HOME/.nimble/nimbinaries/nim-$version"
 exec "$@"'
 
 exec docker run "${args[@]}" "$image" bash -c "$link_nim" toolchain "$@"

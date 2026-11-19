@@ -115,10 +115,8 @@ IOS_TOKEN_ARCHIVE = bash scripts/tkl_bundle_archive.sh build/bin/libstatus.a
 
 # `nim-sds` variables
 #
-# Option 1 (default): Nimble builds libsds into build/. sds-go-bindings pins the revision.
+# Option 1 (default): Nimble builds libsds into build/. status_go.nimble pins the revision.
 # Option 2: Provide NIM_SDS_LIB_DIR and NIM_SDS_INC_DIR (used by Nix).
-
-NIMBLE ?= nimble
 
 ifdef NIM_SDS_LIB_DIR
 ifdef NIM_SDS_INC_DIR
@@ -132,14 +130,9 @@ else
     NIM_SDS_LIB_DIR := $(CURDIR)/build
     NIM_SDS_INC_DIR := $(CURDIR)/build
     NIM_SDS_BUILD_FROM_SOURCE := true
-    # Nix builds have no Nimble on PATH.
-    NIMBLE_SETUP := nimble.paths
 endif
 
-# nimble.paths has every --path, so parent configs (status-app's) are skipped.
-NIMBLE_SDS_ENV = \
-	LIBSDS_OUT="$(NIM_SDS_LIB_DIR)" \
-	NIM_PARAMS="--skipParentCfg $$NIM_PARAMS $$(tr '\n' ' ' < $(CURDIR)/nimble.paths)"
+include nim.mk
 
 LIBSDS ?= $(NIM_SDS_LIB_DIR)/libsds.$(LIB_EXT)
 CGO_CFLAGS+=-I$(NIM_SDS_INC_DIR)
@@ -323,51 +316,70 @@ $(GO_CMD_BUILDS): ##@build Build any Go project from cmd folder
 	@echo "Compilation done."
 	@echo "Run \"build/bin/$(notdir $@) -h\" to view available commands."
 
-# Flag needed by nim-based dependencies (e.g., nim-sds) that also use nimbus-build-system.
-# When USE_SYSTEM_NIM=1 skips compiling Nim compiler locally and instead,
-# enforces to use system-installed Nim.
+# logos-storage builds with nimbus-build-system: USE_SYSTEM_NIM=1 makes it use
+# the Nim on PATH instead of compiling its own.
 USE_SYSTEM_NIM ?= 1
 
 # libsds targets
 
-.PHONY: nimble-deps
+# libsds.h includes generated/sds.h; both go next to the library.
+NIM_SDS_LIBRARY = $(call NIM_PKG_DIR,sds)/library
+NIM_SDS_BUILD = $(call NIM_COMPILE,$(NIM_SDS_LIBRARY)/libsds.nim,$(1),$(2),-d:ffiOutputDir=\"$(NIM_LIB_DIR)/generated\" $(3)) && \
+	cp "$(NIM_SDS_LIBRARY)/libsds.h" "$(NIM_LIB_DIR)/"
 
-nimble.paths: status_go.nimble
-	env -u SDKROOT -u CPATH -u LIBRARY_PATH $(NIMBLE) setup --localdeps -y
+# Each target builds in its own directory, with its own nimcache, and rebuilds
+# only when something changed. The result is copied to NIM_SDS_LIB_DIR, where
+# the Go build and status-app take it.
+NIM_SDS_TARGETS_DIR = $(NIM_SDS_LIB_DIR)/sds
+NIM_SDS_DESKTOP_OS = $(if $(filter Darwin,$(detected_OS)),macos,$(if $(filter Windows,$(detected_OS)),windows,linux))
+NIM_SDS_DESKTOP_DIR = $(NIM_SDS_TARGETS_DIR)/$(NIM_SDS_DESKTOP_OS)-$(or $(ARCH),$(shell uname -m))
+# Named before ARCH is checked, which the build itself does.
+NIM_SDS_ANDROID_DIR = $(NIM_SDS_TARGETS_DIR)/android-$(or $(ARCH),unset)
+NIM_SDS_IOS_DIR = $(NIM_SDS_TARGETS_DIR)/$(NIM_IOS_SDK)-$(NIM_IOS_ARCH)
+# $(call NIM_SDS_PUBLISH,<library file>)
+NIM_SDS_PUBLISH = { cmp -s "$(1)" "$(NIM_SDS_LIB_DIR)/$(notdir $(1))" || cp "$(1)" "$(NIM_SDS_LIB_DIR)/"; } && \
+	cp "$(dir $(1))libsds.h" "$(NIM_SDS_LIB_DIR)/" && mkdir -p "$(NIM_SDS_LIB_DIR)/generated" && \
+	cp "$(dir $(1))generated/"*.h "$(NIM_SDS_LIB_DIR)/generated/"
 
-nimble-deps: nimble.paths ##@build Resolve the Nim dependencies
-
-$(LIBSDS): | $(NIMBLE_SETUP)
 ifeq ($(NIM_SDS_BUILD_FROM_SOURCE),true)
-	@echo "Building nim-sds: $(LIBSDS)"
-	$(NIMBLE_SDS_ENV) $(NIMBLE) libsds
-	@test -f $(LIBSDS) || (echo "Error: libsds not found at $(LIBSDS) after build" && exit 1)
+$(LIBSDS): $(NIM_SDS_DESKTOP_DIR)/libsds.$(LIB_EXT)
+	@$(call NIM_SDS_PUBLISH,$<)
 else
+$(LIBSDS):
 	@test -f $(LIBSDS) || (echo "Error: libsds not found at $(LIBSDS)" && exit 1)
 endif
 
 build-libsds: $(LIBSDS)
 
+$(NIM_SDS_TARGETS_DIR)/%: NIM_LIB_DIR = $(patsubst %/,%,$(dir $@))
+$(NIM_SDS_DESKTOP_DIR)/%: NIM_PARAMS ?= $(NIM_POLICY_DESKTOP)
+$(NIM_SDS_TARGETS_DIR)/android-%: NIM_FLAGS = $(NIM_FLAGS_ANDROID)
+$(NIM_SDS_TARGETS_DIR)/android-%: NIM_PARAMS ?= $(NIM_POLICY_ANDROID)
+$(NIM_SDS_TARGETS_DIR)/iphone%: NIM_FLAGS = $(NIM_FLAGS_IOS)
+$(NIM_SDS_TARGETS_DIR)/iphone%: NIM_PARAMS ?= $(NIM_POLICY_IOS)
 
-## Target-specific architecture mapping for libsds Android build
-# Note: nim-sds uses 'amd64' for both x86 and x86_64
-build-libsds-android: SDSARCH = $(strip $(if $(filter arm64,$(ARCH)),arm64,\
-	$(if $(filter arm,$(ARCH)),arm,\
-	$(if $(filter amd64,$(ARCH)),amd64,\
-	$(if $(filter x86 x86_64,$(ARCH)),amd64,\
-	$(error Unsupported ARCH '$(ARCH)'. Please set ARCH to one of: arm64, arm, amd64, x86, x86_64))))))
-build-libsds-android: | nimble.paths
-	@echo "Building nim-sds for Android" $(LIBSDS)
-	$(NIMBLE_SDS_ENV) ARCH="$(SDSARCH)" ANDROID_NDK_ROOT="$(ANDROID_NDK_ROOT)" \
-		$(NIMBLE) libsdsAndroid
+$(NIM_SDS_DESKTOP_DIR)/libsds.$(LIB_EXT): nimble.paths FORCE
+	@$(call NIM_BUILD_IF_CHANGED,$@,echo "Building nim-sds: $@" && $(call NIM_SDS_BUILD,lib,$(notdir $@)))
 
-build-libsds-ios: | nimble.paths
-	@echo "Building nim-sds for iOS" $(LIBSDS)
-	$(NIMBLE_SDS_ENV) env -u SDKROOT -u CPATH -u LIBRARY_PATH $(NIMBLE) libsdsIOS
+$(NIM_SDS_TARGETS_DIR)/android-%/libsds.so: nimble.paths FORCE
+	@$(call NIM_BUILD_IF_CHANGED,$@,$(call NIM_SDS_BUILD,lib,libsds.so))
+
+# Static, next to other Nim runtimes in one image: sealed, from the objects of
+# a fresh nimcache.
+$(NIM_SDS_TARGETS_DIR)/iphone%/libsds.a: nimble.paths FORCE
+	@$(call NIM_BUILD_IF_CHANGED,$@,rm -rf "$(NIM_LIB_DIR)/nimcache" && \
+		$(call NIM_SDS_BUILD,staticlib,libsds.a,--noLinking --passC:-fvisibility=hidden --passC:-fno-common) && \
+		$(call NIM_SEAL,sds_,$@))
+
+build-libsds-android: $(NIM_SDS_ANDROID_DIR)/libsds.so
+	$(call NIM_SDS_PUBLISH,$<)
+
+build-libsds-ios: $(NIM_SDS_IOS_DIR)/libsds.a
+	$(call NIM_SDS_PUBLISH,$<)
 
 clean-libsds:
 	@echo "Removing libsds"
-	rm $(LIBSDS)
+	rm -rf $(LIBSDS) $(NIM_SDS_TARGETS_DIR)
 
 rebuild-libsds: | clean-libsds $(LIBSDS)
 
@@ -622,7 +634,10 @@ lint-panics: generate
 	GOFLAGS=-tags='$(subst $(space),$(comma),$(strip $(BUILD_TAGS) lint))' \
 	$(TOKEN_ENV) go tool goroutine-defer-guard -test=false -target github.com/status-im/status-go/internal/panics.LogOnPanic ./...
 
-lint: generate lint-panics lint-argon2-fork
+lint-nim-pins: ##@lint Check that every copy of the Nim pins matches status_go.nimble
+	bash scripts/check_nim_pins.sh
+
+lint: generate lint-panics lint-argon2-fork lint-nim-pins
 lint:
 	$(TOKEN_ENV) golangci-lint --build-tags '$(BUILD_TAGS) lint' run ./...
 
@@ -632,11 +647,26 @@ lint-fix: generate
 clean: clean-storage clean-libtkl ##@other Cleanup
 	rm -fr build/bin/*
 
-.PHONY: build-libtkl clean-libtkl test-libtkl test-libtkl-coexistence
+.PHONY: build-libtkl nim-libtkl clean-libtkl test-libtkl test-libtkl-coexistence
 build-libtkl: ##@build Prepare the pinned native token library
 	bash scripts/tkl_native.sh
 
-clean-libtkl: ##@other Remove the managed token-library checkout and build
+# scripts/tkl_native.sh passes the output directory and the target: a mobile
+# platform (TKL_PLATFORM, spelled by this file as for libsds), or the desktop
+# flags of Go's compiler (TKL_NIM_FLAGS) with, for a cross build, the target's
+# NIM_SEAL_* tools. libtkl is linked next to libsds, so it is sealed.
+NIM_TKL_ABI = $(call NIM_PKG_DIR,tokenlists)/abi
+nim-libtkl: NIM_FLAGS = $(if $(filter ANDROID,$(TKL_PLATFORM)),$(NIM_FLAGS_ANDROID) --passC:-fPIC,$(if $(filter IOS,$(TKL_PLATFORM)),$(NIM_FLAGS_IOS),$(TKL_NIM_FLAGS)))
+nim-libtkl: NIM_SEAL_TOOLS = $(if $(filter ANDROID,$(TKL_PLATFORM)),$(NIM_SEAL_TOOLS_ANDROID))
+nim-libtkl: NIM_PARAMS ?= $(NIM_POLICY_TKL)
+nim-libtkl: | nimble.paths
+	@test -n "$(NIM_LIB_DIR)" || { echo "Error: nim-libtkl needs NIM_LIB_DIR; run make build-libtkl" >&2; exit 1; }
+	rm -rf "$(NIM_LIB_DIR)/nimcache"
+	$(call NIM_COMPILE,$(NIM_TKL_ABI)/libtkl.nim,staticlib,libtkl.a,--noLinking)
+	$(call NIM_SEAL,tkl_,$(NIM_LIB_DIR)/link/libtkl.a)
+	cp "$(NIM_TKL_ABI)/tkl.h" "$(NIM_LIB_DIR)/link/"
+
+clean-libtkl: ##@other Remove the token-library build
 	bash scripts/tkl_native.sh clean
 
 test-libtkl: ##@test Check native dependency reuse and public ABI

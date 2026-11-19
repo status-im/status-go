@@ -81,7 +81,10 @@ type Reliability struct {
 }
 
 func NewReliability(datasyncPersistence mvdsnode.Persistence, identity *ecdsa.PrivateKey, missingDepsHandler MissingDependenciesHandler, logger *zap.Logger) (*Reliability, error) {
-	return newReliabilityWithSDSFactory(datasyncPersistence, identity, missingDepsHandler, logger, sds.NewReliabilityManager)
+	newSDSManager := func(logger *zap.Logger) (*sds.ReliabilityManager, error) {
+		return sds.NewReliabilityManager(logger, nil)
+	}
+	return newReliabilityWithSDSFactory(datasyncPersistence, identity, missingDepsHandler, logger, newSDSManager)
 }
 
 func newReliabilityWithSDSFactory(

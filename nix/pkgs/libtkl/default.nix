@@ -25,7 +25,7 @@ stdenv.mkDerivation {
   buildPhase = ''
     export HOME="$TMPDIR"
     export NIM=nim
-    export EXTRA_NIMFLAGS="--cc:${if stdenv.isDarwin then "clang" else "gcc"}"
+    export NIM_PARAMS="--cc:${if stdenv.isDarwin then "clang" else "gcc"}"
     make isolate
   '';
   installPhase = ''

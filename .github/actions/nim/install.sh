@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Puts prebuilt, checksum-pinned Nim compilers and nimble on PATH of an Apple Silicon runner.
+# Puts a prebuilt, checksum-pinned Nim compiler and nimble on PATH of an Apple Silicon runner.
 set -euo pipefail
 
 if [ "$RUNNER_OS-$RUNNER_ARCH" != macOS-ARM64 ]; then
@@ -21,10 +21,6 @@ fetch() { # <directory> <sha256> <url> [tar options]
 
 install_nim() { # <version> <directory>
   case "$1" in
-    2.2.6)
-      fetch "$2" a62ff3c34a2eb3fc69866fcae05b32dc5c2b6668ecfb1d10d91ad72c0183fae5 \
-        "$nightlies/2025-10-31-version-2-2-ab00c56904e3126ad826bb520d243513a139436a/nim-2.2.6-macosx_arm64.tar.xz" \
-        --strip-components=1 ;;
     2.2.10)
       fetch "$2" 9a3b012d0680d11d6163dd2f145470b090c1045f5e634f42daf119bea1cb2b5e \
         "$nightlies/2026-04-24-version-2-2-bfeb3146d1638b39f69007a4ae5a23e23ae4e5ef/nim-2.2.10-macosx_arm64.tar.xz" \
@@ -36,9 +32,6 @@ install_nim() { # <version> <directory>
 }
 
 install_nim "$NIM_VERSION" "$tools/nim-$NIM_VERSION"
-if [ -n "${SDS_NIM_VERSION:-}" ]; then
-  install_nim "$SDS_NIM_VERSION" "$HOME/.nimble/nimbinaries/nim-$SDS_NIM_VERSION"
-fi
 
 case "$NIMBLE_VERSION" in
   0.26.1)
