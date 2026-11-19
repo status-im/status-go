@@ -111,7 +111,7 @@ MOBILE_BUILD_TAGS := gowaku_no_rln nowatchdog disable_torrent
 # The dev shell's prebuilt token library targets the host, not a mobile SDK.
 ANDROID_TOKEN_ENV = env -u NIM_TKL_INC_DIR -u NIM_TKL_LIB_DIR ANDROID_NDK_ROOT="$(ANDROID_NDK_ROOT)" ANDROID_API="$(ANDROID_API)" TKL_HIDE_EXPORTS=1 bash scripts/tkl_env.sh
 IOS_TOKEN_ENV = env -u NIM_TKL_INC_DIR -u NIM_TKL_LIB_DIR IPHONE_SDK="$(IPHONE_SDK)" IOS_TARGET="$(IOS_TARGET)" bash scripts/tkl_env.sh
-IOS_TOKEN_ARCHIVE = bash scripts/tkl_bundle_archive.sh build/bin/libstatus.a
+IOS_TOKEN_ARCHIVE = env NIM_BUNDLE_ARCHIVES="$(NIM_DELIVERY_IOS)" bash scripts/tkl_bundle_archive.sh build/bin/libstatus.a
 
 # `nim-sds` variables
 #
@@ -137,6 +137,26 @@ include nim.mk
 LIBSDS ?= $(NIM_SDS_LIB_DIR)/libsds.$(LIB_EXT)
 CGO_CFLAGS+=-I$(NIM_SDS_INC_DIR)
 CGO_LDFLAGS+=-L$(NIM_SDS_LIB_DIR) -lsds
+
+# `logos-delivery` variables
+#
+# Option 1 (default): the sealed liblogosdelivery, built from this resolution.
+# Option 2: Provide NIM_DELIVERY_LIB_DIR (used by Nix).
+NIM_DELIVERY_DIR = $(CURDIR)/build/delivery
+ifdef NIM_DELIVERY_LIB_DIR
+    NIM_DELIVERY_BUILD_FROM_SOURCE := false
+else
+    NIM_DELIVERY_LIB_DIR := $(NIM_DELIVERY_DIR)/desktop/link
+    NIM_DELIVERY_BUILD_FROM_SOURCE := true
+endif
+
+LIBLOGOSDELIVERY ?= $(NIM_DELIVERY_LIB_DIR)/liblogosdelivery.a
+# The C++ runtime (Leopard-RS) and the system libraries Nim would link.
+NIM_DELIVERY_SYSTEM_LIBS_Darwin = -lc++ -framework Security
+NIM_DELIVERY_SYSTEM_LIBS_Linux = -lstdc++ -lm -lrt -ldl -lpthread
+NIM_DELIVERY_SYSTEM_LIBS_Windows = -lstdc++ -lws2_32 -liphlpapi -lbcrypt
+NIM_DELIVERY_SYSTEM_LIBS = $(NIM_DELIVERY_SYSTEM_LIBS_$(detected_OS))
+CGO_LDFLAGS+=-L$(NIM_DELIVERY_LIB_DIR) -llogosdelivery $(NIM_DELIVERY_SYSTEM_LIBS)
 
 # `logos-storage` variables (opt-in)
 USE_LOGOS_STORAGE ?= false
@@ -210,7 +230,7 @@ STORAGE_TEST_ENV := LD_LIBRARY_PATH="$(LOGOS_STORAGE_LIB_DIR):$(RUNTIME_LIB_DIRS
 	CGO_CFLAGS="$(CGO_CFLAGS) -I$(LOGOS_STORAGE_INC_DIR)"
 STORAGE_TEST_TAGS := use_logos_storage $(BUILD_TAGS) gowaku_skip_migrations
 
-test-storage: build-storage $(LIBSDS) generate ##@tests Run logosstorage package tests via gotestsum
+test-storage: build-storage $(LIBSDS) $(LIBLOGOSDELIVERY) generate ##@tests Run logosstorage package tests via gotestsum
 	$(STORAGE_TEST_ENV) bash scripts/tkl_env.sh go tool gotestsum --packages="./pkg/services/logosstorage" -f testname -- -count 1 -tags "$(STORAGE_TEST_TAGS)"
 	$(STORAGE_TEST_ENV) bash scripts/tkl_env.sh go tool gotestsum --packages="./internal/protocol/communities/archive/logosstorage" -f testname -- -count 1 -tags "$(STORAGE_TEST_TAGS)"
 	$(STORAGE_TEST_ENV) bash scripts/tkl_env.sh go tool gotestsum --packages="./internal/protocol" -f testname -- -count 1 -tags "$(STORAGE_TEST_TAGS)" \
@@ -221,7 +241,7 @@ TORRENT_TEST_ENV := LD_LIBRARY_PATH="$(RUNTIME_LIB_DIRS)" \
 	CGO_CFLAGS="$(CGO_CFLAGS)"
 TORRENT_TEST_TAGS := $(BUILD_TAGS) use_torrent gowaku_skip_migrations
 
-test-torrent: $(LIBSDS) generate ##@tests Run torrent archive package tests via gotestsum
+test-torrent: $(LIBSDS) $(LIBLOGOSDELIVERY) generate ##@tests Run torrent archive package tests via gotestsum
 	$(TORRENT_TEST_ENV) bash scripts/tkl_env.sh go tool gotestsum --packages="./internal/protocol/communities/archive/torrent" -f testname -- -count 1 -tags "$(TORRENT_TEST_TAGS)"
 	$(TORRENT_TEST_ENV) bash scripts/tkl_env.sh go tool gotestsum --packages="./internal/protocol" -f testname -- -count 1 -tags "$(TORRENT_TEST_TAGS)" \
 	-run TestMessengerCommunitiesTokenPermissionsSuite/TestImportDecryptedArchiveMessages
@@ -307,7 +327,7 @@ nix-purge: ##@nix Completely remove Nix setup, including /nix directory
 all: $(GO_CMD_NAMES)
 
 .PHONY: $(GO_CMD_NAMES) $(GO_CMD_PATHS) $(GO_CMD_BUILDS)
-$(GO_CMD_BUILDS): generate $(LOGOS_STORAGE_BUILD_DEPS) $(LIBSDS)
+$(GO_CMD_BUILDS): generate $(LOGOS_STORAGE_BUILD_DEPS) $(LIBSDS) $(LIBLOGOSDELIVERY)
 $(GO_CMD_BUILDS): ##@build Build any Go project from cmd folder
 	CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
 	$(TOKEN_ENV) go build -v \
@@ -392,7 +412,7 @@ status-backend: ##@build Build status-backend to run status-go as HTTP server
 status-backend: build/bin/status-backend
 
 run-status-backend: PORT ?= 0
-run-status-backend: $(LIBSDS)
+run-status-backend: $(LIBSDS) $(LIBLOGOSDELIVERY)
 run-status-backend: generate
 run-status-backend: ##@run Start status-backend server listening to localhost:PORT
 	LD_LIBRARY_PATH="$(NIM_SDS_LIB_DIR)" CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
@@ -428,9 +448,9 @@ statusgo-stub-bindings:
 
 statusgo-library: STATUS_GO_BINDINGS_PATH ?= build/bin/statusgo-lib
 statusgo-library: STATUS_GO_LIBRARY_OUT ?= build/bin
-statusgo-library: TOKEN_STATIC_BUILD = $(TOKEN_ENV) bash scripts/tkl_bundle_archive.sh "$(STATUS_GO_LIBRARY_OUT)/libstatus.a"
+statusgo-library: TOKEN_STATIC_BUILD = $(TOKEN_ENV) env NIM_BUNDLE_ARCHIVES="$(LIBLOGOSDELIVERY)" bash scripts/tkl_bundle_archive.sh "$(STATUS_GO_LIBRARY_OUT)/libstatus.a"
 statusgo-library: generate
-statusgo-library: statusgo-c-bindings $(LIBSDS)  ##@cross-compile Build status-go as static library for current platform
+statusgo-library: statusgo-c-bindings $(LIBSDS) $(LIBLOGOSDELIVERY)  ##@cross-compile Build status-go as static library for current platform
 	@echo "Building static library..."
 	CGO_LDFLAGS='$(CGO_LDFLAGS)' CGO_CFLAGS='$(CGO_CFLAGS)' \
 	$(TOKEN_STATIC_BUILD) go build \
@@ -447,7 +467,7 @@ statusgo-library: statusgo-c-bindings $(LIBSDS)  ##@cross-compile Build status-g
 statusgo-shared-library-tkl: statusgo-shared-library
 
 statusgo-shared-library: TKL_LIBSDS = $(firstword $(wildcard $(LIBSDS) $(NIM_SDS_LIB_DIR)/libsds.a))
-statusgo-shared-library: $(if $(filter true,$(NIM_SDS_BUILD_FROM_SOURCE)),$(LIBSDS))
+statusgo-shared-library: $(if $(filter true,$(NIM_SDS_BUILD_FROM_SOURCE)),$(LIBSDS)) $(LIBLOGOSDELIVERY)
 	@test -n "$(TKL_LIBSDS)" || { echo "libsds not found in $(NIM_SDS_LIB_DIR); run 'make build-libsds' first" >&2; exit 1; }
 	$(GOBIN_SHARED_LIB_CFLAGS) TKL_HIDE_EXPORTS=1 \
 		CGO_CFLAGS='$(CGO_CFLAGS)' CGO_LDFLAGS='$(CGO_LDFLAGS) -Wl,-rpath,$(NIM_SDS_LIB_DIR)' \
@@ -464,7 +484,7 @@ test-tkl-backend:
 	python3 scripts/test_tkl_backend.py
 
 statusgo-shared-library-build: generate
-statusgo-shared-library-build: statusgo-c-bindings $(LIBSDS) ##@cross-compile Build status-go as shared library for current platform
+statusgo-shared-library-build: statusgo-c-bindings $(LIBSDS) $(LIBLOGOSDELIVERY) ##@cross-compile Build status-go as shared library for current platform
 	@echo "Building shared library..."
 	@echo "Tags: $(BUILD_TAGS)"
 	CGO_LDFLAGS='$(CGO_LDFLAGS)' CGO_CFLAGS='$(CGO_CFLAGS)' \
@@ -483,7 +503,9 @@ endif
 	@echo "Shared library built:"
 	@ls -la build/bin/libstatus.*
 
-statusgo-android-library: generate statusgo-c-bindings build-libsds-android ##@cross-compile Build status-go as Android mobile library
+statusgo-android-library: NIM_DELIVERY_LIB_DIR = $(dir $(NIM_DELIVERY_ANDROID))
+statusgo-android-library: NIM_DELIVERY_SYSTEM_LIBS = -lc++_static -lc++abi -llog -lm
+statusgo-android-library: generate statusgo-c-bindings build-libsds-android build-liblogosdelivery-android ##@cross-compile Build status-go as Android mobile library
 	@echo "Building Android mobile library..."
 	$(ANDROID_BUILD_FLAGS) CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" \
 	$(ANDROID_TOKEN_ENV) go build -buildmode=c-shared -tags '$(MOBILE_BUILD_TAGS)' \
@@ -494,7 +516,9 @@ statusgo-android-library: generate statusgo-c-bindings build-libsds-android ##@c
 	TKL_TARGET_OS=android NM="$(ANDROID_NDK_ROOT)/toolchains/llvm/prebuilt/$(HOST_OS)-x86_64/bin/llvm-nm" \
 		bash scripts/check_tkl_exports.sh build/bin/libstatus.so
 
-statusgo-ios-library: generate statusgo-c-bindings build-libsds-ios ##@cross-compile Build status-go as iOS mobile library
+statusgo-ios-library: NIM_DELIVERY_LIB_DIR = $(dir $(NIM_DELIVERY_IOS))
+statusgo-ios-library: NIM_DELIVERY_SYSTEM_LIBS = -lc++ -framework Security
+statusgo-ios-library: generate statusgo-c-bindings build-libsds-ios build-liblogosdelivery-ios ##@cross-compile Build status-go as iOS mobile library
 	@echo "Building iOS mobile library..."
 	DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer" \
 	CC="$$(xcrun --sdk $(IPHONE_SDK) --find clang)" \
@@ -571,7 +595,7 @@ docker-test: ##@tests Run tests in a docker container with golang.
 
 test: test-unit ##@tests Run basic, short tests during development
 
-test-unit-prep: $(LOGOS_STORAGE_BUILD_DEPS) $(LIBSDS)
+test-unit-prep: $(LOGOS_STORAGE_BUILD_DEPS) $(LIBSDS) $(LIBLOGOSDELIVERY)
 test-unit-prep: generate
 test-unit-prep: export BUILD_TAGS ?=
 test-unit-prep: export UNIT_TEST_DRY_RUN ?= false
@@ -667,50 +691,67 @@ nim-libtkl: | nimble.paths
 	cp "$(NIM_TKL_ABI)/tkl.h" "$(NIM_LIB_DIR)/link/"
 
 .PHONY: build-liblogosdelivery build-liblogosdelivery-android build-liblogosdelivery-ios
-# liblogosdelivery, built here and not linked yet: on the app's policy, without
+# liblogosdelivery, linked into every Go build: on the app's policy, without
 # RLN, and sealed like libtkl, with Leopard-RS's archive from the nimcache, for
-# an image it will share with the other Nim runtimes. Leopard-RS is built by
-# CMake during the compile: portable, position-independent and, for a cross
+# an image it will share with the other Nim runtimes. Its C API and the kernel
+# API (waku_*), which the Go bindings call too, stay global. Leopard-RS is built
+# by CMake during the compile: portable, position-independent and, for a cross
 # build, with the target's tools. The sealed archive needs the C++ runtime.
 NIM_DELIVERY_LIBRARY = $(call NIM_PKG_DIR,logos_delivery)/library
-NIM_DELIVERY_DIR = $(CURDIR)/build/delivery
-NIM_DELIVERY_LEOPARD = -DCMAKE_BUILD_TYPE=Release -DENABLE_OPENMP=off -DCOMPILER_SUPPORTS_MARCH_NATIVE=FALSE -DCMAKE_POSITION_INDEPENDENT_CODE=ON
+# MSYS2's cmake needs the generator nim-leopard's own Windows flags name.
+NIM_DELIVERY_LEOPARD_Windows = -G\\\"MSYS Makefiles\\\"
+NIM_DELIVERY_LEOPARD = $(NIM_DELIVERY_LEOPARD_$(detected_OS)) -DCMAKE_BUILD_TYPE=Release -DENABLE_OPENMP=off -DCOMPILER_SUPPORTS_MARCH_NATIVE=FALSE -DCMAKE_POSITION_INDEPENDENT_CODE=ON
 # On x86 Leopard-RS includes <tmmintrin.h>, whose SSSE3 intrinsics compile only
 # with the flag; it checks the CPU before it uses them. As delivery's config.nims.
 # $(call NIM_DELIVERY_LEOPARD_X86,<target architecture>)
 NIM_DELIVERY_LEOPARD_X86 = $(if $(filter x86_64 amd64,$(1)),-DCMAKE_CXX_FLAGS=-mssse3)
 # $(call NIM_DELIVERY_BUILD,<extra Leopard-RS CMake flags>,<extra flags>)
 NIM_DELIVERY_BUILD = rm -rf "$(NIM_LIB_DIR)/nimcache" && \
-	$(call NIM_COMPILE,$(NIM_DELIVERY_LIBRARY)/liblogosdelivery.nim,staticlib,liblogosdelivery.a,--noLinking -d:disable_rln \
+	$(call NIM_COMPILE,$(NIM_DELIVERY_LIBRARY)/liblogosdelivery.nim,staticlib,liblogosdelivery.a,--noLinking --noMain -d:disable_rln \
 	-d:ffiOutputDir=\"$(NIM_LIB_DIR)/link/generated\" --passC:-fvisibility=hidden --passC:-fno-common \
 	-d:LeopardCmakeFlags=\"$(NIM_DELIVERY_LEOPARD) $(1)\" $(2)) && \
-	$(call NIM_SEAL,logosdelivery_,$(NIM_LIB_DIR)/link/liblogosdelivery.a) && \
+	$(call NIM_SEAL,logosdelivery_ waku_,$(NIM_LIB_DIR)/link/liblogosdelivery.a) && \
 	cp "$(NIM_DELIVERY_LIBRARY)/liblogosdelivery.h" "$(NIM_LIB_DIR)/link/"
 
-build-liblogosdelivery build-liblogosdelivery-android build-liblogosdelivery-ios: NIM_PARAMS ?= $(NIM_POLICY_TKL) -d:useMalloc
-build-liblogosdelivery: NIM_LIB_DIR = $(NIM_DELIVERY_DIR)/desktop
-build-liblogosdelivery-android: NIM_LIB_DIR = $(NIM_DELIVERY_DIR)/android-$(NIM_ANDROID_CPU)
-build-liblogosdelivery-ios: NIM_LIB_DIR = $(NIM_DELIVERY_DIR)/$(NIM_IOS_SDK)-$(NIM_IOS_ARCH)
-build-liblogosdelivery-android: NIM_FLAGS = $(NIM_FLAGS_ANDROID) --passC:-fPIC
-build-liblogosdelivery-android: NIM_SEAL_TOOLS = $(NIM_SEAL_TOOLS_ANDROID)
-build-liblogosdelivery-ios: NIM_FLAGS = $(NIM_FLAGS_IOS)
+NIM_DELIVERY_DESKTOP = $(NIM_DELIVERY_DIR)/desktop/link/liblogosdelivery.a
+NIM_DELIVERY_ANDROID = $(NIM_DELIVERY_DIR)/android-$(or $(ARCH),unset)/link/liblogosdelivery.a
+NIM_DELIVERY_IOS = $(NIM_DELIVERY_DIR)/$(NIM_IOS_SDK)-$(NIM_IOS_ARCH)/link/liblogosdelivery.a
+NIM_DELIVERY_TARGETS = $(NIM_DELIVERY_DESKTOP) $(NIM_DELIVERY_ANDROID) $(NIM_DELIVERY_IOS)
+$(NIM_DELIVERY_TARGETS): NIM_PARAMS ?= $(NIM_POLICY_TKL) -d:useMalloc
+$(NIM_DELIVERY_TARGETS): NIM_LIB_DIR = $(patsubst %/link/,%,$(dir $@))
+$(NIM_DELIVERY_ANDROID): NIM_FLAGS = $(NIM_FLAGS_ANDROID) --passC:-fPIC
+$(NIM_DELIVERY_ANDROID): NIM_SEAL_TOOLS = $(NIM_SEAL_TOOLS_ANDROID)
+$(NIM_DELIVERY_IOS): NIM_FLAGS = $(NIM_FLAGS_IOS)
 
 # g++ on Linux gives C++ inline variables (BoringSSL's, libstdc++'s) the
 # unique binding, which GNU objcopy cannot make local: weak symbols instead.
-build-liblogosdelivery: NIM_DELIVERY_GCC = $(if $(filter Linux,$(detected_OS)),$(if $(findstring --cc:clang,$(NIM_PARAMS)),,--passC:-fno-gnu-unique))
-build-liblogosdelivery: | nimble.paths ##@build Build the sealed liblogosdelivery
-	$(call NIM_DELIVERY_BUILD,$(call NIM_DELIVERY_LEOPARD_X86,$(or $(ARCH),$(shell uname -m))),$(if $(filter Windows,$(detected_OS)),,--passC:-fPIC) $(NIM_DELIVERY_GCC))
+$(NIM_DELIVERY_DESKTOP): NIM_DELIVERY_GCC = $(if $(filter Linux,$(detected_OS)),$(if $(findstring --cc:clang,$(NIM_PARAMS)),,--passC:-fno-gnu-unique))
+$(NIM_DELIVERY_DESKTOP): nimble.paths FORCE
+	@$(call NIM_BUILD_IF_CHANGED,$@,echo "Building liblogosdelivery: $@" && \
+		$(call NIM_DELIVERY_BUILD,$(call NIM_DELIVERY_LEOPARD_X86,$(or $(ARCH),$(shell uname -m))),$(if $(filter Windows,$(detected_OS)),,--passC:-fPIC) $(NIM_DELIVERY_GCC)))
 
-build-liblogosdelivery-android: | nimble.paths
-	$(call NIM_DELIVERY_BUILD,-DCMAKE_SYSTEM_NAME=Linux -DCMAKE_C_COMPILER=$(NIM_ANDROID_CC) \
+ifeq ($(NIM_DELIVERY_BUILD_FROM_SOURCE),false)
+$(LIBLOGOSDELIVERY):
+	@test -f $(LIBLOGOSDELIVERY) || (echo "Error: liblogosdelivery not found at $(LIBLOGOSDELIVERY)" && exit 1)
+endif
+
+build-liblogosdelivery: $(LIBLOGOSDELIVERY) ##@build Build the sealed liblogosdelivery
+
+$(NIM_DELIVERY_ANDROID): nimble.paths FORCE
+	@$(call NIM_BUILD_IF_CHANGED,$@,echo "Building liblogosdelivery: $@" && \
+		$(call NIM_DELIVERY_BUILD,-DCMAKE_SYSTEM_NAME=Linux -DCMAKE_C_COMPILER=$(NIM_ANDROID_CC) \
 		-DCMAKE_CXX_COMPILER=$(NIM_ANDROID_CC)++ -DCMAKE_CXX_FLAGS=-DANDROID \
 		-DCMAKE_AR=$(NIM_ANDROID_BIN)/llvm-ar -DCMAKE_RANLIB=$(NIM_ANDROID_BIN)/llvm-ranlib,\
-		-d:LeopardExtraCompilerFlags=-fno-openmp -d:LeopardExtraLinkerFlags=-fno-openmp)
+		-d:LeopardExtraCompilerFlags=-fno-openmp -d:LeopardExtraLinkerFlags=-fno-openmp))
 
-build-liblogosdelivery-ios: | nimble.paths
-	$(call NIM_DELIVERY_BUILD,-DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_SYSROOT=$$(xcrun --sdk $(NIM_IOS_SDK) --show-sdk-path) \
+$(NIM_DELIVERY_IOS): nimble.paths FORCE
+	@$(call NIM_BUILD_IF_CHANGED,$@,echo "Building liblogosdelivery: $@" && \
+		$(call NIM_DELIVERY_BUILD,-DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_SYSROOT=$$(xcrun --sdk $(NIM_IOS_SDK) --show-sdk-path) \
 		-DCMAKE_OSX_ARCHITECTURES=$(NIM_IOS_ARCH) -DCMAKE_OSX_DEPLOYMENT_TARGET=$(or $(IOS_TARGET),13.0) \
-		$(call NIM_DELIVERY_LEOPARD_X86,$(NIM_IOS_ARCH)))
+		$(call NIM_DELIVERY_LEOPARD_X86,$(NIM_IOS_ARCH))))
+
+build-liblogosdelivery-android: $(NIM_DELIVERY_ANDROID)
+build-liblogosdelivery-ios: $(NIM_DELIVERY_IOS)
 
 clean-libtkl: ##@other Remove the token-library build
 	bash scripts/tkl_native.sh clean
