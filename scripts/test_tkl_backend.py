@@ -146,6 +146,7 @@ class BackendCacheTest(unittest.TestCase):
                 "make", "statusgo-shared-library-build", "OS=Linux", "RELEASE_TAG=test",
                 "-o", "generate", "-o", "statusgo-c-bindings", "-o", "install-git-hooks",
                 "LIBSDS=/fixture/libsds.so", "-o", "/fixture/libsds.so",
+                "LIBLOGOSDELIVERY=/fixture/liblogosdelivery.a", "-o", "/fixture/liblogosdelivery.a",
                 env=dict(env, BUILD_CONTENT=content))
             library = self.root / "build/bin/libstatus.so"
             self.assertTrue(library.is_symlink())
@@ -224,9 +225,12 @@ class BackendMakeTargetTest(unittest.TestCase):
         (scripts / "check_tkl_exports.sh").write_text("exit 0\n")
         self.libs = self.root / "sds"
         self.libs.mkdir()
+        self.delivery = self.root / "delivery"
+        self.delivery.mkdir()
+        (self.delivery / "liblogosdelivery.a").write_text("")
 
     def make(self, **overrides):
-        variables = dict(NIM_SDS_LIB_DIR=str(self.libs),
+        variables = dict(NIM_SDS_LIB_DIR=str(self.libs), NIM_DELIVERY_LIB_DIR=str(self.delivery),
                          NIM_SDS_INC_DIR=str(self.libs), LIB_EXT="so", **overrides)
         return subprocess.run(
             ["make", "--no-print-directory", "statusgo-shared-library-tkl"] +

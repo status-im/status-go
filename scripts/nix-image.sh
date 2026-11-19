@@ -4,7 +4,7 @@ set -euo pipefail
 
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # What the image is built from; the Go modules hash changes with go.mod and is not part of it.
-inputs=(flake.nix flake.lock nix/overlay.nix nix/pkgs nix/ci.Dockerfile nix/scripts/ci-image.sh)
+inputs=(flake.nix flake.lock nix/overlay.nix nix/pkgs nix/ci.Dockerfile nix/scripts/ci-image.sh scripts/seal_nim_lib.sh)
 vendor_hash=nix/pkgs/status-go/library/vendorHash.sha256
 # The tag follows these files, so a changed dependency never reuses an old image.
 tag="$(git -C "$repo" ls-tree -r HEAD -- "${inputs[@]}" | grep -vF "$vendor_hash" |
