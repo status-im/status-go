@@ -505,7 +505,20 @@ func (v *SimplifiedTextVisitor) Visit(node ast.Node, entering bool) ast.WalkStat
 		return ast.GoToNext
 	}
 
+	switch node.(type) {
+	case *ast.Paragraph, *ast.BlockQuote, *ast.CodeBlock:
+		if v.text != "" {
+			v.text += "\n\n"
+		}
+	}
+
 	switch n := node.(type) {
+	case *ast.Hardbreak:
+		v.text += "\n"
+	case *ast.BlockQuote:
+		v.text += strings.TrimRight(string(n.Literal), "\n")
+	case *ast.CodeBlock:
+		v.text += strings.TrimRight(string(n.Literal), "\n")
 	case *ast.Mention:
 		literal := string(n.Literal)
 		canonicalName, ok := v.canonicalNames[literal]
