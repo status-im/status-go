@@ -45,3 +45,9 @@ class SharedURLsService(Service):
         params = [url]
         response = self.rpc_request("parseSharedURL", params)
         return response
+
+    def share_thread_url(self, chat_id: str, thread_id: str):
+        return self.rpc_request("shareThreadURL", [chat_id, thread_id])
+
+    def parse_thread_url(self, url: str):
+        return self.rpc_request("parseThreadURL", [url])

@@ -835,6 +835,9 @@ class WakuextService(Service):
         response = self.rpc_request("getActivityCenterState", params)
         return response
 
+    def section_unread_counts(self, include_threads: bool = False):
+        return self.rpc_request("sectionUnreadCounts", [{"includeThreads": include_threads}])
+
     def peer_id(self):
         params = []
         response = self.rpc_request("peerID", params)

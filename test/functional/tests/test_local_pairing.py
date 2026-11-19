@@ -200,12 +200,7 @@ class TestLocalPairing:
         response = alice.wakuext_service.send_one_to_one_message(bob.public_key, "Thread parent")
         parent = async_messenger.get_message_by_content_type(response, content_type=MessageContentType.TEXT_PLAIN.value)[0]
         await bob.wait_for_signal(SignalType.MESSAGES_NEW, pattern=parent["id"], timeout=60)
-        try:
-            bob.wakuext_service.create_thread(alice.public_key, parent["id"])
-        except ApiResponseError as error:
-            if "threads feature is disabled" in str(error):
-                pytest.skip("Requires a status-go backend built with the Threads feature enabled")
-            raise
+        bob.wakuext_service.create_thread(alice.public_key, parent["id"])
 
         response = alice.wakuext_service.send_chat_message(bob.public_key, "Thread reply", responseTo=parent["id"], thread_id=parent["id"])
         reply = async_messenger.get_message_by_content_type(response, content_type=MessageContentType.TEXT_PLAIN.value)[0]

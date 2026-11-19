@@ -524,3 +524,123 @@ class TestWakuextThreadMute:
 
         _, restored_id = await _post_thread_mention(sender, receiver, sender_chat_id, parent_id, receiver.public_key)
         assert _mention_ac(receiver, restored_id)["message"]["threadId"] == parent_id
+
+
+def _personal_mentions(backend, *, include_threads: bool) -> int:
+    for section in (backend.wakuext_service.section_unread_counts(include_threads=include_threads) or {}).get("sections") or []:
+        if section.get("sectionId") == "personal":
+            return section["unviewedMentionsCount"]
+    raise AssertionError("personal section not found")
+
+
+def _rpc_method_missing(exc: ApiResponseError) -> bool:
+    text = str(exc).lower()
+    return "-32601" in text or "does not exist/is not available" in text
+
+
+def _require_share_thread_url(backend) -> None:
+    try:
+        backend.backend.sharedurls_service.share_thread_url("", "")
+    except ApiResponseError as exc:
+        if _rpc_method_missing(exc):
+            pytest.skip("sharedurls shareThreadURL requires status-go#8064")
+        if "required" not in str(exc).lower():
+            raise
+
+
+async def _thread_parent_message(sender, receiver, chat_kind: ChatKind) -> tuple[str, str, str | None]:
+    sender_chat_id, _, community_id = await _open_shared_chat(sender, receiver, chat_kind)
+    parent_text = f"parent-{uuid4()}"
+    if chat_kind == ChatKind.ONE_TO_ONE:
+        parent_response = sender.wakuext_service.send_one_to_one_message(receiver.public_key, parent_text)
+    else:
+        parent_response = sender.wakuext_service.send_chat_message(sender_chat_id, parent_text)
+    parent_id = _message_by_text(parent_response, parent_text)["id"]
+    await receiver.wait_for_signal(SignalType.MESSAGES_NEW, pattern=parent_id, timeout=60, check_buffer=True)
+    sender.wakuext_service.create_thread(sender_chat_id, parent_id)
+    if chat_kind != ChatKind.COMMUNITY:
+        community_id = None
+    return sender_chat_id, parent_id, community_id
+
+
+@pytest.mark.rpc
+@pytest.mark.asyncio
+@parametrize_waku_light_client_non_lc
+class TestWakuextThreadSectionUnread:
+
+    @pytest.fixture
+    async def sender(self, async_backend_new_profile, waku_light_client):
+        return await async_backend_new_profile("sender", waku_light_client=waku_light_client)
+
+    @pytest.fixture
+    async def receiver(self, async_backend_new_profile, waku_light_client):
+        return await async_backend_new_profile("receiver", waku_light_client=waku_light_client)
+
+    async def test_section_unread_counts_mentions_only_followed_threads(self, sender, receiver):
+        sender_chat_id, receiver_chat_id, _ = await _open_shared_chat(sender, receiver, ChatKind.PRIVATE_GROUP)
+        parent_text = f"parent-{uuid4()}"
+        parent_id = _message_by_text(sender.wakuext_service.send_chat_message(sender_chat_id, parent_text), parent_text)["id"]
+        await receiver.wait_for_signal(SignalType.MESSAGES_NEW, pattern=parent_id, timeout=60, check_buffer=True)
+        receiver.wakuext_service.mark_all_read(receiver_chat_id)
+
+        sender.wakuext_service.create_thread(sender_chat_id, parent_id)
+        await receiver.wait_for_signal(
+            SignalType.MESSAGES_NEW,
+            predicate=lambda signal: any(t.get("threadId") == parent_id for t in (signal.event.get("threads") or [])),
+            timeout=60,
+            check_buffer=True,
+        )
+        assert not _thread(receiver.wakuext_service.chat_threads(receiver_chat_id), parent_id)["followed"]
+        receiver.wakuext_service.mark_all_read(receiver_chat_id)
+
+        baseline = _personal_mentions(receiver, include_threads=True)
+        await _post_thread_mention(sender, receiver, sender_chat_id, parent_id, receiver.public_key)
+        assert _personal_mentions(receiver, include_threads=True) == baseline
+        assert _personal_mentions(receiver, include_threads=False) == baseline
+
+        receiver.wakuext_service.follow_thread(receiver_chat_id, parent_id)
+        assert _personal_mentions(receiver, include_threads=True) == baseline + 1
+        assert _personal_mentions(receiver, include_threads=False) == baseline
+
+
+@pytest.mark.rpc
+@pytest.mark.asyncio
+@parametrize_waku_light_client_non_lc
+class TestWakuextThreadLinks:
+
+    @pytest.fixture
+    async def sender(self, async_backend_new_profile, waku_light_client):
+        return await async_backend_new_profile("sender", waku_light_client=waku_light_client)
+
+    @pytest.fixture
+    async def receiver(self, async_backend_new_profile, waku_light_client):
+        return await async_backend_new_profile("receiver", waku_light_client=waku_light_client)
+
+    @pytest.fixture
+    async def outsider(self, async_backend_new_profile, waku_light_client):
+        return await async_backend_new_profile("outsider", waku_light_client=waku_light_client)
+
+    async def test_share_and_parse_thread_url_round_trip(self, sender, receiver, outsider):
+        _require_share_thread_url(sender)
+
+        sender_chat_id, parent_id, community_id = await _thread_parent_message(sender, receiver, ChatKind.COMMUNITY)
+        sharedurls = sender.backend.sharedurls_service
+        outsider_urls = outsider.backend.sharedurls_service
+        community_url = sharedurls.share_thread_url(sender_chat_id, parent_id)
+        assert "thread-id=" in community_url and "/cc/" in community_url
+        parsed = sharedurls.parse_thread_url(community_url)
+        assert parsed["threadId"] == parent_id
+        assert parsed["communityId"] == community_id
+        assert parsed["chatId"] == sender_chat_id
+        outsider_parsed = outsider_urls.parse_thread_url(community_url)
+        assert outsider_parsed["threadId"] == parent_id
+        assert outsider_parsed["communityId"] == community_id
+
+        dm_chat_id, dm_parent_id, _ = await _thread_parent_message(sender, receiver, ChatKind.ONE_TO_ONE)
+        dm_url = sharedurls.share_thread_url(dm_chat_id, dm_parent_id)
+        assert "thread-id=" in dm_url and "/p/" in dm_url
+        parsed_dm = sharedurls.parse_thread_url(dm_url)
+        assert parsed_dm["threadId"] == dm_parent_id
+        assert parsed_dm["chatId"] == dm_chat_id
+        with pytest.raises(ApiResponseError):
+            outsider_urls.parse_thread_url(dm_url)
