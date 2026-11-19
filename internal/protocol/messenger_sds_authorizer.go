@@ -15,11 +15,11 @@ import (
 	"github.com/status-im/status-go/pkg/messaging/layers/reliability"
 )
 
-type communitySDSValidator struct {
+type communitySDSAuthorizer struct {
 	messenger *Messenger
 }
 
-func (v communitySDSValidator) Validate(message sds.ValidationMessage) (bool, error) {
+func (v communitySDSAuthorizer) Authorize(message sds.AuthorizationMessage) (bool, error) {
 	m := v.messenger
 	communityID, topic, _ := strings.Cut(message.ChannelID, ":")
 	// Community IDs are 0x-prefixed, hex-encoded compressed public keys.
@@ -103,7 +103,7 @@ func (v communitySDSValidator) Validate(message sds.ValidationMessage) (bool, er
 		message.ChannelID != reliability.BuildChannelID(chat.CommunityID, community.UniversalChatID()) {
 		return false, nil
 	}
-	// ValidationContext is the Waku-authenticated signer of the full payload,
+	// AuthorizationContext is the Waku-authenticated signer of the full payload,
 	// including SDS IDs, dependencies, and acknowledgements. Require that signer
 	// to be a community participant, while allowing member repair forwarding.
 	transportSender, err := authenticatedSDSTransportSender(message)
@@ -119,8 +119,8 @@ func (v communitySDSValidator) Validate(message sds.ValidationMessage) (bool, er
 	return community.CanPost(application.SigPubKey, chat.CommunityChatID(), application.Type)
 }
 
-func authenticatedSDSTransportSender(message sds.ValidationMessage) (*ecdsa.PublicKey, error) {
-	sender, err := crypto.UnmarshalPubkey(message.ValidationContext)
+func authenticatedSDSTransportSender(message sds.AuthorizationMessage) (*ecdsa.PublicKey, error) {
+	sender, err := crypto.UnmarshalPubkey(message.AuthorizationContext)
 	if err != nil {
 		return nil, fmt.Errorf("invalid SDS transport sender: %w", err)
 	}

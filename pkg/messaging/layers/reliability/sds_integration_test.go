@@ -58,20 +58,20 @@ func TestSDSTickEnsuresChannels(t *testing.T) {
 	}
 }
 
-type testSDSValidatorFunc func(sds.ValidationMessage) (bool, error)
+type testSDSAuthorizerFunc func(sds.AuthorizationMessage) (bool, error)
 
-func (f testSDSValidatorFunc) Validate(message sds.ValidationMessage) (bool, error) {
+func (f testSDSAuthorizerFunc) Authorize(message sds.AuthorizationMessage) (bool, error) {
 	return f(message)
 }
 
-func TestSDSValidatorSurvivesManagerRestart(t *testing.T) {
+func TestSDSAuthorizerSurvivesManagerRestart(t *testing.T) {
 	r := newTestReliability(t)
 	t.Cleanup(r.Close)
 	wrapped, _, err := r.WrapPayloadForSDS([]byte("payload"), "channel")
 	require.NoError(t, err)
 	var context []byte
-	require.NoError(t, r.SetSDSValidator(testSDSValidatorFunc(func(message sds.ValidationMessage) (bool, error) {
-		context = message.ValidationContext
+	require.NoError(t, r.SetSDSAuthorizer(testSDSAuthorizerFunc(func(message sds.AuthorizationMessage) (bool, error) {
+		context = message.AuthorizationContext
 		return false, nil
 	})))
 	for _, restart := range []bool{false, true} {
@@ -84,13 +84,13 @@ func TestSDSValidatorSurvivesManagerRestart(t *testing.T) {
 		require.Nil(t, payload)
 		require.Equal(t, []byte("sender"), context)
 	}
-	require.NoError(t, r.SetSDSValidator(nil))
+	require.NoError(t, r.SetSDSAuthorizer(nil))
 	payload, err := r.UnwrapPayloadFromSDS(wrapped)
 	require.NoError(t, err)
 	require.Equal(t, []byte("payload"), payload)
 }
 
-func TestSDSValidationRejectsBeforeReliabilityEvents(t *testing.T) {
+func TestSDSAuthorizationRejectsBeforeReliabilityEvents(t *testing.T) {
 	receiver := newTestReliability(t)
 	t.Cleanup(receiver.Close)
 	peer := newTestReliability(t)
@@ -110,7 +110,7 @@ func TestSDSValidationRejectsBeforeReliabilityEvents(t *testing.T) {
 		return nil
 	})
 	receiver.SetMessageSentHandler(func(string) { events <- "message sent" })
-	require.NoError(t, receiver.SetSDSValidator(testSDSValidatorFunc(func(sds.ValidationMessage) (bool, error) {
+	require.NoError(t, receiver.SetSDSAuthorizer(testSDSAuthorizerFunc(func(sds.AuthorizationMessage) (bool, error) {
 		return false, nil
 	})))
 	_, err = receiver.UnwrapPayloadFromSDS(wrapped)
@@ -122,7 +122,7 @@ func TestSDSValidationRejectsBeforeReliabilityEvents(t *testing.T) {
 	}
 
 	// Prove the same envelope would otherwise trigger dependency recovery.
-	require.NoError(t, receiver.SetSDSValidator(nil))
+	require.NoError(t, receiver.SetSDSAuthorizer(nil))
 	_, err = receiver.UnwrapPayloadFromSDS(wrapped)
 	require.NoError(t, err)
 	require.Eventually(t, func() bool {

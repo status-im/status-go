@@ -10,8 +10,8 @@ import (
 	types "github.com/status-im/status-go/pkg/messaging/types"
 )
 
-func (a *API) SetSDSValidator(validator sds.Validator) error {
-	return a.core.stack.Reliability.SetSDSValidator(validator)
+func (a *API) SetSDSAuthorizer(authorizer sds.Authorizer) error {
+	return a.core.stack.Reliability.SetSDSAuthorizer(authorizer)
 }
 
 func (a *API) RetrieveRawAll() (map[types.ChatFilter][]*types.ReceivedMessage, error) {

@@ -500,8 +500,8 @@ func NewMessenger(
 	}
 
 	communitiesManager.SetMemberProfileProvider(messenger.allContacts)
-	if err := messenger.messaging.SetSDSValidator(communitySDSValidator{messenger: messenger}); err != nil {
-		return nil, errors.Wrap(err, "failed to configure community SDS validation")
+	if err := messenger.messaging.SetSDSAuthorizer(communitySDSAuthorizer{messenger: messenger}); err != nil {
+		return nil, errors.Wrap(err, "failed to configure community SDS authorization")
 	}
 	messenger.mentionsManager = NewMentionManager(messenger)
 	messenger.storeNodeRequestsManager = NewStoreNodeRequestManager(messenger)
@@ -3297,11 +3297,11 @@ func (m *Messenger) handleImportedMessages(messagesToHandle map[types.ChatFilter
 
 			handleMessageResponse, err := m.messaging.HandleReceivedMessages(shhMessage)
 			if err != nil {
-				if errors.Is(err, sds.ErrValidationFailed) {
+				if errors.Is(err, sds.ErrAuthorizationFailed) {
 					retryMessages = append(retryMessages, retryEnvelope{
 						filter: filter, message: shhMessage,
 					})
-					logger.Info("deferring SDS envelope until validation can be retried", zap.Error(err))
+					logger.Info("deferring SDS envelope until authorization can be retried", zap.Error(err))
 				} else {
 					logger.Info("failed to decode messages", zap.Error(err))
 				}
@@ -3506,9 +3506,9 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[types.ChatFilte
 
 			handleMessagesResponse, err := m.messaging.HandleReceivedMessages(shhMessage)
 			if err != nil {
-				if errors.Is(err, sds.ErrValidationFailed) {
+				if errors.Is(err, sds.ErrAuthorizationFailed) {
 					m.enqueueSDSValidationRetry(&filter, shhMessage)
-					logger.Info("deferring SDS envelope until validation can be retried", zap.Error(err))
+					logger.Info("deferring SDS envelope until authorization can be retried", zap.Error(err))
 				} else {
 					m.clearSDSValidationRetry(shhMessage)
 					logger.Info("failed to process received message", zap.Error(err))
