@@ -63,8 +63,10 @@ func resizeImage(img image.Image, width int, height int) image.Image {
 		height = int(0.7 + float64(img.Bounds().Dy())/scaleY)
 	}
 
-	out := image.NewNRGBA(image.Rect(0, 0, width, height))
-	xdraw.BiLinear.Scale(out, out.Bounds(), img, img.Bounds(), draw.Over, nil)
+	// RGBA (not NRGBA) so jpeg.Encode takes its fast RGBA path instead of calling At() per pixel,
+	// and draw.Src since the destination is fresh (Over onto transparent black gives the same pixels).
+	out := image.NewRGBA(image.Rect(0, 0, width, height))
+	xdraw.BiLinear.Scale(out, out.Bounds(), img, img.Bounds(), draw.Src, nil)
 	return out
 }
 
@@ -224,4 +226,21 @@ func RoundCrop(inputImage []byte) ([]byte, error) {
 		return nil, err
 	}
 	return outputImage.Bytes(), nil
+}
+
+// hasTransparency reports whether img has at least one pixel that isn't fully opaque.
+func hasTransparency(img image.Image) bool {
+	if o, ok := img.(interface{ Opaque() bool }); ok {
+		return !o.Opaque()
+	}
+	return false
+}
+
+// flattenOnWhite composites img over an opaque white background.
+func flattenOnWhite(img image.Image) image.Image {
+	b := img.Bounds()
+	out := image.NewRGBA(image.Rect(0, 0, b.Dx(), b.Dy()))
+	draw.Draw(out, out.Bounds(), image.White, image.Point{}, draw.Src)
+	draw.Draw(out, out.Bounds(), img, b.Min, draw.Over)
+	return out
 }

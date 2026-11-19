@@ -232,6 +232,7 @@ func (m *Message) MarshalJSON() ([]byte, error) {
 		EnsName                  string                           `json:"ensName"`
 		DisplayName              string                           `json:"displayName"`
 		Image                    string                           `json:"image,omitempty"`
+		ImageFormat              string                           `json:"imageFormat,omitempty"`
 		AlbumID                  string                           `json:"albumId,omitempty"`
 		ImageWidth               uint32                           `json:"imageWidth,omitempty"`
 		ImageHeight              uint32                           `json:"imageHeight,omitempty"`
@@ -327,6 +328,11 @@ func (m *Message) MarshalJSON() ([]byte, error) {
 		item.ImageWidth = image.Width
 		item.ImageHeight = image.Height
 		item.AlbumImagesCount = image.AlbumImagesCount
+		// lets clients tell e.g. an animated GIF/WebP apart from a still image without fetching it
+		switch image.Format {
+		case protobuf.ImageFormat_JPEG, protobuf.ImageFormat_PNG, protobuf.ImageFormat_GIF, protobuf.ImageFormat_WEBP:
+			item.ImageFormat = strings.ToLower(image.Format.String())
+		}
 	}
 
 	if discordMessage := m.GetDiscordMessage(); discordMessage != nil {
