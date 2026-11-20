@@ -94,6 +94,8 @@ const maxRelayPeers = 300
 const randomPeersKeepAliveInterval = 5 * time.Second
 const allPeersKeepAliveInterval = 5 * time.Minute
 const pausedModePeerExchangeMinPeers = 3
+const bootstrapRecoveryInitialBackoff = 15 * time.Second
+const bootstrapRecoveryMaxBackoff = 5 * time.Minute
 
 const (
 	// Outgoing publications share one bucket across chat payloads and MVDS control traffic.
@@ -145,6 +147,7 @@ type Waku struct {
 	dnsAddressCache             map[string][]dnsdisc.DiscoveredNode // Map to store the multiaddresses returned by dns discovery
 	dnsAddressCacheLock         *sync.RWMutex                       // lock to handle access to the map
 	dnsDiscAsyncRetrievedSignal chan struct{}
+	dnsDiscoveryInProgress      sync.Map // enrtree address -> struct{}
 
 	// Light-client filter protocol; tracks the wire subscriptions declared via
 	// SyncSubscriptions.
@@ -563,6 +566,10 @@ func dnsDiscoveryBackoff(attempt int) time.Duration {
 }
 
 func (w *Waku) discoverAndConnect(address string) {
+	// Startup, OS connectivity events and zero-peer recovery share the same retry loop.
+	if _, loaded := w.dnsDiscoveryInProgress.LoadOrStore(address, struct{}{}); loaded {
+		return
+	}
 	fnApply := func(d dnsdisc.DiscoveredNode, wg *sync.WaitGroup) {
 		defer wg.Done()
 		if len(d.PeerInfo.Addrs) != 0 {
@@ -570,8 +577,11 @@ func (w *Waku) discoverAndConnect(address string) {
 		}
 	}
 
+	w.wg.Add(1)
 	go func() {
 		defer panics.LogOnPanic()
+		defer w.wg.Done()
+		defer w.dnsDiscoveryInProgress.Delete(address)
 		// Retry on failure with exponential backoff: at cold start on Android,
 		// the device DNS resolver isn't always ready when statusgo starts and
 		// the enrtree:// lookup hits ::1:53 with "connection refused". Without
@@ -640,6 +650,34 @@ func (w *Waku) connect(peerInfo peer.AddrInfo, enr *enode.Node, origin wps.Origi
 	// Connection will be prunned eventually by the connection manager if needed
 	// The peer connector in go-waku uses connect, so it will execute identify as part of its
 	w.node.AddDiscoveredPeer(peerInfo.ID, peerInfo.Addrs, origin, w.cfg.DefaultShardedPubsubTopics, enr, true)
+}
+
+type bootstrapRecovery struct {
+	nextAttempt time.Time
+	backoff     time.Duration
+}
+
+func (r *bootstrapRecovery) due(now time.Time, peerCount int) bool {
+	// Android suspend time may not advance Go's monotonic clock.
+	now = now.Round(0)
+	if peerCount > 0 {
+		*r = bootstrapRecovery{}
+		return false
+	}
+	if r.nextAttempt.IsZero() {
+		r.backoff = bootstrapRecoveryInitialBackoff
+		r.nextAttempt = now.Add(r.backoff)
+		return false
+	}
+	if now.Before(r.nextAttempt) {
+		return false
+	}
+	r.backoff *= 2
+	if r.backoff > bootstrapRecoveryMaxBackoff {
+		r.backoff = bootstrapRecoveryMaxBackoff
+	}
+	r.nextAttempt = now.Add(r.backoff)
+	return true
 }
 
 func (w *Waku) runPeerExchangeLoop() {
@@ -1014,6 +1052,7 @@ func (w *Waku) runConnectionMonitoringLoop() {
 	sub := w.PauseBroadcaster.Subscribe()
 	defer sub.Unsubscribe()
 	paused := <-sub.C()
+	var recovery bootstrapRecovery
 	tracker := newHistoryReconcileTracker(w.reliablyConnected(), time.Now())
 	var pendingReconciliations []types.HistoryReconcileWindow
 
@@ -1024,7 +1063,7 @@ func (w *Waku) runConnectionMonitoringLoop() {
 	startupObservedAt := time.Now()
 	w.queueHistoryReconciliation(&tracker, &pendingReconciliations, tracker.reliable, startupObservedAt)
 	var tickerC <-chan time.Time
-	if !paused {
+	if !paused || w.cfg.IsLightClient() {
 		tickerC = ticker.C
 	}
 	for {
@@ -1044,14 +1083,25 @@ func (w *Waku) runConnectionMonitoringLoop() {
 				return
 			}
 			paused = pausedState
-			if paused {
+			if paused && !w.cfg.IsLightClient() {
 				tickerC = nil
 			} else {
 				tickerC = ticker.C
+			}
+			if !paused {
 				observeConnectionState()
 			}
 		case <-tickerC:
-			observeConnectionState()
+			// Run independently of peer exchange, whose network request may stall.
+			// Zero peers itself marks us offline, so onlineChecker cannot gate recovery.
+			if w.cfg.IsLightClient() && recovery.due(time.Now(), len(w.node.Host().Network().Peers())) {
+				w.logger.Info("rediscovering bootstrap nodes after sustained zero peers",
+					zap.Duration("next-attempt-in", recovery.backoff))
+				w.discoverAndConnectPeers()
+			}
+			if !paused {
+				observeConnectionState()
+			}
 		case topicHealth := <-w.topicHealthStatusChan:
 			// go-waku reports per-shard mesh health (UnHealthy / MinimallyHealthy
 			// / SufficientlyHealthy); cache it so checkForConnectionChanges can
