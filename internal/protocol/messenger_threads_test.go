@@ -328,7 +328,7 @@ func (s *MessengerThreadsSuite) TestStartThreadFromNewMessageWithExplicitName() 
 		}
 	}
 	s.Require().NotNil(root)
-	s.Require().Equal("A custom thread name", root.Text)
+	s.Require().Equal(message.Text, root.Text)
 	s.Require().Equal(protobuf.ChatMessage_TEXT_PLAIN, root.ContentType)
 	s.Require().Empty(root.GetThreadId())
 	s.Require().Empty(root.ResponseTo)
@@ -343,23 +343,23 @@ func (s *MessengerThreadsSuite) TestStartThreadFromNewMessageWithExplicitName() 
 	s.Require().Equal(message.ID, threadMessages[0].ID)
 }
 
-func (s *MessengerThreadsSuite) TestStartThreadFromNewMessageUsesNormalizedMessageTextWhenNameOmitted() {
+func (s *MessengerThreadsSuite) TestStartThreadFromNewMessageKeepsFullTextWhenNameOmitted() {
 	chat := s.createJoinedOneToOneThreadChat()
 
 	message := buildTestMessage(*chat)
-	message.Text = "  " + strings.Repeat("é", 51) + "  "
+	message.Text = "  " + strings.Repeat("👩🏽‍💻", 51) + "\n  "
 	message.ChatMessage.Text = message.Text
 
 	response, err := s.m.StartThreadFromNewMessage(context.Background(), &requests.StartThreadFromNewMessage{Message: message})
 	s.Require().NoError(err)
 	s.Require().Len(response.Threads(), 1)
 
-	expectedRootText := strings.Repeat("é", common.MaxThreadNameLength)
+	expectedName := strings.Repeat("👩🏽‍💻", common.MaxThreadNameLength)
 	thread := response.Threads()[0]
-	s.Require().Equal(expectedRootText, thread.Name)
+	s.Require().Equal(expectedName, thread.Name)
 	for _, responseMessage := range response.Messages() {
 		if responseMessage.ID == thread.ThreadID {
-			s.Require().Equal(expectedRootText, responseMessage.Text)
+			s.Require().Equal(message.Text, responseMessage.Text)
 			return
 		}
 	}
@@ -1301,7 +1301,7 @@ func (s *MessengerThreadsSuite) TestStartThreadFromNewMessageIsReceivedWithThrea
 	s.Require().NoError(err)
 
 	message := buildTestMessage(*senderChat)
-	message.Text = "First message in the new thread"
+	message.Text = "First message in the new thread\n" + strings.Repeat("long text ", 8)
 	message.ChatMessage.Text = message.Text
 
 	senderResponse, err := sender.StartThreadFromNewMessage(context.Background(), &requests.StartThreadFromNewMessage{
@@ -1319,6 +1319,7 @@ func (s *MessengerThreadsSuite) TestStartThreadFromNewMessageIsReceivedWithThrea
 		for _, receivedMessage := range response.Messages() {
 			switch receivedMessage.ID {
 			case threadID:
+				s.Require().Equal(message.Text, receivedMessage.Text)
 				receivedRoot = true
 			case message.ID:
 				receivedReply = true
@@ -1338,6 +1339,9 @@ func (s *MessengerThreadsSuite) TestStartThreadFromNewMessageIsReceivedWithThrea
 	s.Require().Equal("New thread", thread.Name)
 	s.Require().Equal(sender.selfContact.ID, thread.CreatorID)
 	s.Require().False(thread.CreatorPending)
+	storedRoot, err := receiver.MessageByID(threadID)
+	s.Require().NoError(err)
+	s.Require().Equal(message.Text, storedRoot.Text)
 
 	// The creator's later edits must be accepted by the receiver.
 	newName := "Renamed thread"
