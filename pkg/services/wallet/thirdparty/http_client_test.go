@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -494,4 +495,92 @@ func TestHTTPClient_RecordsCompressedTraffic(t *testing.T) {
 	require.Equal(t, uint64(len(payload)), stats.DecodedBodyBytes)
 	require.Less(t, stats.ResponseBytes, uint64(len(payload)), "the compressed size has to be counted")
 	require.Greater(t, stats.ResponseBytes, uint64(len(gzipped)))
+}
+
+func TestHTTPClient_WithTransportWrapper(t *testing.T) {
+	var seen []string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		seen = r.Header.Values("X-Wrapper")
+		_, _ = w.Write([]byte("ok"))
+	}))
+	defer server.Close()
+
+	// mark returns a wrapper that adds its name to the request on the way out.
+	mark := func(name string) func(http.RoundTripper) http.RoundTripper {
+		return func(base http.RoundTripper) http.RoundTripper {
+			return roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+				req = req.Clone(req.Context())
+				req.Header.Add("X-Wrapper", name)
+				return base.RoundTrip(req)
+			})
+		}
+	}
+
+	// The wrappers are given before an option that replaces the transport
+	// and still end up in front of it.
+	client := NewHTTPClient(
+		WithTransportWrapper(mark("first")),
+		WithTransportWrapper(mark("second")),
+		WithDetailedTimeouts(time.Second, time.Second, time.Second, time.Second),
+	)
+
+	body, err := client.DoGetRequest(context.Background(), server.URL, nil)
+	require.NoError(t, err)
+	require.Equal(t, "ok", string(body))
+
+	// The last wrapper sees the request first
+	require.Equal(t, []string{"second", "first"}, seen)
+}
+
+// A wrapper always gets a transport to send with, also when no option set one.
+func TestHTTPClient_WithTransportWrapper_BaseIsNeverNil(t *testing.T) {
+	var base http.RoundTripper
+	NewHTTPClient(WithTransportWrapper(func(rt http.RoundTripper) http.RoundTripper {
+		base = rt
+		return rt
+	}))
+
+	require.NotNil(t, base)
+}
+
+type roundTripperFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripperFunc) RoundTrip(req *http.Request) (*http.Response, error) {
+	return f(req)
+}
+
+// Wrappers sit in front of the traffic recording, so every request a wrapper
+// sends is recorded, not only the one the client asked for.
+func TestHTTPClient_WithTransportWrapper_RecordsTraffic(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte("ok"))
+	}))
+	defer server.Close()
+
+	// A wrapper that sends every request twice, the way one that retries would
+	twice := func(base http.RoundTripper) http.RoundTripper {
+		return roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+			resp, err := base.RoundTrip(req.Clone(req.Context()))
+			if err != nil {
+				return nil, err
+			}
+			_, _ = io.Copy(io.Discard, resp.Body)
+			_ = resp.Body.Close()
+			return base.RoundTrip(req)
+		})
+	}
+
+	rec := httptraffic.NewRecorder()
+	client := NewHTTPClient(WithTrafficRecorder(rec), WithTransportWrapper(twice))
+
+	_, err := client.DoGetRequest(context.Background(), server.URL+"/resource", nil)
+	require.NoError(t, err)
+
+	var requests uint64
+	for _, e := range rec.Snapshot().Endpoints {
+		if e.Path == "/resource" {
+			requests = e.Requests
+		}
+	}
+	require.Equal(t, uint64(2), requests)
 }

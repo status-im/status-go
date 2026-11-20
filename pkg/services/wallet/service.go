@@ -77,11 +77,17 @@ const (
 func createCoingeckoProxyClient(config params.MarketDataProxyConfig) *coingecko.Client {
 	baseURL := leaderboard.GetMarketProxyUrl(config.UrlOverride.Reveal(), config.StageName)
 
+	var puzzleAuthOrigin string
+	if config.UsePuzzleAuth {
+		puzzleAuthOrigin = leaderboard.GetMarketProxyHost(config.UrlOverride.Reveal(), config.StageName)
+	}
+
 	return coingecko.NewClientWithParams(coingecko.Params{
-		URL:           baseURL,
-		User:          config.User,
-		Password:      config.Password,
-		IsMarketProxy: true,
+		URL:              baseURL,
+		User:             config.User,
+		Password:         config.Password,
+		IsMarketProxy:    true,
+		PuzzleAuthOrigin: puzzleAuthOrigin,
 	})
 }
 
@@ -172,6 +178,9 @@ func NewService(
 		marketProviders = []thirdparty.MarketDataProvider{
 			coingeckoProxy, coingeckoClient,
 		}
+		for _, fallbackConfig := range fallbackMarketProxyConfigs(config.WalletConfig.MarketDataProxyConfig) {
+			marketProviders = append(marketProviders, createCoingeckoProxyClient(fallbackConfig))
+		}
 
 		raribleClient := rarible.NewClient(config.WalletConfig.RaribleMainnetAPIKey, config.WalletConfig.RaribleTestnetAPIKey)
 		alchemyClient := alchemy.NewClient(config.WalletConfig.AlchemyAPIKey)
@@ -200,6 +209,14 @@ func NewService(
 			alchemyProxy,
 			raribleClient,
 			alchemyClient,
+		}
+
+		for _, fallbackConfig := range fallbackNftProxyConfigs(config.WalletConfig.NftProxyConfig) {
+			fallbackProxy := createAlchemyProxyClient(fallbackConfig)
+			contractOwnershipProviders = append(contractOwnershipProviders, fallbackProxy)
+			accountOwnershipProviders = append(accountOwnershipProviders, fallbackProxy)
+			collectibleDataProviders = append(collectibleDataProviders, fallbackProxy)
+			collectionDataProviders = append(collectionDataProviders, fallbackProxy)
 		}
 
 		collectibleSearchProviders := []thirdparty.CollectibleSearchProvider{

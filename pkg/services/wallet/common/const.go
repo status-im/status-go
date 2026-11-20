@@ -52,6 +52,10 @@ const (
 	DirectTenderly    = "direct-tenderly"
 )
 
+// StatusSmartProxyFallback is the provider ID of the smart proxy that backs
+// StatusSmartProxy up, see params.FallbackProxyStages.
+const StatusSmartProxyFallback = "status-smart-proxy-fallback"
+
 type ChainID uint64
 
 const (

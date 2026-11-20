@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/status-im/status-go/pkg/security"
+	"github.com/status-im/status-go/pkg/services/wallet/puzzleauth/puzzleauthtest"
 )
 
 func TestProxyFetcherFetchPrices(t *testing.T) {
@@ -244,4 +245,39 @@ func TestProxyFetcherRefreshLoops(t *testing.T) {
 	fetcher.Stop()
 
 	require.Greater(t, requestCount, 0)
+}
+
+func TestProxyFetcherAuthorization(t *testing.T) {
+	db, cleanup := setupTestWalletDB(t)
+	defer cleanup()
+	storage := NewDataStorage(db)
+
+	// fetchPricesWith fetches prices from a proxy with the given auth settings
+	// and returns the Authorization header the proxy received.
+	fetchPricesWith := func(t *testing.T, usePuzzleAuth bool) string {
+		var authorization string
+		server := puzzleauthtest.NewServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			authorization = r.Header.Get("Authorization")
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"bitcoin":{"price":80000.0}}`))
+		}))
+
+		config := ServiceConfig{
+			User:          security.NewSensitiveString("test"),
+			Password:      security.NewSensitiveString("password"),
+			UrlOverride:   security.NewSensitiveString(server.URL),
+			UsePuzzleAuth: usePuzzleAuth,
+		}
+		fetcher := NewProxyFetcher(config, storage, NewSubscriptionManager()).(*ProxyFetcher)
+		require.NoError(t, fetcher.FetchPrices(context.Background()))
+		return authorization
+	}
+
+	t.Run("puzzle token when puzzle auth is on", func(t *testing.T) {
+		require.Equal(t, "Bearer "+puzzleauthtest.Token, fetchPricesWith(t, true))
+	})
+
+	t.Run("basic credentials when puzzle auth is off", func(t *testing.T) {
+		require.Equal(t, "Basic dGVzdDpwYXNzd29yZA==", fetchPricesWith(t, false))
+	})
 }

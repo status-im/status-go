@@ -57,6 +57,9 @@ type HTTPClient struct {
 	maxRetries int
 	// traffic records what the client sends and receives.
 	traffic *httptraffic.Recorder
+	// transportWrappers are put in front of the transport the other options
+	// leave, in the order they were given.
+	transportWrappers []func(http.RoundTripper) http.RoundTripper
 }
 
 // Struct to hold request modifiers and data collectors
@@ -113,6 +116,15 @@ func WithTrafficRecorder(rec *httptraffic.Recorder) Option {
 	}
 }
 
+// WithTransportWrapper puts wrap in front of the client's transport, for
+// example to authorize its requests. Wrappers are applied after all other
+// options, in the order given, so the last one sees a request first.
+func WithTransportWrapper(wrap func(http.RoundTripper) http.RoundTripper) Option {
+	return func(c *HTTPClient) {
+		c.transportWrappers = append(c.transportWrappers, wrap)
+	}
+}
+
 // WithMaxRetries sets the maximum number of retries for failed requests
 func WithMaxRetries(maxRetries int) Option {
 	return func(c *HTTPClient) {
@@ -157,6 +169,11 @@ func NewHTTPClient(opts ...Option) *HTTPClient {
 		client.client.Transport = traffic.Default.Instrument(client.client.Transport)
 	default:
 		client.client.Transport = client.traffic.Instrument(client.client.Transport)
+	}
+
+	// Wrappers go on top of the transport set above, which is never nil.
+	for _, wrap := range client.transportWrappers {
+		client.client.Transport = wrap(client.client.Transport)
 	}
 
 	return client

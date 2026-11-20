@@ -20,6 +20,9 @@ type ServiceConfig struct {
 	User        security.SensitiveString
 	Password    security.SensitiveString
 	StageName   string
+	// UsePuzzleAuth sends requests with a proof-of-work (puzzle) JWT of the
+	// proxy instead of User and Password.
+	UsePuzzleAuth bool
 
 	// Refresh intervals (in seconds)
 	FullDataInterval    time.Duration
@@ -62,6 +65,7 @@ func NewLeaderboardConfig(config params.MarketDataProxyConfig) ServiceConfig {
 		User:                config.User,
 		Password:            config.Password,
 		StageName:           config.StageName,
+		UsePuzzleAuth:       config.UsePuzzleAuth,
 		FullDataInterval:    time.Duration(config.FullDataRefreshInterval) * time.Second,
 		PriceUpdateInterval: time.Duration(config.PriceRefreshInterval) * time.Second,
 		AllowGzip:           true,
