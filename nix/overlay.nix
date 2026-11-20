@@ -39,16 +39,6 @@ in rec {
     vendorHash = "sha256-AG5wtLwWLz55bdp1oi3cW+9O3yj1W1P7MV9zxym7Pb4=";
   });
 
-  go-junit-report = prev.go-junit-report.overrideAttrs ( attrs : rec {
-    version = "2.1.0";
-    src = prev.fetchFromGitHub {
-     owner = "jstemmer";
-     repo = "go-junit-report";
-     rev = "v${version}";
-     sha256 = "sha256-s4XVjACmpd10C5k+P3vtcS/aWxI6UkSUPyxzLhD2vRI=";
-    };
-  });
-
   xcodeWrapper = callPackage ./pkgs/xcodeenv/compose-xcodewrapper.nix { } {
     versions = ["16.0" "16.1" "16.2"];
   };

@@ -156,6 +156,17 @@ func UnfurlURLs(urls []string, httpClient *http.Client, statusDataProvider unfur
 	}
 
 	for _, url := range urls {
+		if sharedurls.IsThreadURL(url) {
+			preview, err := unfurlers.NewStatusUnfurler(url, statusDataProvider, logger).UnfurlThread()
+			if err != nil {
+				logger.Warn("failed to unfurl thread link")
+				response.LinkPreviews = append(response.LinkPreviews, common.NewUnknownThreadPreview(url))
+				continue
+			}
+			response.LinkPreviews = append(response.LinkPreviews, preview)
+			continue
+		}
+
 		logger.Debug("unfurling", zap.String("url", url))
 
 		if sharedurls.IsStatusSharedURL(url) {

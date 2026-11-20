@@ -27,13 +27,16 @@ type LinkPreviewThumbnail struct {
 }
 
 type LinkPreview struct {
-	Type        protobuf.UnfurledLink_LinkType `json:"type"`
-	URL         string                         `json:"url"`
-	Hostname    string                         `json:"hostname"`
-	Title       string                         `json:"title,omitempty"`
-	Description string                         `json:"description,omitempty"`
-	Favicon     LinkPreviewThumbnail           `json:"favicon,omitempty"`
-	Thumbnail   LinkPreviewThumbnail           `json:"thumbnail,omitempty"`
+	Type             protobuf.UnfurledLink_LinkType `json:"type"`
+	URL              string                         `json:"url"`
+	Hostname         string                         `json:"hostname"`
+	Title            string                         `json:"title,omitempty"`
+	Description      string                         `json:"description,omitempty"`
+	ThreadParentName string                         `json:"threadParentName,omitempty"`
+	// ThreadAccessible is computed locally and is never included in message protobufs.
+	ThreadAccessible bool                 `json:"threadAccessible,omitempty"`
+	Favicon          LinkPreviewThumbnail `json:"favicon,omitempty"`
+	Thumbnail        LinkPreviewThumbnail `json:"thumbnail,omitempty"`
 }
 
 type StatusContactLinkPreview struct {
@@ -277,13 +280,32 @@ func (preview *StatusCommunityLinkPreview) loadFromProto(c *protobuf.UnfurledSta
 // client because we can't attempt to re-unfurl URLs at this point (it's
 // actually undesirable). We run a basic validation as an additional safety net.
 func (m *Message) ConvertLinkPreviewsToProto() ([]*protobuf.UnfurledLink, error) {
-	if len(m.LinkPreviews) == 0 {
+	previews := append([]LinkPreview(nil), m.LinkPreviews...)
+	for _, statusPreview := range m.StatusLinkPreviews {
+		if !IsStatusThreadURL(statusPreview.URL) {
+			continue
+		}
+		found := false
+		for _, preview := range previews {
+			if preview.URL == statusPreview.URL {
+				found = true
+				break
+			}
+		}
+		if !found {
+			previews = append(previews, *NewUnknownThreadPreview(statusPreview.URL))
+		}
+	}
+	if len(previews) == 0 {
 		return nil, nil
 	}
 
-	unfurledLinks := make([]*protobuf.UnfurledLink, 0, len(m.LinkPreviews))
+	unfurledLinks := make([]*protobuf.UnfurledLink, 0, len(previews))
 
-	for _, preview := range m.LinkPreviews {
+	for _, preview := range previews {
+		if IsStatusThreadURL(preview.URL) {
+			preview = *NewUnknownThreadPreview(preview.URL)
+		}
 		// Do not process subsequent previews because we do expect all previews to
 		// be valid at this stage.
 		if err := preview.validateForProto(); err != nil {
@@ -379,6 +401,9 @@ func (m *Message) ConvertStatusLinkPreviewsToProto() (*protobuf.UnfurledStatusLi
 	unfurledLinks := make([]*protobuf.UnfurledStatusLink, 0, len(m.StatusLinkPreviews))
 
 	for _, preview := range m.StatusLinkPreviews {
+		if IsStatusThreadURL(preview.URL) {
+			continue
+		}
 		// We expect all previews to be valid at this stage
 		if err := preview.validateForProto(); err != nil {
 			return nil, fmt.Errorf("invalid status link preview, url='%s': %w", preview.URL, err)
@@ -448,6 +473,9 @@ func (m *Message) ConvertStatusLinkPreviewsToProto() (*protobuf.UnfurledStatusLi
 		unfurledLinks = append(unfurledLinks, ul)
 	}
 
+	if len(unfurledLinks) == 0 {
+		return nil, nil
+	}
 	return &protobuf.UnfurledStatusLinks{UnfurledStatusLinks: unfurledLinks}, nil
 }
 

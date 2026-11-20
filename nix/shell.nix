@@ -9,8 +9,8 @@ in pkgs.mkShell {
 
   buildInputs = with pkgs; [
     git jq which gcc rustc cargo openjdk openssl nim nimble go
-    golangci-lint go-junit-report gopls
-    protobuf_36 gotestsum
+    golangci-lint gopls
+    protobuf_36
     libsds libstorage libtkl
   ] ++ lib.optionals (isDarwin) [
     pkgs.xcodeWrapper

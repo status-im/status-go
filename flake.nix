@@ -8,7 +8,7 @@
     ];
     extra-trusted-public-keys = [
       "nix-cache.status.im-1:x/93lOfLU+duPplwMSBR+OlY4+mo+dCN7n0mr4oPwgY="
-      "public:l4HrXgL4nw246+LBh2SOJyhz64BoGegOYLheT/iIAPU="
+      "public:zaDAOkd+E3cQyFm9J7qejQYd9HoLJc1SJvnk68hNWeI="
     ];
     # Some downloads are multiple GB, default is 5 minutes
     stalled-download-timeout = 3600;

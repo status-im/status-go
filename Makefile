@@ -211,9 +211,9 @@ STORAGE_TEST_ENV := LD_LIBRARY_PATH="$(LOGOS_STORAGE_LIB_DIR):$(RUNTIME_LIB_DIRS
 STORAGE_TEST_TAGS := use_logos_storage $(BUILD_TAGS) gowaku_skip_migrations
 
 test-storage: build-storage $(LIBSDS) generate ##@tests Run logosstorage package tests via gotestsum
-	$(STORAGE_TEST_ENV) bash scripts/tkl_env.sh gotestsum --packages="./pkg/services/logosstorage" -f testname -- -count 1 -tags "$(STORAGE_TEST_TAGS)"
-	$(STORAGE_TEST_ENV) bash scripts/tkl_env.sh gotestsum --packages="./internal/protocol/communities/archive/logosstorage" -f testname -- -count 1 -tags "$(STORAGE_TEST_TAGS)"
-	$(STORAGE_TEST_ENV) bash scripts/tkl_env.sh gotestsum --packages="./internal/protocol" -f testname -- -count 1 -tags "$(STORAGE_TEST_TAGS)" \
+	$(STORAGE_TEST_ENV) bash scripts/tkl_env.sh go tool gotestsum --packages="./pkg/services/logosstorage" -f testname -- -count 1 -tags "$(STORAGE_TEST_TAGS)"
+	$(STORAGE_TEST_ENV) bash scripts/tkl_env.sh go tool gotestsum --packages="./internal/protocol/communities/archive/logosstorage" -f testname -- -count 1 -tags "$(STORAGE_TEST_TAGS)"
+	$(STORAGE_TEST_ENV) bash scripts/tkl_env.sh go tool gotestsum --packages="./internal/protocol" -f testname -- -count 1 -tags "$(STORAGE_TEST_TAGS)" \
 	-run TestMessengerCommunitiesTokenPermissionsSuite/TestUploadDownloadLogosStorageHistoryArchives
 
 TORRENT_TEST_ENV := LD_LIBRARY_PATH="$(RUNTIME_LIB_DIRS)" \
@@ -222,8 +222,8 @@ TORRENT_TEST_ENV := LD_LIBRARY_PATH="$(RUNTIME_LIB_DIRS)" \
 TORRENT_TEST_TAGS := $(BUILD_TAGS) use_torrent gowaku_skip_migrations
 
 test-torrent: $(LIBSDS) generate ##@tests Run torrent archive package tests via gotestsum
-	$(TORRENT_TEST_ENV) bash scripts/tkl_env.sh gotestsum --packages="./internal/protocol/communities/archive/torrent" -f testname -- -count 1 -tags "$(TORRENT_TEST_TAGS)"
-	$(TORRENT_TEST_ENV) bash scripts/tkl_env.sh gotestsum --packages="./internal/protocol" -f testname -- -count 1 -tags "$(TORRENT_TEST_TAGS)" \
+	$(TORRENT_TEST_ENV) bash scripts/tkl_env.sh go tool gotestsum --packages="./internal/protocol/communities/archive/torrent" -f testname -- -count 1 -tags "$(TORRENT_TEST_TAGS)"
+	$(TORRENT_TEST_ENV) bash scripts/tkl_env.sh go tool gotestsum --packages="./internal/protocol" -f testname -- -count 1 -tags "$(TORRENT_TEST_TAGS)" \
 	-run TestMessengerCommunitiesTokenPermissionsSuite/TestImportDecryptedArchiveMessages
 
 history-archive-help: ##@build Show history archive build/test toggles and env vars

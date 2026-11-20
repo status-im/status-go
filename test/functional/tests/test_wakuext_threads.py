@@ -554,21 +554,6 @@ def _personal_mentions(backend, *, include_threads: bool) -> int:
     raise AssertionError("personal section not found")
 
 
-def _rpc_method_missing(exc: ApiResponseError) -> bool:
-    text = str(exc).lower()
-    return "-32601" in text or "does not exist/is not available" in text
-
-
-def _require_share_thread_url(backend) -> None:
-    try:
-        backend.backend.sharedurls_service.share_thread_url("", "")
-    except ApiResponseError as exc:
-        if _rpc_method_missing(exc):
-            pytest.skip("sharedurls shareThreadURL requires status-go#8064")
-        if "required" not in str(exc).lower():
-            raise
-
-
 async def _thread_parent_message(sender, receiver, chat_kind: ChatKind) -> tuple[str, str, str | None]:
     sender_chat_id, _, community_id = await _open_shared_chat(sender, receiver, chat_kind)
     parent_text = f"parent-{uuid4()}"
@@ -644,8 +629,6 @@ class TestWakuextThreadLinks:
 
     @pytest.mark.spec("SC-THRD-21")
     async def test_share_and_parse_thread_url_round_trip(self, sender, receiver, outsider):
-        _require_share_thread_url(sender)
-
         sender_chat_id, parent_id, community_id = await _thread_parent_message(sender, receiver, ChatKind.COMMUNITY)
         sharedurls = sender.backend.sharedurls_service
         outsider_urls = outsider.backend.sharedurls_service
