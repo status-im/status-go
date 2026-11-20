@@ -2869,7 +2869,9 @@ func (b *StatusBackend) initProtocol() error {
 	if b.statusNode.NewsFeedService() != nil {
 		b.statusNode.NewsFeedService().SetActivityCenter(nodeadapters.NewNewsFeedActivityCenterAdapter(messenger))
 	}
-	b.statusNode.LinkPreviewService().SetStatusDataProvider(nodeadapters.NewLinkPreviewMessengerAdapter(messenger))
+	previewProvider := nodeadapters.NewLinkPreviewMessengerAdapter(messenger)
+	b.statusNode.LinkPreviewService().SetStatusDataProvider(previewProvider)
+	messenger.SetThreadLinkPreviewResolver(previewProvider.ResolveThreadPreview)
 
 	return nil
 }

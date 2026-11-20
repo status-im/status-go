@@ -47,3 +47,11 @@ func (api *PublicAPI) ShareMessageURL(chatID string, messageID string) (string, 
 func (api *PublicAPI) ParseMessageURL(url string) (*MessageURLData, error) {
 	return ParseMessageURL(url)
 }
+
+func (api *PublicAPI) ShareThreadURL(chatID string, threadID string) (string, error) {
+	return api.service.ShareThreadURL(chatID, threadID)
+}
+
+func (api *PublicAPI) ParseThreadURL(url string) (*ThreadURLData, error) {
+	return api.service.ParseThreadURL(url)
+}
