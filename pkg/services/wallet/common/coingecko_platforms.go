@@ -15,6 +15,5 @@ var CoinGeckoPlatformChainMapper = map[string]uint64{
 	"zksync":              ZkSyncMainnet,
 	"soneium":             SoneiumMainnet,
 	"scroll":              ScrollMainnet,
-	"blast":               BlastMainnet,
 	"robinhood":           RobinhoodMainnet,
 }

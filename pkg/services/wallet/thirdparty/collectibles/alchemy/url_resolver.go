@@ -61,9 +61,6 @@ var alchemyNFTDirectHosts = map[uint64]string{
 	walletCommon.SoneiumMainnet:   "https://soneium-mainnet.g.alchemy.com",
 	walletCommon.SoneiumMinato:    "https://soneium-minato.g.alchemy.com",
 	walletCommon.ScrollMainnet:    "https://scroll-mainnet.g.alchemy.com",
-	walletCommon.ScrollSepolia:    "https://scroll-sepolia.g.alchemy.com",
-	walletCommon.BlastMainnet:     "https://blast-mainnet.g.alchemy.com",
-	walletCommon.BlastSepolia:     "https://blast-sepolia.g.alchemy.com",
 	walletCommon.RobinhoodMainnet: "https://robinhood-mainnet.g.alchemy.com",
 	walletCommon.RobinhoodTestnet: "https://robinhood-testnet.g.alchemy.com",
 }

@@ -82,9 +82,6 @@ const (
 	SoneiumMainnet   uint64 = 1868
 	SoneiumMinato    uint64 = 1946
 	ScrollMainnet    uint64 = 534352
-	ScrollSepolia    uint64 = 534351
-	BlastMainnet     uint64 = 81457
-	BlastSepolia     uint64 = 168587773
 	RobinhoodMainnet uint64 = 4663
 	RobinhoodTestnet uint64 = 46630
 	EthereumHoodi    uint64 = 560048
@@ -106,7 +103,6 @@ var (
 		ZkSyncMainnet:    true,
 		SoneiumMainnet:   true,
 		ScrollMainnet:    true,
-		BlastMainnet:     true,
 		RobinhoodMainnet: true,
 	}
 
@@ -123,8 +119,6 @@ var (
 		AbstractTestnet:  true,
 		ZkSyncSepolia:    true,
 		SoneiumMinato:    true,
-		ScrollSepolia:    true,
-		BlastSepolia:     true,
 		RobinhoodTestnet: true,
 		BSCTestnet:       true,
 		AnvilMainnet:     true,
@@ -196,11 +190,11 @@ func (c ChainID) IsMainnet() bool {
 	switch uint64(c) {
 	case EthereumMainnet, OptimismMainnet, ArbitrumMainnet, BaseMainnet, BSCMainnet, LineaMainnet,
 		UnichainMainnet, KatanaMainnet, InkMainnet, AbstractMainnet, ZkSyncMainnet,
-		SoneiumMainnet, ScrollMainnet, BlastMainnet, RobinhoodMainnet:
+		SoneiumMainnet, ScrollMainnet, RobinhoodMainnet:
 		return true
 	case EthereumHoodi, EthereumSepolia, OptimismSepolia, ArbitrumSepolia, BaseSepolia, LineaSepolia,
 		UnichainSepolia, KatanaBokuto, InkSepolia, AbstractTestnet, ZkSyncSepolia,
-		SoneiumMinato, ScrollSepolia, BlastSepolia, RobinhoodTestnet,
+		SoneiumMinato, RobinhoodTestnet,
 		BSCTestnet:
 		return false
 	case UnknownChainID:
@@ -235,9 +229,6 @@ func AllChainIDs() []ChainID {
 		ChainID(SoneiumMainnet),
 		ChainID(SoneiumMinato),
 		ChainID(ScrollMainnet),
-		ChainID(ScrollSepolia),
-		ChainID(BlastMainnet),
-		ChainID(BlastSepolia),
 		ChainID(RobinhoodMainnet),
 		ChainID(RobinhoodTestnet),
 		ChainID(BSCMainnet),
@@ -285,9 +276,6 @@ var AverageBlockDurationForChain = map[ChainID]time.Duration{
 	ChainID(SoneiumMainnet):   time.Duration(2000) * time.Millisecond,
 	ChainID(SoneiumMinato):    time.Duration(2000) * time.Millisecond,
 	ChainID(ScrollMainnet):    time.Duration(2000) * time.Millisecond,
-	ChainID(ScrollSepolia):    time.Duration(2000) * time.Millisecond,
-	ChainID(BlastMainnet):     time.Duration(2000) * time.Millisecond,
-	ChainID(BlastSepolia):     time.Duration(2000) * time.Millisecond,
 	ChainID(RobinhoodMainnet): time.Duration(2000) * time.Millisecond,
 	ChainID(RobinhoodTestnet): time.Duration(2000) * time.Millisecond,
 	ChainID(BSCMainnet):       time.Duration(3000) * time.Millisecond,
@@ -321,7 +309,6 @@ var ethAddressesByChainID = map[uint64]common.Address{
 	ZkSyncMainnet:    common.HexToAddress("0x0000000000000000000000000000000000000000"),
 	SoneiumMainnet:   common.HexToAddress("0x0000000000000000000000000000000000000000"),
 	ScrollMainnet:    common.HexToAddress("0x0000000000000000000000000000000000000000"),
-	BlastMainnet:     common.HexToAddress("0x0000000000000000000000000000000000000000"),
 	RobinhoodMainnet: common.HexToAddress("0x0000000000000000000000000000000000000000"),
 	EthereumHoodi:    common.HexToAddress("0x0000000000000000000000000000000000000000"),
 	EthereumSepolia:  common.HexToAddress("0x0000000000000000000000000000000000000000"),
@@ -335,8 +322,6 @@ var ethAddressesByChainID = map[uint64]common.Address{
 	AbstractTestnet:  common.HexToAddress("0x0000000000000000000000000000000000000000"),
 	ZkSyncSepolia:    common.HexToAddress("0x0000000000000000000000000000000000000000"),
 	SoneiumMinato:    common.HexToAddress("0x0000000000000000000000000000000000000000"),
-	ScrollSepolia:    common.HexToAddress("0x0000000000000000000000000000000000000000"),
-	BlastSepolia:     common.HexToAddress("0x0000000000000000000000000000000000000000"),
 	RobinhoodTestnet: common.HexToAddress("0x0000000000000000000000000000000000000000"),
 }
 
