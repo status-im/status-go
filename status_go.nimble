@@ -12,7 +12,7 @@ srcDir = "internal/nimble/src"
 ### Dependencies
 # This file pins the Nim that builds the libraries and their revisions.
 # scripts/check_nim_pins.sh holds every other copy, and a consumer's resolution, to it.
-requires "nim == 2.2.10"
+requires "nim == 2.2.12"
 
 # nim-sds, whose C ABI go.mod's sds-go-bindings must match.
 requires "https://github.com/logos-messaging/nim-sds#8f7fee08f0256c1788089e756182c8be0a621930"
