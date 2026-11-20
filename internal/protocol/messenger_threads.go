@@ -461,9 +461,7 @@ func (m *Messenger) EditThread(ctx context.Context, request *requests.EditThread
 	return response, nil
 }
 
-// StartThreadFromNewMessage sends a thread root and the supplied message as its
-// first reply. The root is sent before the reply because its message ID is the
-// thread ID.
+// StartThreadFromNewMessage sends the supplied message as the thread root.
 func (m *Messenger) StartThreadFromNewMessage(ctx context.Context, request *requests.StartThreadFromNewMessage) (*MessengerResponse, error) {
 	if err := request.Validate(); err != nil {
 		return nil, err
@@ -495,13 +493,8 @@ func (m *Messenger) StartThreadFromNewMessage(ctx context.Context, request *requ
 		return nil, errors.New("thread name or message text is required")
 	}
 
-	root := common.NewMessage()
-	root.ChatId = message.ChatId
-	root.Text = message.Text
-	root.ContentType = protobuf.ChatMessage_TEXT_PLAIN
-	root.MessageType = message.MessageType
-
-	rootResponse, err := m.SendChatMessage(ctx, root)
+	message.StartsThread = true
+	rootResponse, err := m.SendChatMessage(ctx, message)
 	if err != nil {
 		return nil, err
 	}
@@ -517,13 +510,6 @@ func (m *Messenger) StartThreadFromNewMessage(ctx context.Context, request *requ
 		return nil, err
 	}
 
-	message.ThreadId = &threadID
-	message.ResponseTo = threadID
-	replyResponse, err := m.SendChatMessage(ctx, message)
-	if err != nil {
-		return nil, err
-	}
-
 	response := &MessengerResponse{}
 	if err := response.Merge(rootResponse); err != nil {
 		return nil, err
@@ -531,10 +517,6 @@ func (m *Messenger) StartThreadFromNewMessage(ctx context.Context, request *requ
 	if err := response.Merge(threadResponse); err != nil {
 		return nil, err
 	}
-	if err := response.Merge(replyResponse); err != nil {
-		return nil, err
-	}
-
 	return response, nil
 }
 

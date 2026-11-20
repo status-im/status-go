@@ -265,6 +265,9 @@ message ChatMessage {
   // Id of the parent message that identifies the thread.
   optional string thread_id = 21;
 
+  // The message is the root of a newly created thread.
+  bool starts_thread = 22;
+
   enum ContentType {
     UNKNOWN_CONTENT_TYPE = 0;
     TEXT_PLAIN = 1;
