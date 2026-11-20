@@ -129,6 +129,27 @@ func (s *NetworkManagerTestSuite) TestInitNetworksKeepsUserProviders() {
 	testutil.CompareProvidersList(s.T(), expectedProviders, foundNetwork.RpcProviders)
 }
 
+func (s *NetworkManagerTestSuite) TestInitNetworksDropsNetworksNoLongerEmbedded() {
+	stored := s.manager.Find(common.BaseMainnet)
+	s.Require().NotNil(stored)
+	s.Require().True(stored.IsActive)
+
+	// Base is no longer among the embedded networks
+	initNetworks := []params.Network{
+		*testutil.CreateNetwork(common.EthereumMainnet, "Ethereum Mainnet", []params.RpcProvider{
+			testutil.CreateProvider(common.EthereumMainnet, "Infura Mainnet", params.EmbeddedEthRpcProxyProviderType, true, security.NewSensitiveString("https://mainnet.infura.io")),
+		}),
+	}
+	s.Require().NoError(s.manager.InitEmbeddedNetworks(initNetworks))
+
+	s.Require().Nil(s.manager.Find(common.BaseMainnet))
+	active, err := s.manager.GetActiveNetworks()
+	s.Require().NoError(err)
+	for _, n := range active {
+		s.Require().NotEqual(common.BaseMainnet, n.ChainID)
+	}
+}
+
 func (s *NetworkManagerTestSuite) TestInitNetworksDoesNotSaveEmbeddedProviders() {
 	persistence := db.NewNetworksPersistence(s.db)
 	s.Require().NoError(persistence.DeleteAllNetworks())

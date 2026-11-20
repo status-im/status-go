@@ -134,9 +134,9 @@ func chainIDToClass(chainID uint64) (gas.ChainClass, error) {
 		return gas.ChainClassArbStack, nil
 	case common.OptimismMainnet, common.OptimismSepolia, common.BaseMainnet, common.BaseSepolia, common.UnichainMainnet,
 		common.UnichainSepolia, common.InkMainnet, common.InkSepolia, common.AbstractMainnet, common.AbstractTestnet,
-		common.SoneiumMainnet, common.SoneiumMinato, common.BlastMainnet, common.BlastSepolia,
+		common.SoneiumMainnet, common.SoneiumMinato,
 		common.KatanaMainnet, common.KatanaBokuto, common.ZkSyncMainnet, common.ZkSyncSepolia,
-		common.ScrollMainnet, common.ScrollSepolia:
+		common.ScrollMainnet:
 		return gas.ChainClassOPStack, nil
 	case common.LineaMainnet, common.LineaSepolia:
 		return gas.ChainClassLineaStack, nil
