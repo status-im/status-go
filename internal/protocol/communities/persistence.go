@@ -373,17 +373,12 @@ func (p *Persistence) GetByID(memberIdentity *ecdsa.PublicKey, id []byte) (*Comm
 	return p.recordBundleToCommunity(r)
 }
 
-// CommunityExists checks if a community with the given ID exists in the database.
-// This is a lightweight alternative to GetByID when only existence checking is needed.
-func (p *Persistence) CommunityExists(memberIdentity *ecdsa.PublicKey, id []byte) (bool, error) {
-	r, err := p.getByID(id, memberIdentity)
-	if err == sql.ErrNoRows {
-		return false, nil
-	}
-	if err != nil {
-		return false, err
-	}
-	return r != nil, nil
+// CommunityExists checks if a community with the given ID exists in the database,
+// without reading its row.
+func (p *Persistence) CommunityExists(_ *ecdsa.PublicKey, id []byte) (bool, error) {
+	var exists bool
+	err := p.db.QueryRow(`SELECT EXISTS (SELECT 1 FROM communities_communities WHERE id = ?)`, id).Scan(&exists)
+	return exists, err
 }
 
 func (p *Persistence) SaveRequestToJoin(request *RequestToJoin) (err error) {
@@ -1741,7 +1736,9 @@ func (p *Persistence) GetCuratedCommunities() (*CuratedCommunities, error) {
 	return result, nil
 }
 
-func (p *Persistence) SetCuratedCommunities(communities *CuratedCommunities) error {
+// SetCuratedCommunities replaces the stored curated communities. When it
+// fails the stored ones are left as they were.
+func (p *Persistence) SetCuratedCommunities(communities *CuratedCommunities) (err error) {
 	tx, err := p.db.BeginTx(context.Background(), &sql.TxOptions{})
 	if err != nil {
 		return err
@@ -1773,8 +1770,7 @@ func (p *Persistence) SetCuratedCommunities(communities *CuratedCommunities) err
 	}
 
 	for _, community := range communities.ContractCommunities {
-		_, err := stmt.Exec(community, featuredMap[community])
-		if err != nil {
+		if _, err = stmt.Exec(community, featuredMap[community]); err != nil {
 			return err
 		}
 	}

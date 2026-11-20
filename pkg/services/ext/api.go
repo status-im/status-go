@@ -238,11 +238,28 @@ func (api *PublicAPI) CommunityTags(parent context.Context) map[string]string {
 	return requests.AvailableTagsEmojis()
 }
 
-// CuratedCommunities returns the list of curated communities stored in the smart contract. If a community is
-// already known by the node, its description will be returned and and will asynchronously retrieve the
-// description for the communities it does not know
+// CuratedCommunities returns the curated communities from the smart contract together with any description
+// already stored locally. It is a pure read and never queries store nodes; use RefreshCuratedCommunities to
+// resolve descriptions the node does not have.
 func (api *PublicAPI) CuratedCommunities(parent context.Context) (*communities.KnownCommunitiesResponse, error) {
 	return api.service.messenger.CuratedCommunities()
+}
+
+// RefreshCuratedCommunities reads the curated directory and fetches the entries
+// with no stored description from store nodes. It returns at once. Signals:
+// started (the directory is stored by then; it tells whether the directory changed and whether updating it
+// failed), then finished, which counts the fetched entries as resolved, not found or failed.
+// Entries already stored are not counted: read them with CuratedCommunities.
+// The result is the ID of the run that was started or joined, a number that both signals carry as runId;
+// 0 when the messenger is shutting down and nothing was started.
+func (api *PublicAPI) RefreshCuratedCommunities(parent context.Context) (uint64, error) {
+	return api.service.messenger.RefreshCuratedCommunities()
+}
+
+// StopCuratedCommunitiesRefresh cancels an in-flight curated communities refresh.
+func (api *PublicAPI) StopCuratedCommunitiesRefresh(parent context.Context) error {
+	api.service.messenger.StopCuratedCommunitiesRefresh()
+	return nil
 }
 
 // SpectateCommunity spectates community with the given ID
