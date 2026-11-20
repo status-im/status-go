@@ -67,9 +67,9 @@ RUN set -eu && \
 ENV PATH="/opt/nimble/bin:${PATH}"
 
 # The Nim status_go.nimble requires for libsds and libtkl, left where nimble looks first.
-ARG NIM_LIBS_VERSION=2.2.10
-ARG NIM_LIBS_X64_SHA256=0a3a38752e97e9d44aa479b3a7b37336dfe0176daf22ee5b5218ad0991ecd211
-ARG NIM_LIBS_ARM64_SHA256=cd86a6e2bcbf029c4870aa51df5c0169345dbf9959889112fd15d403c13ae33a
+ARG NIM_LIBS_VERSION=2.2.12
+ARG NIM_LIBS_X64_SHA256=7df1611449a6842af69322aa2c1206942982650a5f6bc0d37bc8ec109932f638
+ARG NIM_LIBS_ARM64_SHA256=3dc04191af72a8310cf1c8ffb6f772cc3716fc5f264bc7c453ab4aecb4085221
 RUN set -eu && \
     case "$(dpkg --print-architecture)" in \
     amd64) NIM_LIBS_ARCH=x64; NIM_LIBS_SHA256="$NIM_LIBS_X64_SHA256" ;; \
