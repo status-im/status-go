@@ -314,11 +314,12 @@ func (s *MessengerThreadsSuite) TestStartThreadFromNewMessageWithExplicitName() 
 		ThreadName: "  A custom\nthread name  ",
 	})
 	s.Require().NoError(err)
-	s.Require().Len(response.Messages(), 2)
+	s.Require().Len(response.Messages(), 1)
 	s.Require().Len(response.Threads(), 1)
 
 	thread := response.Threads()[0]
 	s.Require().Equal("A custom thread name", thread.Name)
+	s.Require().Equal(uint(1), thread.MessagesCount)
 
 	var root *common.Message
 	for _, responseMessage := range response.Messages() {
@@ -328,45 +329,45 @@ func (s *MessengerThreadsSuite) TestStartThreadFromNewMessageWithExplicitName() 
 		}
 	}
 	s.Require().NotNil(root)
-	s.Require().Equal("A custom thread name", root.Text)
+	s.Require().Equal(message.Text, root.Text)
 	s.Require().Equal(protobuf.ChatMessage_TEXT_PLAIN, root.ContentType)
 	s.Require().Empty(root.GetThreadId())
 	s.Require().Empty(root.ResponseTo)
 
-	s.Require().Equal(thread.ThreadID, message.GetThreadId())
-	s.Require().Equal(thread.ThreadID, message.ResponseTo)
+	s.Require().Equal(thread.ThreadID, message.ID)
+	s.Require().Empty(message.GetThreadId())
+	s.Require().Empty(message.ResponseTo)
 
 	threadMessages, cursor, err := s.m.MessageByChatID(chat.ID, thread.ThreadID, "", 10)
 	s.Require().NoError(err)
 	s.Require().Empty(cursor)
-	s.Require().Len(threadMessages, 1)
-	s.Require().Equal(message.ID, threadMessages[0].ID)
+	s.Require().Empty(threadMessages)
 }
 
-func (s *MessengerThreadsSuite) TestStartThreadFromNewMessageUsesNormalizedMessageTextWhenNameOmitted() {
+func (s *MessengerThreadsSuite) TestStartThreadFromNewMessageKeepsFullTextWhenNameOmitted() {
 	chat := s.createJoinedOneToOneThreadChat()
 
 	message := buildTestMessage(*chat)
-	message.Text = "  " + strings.Repeat("é", 51) + "  "
+	message.Text = "  " + strings.Repeat("👩🏽‍💻", 51) + "\n  "
 	message.ChatMessage.Text = message.Text
 
 	response, err := s.m.StartThreadFromNewMessage(context.Background(), &requests.StartThreadFromNewMessage{Message: message})
 	s.Require().NoError(err)
 	s.Require().Len(response.Threads(), 1)
 
-	expectedRootText := strings.Repeat("é", common.MaxThreadNameLength)
+	expectedName := strings.Repeat("👩🏽‍💻", common.MaxThreadNameLength)
 	thread := response.Threads()[0]
-	s.Require().Equal(expectedRootText, thread.Name)
+	s.Require().Equal(expectedName, thread.Name)
 	for _, responseMessage := range response.Messages() {
 		if responseMessage.ID == thread.ThreadID {
-			s.Require().Equal(expectedRootText, responseMessage.Text)
+			s.Require().Equal(message.Text, responseMessage.Text)
 			return
 		}
 	}
 	s.T().Fatal("thread root message was not returned")
 }
 
-func (s *MessengerThreadsSuite) TestStartThreadFromNewMessagePreservesReplyPreviews() {
+func (s *MessengerThreadsSuite) TestStartThreadFromNewMessagePreservesRootPreviews() {
 	chat := s.createJoinedOneToOneThreadChat()
 
 	message := buildTestMessage(*chat)
@@ -391,22 +392,30 @@ func (s *MessengerThreadsSuite) TestStartThreadFromNewMessagePreservesReplyPrevi
 	s.Require().Len(response.Threads(), 1)
 
 	threadID := response.Threads()[0].ThreadID
-	threadMessages, cursor, err := s.m.MessageByChatID(chat.ID, threadID, "", 10)
+	root, err := s.m.MessageByID(threadID)
 	s.Require().NoError(err)
-	s.Require().Empty(cursor)
-	s.Require().Len(threadMessages, 1)
-
-	reply := threadMessages[0]
-	s.Require().Equal(message.ID, reply.ID)
-	s.Require().Len(reply.UnfurledLinks, 1)
-	s.Require().Equal("https://example.com", reply.UnfurledLinks[0].Url)
-	s.Require().Equal("Example", reply.UnfurledLinks[0].Title)
-	s.Require().NotNil(reply.UnfurledStatusLinks)
-	s.Require().Len(reply.UnfurledStatusLinks.UnfurledStatusLinks, 1)
-	statusPreview := reply.UnfurledStatusLinks.UnfurledStatusLinks[0]
+	s.Require().Equal(message.ID, root.ID)
+	s.Require().Len(root.UnfurledLinks, 1)
+	s.Require().Equal("https://example.com", root.UnfurledLinks[0].Url)
+	s.Require().Equal("Example", root.UnfurledLinks[0].Title)
+	s.Require().NotNil(root.UnfurledStatusLinks)
+	s.Require().Len(root.UnfurledStatusLinks.UnfurledStatusLinks, 1)
+	statusPreview := root.UnfurledStatusLinks.UnfurledStatusLinks[0]
 	s.Require().Equal("https://status.app/u/alice", statusPreview.Url)
 	s.Require().NotNil(statusPreview.GetContact())
 	s.Require().Equal("Alice", statusPreview.GetContact().DisplayName)
+}
+
+func (s *MessengerThreadsSuite) TestStartThreadFromNewMessagePreservesEmojiContentType() {
+	chat := s.createJoinedOneToOneThreadChat()
+	message := buildTestMessage(*chat)
+	message.Text = "😀"
+	message.ContentType = protobuf.ChatMessage_EMOJI
+
+	response, err := s.m.StartThreadFromNewMessage(context.Background(), &requests.StartThreadFromNewMessage{Message: message})
+	s.Require().NoError(err)
+	s.Require().Len(response.Messages(), 1)
+	s.Require().Equal(protobuf.ChatMessage_EMOJI, response.Messages()[0].ContentType)
 }
 
 func (s *MessengerThreadsSuite) TestStartThreadFromNewMessageRequiresThreadNameOrMessageText() {
@@ -1043,6 +1052,100 @@ func (s *MessengerThreadsSuite) TestAddThreadsToResponseUsesLocalChatIDForOneToO
 	s.Require().Equal(uint(1), response.Threads()[0].UnviewedMentionsCount)
 }
 
+func (s *MessengerThreadsSuite) TestReceivedNewThreadRootSummaryInEitherDeliveryOrder() {
+	creator, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+	creatorID := contacts.ContactIDFromPublicKey(&creator.PublicKey)
+	contact, err := contacts.BuildContact(creatorID, &creator.PublicKey)
+	s.Require().NoError(err)
+	s.m.allContacts.Store(creatorID, contact)
+	chat := CreateOneToOneChat("root-summary", &creator.PublicKey, s.m.getTimesource())
+	s.Require().NoError(s.m.SaveChat(chat))
+
+	for _, delivery := range []string{"root-first", "metadata-first", "root-first-same-batch", "metadata-first-same-batch"} {
+		s.Run(delivery, func() {
+			root := buildTestMessage(*chat)
+			root.ID = delivery
+			root.From = creatorID
+			root.Text = "Initial message"
+			root.Timestamp = 12345
+			root.StartsThread = true
+			root.New = true
+			metadata := &protobuf.ThreadMetadata{
+				Clock: 10, ChatId: chat.ID, ThreadId: root.ID, Name: "Thread", CreatorId: creatorID,
+				MessageType: protobuf.MessageType_ONE_TO_ONE,
+			}
+			handleMetadata := func(state *ReceivedMessageState) {
+				state.CurrentMessageState = &CurrentMessageState{
+					PublicKey: &creator.PublicKey, WhisperTimestamp: 10,
+				}
+				s.Require().NoError(s.m.HandleThreadMetadata(context.Background(), state, metadata, nil))
+			}
+			assertSummary := func(response *MessengerResponse) {
+				s.Require().Len(response.Threads(), 1)
+				thread := response.Threads()[0]
+				s.Require().Equal(root.ID, thread.ThreadID)
+				s.Require().Equal("Thread", thread.Name)
+				s.Require().Equal(uint(1), thread.MessagesCount)
+				s.Require().Equal(uint(1), thread.ParticipantsCount)
+				s.Require().Equal([]string{creatorID}, thread.ParticipantsPreviewIDs)
+				s.Require().NotNil(thread.LastMessage)
+				s.Require().Equal(creatorID, thread.LastMessage.From)
+				s.Require().Equal(root.Text, thread.LastMessage.Text)
+				s.Require().Equal(root.Timestamp, thread.LastMessage.Timestamp)
+				s.Require().False(thread.Followed)
+			}
+
+			state := s.m.buildMessageState()
+			switch delivery {
+			case "root-first":
+				state.Response.AddMessage(root)
+				response, err := s.m.saveDataAndPrepareResponse(state)
+				s.Require().NoError(err)
+				s.Require().Empty(response.Threads())
+				state = s.m.buildMessageState()
+				handleMetadata(state)
+				assertSummary(state.Response)
+			case "metadata-first":
+				handleMetadata(state)
+				s.Require().Zero(state.Response.Threads()[0].MessagesCount)
+				state = s.m.buildMessageState()
+				state.Response.AddMessage(root)
+				response, err := s.m.saveDataAndPrepareResponse(state)
+				s.Require().NoError(err)
+				assertSummary(response)
+			case "root-first-same-batch":
+				state.Response.AddMessage(root)
+				handleMetadata(state)
+				response, err := s.m.saveDataAndPrepareResponse(state)
+				s.Require().NoError(err)
+				assertSummary(response)
+			case "metadata-first-same-batch":
+				handleMetadata(state)
+				state.Response.AddMessage(root)
+				response, err := s.m.saveDataAndPrepareResponse(state)
+				s.Require().NoError(err)
+				assertSummary(response)
+			}
+
+			reply := buildTestMessage(*chat)
+			reply.ID = delivery + "-reply"
+			reply.From = creatorID
+			reply.Text = "A later reply"
+			reply.Clock = root.Clock + 1
+			reply.ThreadId = &root.ID
+			state = s.m.buildMessageState()
+			state.Response.AddMessage(reply)
+			response, err := s.m.saveDataAndPrepareResponse(state)
+			s.Require().NoError(err)
+			s.Require().Len(response.Threads(), 1)
+			s.Require().Equal(uint(2), response.Threads()[0].MessagesCount)
+			s.Require().NotNil(response.Threads()[0].LastMessage)
+			s.Require().Equal(reply.Text, response.Threads()[0].LastMessage.Text)
+		})
+	}
+}
+
 func (s *MessengerThreadsSuite) TestMessagesByThreadID() {
 	chat := CreateOneToOneChat("test-user", &s.m.identity.PublicKey, s.m.getTimesource())
 	s.Require().NoError(s.m.SaveChat(chat))
@@ -1301,7 +1404,7 @@ func (s *MessengerThreadsSuite) TestStartThreadFromNewMessageIsReceivedWithThrea
 	s.Require().NoError(err)
 
 	message := buildTestMessage(*senderChat)
-	message.Text = "First message in the new thread"
+	message.Text = "First message in the new thread @" + receiver.myHexIdentity() + "\n" + strings.Repeat("long text ", 8)
 	message.ChatMessage.Text = message.Text
 
 	senderResponse, err := sender.StartThreadFromNewMessage(context.Background(), &requests.StartThreadFromNewMessage{
@@ -1309,19 +1412,19 @@ func (s *MessengerThreadsSuite) TestStartThreadFromNewMessageIsReceivedWithThrea
 		ThreadName: "New thread",
 	})
 	s.Require().NoError(err)
+	s.Require().Len(senderResponse.Messages(), 1)
 	s.Require().Len(senderResponse.Threads(), 1)
 
 	threadID := senderResponse.Threads()[0].ThreadID
-	// The root, the creation metadata and the reply may arrive in one batch or
+	// The root and creation metadata may arrive in one batch or
 	// several, and in any order, so accumulate what was observed across responses.
-	var receivedRoot, receivedReply, receivedCreator bool
+	var receivedRoot, receivedCreator bool
 	_, err = WaitOnMessengerResponse(receiver, func(response *MessengerResponse) bool {
 		for _, receivedMessage := range response.Messages() {
 			switch receivedMessage.ID {
 			case threadID:
+				s.Require().Equal(message.Text, receivedMessage.Text)
 				receivedRoot = true
-			case message.ID:
-				receivedReply = true
 			}
 		}
 		for _, receivedThread := range response.Threads() {
@@ -1329,8 +1432,8 @@ func (s *MessengerThreadsSuite) TestStartThreadFromNewMessageIsReceivedWithThrea
 				receivedCreator = true
 			}
 		}
-		return receivedRoot && receivedReply && receivedCreator
-	}, "thread root, first reply and creation metadata not received")
+		return receivedRoot && receivedCreator
+	}, "thread root and creation metadata not received")
 	s.Require().NoError(err)
 
 	thread, err := receiver.persistence.ThreadByID(receiverChat.ID, threadID)
@@ -1338,6 +1441,10 @@ func (s *MessengerThreadsSuite) TestStartThreadFromNewMessageIsReceivedWithThrea
 	s.Require().Equal("New thread", thread.Name)
 	s.Require().Equal(sender.selfContact.ID, thread.CreatorID)
 	s.Require().False(thread.CreatorPending)
+	s.Require().True(thread.Followed, "a direct mention in the initial message follows the thread")
+	storedRoot, err := receiver.MessageByID(threadID)
+	s.Require().NoError(err)
+	s.Require().Equal(message.Text, storedRoot.Text)
 
 	// The creator's later edits must be accepted by the receiver.
 	newName := "Renamed thread"
@@ -1357,16 +1464,57 @@ func (s *MessengerThreadsSuite) TestStartThreadFromNewMessageIsReceivedWithThrea
 	}, "thread edit not received")
 	s.Require().NoError(err)
 
-	storedReply, err := receiver.MessageByID(message.ID)
-	s.Require().NoError(err)
-	s.Require().Equal(threadID, storedReply.GetThreadId())
-	s.Require().Equal(threadID, storedReply.ResponseTo)
+	s.Require().Empty(storedRoot.GetThreadId())
+	s.Require().Empty(storedRoot.ResponseTo)
 
 	threadMessages, cursor, err := receiver.MessageByChatID(receiverChat.ID, threadID, "", 10)
 	s.Require().NoError(err)
 	s.Require().Empty(cursor)
-	s.Require().Len(threadMessages, 1)
-	s.Require().Equal(message.ID, threadMessages[0].ID)
+	s.Require().Empty(threadMessages)
+}
+
+func (s *MessengerThreadsSuite) TestStartThreadFromNewMessageIsReceivedWithCompleteSummary() {
+	receiver := s.m
+	sender := s.newMessenger()
+	sender.featureFlags.Threads = true
+	receiverChat := CreateOneToOneChat("root-summary-receiver", &sender.identity.PublicKey, receiver.getTimesource())
+	s.Require().NoError(receiver.SaveChat(receiverChat))
+	_, err := receiver.Join(receiverChat)
+	s.Require().NoError(err)
+	senderChat := CreateOneToOneChat("root-summary-sender", &receiver.identity.PublicKey, sender.getTimesource())
+	s.Require().NoError(sender.SaveChat(senderChat))
+	_, err = sender.Join(senderChat)
+	s.Require().NoError(err)
+
+	root := buildTestMessage(*senderChat)
+	root.Text = "A new thread without a mention"
+	sent, err := sender.StartThreadFromNewMessage(context.Background(), &requests.StartThreadFromNewMessage{
+		Message: root, ThreadName: "Thread title",
+	})
+	s.Require().NoError(err)
+	s.Require().Len(sent.Threads(), 1)
+	threadID := sent.Threads()[0].ThreadID
+
+	var receivedRoot, receivedSummary bool
+	_, err = WaitOnMessengerResponse(receiver, func(response *MessengerResponse) bool {
+		for _, message := range response.Messages() {
+			receivedRoot = receivedRoot || message.ID == threadID
+		}
+		for _, thread := range response.Threads() {
+			if thread.ThreadID == threadID && thread.MessagesCount == 1 && thread.LastMessage != nil {
+				s.Require().Equal("Thread title", thread.Name)
+				s.Require().Equal(uint(1), thread.ParticipantsCount)
+				s.Require().Equal([]string{sender.myHexIdentity()}, thread.ParticipantsPreviewIDs)
+				s.Require().Equal(sender.myHexIdentity(), thread.LastMessage.From)
+				s.Require().Equal(root.Text, thread.LastMessage.Text)
+				s.Require().Equal(root.Timestamp, thread.LastMessage.Timestamp)
+				s.Require().False(thread.Followed)
+				receivedSummary = true
+			}
+		}
+		return receivedRoot && receivedSummary
+	}, "new thread root and complete summary not received")
+	s.Require().NoError(err)
 }
 
 func (s *MessengerThreadsSuite) TestMarkThreadReadClearsOnlyThreadMessages() {

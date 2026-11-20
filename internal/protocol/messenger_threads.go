@@ -166,6 +166,10 @@ func (m *Messenger) senderCanEditThread(chat *Chat, thread *Thread, sender *ecds
 // The parent message must already be stored locally. Only community members can
 // create threads in community chats.
 func (m *Messenger) CreateThread(chatID string, parentMessageID string) (*MessengerResponse, error) {
+	return m.createThread(chatID, parentMessageID, "")
+}
+
+func (m *Messenger) createThread(chatID string, parentMessageID string, name string) (*MessengerResponse, error) {
 	if !m.featureFlags.Threads {
 		return nil, ErrThreadFeatureDisabled
 	}
@@ -229,7 +233,10 @@ func (m *Messenger) CreateThread(chatID string, parentMessageID string) (*Messen
 		return nil, ErrThreadParentInThread
 	}
 
-	name, _ := common.NormalizeThreadName(parentMsg.Text, true)
+	name, _ = common.NormalizeThreadName(name, true)
+	if name == "" {
+		name, _ = common.NormalizeThreadName(parentMsg.Text, true)
+	}
 	if err := m.persistence.UpsertThread(parentMessageID, chatID, parentMessageID, name); err != nil {
 		return nil, err
 	}
@@ -454,9 +461,7 @@ func (m *Messenger) EditThread(ctx context.Context, request *requests.EditThread
 	return response, nil
 }
 
-// StartThreadFromNewMessage sends a thread root and the supplied message as its
-// first reply. The root is sent before the reply because its message ID is the
-// thread ID.
+// StartThreadFromNewMessage sends the supplied message as the thread root.
 func (m *Messenger) StartThreadFromNewMessage(ctx context.Context, request *requests.StartThreadFromNewMessage) (*MessengerResponse, error) {
 	if err := request.Validate(); err != nil {
 		return nil, err
@@ -480,21 +485,16 @@ func (m *Messenger) StartThreadFromNewMessage(ctx context.Context, request *requ
 		return nil, errors.New(communityMemberOnlyThreadCreationError)
 	}
 
-	rootText, _ := common.NormalizeThreadName(request.ThreadName, true)
-	if rootText == "" {
-		rootText, _ = common.NormalizeThreadName(message.Text, true)
+	name, _ := common.NormalizeThreadName(request.ThreadName, true)
+	if name == "" {
+		name, _ = common.NormalizeThreadName(message.Text, true)
 	}
-	if rootText == "" {
+	if name == "" {
 		return nil, errors.New("thread name or message text is required")
 	}
 
-	root := common.NewMessage()
-	root.ChatId = message.ChatId
-	root.Text = rootText
-	root.ContentType = protobuf.ChatMessage_TEXT_PLAIN
-	root.MessageType = message.MessageType
-
-	rootResponse, err := m.SendChatMessage(ctx, root)
+	message.StartsThread = true
+	rootResponse, err := m.SendChatMessage(ctx, message)
 	if err != nil {
 		return nil, err
 	}
@@ -505,14 +505,7 @@ func (m *Messenger) StartThreadFromNewMessage(ctx context.Context, request *requ
 	}
 
 	threadID := rootMessages[0].ID
-	threadResponse, err := m.CreateThread(chat.ID, threadID)
-	if err != nil {
-		return nil, err
-	}
-
-	message.ThreadId = &threadID
-	message.ResponseTo = threadID
-	replyResponse, err := m.SendChatMessage(ctx, message)
+	threadResponse, err := m.createThread(chat.ID, threadID, request.ThreadName)
 	if err != nil {
 		return nil, err
 	}
@@ -524,10 +517,6 @@ func (m *Messenger) StartThreadFromNewMessage(ctx context.Context, request *requ
 	if err := response.Merge(threadResponse); err != nil {
 		return nil, err
 	}
-	if err := response.Merge(replyResponse); err != nil {
-		return nil, err
-	}
-
 	return response, nil
 }
 

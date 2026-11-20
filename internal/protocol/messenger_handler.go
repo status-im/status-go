@@ -2455,6 +2455,11 @@ func (m *Messenger) handleChatMessage(ctx context.Context, state *ReceivedMessag
 		default:
 			return err
 		}
+	} else if m.featureFlags.Threads && chat.SupportsThreads() && receivedMessage.GetStartsThread() {
+		receivedMessage.ThreadMetadataCreationAuthorized, err = m.senderCanCreateThread(chat, receivedMessage.SigPubKey)
+		if err != nil {
+			return err
+		}
 	}
 
 	if err := m.updateChatFirstMessageTimestamp(chat, whisperToUnixTimestamp(receivedMessage.WhisperTimestamp), state.Response); err != nil {

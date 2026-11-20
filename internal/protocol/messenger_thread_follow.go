@@ -142,6 +142,33 @@ func (m *Messenger) updateThreadFollowsFromMessages(messages []*common.Message, 
 		}
 		threadID := message.GetThreadId()
 		if threadID == "" {
+			if message.GetStartsThread() && message.New && message.From != ownID &&
+				message.ThreadMetadataCreationAuthorized && slices.Contains(message.Mentions, ownID) {
+				thread, err := m.persistence.ThreadByID(message.LocalChatID, message.ID)
+				if errors.Is(err, common.ErrRecordNotFound) {
+					name, _ := common.NormalizeThreadName(message.Text, true)
+					err = m.persistence.UpsertPendingCreatorThreadAt(message.ID, message.LocalChatID, message.ID, name, messageActivityTime(message))
+					if err != nil {
+						return err
+					}
+				} else if err != nil {
+					return err
+				} else if thread.CreatorID != "" && thread.CreatorID != message.From {
+					continue
+				}
+				followed, err := m.followThreadOnMention(message.LocalChatID, message.ID, message.Clock)
+				if err != nil {
+					return err
+				}
+				if followed {
+					thread, err = m.persistence.ThreadWithSummaryByID(message.LocalChatID, message.ID)
+					if err != nil {
+						return err
+					}
+					response.AddThread(thread)
+				}
+				continue
+			}
 			if message.From != ownID {
 				continue
 			}
@@ -167,14 +194,7 @@ func (m *Messenger) updateThreadFollowsFromMessages(messages []*common.Message, 
 		case message.From == ownID:
 			_, err = m.persistence.SetThreadFollowed(message.LocalChatID, threadID, true, message.Clock)
 		case message.New && slices.Contains(message.Mentions, ownID):
-			var followClock uint64
-			followClock, err = m.persistence.FollowThreadOnMention(message.LocalChatID, threadID, message.Clock)
-			if err == nil && followClock != 0 {
-				if syncErr := m.syncThreadFollow(context.Background(), message.LocalChatID, threadID, true, followClock, m.dispatchMessage); syncErr != nil {
-					m.logger.Warn("failed to sync mention-triggered thread follow",
-						zap.String("chatID", message.LocalChatID), zap.String("threadID", threadID), zap.Uint64("clock", followClock), zap.Error(syncErr))
-				}
-			}
+			_, err = m.followThreadOnMention(message.LocalChatID, threadID, message.Clock)
 		default:
 			_, err = m.persistence.AutoFollowOwnedThread(message.LocalChatID, threadID, ownID)
 		}
@@ -183,4 +203,16 @@ func (m *Messenger) updateThreadFollowsFromMessages(messages []*common.Message, 
 		}
 	}
 	return nil
+}
+
+func (m *Messenger) followThreadOnMention(chatID, threadID string, clock uint64) (bool, error) {
+	followClock, err := m.persistence.FollowThreadOnMention(chatID, threadID, clock)
+	if err != nil || followClock == 0 {
+		return false, err
+	}
+	if syncErr := m.syncThreadFollow(context.Background(), chatID, threadID, true, followClock, m.dispatchMessage); syncErr != nil {
+		m.logger.Warn("failed to sync mention-triggered thread follow",
+			zap.String("chatID", chatID), zap.String("threadID", threadID), zap.Uint64("clock", followClock), zap.Error(syncErr))
+	}
+	return true, nil
 }
