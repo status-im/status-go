@@ -21,9 +21,9 @@ fetch() { # <directory> <sha256> <url> [tar options]
 
 install_nim() { # <version> <directory>
   case "$1" in
-    2.2.10)
-      fetch "$2" 9a3b012d0680d11d6163dd2f145470b090c1045f5e634f42daf119bea1cb2b5e \
-        "$nightlies/2026-04-24-version-2-2-bfeb3146d1638b39f69007a4ae5a23e23ae4e5ef/nim-2.2.10-macosx_arm64.tar.xz" \
+    2.2.12)
+      fetch "$2" 130a43eff76c1c3cc78b89329a7efd892c1f65839dbc6d8e53651f3f77516fe5 \
+        "$nightlies/2026-09-08-version-2-2-8e8fbf60693418dc95bb0d762fd660231d08a583/nim-2.2.12-macosx_arm64.tar.xz" \
         --strip-components=1 ;;
     *)
       echo "No pinned download for Nim $1" >&2
