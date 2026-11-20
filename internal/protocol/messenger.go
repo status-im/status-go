@@ -3735,6 +3735,14 @@ func (m *Messenger) saveDataAndPrepareResponse(messageState *ReceivedMessageStat
 		if err := m.updateThreadFollowsFromMessages(messagesToSave, messageState.Response); err != nil {
 			return nil, err
 		}
+		// Metadata may have been summarized before the root was saved.
+		for _, message := range messagesToSave {
+			if message.GetStartsThread() && message.GetThreadId() == "" {
+				if err := m.addAffectedThreadToResponse(messageState.Response, message); err != nil {
+					return nil, err
+				}
+			}
+		}
 	}
 
 	for _, emojiReaction := range messageState.EmojiReactions {

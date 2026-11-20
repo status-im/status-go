@@ -398,12 +398,18 @@ func (s *MessengerThreadsSuite) TestThreadDeletionPropagatesAndLateRepliesStayDe
 	s.Require().NoError(sender.SaveChat(senderChat))
 	_, err = sender.Join(senderChat)
 	s.Require().NoError(err)
+	rootMessage := buildTestMessage(*senderChat)
+	rootMessage.Text = "thread root"
+	rootMessage.ChatMessage.Text = rootMessage.Text
+	created, err := sender.StartThreadFromNewMessage(context.Background(), &requests.StartThreadFromNewMessage{ThreadName: "Delete test", Message: rootMessage})
+	s.Require().NoError(err)
+	threadID := created.Threads()[0].ThreadID
 	reply := buildTestMessage(*senderChat)
 	reply.Text = "first thread reply"
 	reply.ChatMessage.Text = reply.Text
-	created, err := sender.StartThreadFromNewMessage(context.Background(), &requests.StartThreadFromNewMessage{ThreadName: "Delete test", Message: reply})
+	reply.ThreadId = &threadID
+	_, err = sender.SendChatMessage(context.Background(), reply)
 	s.Require().NoError(err)
-	threadID := created.Threads()[0].ThreadID
 	_, err = WaitOnMessengerResponse(receiver, func(response *MessengerResponse) bool {
 		thread, err := receiver.persistence.ThreadByID(receiverChat.ID, threadID)
 		_, replyErr := receiver.persistence.MessageByID(reply.ID)
