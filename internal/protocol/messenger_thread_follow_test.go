@@ -43,12 +43,25 @@ func TestThreadFollowPersistence(t *testing.T) {
 	require.False(t, followed("thread").Followed)
 	require.EqualValues(t, 11, followed("thread").FollowedClock)
 
-	// Automatic follows never override an explicit choice.
+	// Ownership-based follows never override an explicit choice.
 	require.NoError(t, p.SetThreadCreator("thread", testPublicChatID, ownID))
 	updated, err = p.AutoFollowOwnedThread(testPublicChatID, "thread", ownID)
 	require.NoError(t, err)
 	require.False(t, updated)
 	require.False(t, followed("thread").Followed)
+
+	// A new mention re-follows even if the sender's clock is behind.
+	clock, err := p.FollowThreadOnMention(testPublicChatID, "thread", 8)
+	require.NoError(t, err)
+	require.EqualValues(t, 12, clock)
+	require.True(t, followed("thread").Followed)
+	require.EqualValues(t, 12, followed("thread").FollowedClock)
+
+	clock, err = p.FollowThreadOnMention(testPublicChatID, "thread", 20)
+	require.NoError(t, err)
+	require.Zero(t, clock)
+	require.True(t, followed("thread").Followed)
+	require.EqualValues(t, 12, followed("thread").FollowedClock)
 
 	// Threads created by the user are auto-followed.
 	require.NoError(t, p.UpsertThread("created", testPublicChatID, "created", "Created"))
@@ -83,6 +96,10 @@ func TestThreadFollowPersistence(t *testing.T) {
 	updated, err = p.AutoFollowOwnedThread(testPublicChatID, "deleted", ownID)
 	require.NoError(t, err)
 	require.False(t, updated)
+	clock, err = p.FollowThreadOnMention(testPublicChatID, "deleted", 20)
+	require.NoError(t, err)
+	require.Zero(t, clock)
+	require.False(t, followed("deleted").Followed)
 }
 
 func TestBackedUpThreadsRestoreFollowState(t *testing.T) {
@@ -320,7 +337,7 @@ func (s *MessengerThreadsSuite) TestDelayedParentRetriesThreadAutoFollow() {
 	}
 }
 
-func (s *MessengerThreadsSuite) TestThreadOnOwnMessageIsFollowedOnlyByParentAuthor() {
+func (s *MessengerThreadsSuite) TestThreadFollowOnParentAuthorReplyAndDirectMention() {
 	receiver := s.m
 	sender := s.newMessenger()
 	sender.featureFlags.Threads = true
@@ -335,7 +352,7 @@ func (s *MessengerThreadsSuite) TestThreadOnOwnMessageIsFollowedOnlyByParentAuth
 	_, err = sender.Join(senderChat)
 	s.Require().NoError(err)
 
-	sendAndWait := func(from *Messenger, to *Messenger, chat *Chat, text string, threadID string) string {
+	sendAndWait := func(from *Messenger, to *Messenger, chat *Chat, text string, threadID string) (string, *MessengerResponse) {
 		message := buildTestMessage(*chat)
 		message.Text = text
 		message.ChatMessage.Text = text
@@ -346,7 +363,7 @@ func (s *MessengerThreadsSuite) TestThreadOnOwnMessageIsFollowedOnlyByParentAuth
 		response, err := from.SendChatMessage(context.Background(), message)
 		s.Require().NoError(err)
 		id := response.Messages()[0].ID
-		_, err = WaitOnMessengerResponse(to, func(r *MessengerResponse) bool {
+		received, err := WaitOnMessengerResponse(to, func(r *MessengerResponse) bool {
 			for _, m := range r.Messages() {
 				if m.ID == id {
 					return true
@@ -355,7 +372,7 @@ func (s *MessengerThreadsSuite) TestThreadOnOwnMessageIsFollowedOnlyByParentAuth
 			return false
 		}, "message not received")
 		s.Require().NoError(err)
-		return id
+		return id, received
 	}
 	followedBy := func(m *Messenger, chatID, threadID string) bool {
 		thread, err := m.persistence.ThreadByID(chatID, threadID)
@@ -364,7 +381,7 @@ func (s *MessengerThreadsSuite) TestThreadOnOwnMessageIsFollowedOnlyByParentAuth
 	}
 
 	// The sender starts a thread on the receiver's message: both follow it.
-	parentID := sendAndWait(receiver, sender, receiverChat, "receiver parent", "")
+	parentID, _ := sendAndWait(receiver, sender, receiverChat, "receiver parent", "")
 	_, err = sender.CreateThread(senderChat.ID, parentID)
 	s.Require().NoError(err)
 	_, err = WaitOnMessengerResponse(receiver, func(r *MessengerResponse) bool {
@@ -379,11 +396,30 @@ func (s *MessengerThreadsSuite) TestThreadOnOwnMessageIsFollowedOnlyByParentAuth
 	s.Require().True(followedBy(sender, senderChat.ID, parentID))
 
 	// The sender starts a thread on its own message: the receiver does not follow it.
-	otherParentID := sendAndWait(sender, receiver, senderChat, "sender parent", "")
+	otherParentID, _ := sendAndWait(sender, receiver, senderChat, "sender parent", "")
 	_, err = sender.CreateThread(senderChat.ID, otherParentID)
 	s.Require().NoError(err)
 	sendAndWait(sender, receiver, senderChat, "reply in sender thread", otherParentID)
 	s.Require().False(followedBy(receiver, receiverChat.ID, otherParentID))
+
+	// Only a direct mention in the thread follows it, including after an unfollow.
+	directMention := "Hello @" + receiver.myHexIdentity() + " !"
+	sendAndWait(sender, receiver, senderChat, directMention, "")
+	broadcastID, broadcast := sendAndWait(sender, receiver, senderChat, "Hello @"+common.EveryoneMentionTag+" !", otherParentID)
+	s.Require().True(broadcast.messages[broadcastID].Mentioned)
+	s.Require().False(followedBy(receiver, receiverChat.ID, otherParentID))
+	for range 2 {
+		_, received := sendAndWait(sender, receiver, senderChat, directMention, otherParentID)
+		s.Require().True(followedBy(receiver, receiverChat.ID, otherParentID))
+		s.Require().Len(received.Threads(), 1)
+		s.Require().Equal(otherParentID, received.Threads()[0].ThreadID)
+		s.Require().True(received.Threads()[0].Followed)
+		_, err = receiver.UnfollowThread(context.Background(), &requests.UnfollowThread{
+			ChatID: receiverChat.ID, ThreadID: otherParentID,
+		})
+		s.Require().NoError(err)
+		s.Require().False(followedBy(receiver, receiverChat.ID, otherParentID))
+	}
 
 	// Replies from others keep an explicit unfollow; the user's own reply follows again.
 	_, err = receiver.UnfollowThread(context.Background(), &requests.UnfollowThread{ChatID: receiverChat.ID, ThreadID: parentID})
@@ -438,6 +474,69 @@ func (s *MessengerThreadsSuite) TestSyncThreadFollow() {
 		ChatId: "missing", ThreadId: threadID, Followed: true, Clock: 12,
 	}, nil)
 	s.Require().ErrorIs(err, ErrChatNotFound)
+}
+
+func (s *MessengerThreadsSuite) TestSyncThreadFollowOnDelayedMention() {
+	deviceA, deviceB := s.m, s.anotherMessenger()
+	deviceB.featureFlags.Threads = true
+	PairDevices(&s.Suite, deviceA, deviceB)
+	PairDevices(&s.Suite, deviceB, deviceA)
+
+	const chatID = "thread-mention-sync"
+	threadID := "thread"
+	for _, device := range []*Messenger{deviceA, deviceB} {
+		s.Require().NoError(device.SaveChat(CreatePublicChat(chatID, device.getTimesource())))
+		s.Require().NoError(device.persistence.UpsertThread(threadID, chatID, threadID, "Thread"))
+	}
+
+	// Deliver the parsed mention directly on each device to control the order.
+	deliverMention := func(device *Messenger, clock uint64) {
+		mention := &common.Message{
+			ChatMessage: &protobuf.ChatMessage{ThreadId: &threadID, Clock: clock},
+			From:        "sender", LocalChatID: chatID, New: true, Mentions: []string{device.myHexIdentity()},
+		}
+		s.Require().NoError(device.updateThreadFollowsFromMessages([]*common.Message{mention}, &MessengerResponse{}))
+	}
+	waitForFollowSync := func(device *Messenger, followed bool, clock uint64) {
+		_, err := WaitOnMessengerResponse(device, func(response *MessengerResponse) bool {
+			for _, thread := range response.Threads() {
+				if thread.ThreadID == threadID && thread.Followed == followed && thread.FollowedClock == clock {
+					return true
+				}
+			}
+			return false
+		}, "thread follow sync not received")
+		s.Require().NoError(err)
+	}
+
+	deliverMention(deviceA, 8)
+	updated, err := deviceA.persistence.SetThreadFollowed(chatID, threadID, false, 10)
+	s.Require().NoError(err)
+	s.Require().True(updated)
+	s.Require().NoError(deviceA.syncThreadFollow(context.Background(), chatID, threadID, false, 10, deviceA.dispatchMessage))
+	waitForFollowSync(deviceB, false, 10)
+
+	deliverMention(deviceB, 8)
+	waitForFollowSync(deviceA, true, 11)
+	for _, device := range []*Messenger{deviceA, deviceB} {
+		thread, err := device.persistence.ThreadByID(chatID, threadID)
+		s.Require().NoError(err)
+		s.Require().True(thread.Followed)
+		s.Require().EqualValues(11, thread.FollowedClock)
+	}
+
+	selfChat, ok := deviceB.allChats.Load(deviceB.myHexIdentity())
+	s.Require().True(ok)
+	syncClock := selfChat.LastClockValue
+	deliverMention(deviceB, 12)
+	s.Require().Equal(syncClock, selfChat.LastClockValue, "an already-followed thread does not send another sync")
+
+	replay := deviceB.buildMessageState()
+	s.Require().NoError(deviceB.HandleSyncThreadFollow(context.Background(), replay, &protobuf.SyncThreadFollow{
+		ChatId: chatID, ThreadId: threadID, Followed: true, Clock: 11,
+	}, nil))
+	s.Require().Empty(replay.Response.Threads())
+	s.Require().Equal(syncClock, selfChat.LastClockValue, "inbound sync does not echo")
 }
 
 func (s *MessengerThreadsSuite) TestThreadCreationMetadataAutoFollowsThreadOnOwnMessage() {

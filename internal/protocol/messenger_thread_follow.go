@@ -3,8 +3,10 @@ package protocol
 import (
 	"context"
 	"errors"
+	"slices"
 
 	"github.com/golang/protobuf/proto"
+	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/internal/protocol/common"
 	"github.com/status-im/status-go/internal/protocol/protobuf"
@@ -126,9 +128,9 @@ func (m *Messenger) HandleSyncThreadFollow(ctx context.Context, state *ReceivedM
 	return nil
 }
 
-// updateThreadFollowsFromMessages follows threads the user replied in, and
-// auto-follows threads started on the user's messages. Call it after the
-// messages are saved and before threads are added to the response.
+// updateThreadFollowsFromMessages follows threads on replies by the user,
+// direct mentions of the user, and threads started on the user's messages.
+// Call it after saving messages and before adding threads to the response.
 func (m *Messenger) updateThreadFollowsFromMessages(messages []*common.Message, response *MessengerResponse) error {
 	if !m.featureFlags.Threads {
 		return nil
@@ -161,9 +163,19 @@ func (m *Messenger) updateThreadFollowsFromMessages(messages []*common.Message, 
 			continue
 		}
 		var err error
-		if message.From == ownID {
+		switch {
+		case message.From == ownID:
 			_, err = m.persistence.SetThreadFollowed(message.LocalChatID, threadID, true, message.Clock)
-		} else {
+		case message.New && slices.Contains(message.Mentions, ownID):
+			var followClock uint64
+			followClock, err = m.persistence.FollowThreadOnMention(message.LocalChatID, threadID, message.Clock)
+			if err == nil && followClock != 0 {
+				if syncErr := m.syncThreadFollow(context.Background(), message.LocalChatID, threadID, true, followClock, m.dispatchMessage); syncErr != nil {
+					m.logger.Warn("failed to sync mention-triggered thread follow",
+						zap.String("chatID", message.LocalChatID), zap.String("threadID", threadID), zap.Uint64("clock", followClock), zap.Error(syncErr))
+				}
+			}
+		default:
 			_, err = m.persistence.AutoFollowOwnedThread(message.LocalChatID, threadID, ownID)
 		}
 		if err != nil {
