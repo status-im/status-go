@@ -544,8 +544,8 @@ generate: export GO_GENERATE_FAST_DEBUG ?= false
 generate: export GO_GENERATE_FAST_RECACHE ?= false
 generate: clean-generated
 generate: ##@ Run generate for all given packages using go-generate-fast, fallback to `go generate` (e.g. for docker)
-	@GOROOT=$$(go env GOROOT) $(GO_HOST_ENV) $(GO_GENERATE_CMD) $(PACKAGES)
-	@$(GO_HOST_ENV) go generate -tags "use_logos_storage $(BUILD_TAGS)" ./pkg/services/logosstorage
+	@env -u CGO_CFLAGS -u CGO_LDFLAGS GOROOT=$$(go env GOROOT) $(GO_HOST_ENV) $(GO_GENERATE_CMD) $(PACKAGES)
+	@env -u CGO_CFLAGS -u CGO_LDFLAGS $(GO_HOST_ENV) go generate -tags "use_logos_storage $(BUILD_TAGS)" ./pkg/services/logosstorage
 
 generate-contracts:
 	go generate ./contracts
