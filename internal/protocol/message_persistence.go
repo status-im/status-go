@@ -24,7 +24,7 @@ var basicMessagesSelectQuery = `
 SELECT    %s %s
 FROM      user_messages m1
 LEFT JOIN user_messages m2
-ON        m1.response_to = m2.id
+ON        m1.response_to = m2.id AND m1.local_chat_id = m2.local_chat_id
 LEFT JOIN contacts c
 ON        m1.source = c.id
 LEFT JOIN discord_messages dm
@@ -612,7 +612,7 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 		message.ThreadId = nil
 	}
 
-	if quotedText.Valid {
+	if quotedText.Valid && !common.IsSystemMessageContentType(protobuf.ChatMessage_ContentType(ContentType.Int64)) {
 		if quotedDeleted.Bool || quotedDeletedForMe.Bool {
 			message.QuotedMessage = &common.QuotedMessage{
 				ID:           quotedID.String,
@@ -639,6 +639,8 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 				message.QuotedMessage.BridgeMessage = quotedBridgeMessage
 			}
 		}
+	} else {
+		message.Replied = false
 	}
 	message.Alias = alias.String
 
@@ -900,6 +902,23 @@ func (db sqlitePersistence) MessageByID(id string) (*common.Message, error) {
 	return db.messageByID(nil, id)
 }
 
+func (db sqlitePersistence) replyTarget(chatID, id string) (*common.Message, error) {
+	if id == "" {
+		return nil, nil
+	}
+	target, err := db.MessageByID(id)
+	if errors.Is(err, common.ErrRecordNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	if !target.CanBeReplyTargetIn(chatID) {
+		return nil, nil
+	}
+	return target, nil
+}
+
 func (db sqlitePersistence) AlbumMessages(chatID, albumID string) ([]*common.Message, error) {
 	return db.albumMessages(chatID, albumID)
 }
@@ -955,7 +974,7 @@ func (db sqlitePersistence) MessagesByIDs(ids []string) ([]*common.Message, erro
 }
 
 func (db sqlitePersistence) MessagesByResponseTo(responseTo string) ([]*common.Message, error) {
-	where := "WHERE m1.response_to = ?"
+	where := "WHERE m1.response_to = ? AND m2.id IS NOT NULL"
 	query := db.buildMessagesQuery(where)
 	rows, err := db.db.Query(query, responseTo)
 	if err != nil {
@@ -2311,7 +2330,7 @@ func (db sqlitePersistence) PinnedMessageByChatIDs(chatIDs []string, currCursor 
  			LEFT JOIN
  				user_messages m2
  			ON
- 				m1.response_to = m2.id
+				m1.response_to = m2.id AND m1.local_chat_id = m2.local_chat_id
  			LEFT JOIN
  				contacts c
  			ON
@@ -4595,6 +4614,9 @@ func getMessageFromScanRows(db sqlitePersistence, rows *sql.Rows) (*common.Messa
 		} else if discordMessage := msg.GetDiscordMessage(); discordMessage != nil {
 			msg.Payload = getUpdatedChatMessagePayload(discordMessage, message.GetDiscordMessage())
 		}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
 	if msg == nil {
 		return nil, common.ErrRecordNotFound

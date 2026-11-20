@@ -2074,12 +2074,17 @@ func (m *Messenger) SendChatMessages(ctx context.Context, messages []*common.Mes
 
 // sendChatMessage takes a minimal message and sends it based on the corresponding chat
 func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message) (*MessengerResponse, error) {
-	if len(message.ResponseTo) != 0 {
-		exists, err := m.persistence.MessagesExist([]string{message.ResponseTo})
+	chat, ok := m.allChats.Load(message.ChatId)
+	if !ok {
+		return nil, ErrChatNotFoundError
+	}
+
+	if message.ResponseTo != "" {
+		target, err := m.persistence.replyTarget(chat.ID, message.ResponseTo)
 		if err != nil {
 			return nil, err
 		}
-		if !exists[message.ResponseTo] {
+		if target == nil {
 			return nil, ErrInvalidResponseTo
 		}
 	}
@@ -2157,12 +2162,6 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 	}
 
 	var response MessengerResponse
-
-	// A valid added chat is required.
-	chat, ok := m.allChats.Load(message.ChatId)
-	if !ok {
-		return nil, ErrChatNotFoundError
-	}
 
 	if !m.featureFlags.Threads {
 		message.ThreadId = nil
@@ -3791,16 +3790,20 @@ func (m *Messenger) saveDataAndPrepareResponse(messageState *ReceivedMessageStat
 	for _, message := range messageState.Response.messages {
 		if _, ok := newMessagesIds[message.ID]; ok {
 			message.New = true
+			target := messagesByID[message.GetResponseTo()]
+			if !target.CanBeReplyTargetIn(message.LocalChatID) {
+				target = nil
+			}
 
 			if notificationsEnabled {
 				// Create notification body to be eventually passed to `localnotifications.SendMessageNotifications()`
-				if err = messageState.addNewMessageNotification(m, m.settings, m.identity.PublicKey, message, messagesByID[message.ResponseTo], profilePicturesVisibility); err != nil {
+				if err = messageState.addNewMessageNotification(m, m.settings, m.identity.PublicKey, message, target, profilePicturesVisibility); err != nil {
 					return nil, err
 				}
 			}
 
 			// Create activity center notification body to be eventually passed to `activitycenter.SendActivityCenterNotifications()`
-			if err = messageState.addNewActivityCenterNotification(m.identity.PublicKey, m, message, messagesByID[message.ResponseTo]); err != nil {
+			if err = messageState.addNewActivityCenterNotification(m.identity.PublicKey, m, message, target); err != nil {
 				return nil, err
 			}
 		}
@@ -4712,16 +4715,32 @@ func GenerateAlias(id string) (string, error) {
 // been replied to from the database
 func (m *Messenger) pullMessagesAndResponsesFromDB(messages []*common.Message) ([]*common.Message, error) {
 	var messageIDs []string
+	requested := make(map[string]bool, len(messages))
 	for _, message := range messages {
 		messageIDs = append(messageIDs, message.ID)
+		requested[message.ID] = true
 		if len(message.ResponseTo) != 0 {
 			messageIDs = append(messageIDs, message.ResponseTo)
 		}
-
 	}
-	// We pull from the database all the messages & replies involved,
-	// so we let the db build the correct messages
-	return m.persistence.MessagesByIDs(messageIDs)
+
+	loaded, err := m.persistence.MessagesByIDs(messageIDs)
+	if err != nil {
+		return nil, err
+	}
+	targets := make(map[string]bool)
+	for _, message := range loaded {
+		if requested[message.ID] && message.QuotedMessage != nil {
+			targets[message.QuotedMessage.ID] = true
+		}
+	}
+	result := loaded[:0]
+	for _, message := range loaded {
+		if requested[message.ID] || targets[message.ID] {
+			result = append(result, message)
+		}
+	}
+	return result, nil
 }
 
 func (m *Messenger) SignMessage(message string) ([]byte, error) {
