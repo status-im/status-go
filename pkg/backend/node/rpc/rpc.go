@@ -71,3 +71,33 @@ func (c *SingleRequestCodec) decode(v interface{}) error {
 	*output = json.RawMessage(c.input)
 	return nil
 }
+
+// ErrorResponse returns a JSON-RPC error response to the single request in inputJSON,
+// for requests that cannot reach a server.
+func ErrorResponse(inputJSON string, err error) string {
+	var request struct {
+		ID json.RawMessage `json:"id"`
+	}
+	if json.Unmarshal([]byte(inputJSON), &request) != nil || len(request.ID) == 0 {
+		request.ID = json.RawMessage("null")
+	}
+
+	response := struct {
+		Version string          `json:"jsonrpc"`
+		ID      json.RawMessage `json:"id"`
+		Error   jsonError       `json:"error"`
+	}{
+		Version: "2.0",
+		ID:      request.ID,
+		Error:   jsonError{Code: errcodeDefault, Message: err.Error()},
+	}
+	data, _ := json.Marshal(response)
+	return string(data)
+}
+
+const errcodeDefault = -32000
+
+type jsonError struct {
+	Code    int    `json:"code"`
+	Message string `json:"message"`
+}

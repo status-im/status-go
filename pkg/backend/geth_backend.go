@@ -61,6 +61,7 @@ import (
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/backend/node"
 	nodeadapters "github.com/status-im/status-go/pkg/backend/node/adapters"
+	noderpc "github.com/status-im/status-go/pkg/backend/node/rpc"
 	"github.com/status-im/status-go/pkg/sentry"
 	"github.com/status-im/status-go/pkg/services/ens"
 	"github.com/status-im/status-go/pkg/services/ext"
@@ -2476,7 +2477,11 @@ func (b *StatusBackend) RestartNode() error {
 
 // CallRPC executes public RPC requests on node's in-proc RPC server.
 func (b *StatusBackend) CallInProcessRPC(inputJSON string) string {
-	return b.statusNode.CallInProcessRPC(inputJSON)
+	statusNode := b.StatusNode()
+	if statusNode == nil {
+		return noderpc.ErrorResponse(inputJSON, node.ErrNoRunningNode)
+	}
+	return statusNode.CallInProcessRPC(inputJSON)
 }
 
 // @deprecated
