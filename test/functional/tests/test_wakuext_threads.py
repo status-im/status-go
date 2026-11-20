@@ -43,16 +43,6 @@ def _message_by_text(response: dict, text: str) -> dict:
     raise AssertionError(f"message {text!r} not found in {response.get('messages')}")
 
 
-def _new_thread_messages(response: dict, text: str) -> tuple[dict, dict]:
-    messages = [message for message in response.get("messages") or [] if message.get("text") == text]
-    roots = [message for message in messages if not message.get("threadId")]
-    replies = [message for message in messages if message.get("threadId")]
-    assert len(roots) == 1
-    assert len(replies) == 1
-    assert replies[0]["threadId"] == roots[0]["id"]
-    return roots[0], replies[0]
-
-
 def _texts(response: dict) -> list[str]:
     return [message.get("text", "") for message in response.get("messages") or []]
 
@@ -229,22 +219,34 @@ class TestWakuextThreadExtras:
         await receiver.wait_for_signal(SignalType.MESSAGES_NEW, pattern=seed_text, timeout=60, check_buffer=True)
 
         thread_name = f"Named-{uuid4()}"
-        reply_text = f"first-{uuid4()}"
-        started = sender.wakuext_service.start_thread_from_new_message(sender_chat_id, reply_text, thread_name)
-        root, reply = _new_thread_messages(started, reply_text)
+        root_text = f"first-{uuid4()}"
+        started = sender.wakuext_service.start_thread_from_new_message(sender_chat_id, root_text, thread_name)
+        assert len(started.get("messages") or []) == 1
+        root = _message_by_text(started, root_text)
         thread = _thread(started, root["id"])
         assert thread["name"] == thread_name
         assert thread["parentMessageId"] == root["id"]
+        assert thread["messagesCount"] == 1
         assert not root.get("threadId")
-        assert reply.get("threadId") == root["id"]
+        assert not root.get("responseTo")
 
-        await receiver.wait_for_signal(SignalType.MESSAGES_NEW, pattern=reply["id"], timeout=60, check_buffer=True)
+        await receiver.wait_for_signal(SignalType.MESSAGES_NEW, pattern=root["id"], timeout=60, check_buffer=True)
+        await receiver.wait_for_signal(
+            SignalType.MESSAGES_NEW,
+            predicate=lambda s: any(t.get("threadId") == root["id"] for t in (s.event.get("threads") or [])),
+            timeout=60,
+            check_buffer=True,
+        )
         chat_messages = receiver.wakuext_service.chat_messages(receiver_chat_id, limit=20).get("messages") or []
         assert any(message["id"] == root["id"] for message in chat_messages)
-        assert all(message["id"] != reply["id"] for message in chat_messages)
-        assert reply_text in _texts(receiver.wakuext_service.chat_messages_in_thread(receiver_chat_id, root["id"], limit=20))
+        assert not _texts(receiver.wakuext_service.chat_messages_in_thread(receiver_chat_id, root["id"], limit=20))
         received = _thread(receiver.wakuext_service.chat_threads(receiver_chat_id), root["id"])
         assert received["name"] == thread_name
+
+        reply_text = f"reply-{uuid4()}"
+        reply = _message_by_text(sender.wakuext_service.send_chat_message(sender_chat_id, reply_text, thread_id=root["id"]), reply_text)
+        await receiver.wait_for_signal(SignalType.MESSAGES_NEW, pattern=reply["id"], timeout=60, check_buffer=True)
+        assert reply_text in _texts(receiver.wakuext_service.chat_messages_in_thread(receiver_chat_id, root["id"], limit=20))
 
     @pytest.mark.spec("SC-THRD-23")
     async def test_thread_reply_reaction_stays_in_thread(self, sender, receiver):
@@ -310,15 +312,23 @@ class TestWakuextThreadExtras:
         assert reply_text not in _texts(sender.wakuext_service.chat_messages(sender_chat_id, limit=20))
 
         thread_name = f"Named-{uuid4()}"
-        first_reply_text = f"first-{uuid4()}"
-        started = receiver.wakuext_service.start_thread_from_new_message(receiver_chat_id, first_reply_text, thread_name)
-        root, first_reply = _new_thread_messages(started, first_reply_text)
+        root_text = f"first-{uuid4()}"
+        started = receiver.wakuext_service.start_thread_from_new_message(receiver_chat_id, root_text, thread_name)
+        assert len(started.get("messages") or []) == 1
+        root = _message_by_text(started, root_text)
         assert _thread(started, root["id"])["name"] == thread_name
-        assert first_reply.get("threadId") == root["id"]
+        assert not root.get("threadId")
+        assert not root.get("responseTo")
 
-        await sender.wait_for_signal(SignalType.MESSAGES_NEW, pattern=first_reply["id"], timeout=60, check_buffer=True)
+        await sender.wait_for_signal(SignalType.MESSAGES_NEW, pattern=root["id"], timeout=60, check_buffer=True)
+        await sender.wait_for_signal(
+            SignalType.MESSAGES_NEW,
+            predicate=lambda s: any(t.get("threadId") == root["id"] for t in (s.event.get("threads") or [])),
+            timeout=60,
+            check_buffer=True,
+        )
         assert _thread(sender.wakuext_service.chat_threads(sender_chat_id), root["id"])["name"] == thread_name
-        assert first_reply_text in _texts(sender.wakuext_service.chat_messages_in_thread(sender_chat_id, root["id"], limit=20))
+        assert not _texts(sender.wakuext_service.chat_messages_in_thread(sender_chat_id, root["id"], limit=20))
 
     @pytest.mark.spec("SC-THRD-06")
     @pytest.mark.spec("SC-THRD-10")

@@ -346,6 +346,140 @@ func (s *MessengerThreadsSuite) TestDelayedParentRetriesThreadAutoFollow() {
 	}
 }
 
+func (s *MessengerThreadsSuite) TestNewThreadRootMentionFollowsInEitherDeliveryOrder() {
+	creator, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+	creatorID := contacts.ContactIDFromPublicKey(&creator.PublicKey)
+	chat := CreateOneToOneChat("root-mention-follow", &creator.PublicKey, s.m.getTimesource())
+	s.Require().NoError(s.m.SaveChat(chat))
+
+	for _, metadataFirst := range []bool{false, true} {
+		name := "root-first"
+		if metadataFirst {
+			name = "metadata-first"
+		}
+		s.Run(name, func() {
+			root := buildTestMessage(*chat)
+			root.ID = name
+			root.From = creatorID
+			root.New = true
+			root.Clock = 10
+			root.StartsThread = true
+			root.ThreadMetadataCreationAuthorized = true
+			root.Mentions = []string{s.m.myHexIdentity()}
+
+			metadata := &protobuf.ThreadMetadata{
+				Clock: 10, ChatId: chat.ID, ThreadId: root.ID, Name: "Thread", CreatorId: creatorID,
+				MessageType: protobuf.MessageType_ONE_TO_ONE,
+			}
+			deliverMetadata := func() {
+				state := &ReceivedMessageState{
+					Response: &MessengerResponse{},
+					CurrentMessageState: &CurrentMessageState{
+						PublicKey: &creator.PublicKey, WhisperTimestamp: 10,
+					},
+				}
+				s.Require().NoError(s.m.HandleThreadMetadata(context.Background(), state, metadata, nil))
+			}
+			if metadataFirst {
+				deliverMetadata()
+			}
+			s.Require().NoError(s.m.SaveMessages([]*common.Message{root}))
+			response := &MessengerResponse{}
+			s.Require().NoError(s.m.updateThreadFollowsFromMessages([]*common.Message{root}, response))
+			s.Require().Len(response.Threads(), 1)
+			s.Require().True(response.Threads()[0].Followed)
+			if !metadataFirst {
+				deliverMetadata()
+			}
+
+			thread, err := s.m.persistence.ThreadByID(chat.ID, root.ID)
+			s.Require().NoError(err)
+			s.Require().True(thread.Followed)
+			s.Require().Equal(creatorID, thread.CreatorID)
+			s.Require().False(thread.CreatorPending)
+
+			_, err = s.m.persistence.SetThreadFollowed(chat.ID, root.ID, false, thread.FollowedClock+1)
+			s.Require().NoError(err)
+			root.New = false
+			s.Require().NoError(s.m.updateThreadFollowsFromMessages([]*common.Message{root}, &MessengerResponse{}))
+			deliverMetadata()
+			thread, err = s.m.persistence.ThreadByID(chat.ID, root.ID)
+			s.Require().NoError(err)
+			s.Require().False(thread.Followed, "replaying the root or metadata must not undo an unfollow")
+		})
+	}
+}
+
+func (s *MessengerThreadsSuite) TestThreadRootMentionRequiresNewAuthorizedMarkedMessage() {
+	chat := CreateOneToOneChat("root-mention-conditions", &s.m.identity.PublicKey, s.m.getTimesource())
+	s.Require().NoError(s.m.SaveChat(chat))
+	for _, test := range []struct {
+		name       string
+		marked     bool
+		newMessage bool
+		authorized bool
+		mention    string
+		deleted    bool
+	}{
+		{name: "existing-channel-message", newMessage: true, authorized: true, mention: s.m.myHexIdentity()},
+		{name: "replayed-message", marked: true, authorized: true, mention: s.m.myHexIdentity()},
+		{name: "unauthorized", marked: true, newMessage: true, mention: s.m.myHexIdentity()},
+		{name: "everyone", marked: true, newMessage: true, authorized: true, mention: common.EveryoneMentionTag},
+		{name: "deleted", marked: true, newMessage: true, authorized: true, mention: s.m.myHexIdentity(), deleted: true},
+	} {
+		s.Run(test.name, func() {
+			root := buildTestMessage(*chat)
+			root.ID = test.name
+			root.From = "another-user"
+			root.StartsThread = test.marked
+			root.New = test.newMessage
+			root.ThreadMetadataCreationAuthorized = test.authorized
+			root.Mentions = []string{test.mention}
+			root.Deleted = test.deleted
+			s.Require().NoError(s.m.updateThreadFollowsFromMessages([]*common.Message{root}, &MessengerResponse{}))
+			_, err := s.m.persistence.ThreadByID(chat.ID, root.ID)
+			s.Require().ErrorIs(err, common.ErrRecordNotFound)
+		})
+	}
+}
+
+func (s *MessengerThreadsSuite) TestThreadRootMentionDoesNotFollowDeletedOrMismatchedThread() {
+	chat := CreateOneToOneChat("root-mention-existing", &s.m.identity.PublicKey, s.m.getTimesource())
+	s.Require().NoError(s.m.SaveChat(chat))
+	for _, test := range []struct {
+		name      string
+		creatorID string
+		deleted   bool
+	}{
+		{name: "deleted-thread", creatorID: "sender", deleted: true},
+		{name: "different-creator", creatorID: "another-user"},
+	} {
+		s.Run(test.name, func() {
+			root := buildTestMessage(*chat)
+			root.ID = test.name
+			root.From = "sender"
+			root.New = true
+			root.StartsThread = true
+			root.ThreadMetadataCreationAuthorized = true
+			root.Mentions = []string{s.m.myHexIdentity()}
+			s.Require().NoError(s.m.SaveMessages([]*common.Message{root}))
+			s.Require().NoError(s.m.persistence.UpsertThread(root.ID, chat.ID, root.ID, "Thread"))
+			s.Require().NoError(s.m.persistence.SetThreadCreator(root.ID, chat.ID, test.creatorID))
+			if test.deleted {
+				_, err := s.m.persistence.SoftDeleteThread(chat.ID, root.ID, 20, test.creatorID, 20)
+				s.Require().NoError(err)
+			}
+			response := &MessengerResponse{}
+			s.Require().NoError(s.m.updateThreadFollowsFromMessages([]*common.Message{root}, response))
+			s.Require().Empty(response.Threads())
+			thread, err := s.m.persistence.ThreadByID(chat.ID, root.ID)
+			s.Require().NoError(err)
+			s.Require().False(thread.Followed)
+		})
+	}
+}
+
 func (s *MessengerThreadsSuite) TestThreadFollowOnParentAuthorReplyAndDirectMention() {
 	receiver := s.m
 	sender := s.newMessenger()
@@ -413,7 +547,19 @@ func (s *MessengerThreadsSuite) TestThreadFollowOnParentAuthorReplyAndDirectMent
 
 	// Only a direct mention in the thread follows it, including after an unfollow.
 	directMention := "Hello @" + receiver.myHexIdentity() + " !"
-	sendAndWait(sender, receiver, senderChat, directMention, "")
+	oldMentionID, _ := sendAndWait(sender, receiver, senderChat, directMention, "")
+	_, err = sender.CreateThread(senderChat.ID, oldMentionID)
+	s.Require().NoError(err)
+	_, err = WaitOnMessengerResponse(receiver, func(r *MessengerResponse) bool {
+		for _, thread := range r.Threads() {
+			if thread.ThreadID == oldMentionID {
+				return true
+			}
+		}
+		return false
+	}, "thread on existing mentioned message not received")
+	s.Require().NoError(err)
+	s.Require().False(followedBy(receiver, receiverChat.ID, oldMentionID))
 	broadcastID, broadcast := sendAndWait(sender, receiver, senderChat, "Hello @"+common.EveryoneMentionTag+" !", otherParentID)
 	s.Require().True(broadcast.messages[broadcastID].Mentioned)
 	s.Require().False(followedBy(receiver, receiverChat.ID, otherParentID))
@@ -557,6 +703,20 @@ func (s *MessengerThreadsSuite) TestSyncThreadFollowOnDelayedMention() {
 	}, nil))
 	s.Require().Empty(replay.Response.Threads())
 	s.Require().Equal(syncClock, selfChat.LastClockValue, "inbound sync does not echo")
+
+	threadID = "new-root"
+	root := &common.Message{
+		ID: threadID, LocalChatID: chatID, From: "sender", New: true,
+		ChatMessage:                      &protobuf.ChatMessage{StartsThread: true, Clock: 20, Text: "Root"},
+		ThreadMetadataCreationAuthorized: true,
+		Mentions:                         []string{deviceA.myHexIdentity()},
+	}
+	s.Require().NoError(deviceA.SaveMessages([]*common.Message{root}))
+	s.Require().NoError(deviceA.updateThreadFollowsFromMessages([]*common.Message{root}, &MessengerResponse{}))
+	waitForFollowSync(deviceB, true, 20)
+	thread, err := deviceB.persistence.ThreadByID(chatID, threadID)
+	s.Require().NoError(err)
+	s.Require().True(thread.Followed)
 }
 
 func (s *MessengerThreadsSuite) TestThreadCreationMetadataAutoFollowsThreadOnOwnMessage() {
