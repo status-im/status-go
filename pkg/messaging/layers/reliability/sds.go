@@ -13,16 +13,17 @@ import (
 // payload simply not being SDS-wrapped.
 var ErrSDSManagerUnavailable = errors.New("sds reliability manager unavailable")
 
-type sdsManagerFactoryFunc func(*zap.Logger) (*sds.ReliabilityManager, error)
+type sdsManagerFactoryFunc func(*zap.Logger, sds.PersistenceCallbacks) (*sds.ReliabilityManager, error)
 
 func newSdsReliabilityManager(
 	sdsManagerFactory sdsManagerFactoryFunc,
 	logger *zap.Logger,
+	persistence sds.PersistenceCallbacks,
 	onMessageSent func(messageId sds.MessageID, channelId string),
 	onMissingDependencies func(messageId sds.MessageID, missingDeps []sds.HistoryEntry, channelId string),
 	retrievalHintProvider func(messageId sds.MessageID) []byte,
 ) (*sds.ReliabilityManager, error) {
-	reliabilityManager, err := sdsManagerFactory(logger)
+	reliabilityManager, err := sdsManagerFactory(logger, persistence)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create ReliabilityManager")
 	}
@@ -104,8 +105,11 @@ func (r *Reliability) UnwrapPayloadFromSDS(wrappedPayload []byte) ([]byte, error
 	unwrappedMessage, err := manager.UnwrapReceivedMessage(wrappedPayload)
 	if err != nil {
 		r.logger.Debug("failed to unwrap received message with SDS", zap.Error(err))
-		// return original payload since wrapping is not mandatory for all kinds of messages
-		return wrappedPayload, nil
+		if errors.Is(err, sds.ErrNotSDS) {
+			// Legacy messages are not necessarily SDS-wrapped.
+			return wrappedPayload, nil
+		}
+		return nil, errors.Wrap(err, "failed to unwrap message with SDS")
 	}
 
 	missingDeps := *unwrappedMessage.MissingDeps

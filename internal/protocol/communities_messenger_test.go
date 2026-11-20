@@ -1094,6 +1094,8 @@ func (s *MessengerCommunitiesSuite) TestDeletePendingRequestAccess() {
 	s.Require().Len(response.Communities(), 1)
 	s.Require().Equal(response.Communities()[0].RequestedToJoinAt(), requestToJoin.Clock)
 
+	firstRequestClock := requestToJoin.Clock
+
 	// updating request clock by 8 days back
 	requestTime := uint64(time.Now().AddDate(0, 0, -8).Unix())
 	err = s.alice.communitiesManager.UpdateClockInRequestToJoin(requestToJoin.ID, requestTime)
@@ -1183,6 +1185,9 @@ func (s *MessengerCommunitiesSuite) TestDeletePendingRequestAccess() {
 	s.Require().Equal(notification.Type, ActivityCenterNotificationTypeCommunityMembershipRequest)
 	s.Require().True(notification.Deleted)
 
+	// Database clock changes do not change the original message's second-based clock.
+	time.Sleep(time.Until(time.Unix(int64(firstRequestClock)+1, 0)))
+
 	// Alice request to join community
 	request = s.createRequestToJoinCommunity(community.ID(), s.alice)
 	response, err = s.alice.RequestToJoinCommunity(request)
@@ -1191,6 +1196,7 @@ func (s *MessengerCommunitiesSuite) TestDeletePendingRequestAccess() {
 	s.Require().Len(response.RequestsToJoinCommunity(), 1)
 
 	aliceRequestToJoin := response.RequestsToJoinCommunity()[0]
+	s.Require().Greater(aliceRequestToJoin.Clock, firstRequestClock)
 
 	// Retrieve request to join and Check activity center notification for Bob
 	err = testutils.RetryWithBackOff(func() error {
@@ -1292,6 +1298,8 @@ func (s *MessengerCommunitiesSuite) TestDeletePendingRequestAccessWithDeclinedSt
 
 	s.Require().Len(response.Communities(), 1)
 	s.Require().Equal(response.Communities()[0].RequestedToJoinAt(), requestToJoin.Clock)
+
+	firstRequestClock := requestToJoin.Clock
 
 	// Alice deletes activity center notification
 	var updatedAt uint64 = 99
@@ -1435,12 +1443,16 @@ func (s *MessengerCommunitiesSuite) TestDeletePendingRequestAccessWithDeclinedSt
 	notificationState := response.ActivityCenterState()
 	s.Require().False(notificationState.HasSeen)
 
+	// Database clock changes do not change the original message's second-based clock.
+	time.Sleep(time.Until(time.Unix(int64(firstRequestClock)+1, 0)))
+
 	// Alice request to join community
 	request = s.createRequestToJoinCommunity(community.ID(), s.alice)
 	response, err = s.alice.RequestToJoinCommunity(request)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 	s.Require().Len(response.RequestsToJoinCommunity(), 1)
+	s.Require().Greater(response.RequestsToJoinCommunity()[0].Clock, firstRequestClock)
 
 	// Retrieve request to join and Check activity center notification for Bob
 	err = testutils.RetryWithBackOff(func() error {

@@ -38,6 +38,7 @@ type EncryptionLayer struct {
 
 // Message encapsulates layers of the protocol
 type Message struct {
+	SDSWrapped        bool              `json:"-"`
 	TransportLayer    TransportLayer    `json:"transportLayer"`
 	SegmentationLayer SegmentationLayer `json:"segmentationLayer"`
 	EncryptionLayer   EncryptionLayer   `json:"encryptionLayer"`
