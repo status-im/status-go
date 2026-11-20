@@ -25,7 +25,7 @@ RUN set -eu && \
     protoc --version
 
 # Install Nim from pre-built binaries
-ARG NIM_VERSION=2.2.12
+ARG NIM_VERSION=2.2.4
 RUN set -eu && \
     DPKG_ARCH="$(dpkg --print-architecture)" && \
     case "$DPKG_ARCH" in \
