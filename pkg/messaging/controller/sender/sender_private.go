@@ -72,7 +72,7 @@ func (s *Sender) SendPrivate(ctx context.Context, params messagingtypes.SendPriv
 		}
 	}
 
-	hashes, wakuMessages, err := s.sendPrivate(ctx, logger, sendPrivateParams{
+	requestIDs, wakuMessages, err := s.sendPrivate(ctx, logger, sendPrivateParams{
 		recipient:           params.Recipient,
 		payload:             payload,
 		pubsubTopic:         params.PubsubTopic,
@@ -84,10 +84,10 @@ func (s *Sender) SendPrivate(ctx context.Context, params messagingtypes.SendPriv
 	}
 
 	logger.Debug("sent-message",
-		zap.Strings("hashes", cryptotypes.EncodeHexes(hashes)),
+		zap.Stringers("requestIDs", requestIDs),
 	)
 
-	s.stack.Transport.Track(messageID, hashes, wakuMessages)
+	s.stack.Transport.Track(messageID, requestIDs, wakuMessages)
 
 	if spec != nil {
 		pubsub.Publish(s.publisher, SentMessage{
@@ -128,7 +128,7 @@ func (s *Sender) SendPrivateHashRatchetKeys(ctx context.Context, recipients []*e
 			return err
 		}
 
-		hashes, _, err := s.sendPrivate(ctx, logger, sendPrivateParams{
+		requestIDs, _, err := s.sendPrivate(ctx, logger, sendPrivateParams{
 			recipient:       recipients[i],
 			payload:         payload,
 			sharedSecretKey: sharedSecretKey,
@@ -138,7 +138,7 @@ func (s *Sender) SendPrivateHashRatchetKeys(ctx context.Context, recipients []*e
 		}
 
 		logger.Debug("sent-message",
-			zap.Strings("hashes", cryptotypes.EncodeHexes(hashes)),
+			zap.Stringers("requestIDs", requestIDs),
 		)
 	}
 
@@ -191,7 +191,7 @@ type sendPrivateParams struct {
 	sharedSecretKey     []byte
 }
 
-func (s *Sender) sendPrivate(ctx context.Context, logger *zap.Logger, params sendPrivateParams) ([][]byte, []*wakutypes.NewMessage, error) {
+func (s *Sender) sendPrivate(ctx context.Context, logger *zap.Logger, params sendPrivateParams) ([]wakutypes.RequestID, []*wakutypes.NewMessage, error) {
 	segments, err := s.segmentMessage(params.payload)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "failed to segment message")
@@ -200,10 +200,10 @@ func (s *Sender) sendPrivate(ctx context.Context, logger *zap.Logger, params sen
 	ctx, span := s.tracer.Start(ctx, "Sender.sendPrivate")
 	defer span.End()
 
-	hashes := make([][]byte, 0, len(segments))
+	requestIDs := make([]wakutypes.RequestID, 0, len(segments))
 	wakuMessages := make([]*wakutypes.NewMessage, len(segments))
 	for i, segment := range segments {
-		var hash []byte
+		var requestID wakutypes.RequestID
 		wakuMessage := &wakutypes.NewMessage{
 			Payload:     segment,
 			PubsubTopic: params.pubsubTopic,
@@ -212,27 +212,27 @@ func (s *Sender) sendPrivate(ctx context.Context, logger *zap.Logger, params sen
 		if params.sendOnPersonalTopic {
 			logger.Debug("sending on personal topic")
 			span.AddEvent("sending on personal topic")
-			hash, err = s.stack.Transport.SendPrivateOnPersonalTopic(ctx, wakuMessage, params.recipient)
+			requestID, err = s.stack.Transport.SendPrivateOnPersonalTopic(ctx, wakuMessage, params.recipient)
 		} else if params.sharedSecretKey != nil {
 			logger.Debug("sending on shared secret topic")
 			span.AddEvent("sending on shared secret topic")
-			hash, err = s.stack.Transport.SendPrivateWithSharedSecret(ctx, wakuMessage, params.recipient, params.sharedSecretKey)
+			requestID, err = s.stack.Transport.SendPrivateWithSharedSecret(ctx, wakuMessage, params.recipient, params.sharedSecretKey)
 		} else {
 			logger.Debug("sending on partitioned topic")
 			span.AddEvent("sending on partitioned topic")
-			hash, err = s.stack.Transport.SendPrivateWithPartitioned(ctx, wakuMessage, params.recipient)
+			requestID, err = s.stack.Transport.SendPrivateWithPartitioned(ctx, wakuMessage, params.recipient)
 		}
 		if err != nil {
 			return nil, nil, errors.Wrap(err, "failed to send message")
 		}
-		hashes = append(hashes, hash)
+		requestIDs = append(requestIDs, requestID)
 	}
 
 	if s.tracer.Enabled() {
-		linkSpanWithHashes(span, hashes)
+		setSpanRequestIDs(span, requestIDs)
 	}
 
-	return hashes, wakuMessages, nil
+	return requestIDs, wakuMessages, nil
 }
 
 func (s *Sender) buildEncryptedMessage(sender *ecdsa.PrivateKey, recipient *ecdsa.PublicKey, payload []byte) (*encryption.ProtocolMessageSpec, error) {

@@ -48,7 +48,7 @@ func (s *Sender) SendPrivateReliability(recipient *ecdsa.PublicKey, wrappedPaylo
 		return errors.Wrap(err, "failed to process and marshal message spec")
 	}
 
-	hashes, wakuMessages, err := s.sendPrivate(context.Background(), logger, sendPrivateParams{
+	requestIDs, wakuMessages, err := s.sendPrivate(context.Background(), logger, sendPrivateParams{
 		recipient:       recipient,
 		payload:         payload,
 		sharedSecretKey: sharedSecretKey,
@@ -58,7 +58,7 @@ func (s *Sender) SendPrivateReliability(recipient *ecdsa.PublicKey, wrappedPaylo
 	}
 
 	logger.Debug("sent-message",
-		zap.Strings("hashes", cryptotypes.EncodeHexes(hashes)),
+		zap.Stringers("requestIDs", requestIDs),
 	)
 
 	byteMessageIDs := make([][]byte, len(messageIDs))
@@ -66,7 +66,7 @@ func (s *Sender) SendPrivateReliability(recipient *ecdsa.PublicKey, wrappedPaylo
 		byteMessageIDs[i] = []byte(id)
 	}
 
-	s.stack.Transport.TrackMany(byteMessageIDs, hashes, wakuMessages)
+	s.stack.Transport.TrackMany(byteMessageIDs, requestIDs, wakuMessages)
 
 	pubsub.Publish(s.publisher, SentMessage{
 		Private:                true,

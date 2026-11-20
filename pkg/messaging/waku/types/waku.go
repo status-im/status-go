@@ -87,10 +87,11 @@ type TopicSubscription struct {
 // Whisper represents a dark communication interface through the Ethereum
 // network, using its very own P2P communication layer.
 type Waku interface {
-	// Send publishes a pre-encoded payload on the messaging network. The
-	// payload is expected to be already encoded for WakuMessage version=1
-	// (see transport/rfc26.Encode). Returns the wire hash on success.
-	Send(ctx context.Context, pubsubTopic, contentTopic string, payload []byte, ephemeral bool, priority *int) ([]byte, error)
+	// Send queues a payload already encrypted with transport/rfc26.Encode and
+	// returns the ID of the request. The outcome arrives later as an envelope
+	// event with that ID: EventEnvelopeSent, which carries the wire hash, or
+	// EventEnvelopeExpired.
+	Send(ctx context.Context, pubsubTopic, contentTopic string, payload []byte, ephemeral bool, priority *int) (RequestID, error)
 
 	Start() error
 	Stop() error
