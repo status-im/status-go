@@ -37,7 +37,13 @@ type MessageDispatcher func(publicKey *ecdsa.PublicKey, wrappedPayload []byte, m
 
 // MissingDependenciesHandler is triggered when SDS reports missing dependencies
 // for an incoming message.
-type MissingDependenciesHandler func(messageID string, missingDeps []string, channelID string) error
+type MissingDependenciesHandler func(messageID string, missingDeps []MissingDependency, channelID string) error
+
+// MissingDependency retains the SDS identity and all envelopes needed to recover it.
+type MissingDependency struct {
+	MessageID      string
+	EnvelopeHashes []string
+}
 
 // RetrievalHintProvider returns a transport-level retrieval hint for a given
 // SDS message ID.
@@ -117,6 +123,38 @@ func (r *Reliability) SDSEnvelopeHashes(channelID, messageID string) ([][]byte, 
 		return nil, errors.New("SDS retrieval hint persistence is not configured")
 	}
 	return store.LoadSDSRetrievalHints(channelID, messageID)
+}
+
+// RecordSDSMessageReceived records a complete payload that passed SDS unwrap.
+func (r *Reliability) RecordSDSMessageReceived(channelID string, messageID []byte) error {
+	r.retrievalHintPersistenceMu.RLock()
+	store := r.retrievalHintStore
+	r.retrievalHintPersistenceMu.RUnlock()
+	if store == nil {
+		return nil
+	}
+	return store.SaveSDSMessageReceived(channelID, cryptotypes.EncodeHex(messageID))
+}
+
+// IsSDSMessageReceived checks complete inbound unwraps, independent of bounded SDS history.
+func (r *Reliability) IsSDSMessageReceived(channelID, messageID string) (bool, error) {
+	r.retrievalHintPersistenceMu.RLock()
+	store := r.retrievalHintStore
+	r.retrievalHintPersistenceMu.RUnlock()
+	if store == nil {
+		return false, errors.New("SDS retrieval hint persistence is not configured")
+	}
+	return store.IsSDSMessageReceived(channelID, messageID)
+}
+
+func (r *Reliability) DeleteExpiredSDSReceivedMessages() error {
+	r.retrievalHintPersistenceMu.RLock()
+	store := r.retrievalHintStore
+	r.retrievalHintPersistenceMu.RUnlock()
+	if store == nil {
+		return errors.New("SDS retrieval hint persistence is not configured")
+	}
+	return store.DeleteExpiredSDSReceivedMessages()
 }
 
 // CurrentSDSChannelID returns the channel currently being wrapped.
@@ -251,31 +289,37 @@ func (r *Reliability) handleMissingDependencies(messageID sds.MessageID, missing
 		return
 	}
 
-	missingDepsAsString := make([]string, 0, len(missingDeps))
+	dependencies := make([]MissingDependency, 0, len(missingDeps))
 	for _, dep := range missingDeps {
-		if len(dep.RetrievalHint) == 0 {
+		if dep.MessageID == "" {
+			r.logger.Warn("missing SDS dependency has no message ID", zap.String("channelID", channelID))
 			continue
 		}
-
+		dependency := MissingDependency{MessageID: string(dep.MessageID)}
 		var hint protobuf.RetrievalHint
 		if err := proto.Unmarshal(dep.RetrievalHint, &hint); err != nil {
 			r.logger.Debug("failed to unmarshal retrieval hint",
 				zap.String("messageId", string(dep.MessageID)),
 				zap.Error(err))
-			continue
+			hint.EnvelopeHashes = nil
 		}
 
 		for _, envelopeHash := range hint.EnvelopeHashes {
-			if len(envelopeHash) > 0 {
-				missingDepsAsString = append(missingDepsAsString, string(envelopeHash))
+			if len(envelopeHash) == 0 {
+				r.logger.Warn("SDS retrieval hint contains an empty envelope hash",
+					zap.String("messageID", dependency.MessageID))
+				dependency.EnvelopeHashes = nil
+				break
 			}
+			dependency.EnvelopeHashes = append(dependency.EnvelopeHashes, string(envelopeHash))
 		}
+		dependencies = append(dependencies, dependency)
 	}
-	if len(missingDepsAsString) == 0 {
+	if len(dependencies) == 0 {
 		return
 	}
 
-	if err := handler(string(messageID), missingDepsAsString, channelID); err != nil {
+	if err := handler(string(messageID), dependencies, channelID); err != nil {
 		r.logger.Debug("failed to fetch missing dependencies from sds callback", zap.Error(err))
 	}
 }

@@ -51,8 +51,29 @@ type ProcessorSuite struct {
 }
 
 type testSDSRetrievalHintPersistence struct {
-	hints     map[string][][]byte
-	saveError error
+	hints        map[string][][]byte
+	saveError    error
+	received     map[string]bool
+	receiveError error
+}
+
+func (p *testSDSRetrievalHintPersistence) SaveSDSMessageReceived(channelID, messageID string) error {
+	if p.receiveError != nil {
+		return p.receiveError
+	}
+	if p.received == nil {
+		p.received = make(map[string]bool)
+	}
+	p.received[channelID+":"+messageID] = true
+	return nil
+}
+
+func (p *testSDSRetrievalHintPersistence) IsSDSMessageReceived(channelID, messageID string) (bool, error) {
+	return p.received[channelID+":"+messageID], nil
+}
+
+func (*testSDSRetrievalHintPersistence) DeleteExpiredSDSReceivedMessages() error {
+	return nil
 }
 
 func (p *testSDSRetrievalHintPersistence) SaveSDSRetrievalHints(channelID, messageID string, envelopeHashes [][]byte) error {
@@ -85,7 +106,7 @@ func (s *ProcessorSuite) newStandaloneReliability(persistence ...sds.Persistence
 	r, err := reliability.NewReliability(
 		mvdsnode.NewSQLitePersistence(db),
 		identity,
-		func(string, []string, string) error { return nil },
+		func(string, []reliability.MissingDependency, string) error { return nil },
 		s.logger,
 		persistence...,
 	)
@@ -206,7 +227,7 @@ func (s *ProcessorSuite) SetupTest() {
 	stack.Reliability, err = reliability.NewReliability(
 		mvdsnode.NewSQLitePersistence(db),
 		identity,
-		func(string, []string, string) error { return nil },
+		func(string, []reliability.MissingDependency, string) error { return nil },
 		s.logger,
 	)
 	s.Require().NoError(err)
@@ -629,6 +650,9 @@ func (s *ProcessorSuite) TestProcessSDSLayerRecordsReceivedEnvelopeHashes() {
 			got, err := hintStore.LoadSDSRetrievalHints(channelID, messageID)
 			s.Require().NoError(err)
 			s.Require().Equal(test.expectedHashes, got)
+			received, err := hintStore.IsSDSMessageReceived(channelID, messageID)
+			s.Require().NoError(err)
+			s.Require().True(received)
 		})
 	}
 }
@@ -639,6 +663,7 @@ func (s *ProcessorSuite) TestSDSHintSaveFailureDoesNotPreventDelivery() {
 		if segmented {
 			name = "segmented"
 		}
+
 		s.Run(name, func() {
 			saveError := errors.New("injected hint save failure")
 			s.processor.stack.Reliability.SetSDSRetrievalHintPersistence(&testSDSRetrievalHintPersistence{
@@ -704,6 +729,73 @@ func (s *ProcessorSuite) TestSDSHintSaveFailureDoesNotPreventDelivery() {
 	}
 }
 
+func (s *ProcessorSuite) TestSDSReceivedEvidenceRequiresCompleteUnwrap() {
+	store := &testSDSRetrievalHintPersistence{hints: make(map[string][][]byte)}
+	s.processor.stack.Reliability.SetSDSRetrievalHintPersistence(store)
+	sender := s.newStandaloneReliability()
+	const channelID = "segmented-dependency"
+	wrapped, id, err := sender.WrapPayloadForSDS([]byte("complete segmented dependency"), channelID)
+	s.Require().NoError(err)
+	segments, err := s.processor.stack.Segmentation.Segment(wrapped, (len(wrapped)+1)/2)
+	s.Require().NoError(err)
+	s.Require().Len(segments, 2)
+	key, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+	for i, segment := range segments {
+		response, err := s.processor.ProcessMessage(&types.ReceivedMessage{
+			Sig: crypto.FromECDSAPub(&key.PublicKey), Hash: crypto.Keccak256(segment), Payload: segment,
+		})
+		s.Require().NoError(err)
+		received, err := store.IsSDSMessageReceived(channelID, cryptotypes.EncodeHex(id))
+		s.Require().NoError(err)
+		s.Require().Equal(i == len(segments)-1, received)
+		if i == 0 {
+			s.Require().Nil(response)
+		}
+	}
+}
+
+func (s *ProcessorSuite) TestSDSReceivedEvidenceSaveFailureIsLogged() {
+	failure := errors.New("injected received-message persistence failure")
+	store := &testSDSRetrievalHintPersistence{
+		hints: make(map[string][][]byte), receiveError: failure,
+	}
+	s.processor.stack.Reliability.SetSDSRetrievalHintPersistence(store)
+	logger, logs := observer.New(zap.ErrorLevel)
+	s.processor.logger = zap.New(logger)
+	sender := s.newStandaloneReliability()
+	const channelID = "received-evidence-failure"
+	payload := []byte("valid SDS payload")
+	wrapped, id, err := sender.WrapPayloadForSDS(payload, channelID)
+	s.Require().NoError(err)
+	message := types.Message{
+		TransportLayer:  types.TransportLayer{Hash: []byte("hash")},
+		EncryptionLayer: types.EncryptionLayer{Payload: wrapped},
+	}
+	s.Require().NoError(s.processor.processSDSLayer(&message))
+	s.Require().Equal(payload, message.EncryptionLayer.Payload)
+	received, err := store.IsSDSMessageReceived(channelID, cryptotypes.EncodeHex(id))
+	s.Require().NoError(err)
+	s.Require().False(received)
+	entries := logs.FilterMessage("failed to persist received SDS message").All()
+	s.Require().Len(entries, 1)
+	s.Require().Equal(failure.Error(), entries[0].ContextMap()["error"])
+}
+
+func (s *ProcessorSuite) TestFailedSDSUnwrapDoesNotRecordReceivedEvidence() {
+	store := &testSDSRetrievalHintPersistence{hints: make(map[string][][]byte)}
+	s.processor.stack.Reliability.SetSDSRetrievalHintPersistence(store)
+	sender := s.newStandaloneReliability()
+	wrapped, id, err := sender.WrapPayloadForSDS([]byte("payload"), "channel")
+	s.Require().NoError(err)
+	s.processor.stack.Reliability.Close()
+	message := types.Message{EncryptionLayer: types.EncryptionLayer{Payload: wrapped}}
+	s.Require().Error(s.processor.processSDSLayer(&message))
+	received, err := store.IsSDSMessageReceived("channel", cryptotypes.EncodeHex(id))
+	s.Require().NoError(err)
+	s.Require().False(received)
+}
+
 func (s *ProcessorSuite) TestSDSMissingDependencyTriggersFetchHintsAndRecoversPayloads() {
 	senderReliability := s.newStandaloneReliability()
 	receiverReliability := s.newStandaloneReliability()
@@ -735,7 +827,7 @@ func (s *ProcessorSuite) TestSDSMissingDependencyTriggersFetchHintsAndRecoversPa
 
 	type missingDepsCall struct {
 		messageID string
-		deps      []string
+		deps      []reliability.MissingDependency
 		channelID string
 	}
 
@@ -744,11 +836,11 @@ func (s *ProcessorSuite) TestSDSMissingDependencyTriggersFetchHintsAndRecoversPa
 		calls   []missingDepsCall
 	)
 
-	receiverReliability.SetMissingDependenciesHandler(func(messageID string, missingDeps []string, missingDepsChannelID string) error {
+	receiverReliability.SetMissingDependenciesHandler(func(messageID string, missingDeps []reliability.MissingDependency, missingDepsChannelID string) error {
 		callsMu.Lock()
 		calls = append(calls, missingDepsCall{
 			messageID: messageID,
-			deps:      append([]string(nil), missingDeps...),
+			deps:      append([]reliability.MissingDependency(nil), missingDeps...),
 			channelID: missingDepsChannelID,
 		})
 		callsMu.Unlock()
@@ -790,7 +882,9 @@ func (s *ProcessorSuite) TestSDSMissingDependencyTriggersFetchHintsAndRecoversPa
 
 	s.Require().Equal(expectedNewMessageID, firstCall.messageID)
 	s.Require().Equal(channelID, firstCall.channelID)
-	s.Require().Contains(firstCall.deps, expectedOldHint)
+	s.Require().Contains(firstCall.deps, reliability.MissingDependency{
+		MessageID: expectedOldMessageID, EnvelopeHashes: []string{expectedOldHint},
+	})
 
 	recovered := map[string]bool{}
 	if bytes.Equal(newMessageFirst.EncryptionLayer.Payload, newPayload) {

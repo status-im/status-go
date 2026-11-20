@@ -9,6 +9,7 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/status-im/status-go/pkg/messaging/layers/reliability"
 	"github.com/status-im/status-go/pkg/messaging/waku"
 )
 
@@ -17,7 +18,7 @@ const (
 	// their batch, and the minimum pause between two by-hash store queries.
 	missingDepsBatchDelay = 2 * time.Second
 	missingDepsMaxBatch   = 50
-	// missingDepsMaxQueue caps hashes waiting to be fetched; extra ones are dropped.
+	// missingDepsMaxQueue bounds each queue: envelope hashes and SDS dependencies.
 	missingDepsMaxQueue = 1000
 	// missingDepsFetchTimeout bounds one batch fetch, across storenode failovers.
 	missingDepsFetchTimeout = 70 * time.Second
@@ -52,14 +53,32 @@ type pendingMissingDep struct {
 	seq      uint64
 }
 
+type sdsDependencyReconciler interface {
+	IsSDSMessageReceived(channelID, messageID string) (bool, error)
+	MarkDependenciesMet(messageIDs []string, channelID string) error
+}
+
+type dependencyKey struct {
+	channelID string
+	messageID string
+}
+
+type pendingSDSDependency struct {
+	hashes   []string
+	dueAt    time.Time
+	attempts int
+}
+
 // missingDepsFetcher fetches SDS missing dependencies from storenodes with a
 // single worker: hashes are deduplicated (in flight and recently requested),
-// batched into one by-hash query and retried with per-hash backoff.
+// batched into one by-hash query and retried with per-hash backoff. Dependency
+// identities remain queued separately until local availability can be reconciled.
 type missingDepsFetcher struct {
-	logger    *zap.Logger
-	fetcher   missingDependencyFetcher
-	requested *requestedHashes
-	now       func() time.Time
+	logger     *zap.Logger
+	fetcher    missingDependencyFetcher
+	requested  *requestedHashes
+	now        func() time.Time
+	reconciler sdsDependencyReconciler
 
 	batchDelay         time.Duration
 	maxBatch           int
@@ -69,10 +88,11 @@ type missingDepsFetcher struct {
 	timeoutRetryDelays []time.Duration
 	exhaustedTTL       time.Duration
 
-	mu      sync.Mutex
-	pending map[string]*pendingMissingDep
-	seq     uint64
-	wake    chan struct{}
+	mu           sync.Mutex
+	pending      map[string]*pendingMissingDep
+	seq          uint64
+	wake         chan struct{}
+	dependencies map[dependencyKey]*pendingSDSDependency
 }
 
 func newMissingDepsFetcher(logger *zap.Logger, fetcher missingDependencyFetcher, requested *requestedHashes) *missingDepsFetcher {
@@ -90,7 +110,162 @@ func newMissingDepsFetcher(logger *zap.Logger, fetcher missingDependencyFetcher,
 		exhaustedTTL:       missingDepsExhaustedTTL,
 		pending:            make(map[string]*pendingMissingDep),
 		wake:               make(chan struct{}, 1),
+		dependencies:       make(map[dependencyKey]*pendingSDSDependency),
 	}
+}
+
+func (f *missingDepsFetcher) enqueueDependencies(channelID string, deps []reliability.MissingDependency) (queued, dropped int) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for _, dep := range deps {
+		key := dependencyKey{channelID: channelID, messageID: dep.MessageID}
+		if pending, ok := f.dependencies[key]; ok {
+			if len(pending.hashes) == 0 {
+				pending.hashes = append([]string(nil), dep.EnvelopeHashes...)
+			}
+			continue
+		}
+		if len(f.dependencies) >= f.maxQueue {
+			dropped++
+			continue
+		}
+		f.dependencies[key] = &pendingSDSDependency{
+			hashes: append([]string(nil), dep.EnvelopeHashes...),
+			dueAt:  f.now().Add(f.batchDelay),
+		}
+		queued++
+	}
+	if queued > 0 {
+		select {
+		case f.wake <- struct{}{}:
+		default:
+		}
+	}
+	return queued, dropped
+}
+
+// reconcile runs only on the recovery worker, never on the native event thread.
+// Seen envelopes suppress fetches but cannot prove a dependency was unwrapped.
+func (f *missingDepsFetcher) reconcile() time.Time {
+	if f.reconciler == nil {
+		return time.Time{}
+	}
+	now := f.now()
+	batch := make(map[dependencyKey]pendingSDSDependency)
+	var hashes []string
+	f.mu.Lock()
+	for key, dep := range f.dependencies {
+		due := !dep.dueAt.After(now)
+		for _, hash := range dep.hashes {
+			if pending, ok := f.pending[hash]; ok && !pending.dueAt.After(now) {
+				due = true
+			}
+		}
+		if due {
+			batch[key] = *dep
+			hashes = append(hashes, dep.hashes...)
+		}
+	}
+	f.mu.Unlock()
+
+	if len(batch) == 0 {
+		f.mu.Lock()
+		defer f.mu.Unlock()
+		var nextDue time.Time
+		for _, dep := range f.dependencies {
+			if nextDue.IsZero() || dep.dueAt.Before(nextDue) {
+				nextDue = dep.dueAt
+			}
+		}
+		return nextDue
+	}
+	processed, cacheErr := f.fetcher.AlreadyProcessed(hashes)
+	if cacheErr != nil {
+		f.logger.Warn("failed to check SDS dependency envelopes", zap.Error(cacheErr))
+		processed = nil
+	}
+	ready := make(map[string][]string)
+	for key, dep := range batch {
+		received, err := f.reconciler.IsSDSMessageReceived(key.channelID, key.messageID)
+		if err != nil {
+			f.logger.Warn("failed to check received SDS dependency",
+				zap.String("channelID", key.channelID), zap.String("messageID", key.messageID), zap.Error(err))
+		}
+		// Pre-upgrade segmented messages may lack receipts and cache only the completing
+		// envelope; their completion markers also block replay. We defer recovery-only
+		// replay complexity given the limited production use (some community descriptions).
+		allProcessed := cacheErr == nil && len(dep.hashes) > 0
+		for _, hash := range dep.hashes {
+			allProcessed = allProcessed && processed[hash]
+		}
+		if (err == nil && received) || allProcessed {
+			ready[key.channelID] = append(ready[key.channelID], key.messageID)
+			continue
+		}
+		missing := withoutHashes(dep.hashes, processed)
+		_, dropped := f.enqueue(missing)
+		if dropped > 0 {
+			f.logger.Warn("SDS dependency recovery queue full", zap.Int("dropped", dropped))
+		}
+	}
+	completedHashes := make(map[string]bool)
+	for channelID, ids := range ready {
+		if err := f.reconciler.MarkDependenciesMet(ids, channelID); err != nil {
+			f.logger.Warn("failed to mark SDS dependencies met",
+				zap.String("channelID", channelID), zap.Strings("messageIDs", ids), zap.Error(err))
+			continue
+		}
+		f.mu.Lock()
+		for _, id := range ids {
+			key := dependencyKey{channelID: channelID, messageID: id}
+			// A dependency may have arrived after its hashes were queued.
+			// Do not fetch those envelopes after confirming it is complete.
+			for _, hash := range f.dependencies[key].hashes {
+				completedHashes[hash] = true
+			}
+			delete(f.dependencies, key)
+			delete(batch, key)
+		}
+		f.mu.Unlock()
+	}
+
+	var nextDue time.Time
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for _, dep := range f.dependencies {
+		for _, hash := range dep.hashes {
+			delete(completedHashes, hash)
+		}
+	}
+	for hash := range completedHashes {
+		delete(f.pending, hash)
+	}
+	for key := range batch {
+		dep := f.dependencies[key]
+		dep.attempts++
+		if dep.attempts > len(f.retryDelays) {
+			fetchPending := false
+			for _, hash := range dep.hashes {
+				_, pending := f.pending[hash]
+				fetchPending = fetchPending || pending
+			}
+			if !fetchPending {
+				f.logger.Warn("SDS dependency reconciliation exhausted",
+					zap.String("channelID", key.channelID), zap.String("messageID", key.messageID))
+				delete(f.dependencies, key)
+				continue
+			}
+			dep.dueAt = now.Add(f.batchDelay)
+		} else {
+			dep.dueAt = now.Add(f.retryDelays[dep.attempts-1])
+		}
+	}
+	for _, dep := range f.dependencies {
+		if nextDue.IsZero() || dep.dueAt.Before(nextDue) {
+			nextDue = dep.dueAt
+		}
+	}
+	return nextDue
 }
 
 // enqueue schedules hashes for fetching. It does not block: hashes already
@@ -257,6 +432,10 @@ func (f *missingDepsFetcher) fetchBatch(ctx context.Context, batch []string) {
 // run is the single worker loop. It returns when ctx is done.
 func (f *missingDepsFetcher) run(ctx context.Context) {
 	for {
+		if ctx.Err() != nil {
+			return
+		}
+		nextReconcile := f.reconcile()
 		batch, nextDue := f.takeBatch(f.now())
 		if len(batch) > 0 {
 			f.fetchBatch(ctx, batch)
@@ -265,6 +444,9 @@ func (f *missingDepsFetcher) run(ctx context.Context) {
 				return
 			}
 			continue
+		}
+		if !nextReconcile.IsZero() && (nextDue.IsZero() || nextReconcile.Before(nextDue)) {
+			nextDue = nextReconcile
 		}
 
 		var timer *time.Timer
