@@ -17,6 +17,7 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
+	"github.com/waku-org/sds-go-bindings/sds"
 	otelattribute "go.opentelemetry.io/otel/attribute"
 	oteltrace "go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
@@ -179,6 +180,12 @@ type Messenger struct {
 	mutex                     sync.Mutex
 	handleMessagesMutex       sync.Mutex
 	handleImportMessagesMutex sync.Mutex
+	// Accessed under handleMessagesMutex.
+	sdsValidationRetries      []pendingSDSValidationEnvelope
+	sdsValidationRetryHashes  map[string]struct{}
+	sdsValidationRetrySince   map[string]time.Time
+	sdsValidationRetryBytes   int
+	sdsValidationRetryTrigger chan struct{}
 
 	// flag to disable checking #hasPairedDevices
 	localPairing bool
@@ -458,6 +465,7 @@ func NewMessenger(
 		account:                                 c.account,
 		quit:                                    make(chan struct{}),
 		historicSyncTrigger:                     make(chan struct{}, 1),
+		sdsValidationRetryTrigger:               make(chan struct{}, 1),
 		ctx:                                     ctx,
 		cancel:                                  cancel,
 		importingCommunities:                    make(map[string]bool),
@@ -492,6 +500,9 @@ func NewMessenger(
 	}
 
 	communitiesManager.SetMemberProfileProvider(messenger.allContacts)
+	if err := messenger.messaging.SetSDSAuthorizer(communitySDSAuthorizer{messenger: messenger}); err != nil {
+		return nil, errors.Wrap(err, "failed to configure community SDS authorization")
+	}
 	messenger.mentionsManager = NewMentionManager(messenger)
 	messenger.storeNodeRequestsManager = NewStoreNodeRequestManager(messenger)
 
@@ -2910,7 +2921,7 @@ func (m *Messenger) RetrieveAll() (*MessengerResponse, error) {
 }
 
 func (m *Messenger) StartRetrieveMessagesLoop(_ time.Duration, cancel <-chan struct{}) {
-	m.shutdownWaitGroup.Add(1)
+	m.shutdownWaitGroup.Add(2)
 	go func() {
 		defer panics.LogOnPanic()
 		defer m.shutdownWaitGroup.Done()
@@ -2919,6 +2930,14 @@ func (m *Messenger) StartRetrieveMessagesLoop(_ time.Duration, cancel <-chan str
 		defer m.messaging.UnsubscribeFilterMatched(matchedCh)
 
 		runRetrieveMessagesLoop(matchedCh, cancel, m.quit, m.ProcessAllMessages)
+	}()
+
+	go func() {
+		defer panics.LogOnPanic()
+		defer m.shutdownWaitGroup.Done()
+
+		runSDSValidationRetryLoop(m.sdsValidationRetryTrigger, cancel, m.quit,
+			m.hasSDSValidationRetries, m.ProcessAllMessages)
 	}()
 }
 
@@ -3254,14 +3273,49 @@ func (m *Messenger) handleImportedMessages(messagesToHandle map[types.ChatFilter
 	messageState := m.buildMessageState()
 
 	logger := m.logger.With(zap.String("site", "handleImportedMessages"))
+	type retryEnvelope struct {
+		filter  types.ChatFilter
+		message *types.ReceivedMessage
+	}
+	var retryMessages []retryEnvelope
+	defer func() {
+		if len(retryMessages) == 0 {
+			return
+		}
+		m.handleMessagesMutex.Lock()
+		defer m.handleMessagesMutex.Unlock()
+		for _, retryMessage := range retryMessages {
+			filter := retryMessage.filter
+			m.enqueueSDSValidationRetry(&filter, retryMessage.message)
+		}
+	}()
 
+	archiveContext := &types.ReceivedMessageProcessingContext{FromArchive: true}
 	for filter, messages := range messagesToHandle {
 		for _, shhMessage := range messages {
+			shhMessage := withReceivedMessageContext(shhMessage, archiveContext)
 
 			handleMessageResponse, err := m.messaging.HandleReceivedMessages(shhMessage)
 			if err != nil {
-				logger.Info("failed to decode messages", zap.Error(err))
+				if errors.Is(err, sds.ErrAuthorizationFailed) {
+					retryMessages = append(retryMessages, retryEnvelope{
+						filter: filter, message: shhMessage,
+					})
+					logger.Info("deferring SDS envelope until authorization can be retried", zap.Error(err))
+				} else {
+					logger.Info("failed to decode messages", zap.Error(err))
+				}
 				continue
+			}
+			if handleMessageResponse == nil {
+				continue
+			}
+			for _, retryMessage := range handleMessageResponse.RetryableMessages {
+				entry := retryEnvelope{message: retryMessage}
+				if retryFilter := m.messaging.ChatFilterByTopic(retryMessage.Topic.Bytes()); retryFilter != nil {
+					entry.filter = *retryFilter
+				}
+				retryMessages = append(retryMessages, entry)
 			}
 
 			statusMessages := common.NewStatusMessages(handleMessageResponse.Messages)
@@ -3427,17 +3481,22 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[types.ChatFilte
 		controlledCommunitiesChatIDs[chatID] = flag
 	}
 
+	chatWithMessages = m.takeSDSValidationRetries(chatWithMessages)
+
+	batchContext := &types.ReceivedMessageProcessingContext{FromArchive: fromArchive, StoreWakuMessages: storeWakuMessages}
 	var processedMessages []string
+	var rejectedMessages []string
 	iterator := m.retrievedMessagesIteratorFactory(chatWithMessages)
 	for iterator.HasNext() {
 		filter, messages := iterator.Next()
 
 		for _, shhMessage := range messages {
+			shhMessage := withReceivedMessageContext(shhMessage, batchContext)
 			logger := logger.With(zap.String("hash", cryptotypes.EncodeHex(shhMessage.Hash)))
 			// Indicates tha all messages in the batch have been processed correctly
 			allMessagesProcessed := true
 
-			if controlledCommunitiesChatIDs[filter.ChatID()] && storeWakuMessages {
+			if controlledCommunitiesChatIDs[filter.ChatID()] && shhMessage.ProcessingContext.StoreWakuMessages {
 				logger.Debug("storing waku message")
 				err := m.communitiesManager.StoreWakuMessage(shhMessage)
 				if err != nil {
@@ -3447,13 +3506,25 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[types.ChatFilte
 
 			handleMessagesResponse, err := m.messaging.HandleReceivedMessages(shhMessage)
 			if err != nil {
-				logger.Info("failed to decode messages", zap.Error(err))
+				if errors.Is(err, sds.ErrAuthorizationFailed) {
+					m.enqueueSDSValidationRetry(&filter, shhMessage)
+					logger.Info("deferring SDS envelope until authorization can be retried", zap.Error(err))
+				} else {
+					m.clearSDSValidationRetry(shhMessage)
+					logger.Info("failed to process received message", zap.Error(err))
+				}
 				continue
 			}
 
 			if handleMessagesResponse == nil {
+				m.clearSDSValidationRetry(shhMessage)
 				continue
 			}
+			for _, retryMessage := range handleMessagesResponse.RetryableMessages {
+				retryFilter := m.messaging.ChatFilterByTopic(retryMessage.Topic.Bytes())
+				m.enqueueSDSValidationRetry(retryFilter, retryMessage)
+			}
+			m.clearSDSValidationRetry(shhMessage)
 
 			m.messaging.MetricsPushReceivedMessages(types.ReceivedMessages{
 				Filter:     filter,
@@ -3466,7 +3537,11 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[types.ChatFilte
 			statusMessages := common.NewStatusMessages(handleMessagesResponse.Messages)
 			logger.Debug("processing messages further", zap.Int("count", len(statusMessages)))
 			for _, msg := range statusMessages {
-				err := m.processStatusMessage(shhMessage.Hash, messageState, msg, filter, fromArchive, logger)
+				archive := shhMessage.ProcessingContext.FromArchive
+				if envelope := msg.TransportLayer.Message; envelope != nil && envelope.ProcessingContext != nil {
+					archive = envelope.ProcessingContext.FromArchive
+				}
+				err := m.processStatusMessage(shhMessage.Hash, messageState, msg, filter, archive, logger)
 				if err != nil {
 					logger.Warn("failed to process application message", zap.Error(err))
 					allMessagesProcessed = false
@@ -3476,10 +3551,22 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[types.ChatFilte
 			m.processCommunityChanges(messageState)
 
 			if allMessagesProcessed {
-				processedMessages = append(processedMessages, cryptotypes.EncodeHex(shhMessage.Hash))
+				rejectedHashes := make(map[string]struct{}, len(handleMessagesResponse.RejectedEnvelopeHashes))
+				for _, hash := range handleMessagesResponse.RejectedEnvelopeHashes {
+					rejectedHashes[cryptotypes.EncodeHex(hash)] = struct{}{}
+				}
+				appendProcessed := func(hash []byte) {
+					encoded := cryptotypes.EncodeHex(hash)
+					if _, rejected := rejectedHashes[encoded]; rejected {
+						rejectedMessages = append(rejectedMessages, encoded)
+						return
+					}
+					processedMessages = append(processedMessages, encoded)
+				}
+				appendProcessed(shhMessage.Hash)
 				for _, hash := range handleMessagesResponse.ConsumedEnvelopeHashes {
 					if !bytes.Equal(hash, shhMessage.Hash) {
-						processedMessages = append(processedMessages, cryptotypes.EncodeHex(hash))
+						appendProcessed(hash)
 					}
 				}
 			}
@@ -3496,6 +3583,11 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[types.ChatFilte
 	if len(processedMessages) != 0 {
 		if err := m.messaging.ConfirmMessagesProcessed(processedMessages, m.getTimesource().GetCurrentTime()); err != nil {
 			logger.Warn("failed to confirm processed messages", zap.Error(err))
+		}
+	}
+	if len(rejectedMessages) != 0 {
+		if err := m.messaging.ConfirmRejectedMessagesProcessed(rejectedMessages, m.getTimesource().GetCurrentTime()); err != nil {
+			logger.Warn("failed to confirm rejected messages", zap.Error(err))
 		}
 	}
 	return response, nil

@@ -1,6 +1,7 @@
 package segmentation
 
 import (
+	"crypto/ecdsa"
 	_ "embed"
 	"testing"
 
@@ -159,6 +160,28 @@ func (s *MessageSegmentationSuite) TestHandleSegmentationLayer() {
 
 			s.Require().Equal(tc.shouldSucceed, messageRecreated)
 		})
+	}
+}
+
+func (s *MessageSegmentationSuite) TestCompletionIsScopedToSigner() {
+	authorizedSigner, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+	unauthorizedSigner, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+	segments, err := s.segmenter.Segment(s.testPayload, len(s.testPayload)/2)
+	s.Require().NoError(err)
+
+	for _, signer := range []*ecdsa.PrivateKey{unauthorizedSigner, authorizedSigner} {
+		var reconstructed []byte
+		for i, segment := range segments {
+			reconstructed, _, err = s.segmenter.Reconstruct(segment, &signer.PublicKey, nil)
+			if i < len(segments)-1 {
+				s.Require().ErrorIs(err, ErrIncomplete)
+			} else {
+				s.Require().NoError(err)
+			}
+		}
+		s.Require().Equal(s.testPayload, reconstructed)
 	}
 }
 

@@ -18,9 +18,12 @@ func NewSQLitePersistence(db *sql.DB) *SQLitePersistence {
 	return &SQLitePersistence{db: db}
 }
 
-func (s *SQLitePersistence) IsMessageAlreadyCompleted(hash []byte) (bool, error) {
+func (s *SQLitePersistence) IsMessageAlreadyCompleted(hash []byte, sigPubKey *ecdsa.PublicKey) (bool, error) {
 	var alreadyCompleted int
-	err := s.db.QueryRow("SELECT COUNT(*) FROM message_segments_completed WHERE hash = ?", hash).Scan(&alreadyCompleted)
+	err := s.db.QueryRow(
+		"SELECT COUNT(*) FROM message_segments_completed WHERE hash = ? AND sig_pub_key = ?",
+		hash, crypto.CompressPubkey(sigPubKey),
+	).Scan(&alreadyCompleted)
 	if err != nil {
 		return false, err
 	}

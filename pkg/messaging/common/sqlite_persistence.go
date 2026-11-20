@@ -101,23 +101,35 @@ func NewSQLiteHashRatchetPersistence(db *sql.DB) *SQLiteHashRatchetPersistence {
 var _ HashRatchetPersistence = (*SQLiteHashRatchetPersistence)(nil)
 
 func (p *SQLiteHashRatchetPersistence) SaveMessage(groupID []byte, keyID []byte, m *types.ReceivedMessage) error {
-	_, err := p.db.Exec(`INSERT INTO hash_ratchet_encrypted_messages(hash, sig, timestamp, topic, payload, dst, padding, group_id, key_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, m.Hash, m.Sig, m.Timestamp, m.Topic.Bytes(), m.Payload, m.Dst, m.Padding, groupID, keyID)
+	var context types.ReceivedMessageProcessingContext
+	if m.ProcessingContext != nil {
+		context = *m.ProcessingContext
+	}
+	_, err := p.db.Exec(`INSERT INTO hash_ratchet_encrypted_messages
+		(hash, sig, timestamp, topic, payload, dst, padding, group_id, key_id, from_archive, store_waku_messages)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		m.Hash, m.Sig, m.Timestamp, m.Topic.Bytes(), m.Payload, m.Dst, m.Padding, groupID, keyID,
+		context.FromArchive, context.StoreWakuMessages)
 	return err
 }
 
 func (p *SQLiteHashRatchetPersistence) GetMessages(keyID []byte) ([]*types.ReceivedMessage, error) {
 	var messages []*types.ReceivedMessage
 
-	rows, err := p.db.Query(`SELECT hash, sig, timestamp, topic, payload, dst, padding FROM hash_ratchet_encrypted_messages WHERE key_id = ?`, keyID)
+	rows, err := p.db.Query(`SELECT hash, sig, timestamp, topic, payload, dst, padding, from_archive, store_waku_messages
+		FROM hash_ratchet_encrypted_messages WHERE key_id = ?`, keyID)
 	if err != nil {
 		return nil, err
 	}
+	defer rows.Close()
 
 	for rows.Next() {
 		var topic []byte
-		message := &types.ReceivedMessage{}
+		context := &types.ReceivedMessageProcessingContext{}
+		message := &types.ReceivedMessage{ProcessingContext: context}
 
-		err := rows.Scan(&message.Hash, &message.Sig, &message.Timestamp, &topic, &message.Payload, &message.Dst, &message.Padding)
+		err := rows.Scan(&message.Hash, &message.Sig, &message.Timestamp, &topic, &message.Payload, &message.Dst, &message.Padding,
+			&context.FromArchive, &context.StoreWakuMessages)
 		if err != nil {
 			return nil, err
 		}
@@ -126,7 +138,7 @@ func (p *SQLiteHashRatchetPersistence) GetMessages(keyID []byte) ([]*types.Recei
 		messages = append(messages, message)
 	}
 
-	return messages, nil
+	return messages, rows.Err()
 }
 
 func (p *SQLiteHashRatchetPersistence) GetMessagesCountForGroup(groupID []byte) (int, error) {

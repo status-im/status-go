@@ -126,6 +126,21 @@ func (s *Segmenter) Segment(payload []byte, segmentSize int) ([][]byte, error) {
 }
 
 func (s *Segmenter) Reconstruct(payload []byte, sigPubKey *ecdsa.PublicKey, transportID []byte) ([]byte, [][]byte, error) {
+	return s.reconstruct(payload, sigPubKey, transportID, true)
+}
+
+// ReconstructForProcessing reconstructs a complete payload without marking its
+// segments complete. The caller must complete it after validation is definitive.
+func (s *Segmenter) ReconstructForProcessing(payload []byte, sigPubKey *ecdsa.PublicKey, transportID []byte) ([]byte, [][]byte, error) {
+	return s.reconstruct(payload, sigPubKey, transportID, false)
+}
+
+// CompleteReconstruction marks a reconstructed payload's segments as complete.
+func (s *Segmenter) CompleteReconstruction(payload []byte, sigPubKey *ecdsa.PublicKey) error {
+	return s.persistence.CompleteMessageSegments(crypto.Keccak256(payload), sigPubKey, time.Now().Unix())
+}
+
+func (s *Segmenter) reconstruct(payload []byte, sigPubKey *ecdsa.PublicKey, transportID []byte, complete bool) ([]byte, [][]byte, error) {
 	segmentMessage := &Message{
 		SegmentMessage: &protobuf.SegmentMessage{},
 		transportID:    transportID,
@@ -142,7 +157,7 @@ func (s *Segmenter) Reconstruct(payload []byte, sigPubKey *ecdsa.PublicKey, tran
 		zap.Uint32("ParitySegmentIndex", segmentMessage.ParitySegmentIndex),
 		zap.Uint32("ParitySegmentsCount", segmentMessage.ParitySegmentsCount))
 
-	alreadyCompleted, err := s.persistence.IsMessageAlreadyCompleted(segmentMessage.EntireMessageHash)
+	alreadyCompleted, err := s.persistence.IsMessageAlreadyCompleted(segmentMessage.EntireMessageHash, sigPubKey)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -242,9 +257,11 @@ func (s *Segmenter) Reconstruct(payload []byte, sigPubKey *ecdsa.PublicKey, tran
 		return nil, nil, ErrHashMismatch
 	}
 
-	err = s.persistence.CompleteMessageSegments(segmentMessage.EntireMessageHash, sigPubKey, time.Now().Unix())
-	if err != nil {
-		return nil, nil, err
+	if complete {
+		err = s.CompleteReconstruction(reconstructedPayload, sigPubKey)
+		if err != nil {
+			return nil, nil, err
+		}
 	}
 
 	transportIDs := make([][]byte, len(segments))

@@ -25,10 +25,11 @@ import (
 )
 
 type fakeMissingDependencyFetcher struct {
-	mu        sync.Mutex
-	processed map[string]bool
-	seen      map[string]bool
-	fetches   [][]string
+	mu             sync.Mutex
+	processed      map[string]bool
+	dependencyHits map[string]bool
+	seen           map[string]bool
+	fetches        [][]string
 	// fetchErrs[i] is returned by the i-th fetch; fetches beyond it succeed.
 	fetchErrs []error
 	// onFetch, if set, runs on every fetch (e.g. to mark hashes as processed).
@@ -42,6 +43,22 @@ func (f *fakeMissingDependencyFetcher) AlreadyProcessed(hashes []string) (map[st
 	hits := make(map[string]bool)
 	for _, h := range hashes {
 		if f.processed[h] {
+			hits[h] = true
+		}
+	}
+	return hits, f.cacheErr
+}
+
+func (f *fakeMissingDependencyFetcher) DependencyHits(hashes []string) (map[string]bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	source := f.dependencyHits
+	if source == nil {
+		source = f.processed
+	}
+	hits := make(map[string]bool)
+	for _, h := range hashes {
+		if source[h] {
 			hits[h] = true
 		}
 	}
@@ -167,6 +184,27 @@ func TestMissingDepsFetcher_ReconcilesWholeDependencies(t *testing.T) {
 	require.Len(t, f.fetches, 1)
 	require.ElementsMatch(t, []string{"partial-2", "missing"}, f.fetches[0])
 	require.Len(t, m.dependencies, 2)
+}
+
+func TestMissingDepsFetcher_RejectedEnvelopeDoesNotSatisfyDependency(t *testing.T) {
+	f := &fakeMissingDependencyFetcher{
+		processed:      map[string]bool{"rejected": true},
+		dependencyHits: map[string]bool{},
+		seen:           map[string]bool{"rejected": true},
+	}
+	m, clock := newTestMissingDepsFetcher(f)
+	r := &fakeSDSDependencyReconciler{}
+	m.reconciler = r
+	m.enqueueDependencies("channel", []reliability.MissingDependency{
+		{MessageID: "depends-on-rejected", EnvelopeHashes: []string{"rejected"}},
+	})
+
+	clock.advance(missingDepsBatchDelay)
+	m.reconcile()
+
+	require.Empty(t, r.marked)
+	require.Len(t, m.dependencies, 1, "rejected transport handling is not SDS receipt evidence")
+	require.Empty(t, f.fetches, "already handled rejected envelopes should not be fetched again")
 }
 
 func TestMissingDepsFetcher_ReceivedEvidenceIsChannelScoped(t *testing.T) {

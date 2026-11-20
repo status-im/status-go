@@ -3,10 +3,16 @@ package messaging
 import (
 	"crypto/ecdsa"
 
+	"github.com/waku-org/sds-go-bindings/sds"
+
 	"github.com/status-im/status-go/internal/connection"
 	adapters "github.com/status-im/status-go/pkg/messaging/adapters"
 	types "github.com/status-im/status-go/pkg/messaging/types"
 )
+
+func (a *API) SetSDSAuthorizer(authorizer sds.Authorizer) error {
+	return a.core.stack.Reliability.SetSDSAuthorizer(authorizer)
+}
 
 func (a *API) RetrieveRawAll() (map[types.ChatFilter][]*types.ReceivedMessage, error) {
 	filters, err := a.core.stack.Transport.RetrieveRawAll()
@@ -26,6 +32,10 @@ func (a *API) HandleReceivedMessages(msg *types.ReceivedMessage) (*types.HandleM
 
 func (a *API) ConfirmMessagesProcessed(ids []string, timestamp uint64) error {
 	return a.core.stack.Transport.ConfirmMessagesProcessed(ids, timestamp)
+}
+
+func (a *API) ConfirmRejectedMessagesProcessed(ids []string, timestamp uint64) error {
+	return a.core.stack.Transport.ConfirmRejectedMessagesProcessed(ids, timestamp)
 }
 
 func (a *API) CleanMessagesProcessed(timestamp uint64) error {

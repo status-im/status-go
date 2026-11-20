@@ -1,8 +1,11 @@
 package protocol
 
 import (
+	"context"
+	"crypto/ecdsa"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/golang/protobuf/proto"
 	"github.com/stretchr/testify/require"
@@ -10,12 +13,18 @@ import (
 	"github.com/waku-org/sds-go-bindings/sds"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zaptest/observer"
+	"google.golang.org/protobuf/encoding/protowire"
 
 	"github.com/status-im/status-go/internal/crypto"
 	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
+	"github.com/status-im/status-go/internal/panics"
 	"github.com/status-im/status-go/internal/protocol/common"
+	"github.com/status-im/status-go/internal/protocol/communities"
 	"github.com/status-im/status-go/internal/protocol/protobuf"
+	"github.com/status-im/status-go/internal/protocol/requests"
 	v1protocol "github.com/status-im/status-go/internal/protocol/v1"
+	"github.com/status-im/status-go/pkg/messaging/layers/reliability"
+	"github.com/status-im/status-go/pkg/messaging/layers/transport"
 	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
 )
 
@@ -25,6 +34,523 @@ func TestMessengerSDSProcessingSuite(t *testing.T) {
 
 type MessengerSDSProcessingSuite struct {
 	MessengerBaseTestSuite
+}
+
+type messengerSDSAuthorizerFunc func(sds.AuthorizationMessage) (bool, error)
+
+func (f messengerSDSAuthorizerFunc) Authorize(message sds.AuthorizationMessage) (bool, error) {
+	return f(message)
+}
+
+func (s *MessengerSDSProcessingSuite) sdsCommunity() (*communities.Community, *Chat) {
+	response, err := s.m.CreateCommunity(&requests.CreateCommunity{
+		Membership: protobuf.CommunityPermissions_AUTO_ACCEPT,
+		Name:       "SDS community", Color: "#ffffff", Description: "SDS authorization",
+	}, true)
+	s.Require().NoError(err)
+	s.Require().Len(response.Chats(), 1)
+	return response.Communities()[0], response.Chats()[0]
+}
+
+func (s *MessengerSDSProcessingSuite) sdsApplication(message proto.Message, messageType protobuf.ApplicationMetadataMessage_Type, key *ecdsa.PrivateKey) []byte {
+	body, err := proto.Marshal(message)
+	s.Require().NoError(err)
+	application, err := v1protocol.WrapIntoAppLayerMessage(body, messageType, key)
+	s.Require().NoError(err)
+	return application
+}
+
+func (s *MessengerSDSProcessingSuite) TestSDSCommunityPostingPermissions() {
+	community, chat := s.sdsCommunity()
+	_, err := community.UpsertTokenPermission(&protobuf.CommunityTokenPermission{
+		Id: "posting", Type: protobuf.CommunityTokenPermission_CAN_VIEW_AND_POST_CHANNEL,
+		ChatIds: []string{chat.ID},
+	})
+	s.Require().NoError(err)
+	viewer, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+	member, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+	banned, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+	outsider, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+	for _, key := range []*ecdsa.PrivateKey{viewer, member, banned} {
+		_, err = community.AddMember(&key.PublicKey, nil, 0)
+		s.Require().NoError(err)
+		role := protobuf.CommunityMember_CHANNEL_ROLE_POSTER
+		if key == viewer {
+			role = protobuf.CommunityMember_CHANNEL_ROLE_VIEWER
+		}
+		_, err = community.AddMemberToChat(chat.CommunityChatID(), &key.PublicKey, nil, role)
+		s.Require().NoError(err)
+	}
+	community.Description().Chats[chat.CommunityChatID()].ViewersCanPostReactions = true
+	_, err = community.BanUserFromCommunity(&banned.PublicKey, &protobuf.CommunityBanInfo{})
+	s.Require().NoError(err)
+	s.Require().NoError(s.m.communitiesManager.SaveCommunity(community))
+	channelID := reliability.BuildChannelID(community.IDString(), community.UniversalChatID())
+	authorizer := communitySDSAuthorizer{messenger: s.m}
+	for _, message := range []struct {
+		kind protobuf.ApplicationMetadataMessage_Type
+		body proto.Message
+	}{
+		{protobuf.ApplicationMetadataMessage_CHAT_MESSAGE, &protobuf.ChatMessage{ChatId: chat.ID, MessageType: protobuf.MessageType_COMMUNITY_CHAT}},
+		{protobuf.ApplicationMetadataMessage_EMOJI_REACTION, &protobuf.EmojiReaction{ChatId: chat.ID, MessageType: protobuf.MessageType_COMMUNITY_CHAT}},
+		{protobuf.ApplicationMetadataMessage_PIN_MESSAGE, &protobuf.PinMessage{ChatId: chat.ID, MessageType: protobuf.MessageType_COMMUNITY_CHAT}},
+		{protobuf.ApplicationMetadataMessage_EDIT_MESSAGE, &protobuf.EditMessage{ChatId: chat.ID, MessageType: protobuf.MessageType_COMMUNITY_CHAT}},
+		{protobuf.ApplicationMetadataMessage_DELETE_MESSAGE, &protobuf.DeleteMessage{ChatId: chat.ID, MessageType: protobuf.MessageType_COMMUNITY_CHAT}},
+		{protobuf.ApplicationMetadataMessage_THREAD_METADATA, &protobuf.ThreadMetadata{ChatId: chat.ID, MessageType: protobuf.MessageType_COMMUNITY_CHAT}},
+		{protobuf.ApplicationMetadataMessage_DELETE_THREAD, &protobuf.DeleteThread{ChatId: chat.ID, MessageType: protobuf.MessageType_COMMUNITY_CHAT}},
+	} {
+		for _, sender := range []struct {
+			name    string
+			key     *ecdsa.PrivateKey
+			allowed bool
+		}{
+			{"owner", s.m.identity, true},
+			{"poster", member, message.kind != protobuf.ApplicationMetadataMessage_PIN_MESSAGE},
+			{"non-member", outsider, false},
+			{"banned", banned, false},
+			{"viewer", viewer, message.kind == protobuf.ApplicationMetadataMessage_EMOJI_REACTION || message.kind == protobuf.ApplicationMetadataMessage_THREAD_METADATA || message.kind == protobuf.ApplicationMetadataMessage_DELETE_THREAD},
+		} {
+			s.Run(message.kind.String()+"/"+sender.name, func() {
+				allowed, err := authorizer.Authorize(sds.AuthorizationMessage{
+					ChannelID: channelID,
+					Content:   s.sdsApplication(message.body, message.kind, sender.key),
+					// The transport signer may relay a message, but the
+					// application signer determines its posting permission.
+					AuthorizationContext: crypto.FromECDSAPub(&viewer.PublicKey),
+					SenderID:             crypto.PubkeyToHex(&member.PublicKey),
+				})
+				s.Require().NoError(err)
+				s.Require().Equal(sender.allowed, allowed)
+			})
+		}
+	}
+	application := s.sdsApplication(&protobuf.ChatMessage{
+		ChatId: chat.ID, MessageType: protobuf.MessageType_COMMUNITY_CHAT,
+	}, protobuf.ApplicationMetadataMessage_CHAT_MESSAGE, member)
+	allowed, err := authorizer.Authorize(sds.AuthorizationMessage{ChannelID: "wrong-channel", Content: application})
+	s.Require().NoError(err)
+	s.Require().False(allowed)
+	allowed, err = authorizer.Authorize(sds.AuthorizationMessage{ChannelID: channelID, Content: s.sdsApplication(
+		&protobuf.ContactUpdate{}, protobuf.ApplicationMetadataMessage_CONTACT_UPDATE, member,
+	)})
+	s.Require().NoError(err)
+	s.Require().False(allowed, "a different application type must not bypass the community gate")
+	allowed, err = authorizer.Authorize(sds.AuthorizationMessage{ChannelID: channelID, Content: s.sdsApplication(
+		&protobuf.ChatMessage{ChatId: chat.ID, MessageType: protobuf.MessageType_PUBLIC_GROUP},
+		protobuf.ApplicationMetadataMessage_CHAT_MESSAGE, member,
+	)})
+	s.Require().NoError(err)
+	s.Require().False(allowed, "a non-community message type must not bypass the community gate")
+	allowed, err = authorizer.Authorize(sds.AuthorizationMessage{
+		ChannelID: channelID, Content: application,
+		AuthorizationContext: crypto.FromECDSAPub(&viewer.PublicKey),
+		SenderID:             crypto.PubkeyToHex(&member.PublicKey),
+	})
+	s.Require().NoError(err)
+	s.Require().True(allowed, "a community member can relay another member's signed message")
+	allowed, err = authorizer.Authorize(sds.AuthorizationMessage{
+		ChannelID: channelID, Content: application,
+		AuthorizationContext: crypto.FromECDSAPub(&outsider.PublicKey),
+		SenderID:             crypto.PubkeyToHex(&member.PublicKey),
+	})
+	s.Require().NoError(err)
+	s.Require().False(allowed, "untrusted SDS sender metadata cannot authorize a non-member transport sender")
+	envelope, err := protobuf.Unmarshal(application)
+	s.Require().NoError(err)
+	envelope.Signature = nil
+	unsigned, err := proto.Marshal(envelope)
+	s.Require().NoError(err)
+	_, err = authorizer.Authorize(sds.AuthorizationMessage{ChannelID: channelID, Content: unsigned})
+	s.Require().Error(err)
+	envelope.Signature = []byte{1}
+	invalidSignature, err := proto.Marshal(envelope)
+	s.Require().NoError(err)
+	_, err = authorizer.Authorize(sds.AuthorizationMessage{ChannelID: channelID, Content: invalidSignature})
+	s.Require().Error(err)
+	_, err = authorizer.Authorize(sds.AuthorizationMessage{ChannelID: channelID, Content: []byte{0xff}})
+	s.Require().Error(err)
+}
+
+func (s *MessengerSDSProcessingSuite) TestSDSUnauthorizedMetadataDoesNotChangeState() {
+	community, chat := s.sdsCommunity()
+	poster, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+	_, err = community.AddMember(&poster.PublicKey, nil, 0)
+	s.Require().NoError(err)
+	_, err = community.AddMemberToChat(chat.CommunityChatID(), &poster.PublicKey, nil, protobuf.CommunityMember_CHANNEL_ROLE_POSTER)
+	s.Require().NoError(err)
+	s.Require().NoError(s.m.communitiesManager.SaveCommunity(community))
+	channelID := reliability.BuildChannelID(community.IDString(), community.UniversalChatID())
+	message := common.NewMessage()
+	message.ChatId = chat.ID
+	message.Text = "pending acknowledgement"
+	message.ContentType = protobuf.ChatMessage_TEXT_PLAIN
+	_, err = s.m.SendChatMessage(context.Background(), message)
+	s.Require().NoError(err)
+	persistence := reliability.NewSQLitePersistence(s.m.database)
+	before, err := persistence.LoadChannel(channelID)
+	s.Require().NoError(err)
+	s.Require().NotEmpty(before.MessageHistory)
+
+	attacker, err := sds.NewReliabilityManager(zap.NewNop(), nil)
+	s.Require().NoError(err)
+	s.T().Cleanup(func() { s.Require().NoError(attacker.Cleanup()) })
+	_, err = attacker.UnwrapReceivedMessage(before.MessageHistory[0])
+	s.Require().NoError(err)
+	_, err = attacker.WrapOutgoingMessage([]byte("fake dependency"), "fake-dependency", channelID)
+	s.Require().NoError(err)
+	application := s.sdsApplication(&protobuf.ChatMessage{
+		ChatId: chat.ID, MessageType: protobuf.MessageType_COMMUNITY_CHAT, Text: "unauthorized",
+	}, protobuf.ApplicationMetadataMessage_CHAT_MESSAGE, poster)
+	id := cryptotypes.EncodeHex(crypto.Keccak256(application))
+	wrapped, err := attacker.WrapOutgoingMessage(application, sds.MessageID(id), channelID)
+	s.Require().NoError(err)
+	attackerKey, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+	hash := crypto.Keccak256(wrapped)
+	response, err := s.m.messaging.HandleReceivedMessages(&messagingtypes.ReceivedMessage{
+		Sig: crypto.FromECDSAPub(&attackerKey.PublicKey), Hash: hash, Payload: wrapped,
+	})
+	s.Require().NoError(err)
+	s.Require().Empty(response.Messages)
+	s.Require().Equal([][]byte{hash}, response.ConsumedEnvelopeHashes)
+	s.Require().Equal([][]byte{hash}, response.RejectedEnvelopeHashes)
+	after, err := persistence.LoadChannel(channelID)
+	s.Require().NoError(err)
+	s.Require().Equal(before, after, "rejected history and acknowledgement metadata must not reach SDS")
+	store := reliability.NewSQLiteRetrievalHintPersistence(s.m.database)
+	received, err := store.IsSDSMessageReceived(channelID, id)
+	s.Require().NoError(err)
+	s.Require().False(received)
+
+	filter := messagingtypes.NewChatFilter(&messagingtypes.ChatFilterConfig{ChatID: chat.ID})
+	_, err = s.m.handleRetrievedMessages(map[messagingtypes.ChatFilter][]*messagingtypes.ReceivedMessage{
+		*filter: {{Sig: crypto.FromECDSAPub(&attackerKey.PublicKey), Hash: hash, Payload: wrapped}},
+	}, false, false)
+	s.Require().NoError(err)
+	cache := transport.NewSQLiteProcessedMessageIDsCachePersistence(s.m.database)
+	processed, err := cache.Hits([]string{cryptotypes.EncodeHex(hash)})
+	s.Require().NoError(err)
+	s.Require().True(processed[cryptotypes.EncodeHex(hash)], "rejected envelope must be deduplicated")
+	dependencyHits, err := cache.DependencyHits([]string{cryptotypes.EncodeHex(hash)})
+	s.Require().NoError(err)
+	s.Require().Empty(dependencyHits, "rejected envelope must not count as dependency evidence")
+}
+
+func (s *MessengerSDSProcessingSuite) TestSDSAuthorizationFailureRetriesOnNextRetrieve() {
+	community, chat := s.sdsCommunity()
+	channelID := reliability.BuildChannelID(community.IDString(), community.UniversalChatID())
+	application := s.sdsApplication(&protobuf.ChatMessage{
+		ChatId: chat.ID, MessageType: protobuf.MessageType_COMMUNITY_CHAT, Text: "retry after authorization loads",
+	}, protobuf.ApplicationMetadataMessage_CHAT_MESSAGE, s.m.identity)
+	messageID := cryptotypes.EncodeHex(crypto.Keccak256(application))
+	sender, err := sds.NewReliabilityManager(zap.NewNop(), nil)
+	s.Require().NoError(err)
+	wrapped, err := sender.WrapOutgoingMessage(application, sds.MessageID(messageID), channelID)
+	s.Require().NoError(err)
+	s.Require().NoError(sender.Cleanup())
+
+	var authorizationCalls int
+	s.Require().NoError(s.m.messaging.SetSDSAuthorizer(messengerSDSAuthorizerFunc(func(sds.AuthorizationMessage) (bool, error) {
+		authorizationCalls++
+		if authorizationCalls == 1 {
+			return false, fmt.Errorf("community description not loaded yet")
+		}
+		return true, nil
+	})))
+	hash := crypto.Keccak256(wrapped)
+	received := &messagingtypes.ReceivedMessage{
+		Sig: crypto.FromECDSAPub(&s.m.identity.PublicKey), Hash: hash, Payload: wrapped,
+	}
+	filter := messagingtypes.NewChatFilter(&messagingtypes.ChatFilterConfig{ChatID: chat.ID})
+	input := map[messagingtypes.ChatFilter][]*messagingtypes.ReceivedMessage{
+		*filter: {received},
+	}
+
+	_, err = s.m.handleRetrievedMessages(input, false, false)
+	s.Require().NoError(err)
+	s.Require().Equal(1, authorizationCalls)
+	s.Require().Len(s.m.sdsValidationRetries, 1)
+
+	_, err = s.m.handleRetrievedMessages(nil, false, false)
+	s.Require().NoError(err)
+	s.Require().Equal(2, authorizationCalls)
+	s.Require().Empty(s.m.sdsValidationRetries)
+	s.Require().Empty(s.m.sdsValidationRetrySince)
+
+	receivedMessage, err := reliability.NewSQLiteRetrievalHintPersistence(s.m.database).
+		IsSDSMessageReceived(channelID, messageID)
+	s.Require().NoError(err)
+	s.Require().True(receivedMessage, "the retried message must be recorded after successful authorization")
+}
+
+func (s *MessengerSDSProcessingSuite) TestSDSAuthorizationFailureRetriesWithoutNewTraffic() {
+	community, chat := s.sdsCommunity()
+	channelID := reliability.BuildChannelID(community.IDString(), community.UniversalChatID())
+	application := s.sdsApplication(&protobuf.ChatMessage{
+		ChatId: chat.ID, MessageType: protobuf.MessageType_COMMUNITY_CHAT, Text: "retry without new traffic",
+	}, protobuf.ApplicationMetadataMessage_CHAT_MESSAGE, s.m.identity)
+	messageID := cryptotypes.EncodeHex(crypto.Keccak256(application))
+	sender, err := sds.NewReliabilityManager(zap.NewNop(), nil)
+	s.Require().NoError(err)
+	wrapped, err := sender.WrapOutgoingMessage(application, sds.MessageID(messageID), channelID)
+	s.Require().NoError(err)
+	s.Require().NoError(sender.Cleanup())
+
+	var authorizationCalls int
+	s.Require().NoError(s.m.messaging.SetSDSAuthorizer(messengerSDSAuthorizerFunc(func(sds.AuthorizationMessage) (bool, error) {
+		authorizationCalls++
+		if authorizationCalls <= 2 {
+			return false, fmt.Errorf("community description not loaded yet")
+		}
+		return true, nil
+	})))
+	hash := crypto.Keccak256(wrapped)
+	received := &messagingtypes.ReceivedMessage{
+		Sig: crypto.FromECDSAPub(&s.m.identity.PublicKey), Hash: hash, Payload: wrapped,
+	}
+	filter := messagingtypes.NewChatFilter(&messagingtypes.ChatFilterConfig{ChatID: chat.ID})
+	_, err = s.m.handleRetrievedMessages(map[messagingtypes.ChatFilter][]*messagingtypes.ReceivedMessage{
+		*filter: {received},
+	}, false, false)
+	s.Require().NoError(err)
+	s.Require().Equal(1, authorizationCalls)
+
+	cancel := make(chan struct{})
+	quit := make(chan struct{})
+	retried := make(chan error, 1)
+	go func() {
+		defer panics.LogOnPanic()
+		runSDSValidationRetryLoopWithBackoff(
+			s.m.sdsValidationRetryTrigger, cancel, quit,
+			s.m.hasSDSValidationRetries,
+			func() {
+				_, processErr := s.m.handleRetrievedMessages(nil, false, false)
+				if processErr != nil {
+					retried <- processErr
+					return
+				}
+				if authorizationCalls == 3 {
+					retried <- nil
+				}
+			},
+			10*time.Millisecond, 40*time.Millisecond,
+		)
+	}()
+	defer close(cancel)
+
+	select {
+	case err := <-retried:
+		s.Require().NoError(err)
+	case <-time.After(time.Second):
+		s.FailNow("queued SDS envelope was not retried without new traffic")
+	}
+	s.Require().Equal(3, authorizationCalls)
+	s.Require().Empty(s.m.sdsValidationRetries)
+}
+
+func (s *MessengerSDSProcessingSuite) TestSDSRetryPreservesOriginalProcessingContext() {
+	for _, fromArchive := range []bool{true, false} {
+		name := "live retried by archive batch"
+		if fromArchive {
+			name = "archive import retried by live batch"
+		}
+		s.Run(name, func() {
+			community, chat := s.sdsCommunity()
+			member, err := crypto.GenerateKey()
+			s.Require().NoError(err)
+			_, err = community.AddMember(&member.PublicKey, nil, 0)
+			s.Require().NoError(err)
+			_, err = community.AddMemberToChat(chat.CommunityChatID(), &member.PublicKey, nil, protobuf.CommunityMember_CHANNEL_ROLE_POSTER)
+			s.Require().NoError(err)
+			s.Require().NoError(s.m.communitiesManager.SaveCommunity(community))
+
+			now := time.Now()
+			application := s.sdsApplication(&protobuf.ChatMessage{
+				ChatId: chat.ID, MessageType: protobuf.MessageType_COMMUNITY_CHAT,
+				Text: name, Clock: uint64(now.UnixMilli()), Timestamp: uint64(now.UnixMilli()),
+				ContentType: protobuf.ChatMessage_TEXT_PLAIN,
+			}, protobuf.ApplicationMetadataMessage_CHAT_MESSAGE, member)
+			channelID := reliability.BuildChannelID(community.IDString(), community.UniversalChatID())
+			sender, err := sds.NewReliabilityManager(zap.NewNop(), nil)
+			s.Require().NoError(err)
+			wrapped, err := sender.WrapOutgoingMessage(application, sds.MessageID(cryptotypes.EncodeHex(crypto.Keccak256(application))), channelID)
+			s.Require().NoError(err)
+			s.Require().NoError(sender.Cleanup())
+
+			var authorizationCalls int
+			s.Require().NoError(s.m.messaging.SetSDSAuthorizer(messengerSDSAuthorizerFunc(func(sds.AuthorizationMessage) (bool, error) {
+				authorizationCalls++
+				if authorizationCalls <= 2 {
+					return false, fmt.Errorf("community description not loaded yet")
+				}
+				return true, nil
+			})))
+			hash := crypto.Keccak256(wrapped)
+			received := &messagingtypes.ReceivedMessage{
+				Sig: crypto.FromECDSAPub(&member.PublicKey), Timestamp: uint32(now.Unix()), Hash: hash, Payload: wrapped, Padding: []byte{},
+			}
+			filter := messagingtypes.NewChatFilter(&messagingtypes.ChatFilterConfig{ChatID: chat.ID})
+			input := map[messagingtypes.ChatFilter][]*messagingtypes.ReceivedMessage{*filter: {received}}
+
+			if fromArchive {
+				received.ThirdPartyID = "imported message"
+				s.Require().NoError(s.m.handleImportedMessages(input))
+			} else {
+				_, err = s.m.handleRetrievedMessages(input, true, false)
+				s.Require().NoError(err)
+			}
+			s.Require().Len(s.m.sdsValidationRetries, 1)
+
+			// Remove any first-attempt Waku row so the assertion measures retry storage.
+			wakuHash := cryptotypes.Bytes2Hex(hash)
+			_, err = s.m.database.Exec("DELETE FROM waku_messages WHERE hash = ?", wakuHash)
+			s.Require().NoError(err)
+			duplicate := *received
+			duplicate.ThirdPartyID = ""
+			_, err = s.m.handleRetrievedMessages(map[messagingtypes.ChatFilter][]*messagingtypes.ReceivedMessage{
+				*filter: {&duplicate},
+			}, fromArchive, !fromArchive)
+			s.Require().NoError(err)
+			s.Require().Equal(2, authorizationCalls)
+			s.Require().Len(s.m.sdsValidationRetries, 1)
+
+			response, err := s.m.handleRetrievedMessages(nil, fromArchive, !fromArchive)
+			s.Require().NoError(err)
+			s.Require().Equal(3, authorizationCalls)
+			s.Require().Empty(s.m.sdsValidationRetries)
+			s.Require().Len(response.Messages(), 1)
+			s.Require().Equal(fromArchive, response.Messages()[0].Seen)
+			var stored bool
+			s.Require().NoError(s.m.database.QueryRow("SELECT EXISTS(SELECT 1 FROM waku_messages WHERE hash = ?)", wakuHash).Scan(&stored))
+			s.Require().Equal(!fromArchive, stored)
+		})
+	}
+}
+
+func (s *MessengerSDSProcessingSuite) TestSDSLegacyControlChannelCompatibility() {
+	community, _ := s.sdsCommunity()
+	key, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+	application := s.sdsApplication(&protobuf.CommunityRequestToJoin{},
+		protobuf.ApplicationMetadataMessage_COMMUNITY_REQUEST_TO_JOIN, key)
+	peer, err := sds.NewReliabilityManager(zap.NewNop(), nil)
+	s.Require().NoError(err)
+	s.T().Cleanup(func() { s.Require().NoError(peer.Cleanup()) })
+	for _, channel := range []struct {
+		id      string
+		allowed bool
+	}{
+		{community.IDString(), true},
+		{reliability.BuildChannelID(community.IDString(), community.UniversalChatID()), false},
+		{reliability.BuildChannelID(community.IDString(), "other-topic"), false},
+	} {
+		s.Run(channel.id, func() {
+			wrapped, err := peer.WrapOutgoingMessage(application, sds.MessageID("legacy-join"), channel.id)
+			s.Require().NoError(err)
+			hash := crypto.Keccak256(wrapped)
+			response, err := s.m.messaging.HandleReceivedMessages(&messagingtypes.ReceivedMessage{
+				Sig: crypto.FromECDSAPub(&key.PublicKey), Hash: hash, Payload: wrapped,
+			})
+			s.Require().NoError(err)
+			if channel.allowed {
+				s.Require().Len(response.Messages, 1)
+			} else {
+				s.Require().Empty(response.Messages)
+				s.Require().Equal([][]byte{hash}, response.ConsumedEnvelopeHashes)
+				state, err := reliability.NewSQLitePersistence(s.m.database).LoadChannel(channel.id)
+				s.Require().NoError(err)
+				s.Require().Empty(state.Meta)
+				s.Require().Empty(state.MessageHistory)
+			}
+		})
+	}
+	relay, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+	allowed, err := (communitySDSAuthorizer{messenger: s.m}).Authorize(sds.AuthorizationMessage{
+		ChannelID: community.IDString(), Content: application,
+		AuthorizationContext: crypto.FromECDSAPub(&relay.PublicKey),
+	})
+	s.Require().NoError(err)
+	s.Require().False(allowed, "legacy control payloads cannot be rewrapped by another transport signer")
+}
+
+func (s *MessengerSDSProcessingSuite) TestSDSCommunityControlMessagesSkipHistory() {
+	community, _ := s.sdsCommunity()
+	body, err := proto.Marshal(&protobuf.CommunityRequestToJoin{})
+	s.Require().NoError(err)
+	_, err = s.m.SendMessageToControlNode(context.Background(), community, &common.RawMessage{
+		CommunityID: community.ID(),
+		MessageType: protobuf.ApplicationMetadataMessage_COMMUNITY_REQUEST_TO_JOIN,
+		Payload:     body,
+	})
+	s.Require().NoError(err)
+	state, err := reliability.NewSQLitePersistence(s.m.database).LoadChannel(community.IDString())
+	s.Require().NoError(err)
+	s.Require().Empty(state.Meta)
+	s.Require().Empty(state.MessageHistory)
+}
+
+func (s *MessengerSDSProcessingSuite) TestSDSCommunitySyncMembership() {
+	community, _ := s.sdsCommunity()
+	channelID := reliability.BuildChannelID(community.IDString(), community.UniversalChatID())
+	member, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+	banned, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+	outsider, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+	for _, key := range []*ecdsa.PrivateKey{member, banned} {
+		_, err = community.AddMember(&key.PublicKey, nil, 0)
+		s.Require().NoError(err)
+	}
+	_, err = community.BanUserFromCommunity(&banned.PublicKey, &protobuf.CommunityBanInfo{})
+	s.Require().NoError(err)
+	s.Require().NoError(s.m.communitiesManager.SaveCommunity(community))
+	// Metadata-only SDS wire message; senderId deliberately claims the owner.
+	sync := protowire.AppendString(protowire.AppendTag(nil, 1, protowire.BytesType), "sync")
+	sync = protowire.AppendVarint(protowire.AppendTag(sync, 2, protowire.VarintType), 1)
+	sync = protowire.AppendString(protowire.AppendTag(sync, 4, protowire.BytesType), channelID)
+	sync = protowire.AppendString(protowire.AppendTag(sync, 7, protowire.BytesType), s.m.IdentityPublicKeyString())
+	persistence := reliability.NewSQLitePersistence(s.m.database)
+	for _, sender := range []struct {
+		name    string
+		key     *ecdsa.PrivateKey
+		allowed bool
+	}{
+		{"non-member", outsider, false}, {"banned", banned, false},
+		{"member-without-posting-role", member, true}, {"owner", s.m.identity, true},
+	} {
+		s.Run(sender.name, func() {
+			before, err := persistence.LoadChannel(channelID)
+			s.Require().NoError(err)
+			allowed, err := (communitySDSAuthorizer{messenger: s.m}).Authorize(sds.AuthorizationMessage{
+				ChannelID: channelID, AuthorizationContext: crypto.FromECDSAPub(&sender.key.PublicKey),
+			})
+			s.Require().NoError(err)
+			s.Require().Equal(sender.allowed, allowed)
+			hash := crypto.Keccak256(append(crypto.FromECDSAPub(&sender.key.PublicKey), sync...))
+			response, err := s.m.messaging.HandleReceivedMessages(&messagingtypes.ReceivedMessage{
+				Sig: crypto.FromECDSAPub(&sender.key.PublicKey), Hash: hash, Payload: sync,
+			})
+			s.Require().NoError(err)
+			s.Require().Empty(response.Messages)
+			s.Require().Equal([][]byte{hash}, response.ConsumedEnvelopeHashes)
+			after, err := persistence.LoadChannel(channelID)
+			s.Require().NoError(err)
+			if sender.allowed {
+				s.Require().NotEmpty(after.Meta)
+			} else {
+				s.Require().Equal(before, after)
+			}
+		})
+	}
+	_, err = (communitySDSAuthorizer{messenger: s.m}).Authorize(sds.AuthorizationMessage{ChannelID: channelID})
+	s.Require().Error(err, "sync messages require an authenticated transport sender")
 }
 
 func (s *MessengerSDSProcessingSuite) TestNonChatReplayAfterRestart() {
@@ -209,6 +735,6 @@ func (s *MessengerSDSProcessingSuite) TestInvalidApplicationMessageRemainsRetrya
 		s.Require().NoError(err)
 		s.Require().Empty(response.Messages())
 	}
-	s.Require().Equal(2, logs.FilterMessage("failed to process application message").Len(),
+	s.Require().Equal(2, logs.FilterMessage("deferring SDS envelope until authorization can be retried").Len(),
 		"the malformed envelope must not be transport-confirmed after its first delivery")
 }

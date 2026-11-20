@@ -39,6 +39,7 @@ var missingDepsTimeoutRetryDelays = []time.Duration{30 * time.Second, 2 * time.M
 
 type missingDependencyFetcher interface {
 	AlreadyProcessed(messageHashes []string) (map[string]bool, error)
+	DependencyHits(messageHashes []string) (map[string]bool, error)
 	// EnvelopesSeen reports hashes recently handed on for processing, even if
 	// processing failed. Fetching them again would only redeliver the same
 	// envelope.
@@ -179,9 +180,14 @@ func (f *missingDepsFetcher) reconcile() time.Time {
 		}
 		return nextDue
 	}
+	dependencyHits, evidenceErr := f.fetcher.DependencyHits(hashes)
+	if evidenceErr != nil {
+		f.logger.Warn("failed to check SDS dependency evidence", zap.Error(evidenceErr))
+		dependencyHits = nil
+	}
 	processed, cacheErr := f.fetcher.AlreadyProcessed(hashes)
 	if cacheErr != nil {
-		f.logger.Warn("failed to check SDS dependency envelopes", zap.Error(cacheErr))
+		f.logger.Warn("failed to check processed SDS dependency envelopes", zap.Error(cacheErr))
 		processed = nil
 	}
 	ready := make(map[string][]string)
@@ -191,12 +197,11 @@ func (f *missingDepsFetcher) reconcile() time.Time {
 			f.logger.Warn("failed to check received SDS dependency",
 				zap.String("channelID", key.channelID), zap.String("messageID", key.messageID), zap.Error(err))
 		}
-		// Pre-upgrade segmented messages may lack receipts and cache only the completing
-		// envelope; their completion markers also block replay. We defer recovery-only
-		// replay complexity given the limited production use (some community descriptions).
-		allProcessed := cacheErr == nil && len(dep.hashes) > 0
+		// Older segmented messages may lack receipts; only non-rejected cached
+		// envelopes may be used as fallback evidence for those messages.
+		allProcessed := evidenceErr == nil && len(dep.hashes) > 0
 		for _, hash := range dep.hashes {
-			allProcessed = allProcessed && processed[hash]
+			allProcessed = allProcessed && dependencyHits[hash]
 		}
 		if (err == nil && received) || allProcessed {
 			ready[key.channelID] = append(ready[key.channelID], key.messageID)
