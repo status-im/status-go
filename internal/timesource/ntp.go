@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"net"
 	"sort"
 	"sync"
 	"sync/atomic"
@@ -81,6 +82,18 @@ func (e multiRPCError) Error() string {
 	return b.String()
 }
 
+// dialNTPServer resolves and dials an NTP server under DefaultRPCTimeout. The
+// ntp package's default dialer resolves the name with net.ResolveUDPAddr,
+// which has no timeout, so a resolver that never answers kept the query
+// running after computeOffset had stopped waiting for it.
+func dialNTPServer(localAddress, remoteAddress string) (net.Conn, error) {
+	dialer := net.Dialer{Timeout: DefaultRPCTimeout}
+	if localAddress != "" {
+		dialer.LocalAddr = &net.UDPAddr{IP: net.ParseIP(localAddress)}
+	}
+	return dialer.Dial("udp", remoteAddress)
+}
+
 func computeOffset(timeQuery ntpQuery, servers []string, allowedFailures int, deadline time.Duration) (time.Duration, error) {
 	if len(servers) == 0 {
 		return 0, nil
@@ -91,6 +104,7 @@ func computeOffset(timeQuery ntpQuery, servers []string, allowedFailures int, de
 			defer panics.LogOnPanic()
 			response, err := timeQuery(server, ntp.QueryOptions{
 				Timeout: DefaultRPCTimeout,
+				Dialer:  dialNTPServer,
 			})
 			if err == nil {
 				err = response.Validate()
