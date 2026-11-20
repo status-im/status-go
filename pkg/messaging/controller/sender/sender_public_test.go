@@ -31,10 +31,15 @@ import (
 
 type publicSendWakuStub struct {
 	wakutypes.Waku
-	hashes [][]byte
+	hashes       [][]byte
+	pubsubTopic  string
+	contentTopic string
+	ephemeral    bool
+	priority     *int
 }
 
-func (w *publicSendWakuStub) Send(_ context.Context, _, _ string, payload []byte, _ bool, _ *int) ([]byte, error) {
+func (w *publicSendWakuStub) Send(_ context.Context, pubsubTopic, contentTopic string, payload []byte, ephemeral bool, priority *int) ([]byte, error) {
+	w.pubsubTopic, w.contentTopic, w.ephemeral, w.priority = pubsubTopic, contentTopic, ephemeral, priority
 	hash := crypto.Keccak256(payload)
 	w.hashes = append(w.hashes, hash)
 	return hash, nil
@@ -159,6 +164,25 @@ func TestSendPublicSDSHintSaveFailurePreservesSendCompletion(t *testing.T) {
 	require.Equal(t, hints.channelID, entries[0].ContextMap()["channelID"])
 	require.Equal(t, hints.messageID, entries[0].ContextMap()["sdsMessageID"])
 	require.Equal(t, hints.err.Error(), entries[0].ContextMap()["error"])
+
+	hints.channelID, hints.messageID, hints.hashes = "", "", nil
+	syncPayload := []byte("tick-generated-sync")
+	require.NoError(t, sender.SendSDSSync(context.Background(), syncPayload, "/waku/2/rs/1/1", "sync-topic"))
+	require.Len(t, backend.hashes, 2)
+	require.Equal(t, "/waku/2/rs/1/1", backend.pubsubTopic)
+	require.True(t, backend.ephemeral)
+	require.NotNil(t, backend.priority)
+	require.Equal(t, messagingtypes.LowPriority, *backend.priority)
+	require.Empty(t, hints.messageID)
+	select {
+	case notification := <-sent:
+		t.Fatalf("sync emitted SentMessage: %+v", notification)
+	default:
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	require.ErrorIs(t, sender.SendSDSSync(ctx, syncPayload, "/waku/2/rs/1/1", "sync-topic"), context.Canceled)
+	require.Len(t, backend.hashes, 2)
 }
 
 type sdsWrapperStub struct {

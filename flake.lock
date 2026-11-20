@@ -48,16 +48,18 @@
         "nixpkgs": "nixpkgs_2"
       },
       "locked": {
-        "lastModified": 1794854075,
-        "narHash": "sha256-h4BMb1CxQwUVbiicT/tvkf4KQvyeoLnT2rpXgKhnAs4=",
-        "rev": "b674beae72869d67a78c4fbc6f95ba28c14a72cd",
-        "revCount": 117,
+        "allRefs": true,
+        "lastModified": 1795207558,
+        "narHash": "sha256-MfK4kP23+zTo20jzvbz1dpow2uwSmVnQ8yMgJTRbj88=",
+        "rev": "e8cb53503835230bf3d7842b4486fffcb52b5ee7",
+        "revCount": 125,
         "submodules": true,
         "type": "git",
         "url": "https://github.com/logos-messaging/nim-sds"
       },
       "original": {
-        "rev": "b674beae72869d67a78c4fbc6f95ba28c14a72cd",
+        "allRefs": true,
+        "rev": "e8cb53503835230bf3d7842b4486fffcb52b5ee7",
         "submodules": true,
         "type": "git",
         "url": "https://github.com/logos-messaging/nim-sds"

@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"errors"
+	"fmt"
 	"math"
 	"sync"
 	"testing"
@@ -55,6 +56,26 @@ type testSDSRetrievalHintPersistence struct {
 	saveError    error
 	received     map[string]bool
 	receiveError error
+}
+
+type metadataOnlySDSLayerStub struct {
+	channelID string
+	received  bool
+	hints     bool
+}
+
+func (s *metadataOnlySDSLayerStub) UnwrapPayloadFromSDSWithMetadata([]byte) ([]byte, []byte, string, bool, error) {
+	return nil, nil, s.channelID, true, nil
+}
+
+func (s *metadataOnlySDSLayerStub) RecordSDSMessageReceived(string, []byte) error {
+	s.received = true
+	return nil
+}
+
+func (s *metadataOnlySDSLayerStub) RecordSDSRetrievalHints(string, []byte, [][]byte) error {
+	s.hints = true
+	return nil
 }
 
 func (p *testSDSRetrievalHintPersistence) SaveSDSMessageReceived(channelID, messageID string) error {
@@ -594,6 +615,29 @@ func (s *ProcessorSuite) TestSDSWrappedMessages() {
 	s.Require().NoError(err)
 	s.Require().Equal(anotherPayload, receivedMsg2.EncryptionLayer.Payload)
 	s.Require().False(receivedMsg2.SDSWrapped)
+}
+
+func (s *ProcessorSuite) TestSDSSyncConsumedWithoutContentEvidence() {
+	for _, segmented := range []bool{false, true} {
+		s.Run(fmt.Sprintf("segmented=%t", segmented), func() {
+			sdsLayer := &metadataOnlySDSLayerStub{channelID: "sync-channel"}
+			message := &types.Message{
+				TransportLayer: types.TransportLayer{Hash: []byte("sync-envelope")},
+				SegmentationLayer: types.SegmentationLayer{
+					Segmented: segmented,
+					Hashes:    [][]byte{[]byte("sync-envelope")},
+				},
+				EncryptionLayer: types.EncryptionLayer{Payload: []byte("wrapped-sync")},
+			}
+
+			s.Require().NoError(s.processor.processSDSLayerWithReliability(message, sdsLayer))
+			s.Require().True(message.SDSSync)
+			s.Require().True(message.SDSWrapped)
+			s.Require().Nil(message.EncryptionLayer.Payload)
+			s.Require().False(sdsLayer.received)
+			s.Require().False(sdsLayer.hints)
+		})
+	}
 }
 
 func (s *ProcessorSuite) TestProcessSDSLayerRecordsReceivedEnvelopeHashes() {
