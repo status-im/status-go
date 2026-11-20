@@ -20,6 +20,19 @@ func (db sqlitePersistence) SetThreadFollowed(chatID, threadID string, followed 
 	return affected > 0, nil
 }
 
+// FollowThreadOnMention re-follows a thread on a direct mention newer than the last follow choice.
+// It returns the new follow clock, or zero if nothing changed.
+func (db sqlitePersistence) FollowThreadOnMention(chatID, threadID string, clock uint64) (uint64, error) {
+	var followClock uint64
+	err := db.db.QueryRow(`UPDATE threads SET followed = TRUE, followed_clock = ?
+		WHERE thread_id = ? AND chat_id = ? AND NOT followed AND NOT deleted AND followed_clock < ?
+		RETURNING followed_clock`, clock, threadID, chatID, clock).Scan(&followClock)
+	if err == sql.ErrNoRows {
+		return 0, nil
+	}
+	return followClock, err
+}
+
 // AutoFollowOwnedThread follows a thread created by ownID or started on one of
 // ownID's messages, unless the user has already made an explicit choice.
 func (db sqlitePersistence) AutoFollowOwnedThread(chatID, threadID, ownID string) (bool, error) {
