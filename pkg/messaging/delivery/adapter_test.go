@@ -91,3 +91,32 @@ func TestConnectionStatusIsTracked(t *testing.T) {
 		return a.ConnectionState() == types.ConnectionStatePartiallyConnected
 	}, time.Second, time.Millisecond)
 }
+
+func TestRetryableRefusalIsReportedAsAnExpiredSend(t *testing.T) {
+	a := newAdapter(nil, zap.NewNop())
+	events := subscribeEvents(t, a)
+
+	hash, err := a.sendOutcome("", &messaging.SendError{Kind: messaging.SendNotConnected, Message: "no peer"})
+	require.NoError(t, err)
+	require.Len(t, hash, 32)
+	ev := nextEvent(t, events)
+	require.Equal(t, types.EventEnvelopeExpired, ev.Event)
+	require.Equal(t, cryptotypes.BytesToHash(hash), ev.Hash)
+}
+
+func TestPermanentRefusalFailsTheSend(t *testing.T) {
+	a := newAdapter(nil, zap.NewNop())
+
+	_, err := a.sendOutcome("", &messaging.SendError{Kind: messaging.SendTooLarge, Message: "too large"})
+	var refused *messaging.SendError
+	require.ErrorAs(t, err, &refused)
+	require.Equal(t, messaging.SendTooLarge, refused.Kind)
+}
+
+func TestAcceptedSendReturnsItsHash(t *testing.T) {
+	a := newAdapter(nil, zap.NewNop())
+
+	hash, err := a.sendOutcome(testHash, nil)
+	require.NoError(t, err)
+	require.Equal(t, decodeHash(testHash), hash)
+}
