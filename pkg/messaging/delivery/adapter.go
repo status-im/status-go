@@ -2,6 +2,7 @@ package delivery
 
 import (
 	"context"
+	"crypto/rand"
 	"errors"
 	"fmt"
 	"sync"
@@ -171,13 +172,9 @@ func (a *Adapter) handleReceived(e messaging.MessageReceivedEvent) {
 // pubsubTopic and priority are not honoured: the Messaging API derives the
 // shard from the content topic and has no send priority.
 func (a *Adapter) Send(ctx context.Context, pubsubTopic, contentTopic string, payload []byte, ephemeral bool, priority *int) ([]byte, error) {
-	messageHash, err := a.mc.Send(ctx, contentTopic, payload, ephemeral)
+	hash, err := a.sendOutcome(a.mc.Send(ctx, contentTopic, payload, ephemeral))
 	if err != nil {
-		return nil, fmt.Errorf("delivery: send: %w", err)
-	}
-	hash := decodeHash(messageHash)
-	if hash == nil {
-		return nil, fmt.Errorf("delivery: send: unexpected message hash %q", messageHash)
+		return nil, err
 	}
 	a.envelopeFeed.Send(types.EnvelopeEvent{
 		Event: types.EventEnvelopeAvailable,
@@ -191,6 +188,39 @@ func (a *Adapter) Send(ctx context.Context, pubsubTopic, contentTopic string, pa
 		},
 	})
 	return hash, nil
+}
+
+// sendOutcome turns the node's answer to a send into the hash the transport
+// tracks. A refusal a later resend can clear is reported, as on the go-waku
+// backend, as a send that expired: under a hash of its own, which no message
+// on the network has.
+func (a *Adapter) sendOutcome(messageHash string, err error) ([]byte, error) {
+	var refused *messaging.SendError
+	if errors.As(err, &refused) && retryableRefusal(refused.Kind) {
+		a.logger.Debug("send refused", zap.String("kind", string(refused.Kind)), zap.String("reason", refused.Message))
+		hash := make([]byte, cryptotypes.HashLength)
+		if _, err := rand.Read(hash); err != nil {
+			return nil, fmt.Errorf("delivery: send: %w", err)
+		}
+		a.envelopeFeed.Send(types.EnvelopeEvent{Event: types.EventEnvelopeExpired, Hash: cryptotypes.BytesToHash(hash)})
+		return hash, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("delivery: send: %w", err)
+	}
+	hash := decodeHash(messageHash)
+	if hash == nil {
+		return nil, fmt.Errorf("delivery: send: unexpected message hash %q", messageHash)
+	}
+	return hash, nil
+}
+
+func retryableRefusal(kind messaging.SendErrorKind) bool {
+	switch kind {
+	case messaging.SendNotConnected, messaging.SendQueueFull, messaging.SendRateLimited:
+		return true
+	}
+	return false
 }
 
 // Subscribe subscribes the content topics. The pubsub topic is ignored: the
