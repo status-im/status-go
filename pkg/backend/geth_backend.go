@@ -307,6 +307,28 @@ func (b *StatusBackend) OpenAccounts() error {
 	return nil
 }
 
+// CloseAccounts closes the multiaccounts database.
+//
+// OpenAccounts opens the database once and returns early afterwards, so a host that
+// changes rootDataDir without restarting keeps being served the first directory's
+// accounts while the keystore root has already moved. Closing detaches the database from
+// the node and releases the file; the next OpenAccounts then reads the directory that
+// UpdateRootDataDir set. Existing callers are unaffected: they never close it.
+func (b *StatusBackend) CloseAccounts() error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	if b.multiaccountsDB == nil {
+		return nil
+	}
+	db := b.multiaccountsDB
+	b.multiaccountsDB = nil
+	if b.statusNode != nil {
+		b.statusNode.SetMultiaccountsDB(nil)
+	}
+	return db.Close()
+}
+
 func (b *StatusBackend) GetAccounts() ([]multiaccounts.Account, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()

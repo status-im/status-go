@@ -210,6 +210,23 @@ func OpenAccounts(datadir string) string {
 	return callWithResponse(openAccounts, datadir)
 }
 
+// CloseAccounts closes the multiaccounts database.
+//
+// The next InitializeApplication or OpenAccounts opens the directory it is given, which
+// is what a host that changes its data directory without restarting the process needs.
+// Without it a new directory keeps returning the accounts of the first one, because
+// OpenAccounts opens the database only once. See StatusBackend.CloseAccounts.
+func CloseAccounts() string {
+	return callWithResponse(closeAccounts)
+}
+
+func closeAccounts() string {
+	if err := statusBackend.CloseAccounts(); err != nil {
+		return makeJSONResponse(err)
+	}
+	return "{}"
+}
+
 // DEPRECATED: use InitializeApplication
 // openAccounts opens database and returns accounts list.
 func openAccounts(datadir string) string {
