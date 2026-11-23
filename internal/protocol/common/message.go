@@ -104,6 +104,7 @@ type Message struct {
 	*protobuf.ChatMessage
 
 	ThreadMetadataCreationAuthorized bool `json:"-"`
+	FromArchive                      bool `json:"-"`
 	// HasThread is a local read hint; nil means thread presence was not queried.
 	HasThread *bool `json:"-"`
 

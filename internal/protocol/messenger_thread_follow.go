@@ -137,7 +137,7 @@ func (m *Messenger) updateThreadFollowsFromMessages(messages []*common.Message, 
 	}
 	ownID := m.myHexIdentity()
 	for _, message := range messages {
-		if message == nil || message.Deleted || message.DeletedForMe || message.LocalChatID == "" {
+		if message == nil || message.Deleted || message.DeletedForMe || message.FromArchive || message.LocalChatID == "" {
 			continue
 		}
 		threadID := message.GetThreadId()

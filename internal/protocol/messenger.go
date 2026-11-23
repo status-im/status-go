@@ -2968,7 +2968,8 @@ type CurrentMessageState struct {
 	// Contact is the contact associated with the author of the message
 	Contact *contacts.Contact
 	// PublicKey is the public key of the author of the message
-	PublicKey *ecdsa.PublicKey
+	PublicKey   *ecdsa.PublicKey
+	FromArchive bool
 
 	StatusMessage *common.StatusMessage
 }
@@ -3304,6 +3305,7 @@ func (m *Messenger) handleImportedMessages(messagesToHandle map[types.ChatFilter
 					WhisperTimestamp: uint64(msg.TransportLayer.Message.Timestamp) * 1000,
 					Contact:          contact,
 					PublicKey:        publicKey,
+					FromArchive:      true,
 					StatusMessage:    msg,
 				}
 
@@ -3554,6 +3556,7 @@ func (m *Messenger) processStatusMessage(
 		WhisperTimestamp: uint64(msg.TransportLayer.Message.Timestamp) * 1000,
 		Contact:          contact,
 		PublicKey:        publicKey,
+		FromArchive:      fromArchive,
 		StatusMessage:    msg,
 	}
 

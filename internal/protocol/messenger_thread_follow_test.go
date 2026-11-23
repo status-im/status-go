@@ -574,6 +574,11 @@ func (s *MessengerThreadsSuite) TestThreadFollowOnParentAuthorReplyAndDirectMent
 		})
 		s.Require().NoError(err)
 		s.Require().False(followedBy(receiver, receiverChat.ID, otherParentID))
+		thread, err := receiver.persistence.ThreadByID(receiverChat.ID, otherParentID)
+		s.Require().NoError(err)
+		if senderChat.LastClockValue < thread.FollowedClock {
+			senderChat.LastClockValue = thread.FollowedClock
+		}
 	}
 
 	// Replies from others keep an explicit unfollow; the user's own reply follows again.
@@ -717,6 +722,39 @@ func (s *MessengerThreadsSuite) TestSyncThreadFollowOnDelayedMention() {
 	thread, err := deviceB.persistence.ThreadByID(chatID, threadID)
 	s.Require().NoError(err)
 	s.Require().True(thread.Followed)
+
+	threadID = "archived-root"
+	s.Require().NoError(deviceA.persistence.UpsertThread(threadID, chatID, threadID, "Thread"))
+	updated, err = deviceA.persistence.SetThreadFollowed(chatID, threadID, false, 10)
+	s.Require().NoError(err)
+	s.Require().True(updated)
+	s.Require().NoError(deviceA.syncThreadFollow(context.Background(), chatID, threadID, false, 10, deviceA.dispatchMessage))
+	waitForFollowSync(deviceB, false, 10)
+
+	root = &common.Message{
+		ID: threadID, LocalChatID: chatID, From: "sender", New: true, Seen: true, FromArchive: true,
+		ChatMessage:                      &protobuf.ChatMessage{StartsThread: true, Clock: 20, Text: "Root"},
+		ThreadMetadataCreationAuthorized: true,
+		Mentions:                         []string{deviceB.myHexIdentity()},
+	}
+	s.Require().NoError(deviceB.SaveMessages([]*common.Message{root}))
+	syncClock = selfChat.LastClockValue
+	s.Require().NoError(deviceB.updateThreadFollowsFromMessages([]*common.Message{root}, &MessengerResponse{}))
+	s.Require().Equal(syncClock, selfChat.LastClockValue, "an archived mention does not send a sync")
+	for _, device := range []*Messenger{deviceA, deviceB} {
+		thread, err := device.persistence.ThreadByID(chatID, threadID)
+		s.Require().NoError(err)
+		s.Require().False(thread.Followed)
+		s.Require().EqualValues(10, thread.FollowedClock)
+	}
+	deliverMention(deviceB, 21)
+	waitForFollowSync(deviceA, true, 21)
+	for _, device := range []*Messenger{deviceA, deviceB} {
+		thread, err := device.persistence.ThreadByID(chatID, threadID)
+		s.Require().NoError(err)
+		s.Require().True(thread.Followed)
+		s.Require().EqualValues(21, thread.FollowedClock)
+	}
 }
 
 func (s *MessengerThreadsSuite) TestThreadCreationMetadataAutoFollowsThreadOnOwnMessage() {
@@ -757,4 +795,207 @@ func (s *MessengerThreadsSuite) TestThreadCreationMetadataAutoFollowsThreadOnOwn
 	response = handle(otherParent.ID)
 	s.Require().Len(response.Threads(), 1)
 	s.Require().False(response.Threads()[0].Followed)
+}
+
+func (s *MessengerThreadsSuite) TestArchivedMessagesDoNotFollowThreads() {
+	sender, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+	senderID := contacts.ContactIDFromPublicKey(&sender.PublicKey)
+	contact, err := contacts.BuildContact(senderID, &sender.PublicKey)
+	s.Require().NoError(err)
+	s.m.allContacts.Store(senderID, contact)
+	chat := CreateOneToOneChat("archive-follow", &sender.PublicKey, s.m.getTimesource())
+	s.Require().NoError(s.m.SaveChat(chat))
+
+	for _, test := range []struct {
+		name        string
+		root        bool
+		archive     bool
+		unfollowed  bool
+		alreadySeen bool
+		ownSender   bool
+		nested      bool
+	}{
+		{name: "archived-root", root: true, archive: true},
+		{name: "archived-root-after-unfollow", root: true, archive: true, unfollowed: true},
+		{name: "archived-reply", archive: true},
+		{name: "archived-reply-after-unfollow", archive: true, unfollowed: true},
+		{name: "archived-own-reply", archive: true, unfollowed: true, ownSender: true},
+		{name: "archived-nested-root", root: true, archive: true, nested: true},
+		{name: "live-root", root: true},
+		{name: "live-reply-after-unfollow", unfollowed: true},
+		{name: "live-seen-root", root: true, alreadySeen: true},
+	} {
+		s.Run(test.name, func() {
+			threadID := test.name
+			s.Require().NoError(s.m.persistence.UpsertThread(threadID, chat.ID, threadID, "Thread"))
+			if test.unfollowed {
+				updated, err := s.m.persistence.SetThreadFollowed(chat.ID, threadID, false, 10)
+				s.Require().NoError(err)
+				s.Require().True(updated)
+			}
+			if !test.root {
+				parent := buildTestMessage(*chat)
+				parent.ID = threadID
+				parent.From = senderID
+				s.Require().NoError(s.m.SaveMessages([]*common.Message{parent}))
+			}
+			chat.ReadMessagesAtClockValue = 0
+			if test.alreadySeen {
+				chat.ReadMessagesAtClockValue = 20
+			}
+			state := s.m.buildMessageState()
+			messageContact := contact
+			messageSigner := &sender.PublicKey
+			if test.ownSender {
+				messageContact = s.m.selfContact
+				messageSigner = &s.m.identity.PublicKey
+			}
+			state.CurrentMessageState = &CurrentMessageState{
+				MessageID: threadID, WhisperTimestamp: 20, Contact: messageContact, PublicKey: messageSigner,
+				FromArchive: test.archive,
+			}
+			message := &protobuf.ChatMessage{
+				ChatId: chat.ID, Clock: 20, Timestamp: 20, Text: "Hello @" + s.m.myHexIdentity() + " !",
+				MessageType: protobuf.MessageType_ONE_TO_ONE, ContentType: protobuf.ChatMessage_TEXT_PLAIN,
+				StartsThread: test.root,
+			}
+			if !test.root {
+				state.CurrentMessageState.MessageID = threadID + "-reply"
+				message.ThreadId = &threadID
+			}
+			s.Require().NoError(s.m.HandleChatMessage(context.Background(), state, message, nil, test.archive && !test.nested))
+			s.Require().Len(state.Response.Messages(), 1)
+			received := state.Response.Messages()[0]
+			s.Require().Equal(test.archive, received.FromArchive)
+			s.Require().Equal((test.archive && !test.nested) || test.alreadySeen || test.ownSender, received.Seen)
+			s.Require().True(received.New)
+			s.Require().NoError(s.m.SaveMessages([]*common.Message{received}))
+			s.Require().NoError(s.m.updateThreadFollowsFromMessages([]*common.Message{received}, state.Response))
+
+			thread, err := s.m.persistence.ThreadByID(chat.ID, threadID)
+			s.Require().NoError(err)
+			s.Require().Equal(!test.archive, thread.Followed)
+			if test.archive && test.unfollowed {
+				s.Require().EqualValues(10, thread.FollowedClock)
+			}
+			stored, err := s.m.MessageByID(received.ID)
+			s.Require().NoError(err)
+			s.Require().Equal(message.Text, stored.Text)
+		})
+	}
+}
+
+func (s *MessengerThreadsSuite) TestArchivedThreadMetadataDoesNotFollowOwnedThreads() {
+	creator, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+	creatorID := contacts.ContactIDFromPublicKey(&creator.PublicKey)
+	chat := CreateOneToOneChat("archive-metadata-follow", &creator.PublicKey, s.m.getTimesource())
+	s.Require().NoError(s.m.SaveChat(chat))
+
+	for _, test := range []struct {
+		name          string
+		ownCreator    bool
+		archive       bool
+		parentPresent bool
+	}{
+		{name: "archived-metadata-own-parent", archive: true, parentPresent: true},
+		{name: "archived-metadata-own-creator", archive: true, ownCreator: true},
+		{name: "live-metadata-own-parent", parentPresent: true},
+		{name: "live-metadata-own-creator", ownCreator: true},
+	} {
+		s.Run(test.name, func() {
+			if test.parentPresent {
+				parent := buildTestMessage(*chat)
+				parent.ID = test.name
+				parent.From = s.m.myHexIdentity()
+				s.Require().NoError(s.m.SaveMessages([]*common.Message{parent}))
+			}
+			signer := &creator.PublicKey
+			signerID := creatorID
+			if test.ownCreator {
+				signer = &s.m.identity.PublicKey
+				signerID = s.m.myHexIdentity()
+			}
+			state := &ReceivedMessageState{
+				Response: &MessengerResponse{},
+				CurrentMessageState: &CurrentMessageState{
+					PublicKey: signer, WhisperTimestamp: 10, FromArchive: test.archive,
+				},
+			}
+			err := s.m.HandleThreadMetadata(context.Background(), state, &protobuf.ThreadMetadata{
+				Clock: 10, ChatId: chat.ID, ThreadId: test.name, Name: "Thread", CreatorId: signerID,
+				MessageType: protobuf.MessageType_ONE_TO_ONE,
+			}, nil)
+			s.Require().NoError(err)
+			thread, err := s.m.persistence.ThreadByID(chat.ID, test.name)
+			s.Require().NoError(err)
+			s.Require().Equal(!test.archive, thread.Followed)
+			s.Require().Equal(signerID, thread.CreatorID)
+		})
+	}
+}
+
+func (s *MessengerThreadsSuite) TestArchivedRootAndMetadataPreserveUnfollowInEitherOrder() {
+	sender, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+	senderID := contacts.ContactIDFromPublicKey(&sender.PublicKey)
+	contact, err := contacts.BuildContact(senderID, &sender.PublicKey)
+	s.Require().NoError(err)
+	s.m.allContacts.Store(senderID, contact)
+	chat := CreateOneToOneChat("archive-order", &sender.PublicKey, s.m.getTimesource())
+	s.Require().NoError(s.m.SaveChat(chat))
+
+	for _, metadataFirst := range []bool{false, true} {
+		name := "root-first"
+		if metadataFirst {
+			name = "metadata-first"
+		}
+		s.Run(name, func() {
+			s.Require().NoError(s.m.HandleSyncThreadFollow(context.Background(), s.m.buildMessageState(),
+				&protobuf.SyncThreadFollow{ChatId: chat.ID, ThreadId: name, Clock: 10}, nil))
+			deliverMetadata := func() *MessengerResponse {
+				state := s.m.buildMessageState()
+				state.CurrentMessageState = &CurrentMessageState{
+					PublicKey: &sender.PublicKey, WhisperTimestamp: 21, FromArchive: true,
+				}
+				s.Require().NoError(s.m.HandleThreadMetadata(context.Background(), state, &protobuf.ThreadMetadata{
+					Clock: 21, ChatId: chat.ID, ThreadId: name, Name: "Thread", CreatorId: senderID,
+					MessageType: protobuf.MessageType_ONE_TO_ONE,
+				}, nil))
+				return state.Response
+			}
+			deliverRoot := func() *MessengerResponse {
+				state := s.m.buildMessageState()
+				state.CurrentMessageState = &CurrentMessageState{
+					MessageID: name, WhisperTimestamp: 20, Contact: contact, PublicKey: &sender.PublicKey,
+				}
+				s.Require().NoError(s.m.HandleChatMessage(context.Background(), state, &protobuf.ChatMessage{
+					ChatId: chat.ID, Clock: 20, Timestamp: 20, Text: "Hello @" + s.m.myHexIdentity() + " !",
+					MessageType: protobuf.MessageType_ONE_TO_ONE, ContentType: protobuf.ChatMessage_TEXT_PLAIN,
+					StartsThread: true,
+				}, nil, true))
+				response, err := s.m.saveDataAndPrepareResponse(state)
+				s.Require().NoError(err)
+				return response
+			}
+
+			var lastResponse *MessengerResponse
+			if metadataFirst {
+				deliverMetadata()
+				lastResponse = deliverRoot()
+			} else {
+				deliverRoot()
+				lastResponse = deliverMetadata()
+			}
+			s.Require().Len(lastResponse.Threads(), 1)
+			s.Require().Equal(uint(1), lastResponse.Threads()[0].MessagesCount)
+			s.Require().NotNil(lastResponse.Threads()[0].LastMessage)
+			thread, err := s.m.persistence.ThreadByID(chat.ID, name)
+			s.Require().NoError(err)
+			s.Require().Equal(senderID, thread.CreatorID)
+			s.Require().False(thread.Followed)
+			s.Require().EqualValues(10, thread.FollowedClock)
+		})
+	}
 }

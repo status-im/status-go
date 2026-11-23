@@ -2006,11 +2006,13 @@ func (m *Messenger) HandleThreadMetadata(ctx context.Context, state *ReceivedMes
 		if err != nil {
 			return err
 		}
-		followed, err := m.persistence.AutoFollowOwnedThread(chat.ID, metadata.ThreadId, m.myHexIdentity())
-		if err != nil {
-			return err
+		if !state.CurrentMessageState.FromArchive {
+			followed, err := m.persistence.AutoFollowOwnedThread(chat.ID, metadata.ThreadId, m.myHexIdentity())
+			if err != nil {
+				return err
+			}
+			replayed = replayed || followed
 		}
-		replayed = replayed || followed
 	}
 	if err := m.addDeletedActivityCenterNotificationsToResponse(state.Response, deletedNotifications); err != nil {
 		return err
@@ -2303,6 +2305,7 @@ func (m *Messenger) handleChatMessage(ctx context.Context, state *ReceivedMessag
 		Alias:            state.CurrentMessageState.Contact.Alias,
 		SigPubKey:        state.CurrentMessageState.PublicKey,
 		WhisperTimestamp: state.CurrentMessageState.WhisperTimestamp,
+		FromArchive:      forceSeen || state.CurrentMessageState.FromArchive,
 	}
 
 	// is the message coming from us?
