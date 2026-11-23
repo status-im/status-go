@@ -3,6 +3,7 @@ package market
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 	"time"
 
@@ -154,10 +155,12 @@ func (pm *Manager) stopDownTimerLocked() {
 func (pm *Manager) makeCall(providers []thirdparty.MarketDataProvider, f func(provider thirdparty.MarketDataProvider) (interface{}, error)) (interface{}, error) {
 	cmd := circuitbreaker.NewCommand(context.Background(), nil)
 	cmd.SetNonFailureErrorClassifier(provider_errors.IsIgnorableForConnectivity)
-	for _, provider := range providers {
+	for i, provider := range providers {
 		provider := provider
-		// FIXME: we might want a different circuitName. See other uses of NewFunctor
-		circuitName := provider.ID()
+		// Providers may share an ID, such as the CoinGecko proxies and direct
+		// CoinGecko: each gets a circuit of its own, so that one failing does
+		// not shut the others out.
+		circuitName := fmt.Sprintf("%s#%d", provider.ID(), i)
 		cmd.Add(circuitbreaker.NewFunctor(func() ([]interface{}, error) {
 			result, err := f(provider)
 			return []interface{}{result}, err
