@@ -30,7 +30,6 @@ func deliveryConfig(params CoreParams) (bindings.Config, error) {
 		mode = bindings.ModeEdge
 	}
 	overrides := bindings.Overrides{
-		// SDS tracks delivery; the Messenger catches up after a restart.
 		"reliability":      false,
 		"backfill-enabled": false,
 	}

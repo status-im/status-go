@@ -263,7 +263,12 @@ func NewCore(params CoreParams, options ...Options) (*Core, error) {
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to create logos-delivery backend")
 		}
-		return newCore(backend, params, config)
+		core, err := newCore(backend, params, config)
+		if err != nil {
+			_ = backend.Stop()
+			return nil, err
+		}
+		return core, nil
 	default:
 		return newGoWakuCore(params, config)
 	}

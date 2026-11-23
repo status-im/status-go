@@ -43,6 +43,11 @@ type Adapter struct {
 
 	maxMessageSize atomic.Uint32
 
+	// calls is held shared by every call into the node and exclusively by
+	// Stop, which must not release the node while one is in flight.
+	calls  sync.RWMutex
+	closed bool
+
 	quit     chan struct{}
 	stopOnce sync.Once
 	stopErr  error
@@ -78,6 +83,13 @@ func (a *Adapter) Start() error {
 	if err := a.mc.Start(); err != nil {
 		return fmt.Errorf("delivery: start: %w", err)
 	}
+	if err := a.readNodeInfo(); err != nil {
+		return errors.Join(err, a.mc.Stop())
+	}
+	return nil
+}
+
+func (a *Adapter) readNodeInfo() error {
 	size, err := a.mc.Node().Debug().MaxMessageSize()
 	if err != nil {
 		return fmt.Errorf("delivery: max message size: %w", err)
@@ -86,10 +98,27 @@ func (a *Adapter) Start() error {
 	return nil
 }
 
-// Stop stops the node and releases it. Later calls return the first result.
-// The Adapter cannot be restarted.
+// enter reports whether the node may still be called. On true, the caller
+// holds the call guard until it calls leave.
+func (a *Adapter) enter() bool {
+	a.calls.RLock()
+	if a.closed {
+		a.calls.RUnlock()
+		return false
+	}
+	return true
+}
+
+func (a *Adapter) leave() { a.calls.RUnlock() }
+
+// Stop stops the node and releases it, once the calls in flight return.
+// Later calls return the first result. The Adapter cannot be restarted.
 func (a *Adapter) Stop() error {
 	a.stopOnce.Do(func() {
+		a.calls.Lock()
+		a.closed = true
+		a.calls.Unlock()
+
 		stopErr := a.mc.Stop()
 		closeErr := a.mc.Close()
 		close(a.quit)
@@ -172,7 +201,12 @@ func (a *Adapter) handleReceived(e messaging.MessageReceivedEvent) {
 // pubsubTopic and priority are not honoured: the Messaging API derives the
 // shard from the content topic and has no send priority.
 func (a *Adapter) Send(ctx context.Context, pubsubTopic, contentTopic string, payload []byte, ephemeral bool, priority *int) ([]byte, error) {
-	hash, err := a.sendOutcome(a.mc.Send(ctx, contentTopic, payload, ephemeral))
+	if !a.enter() {
+		return nil, fmt.Errorf("delivery: send: %w", messaging.ErrClosed)
+	}
+	messageHash, err := a.mc.Send(ctx, contentTopic, payload, ephemeral)
+	a.leave()
+	hash, err := a.sendOutcome(messageHash, err)
 	if err != nil {
 		return nil, err
 	}
@@ -226,6 +260,10 @@ func retryableRefusal(kind messaging.SendErrorKind) bool {
 // Subscribe subscribes the content topics. The pubsub topic is ignored: the
 // transport counts subscriptions per content topic (see ContentTopicOnly).
 func (a *Adapter) Subscribe(ctx context.Context, pubsubTopic string, contentTopics []types.TopicType) error {
+	if !a.enter() {
+		return fmt.Errorf("delivery: subscribe: %w", messaging.ErrClosed)
+	}
+	defer a.leave()
 	for _, topic := range contentTopics {
 		if err := a.mc.Subscribe(topic.ContentTopic()); err != nil {
 			return fmt.Errorf("delivery: subscribe %s: %w", topic.ContentTopic(), err)
@@ -236,6 +274,10 @@ func (a *Adapter) Subscribe(ctx context.Context, pubsubTopic string, contentTopi
 
 // Unsubscribe unsubscribes the content topics. The pubsub topic is ignored.
 func (a *Adapter) Unsubscribe(ctx context.Context, pubsubTopic string, contentTopics []types.TopicType) error {
+	if !a.enter() {
+		return fmt.Errorf("delivery: unsubscribe: %w", messaging.ErrClosed)
+	}
+	defer a.leave()
 	for _, topic := range contentTopics {
 		if err := a.mc.Unsubscribe(topic.ContentTopic()); err != nil {
 			return fmt.Errorf("delivery: unsubscribe %s: %w", topic.ContentTopic(), err)
@@ -313,6 +355,10 @@ func (a *Adapter) ConfirmMessageDelivered([]common.Hash) {}
 
 // Peers returns the node's connected peers, or none when it cannot tell.
 func (a *Adapter) Peers() types.PeerStats {
+	if !a.enter() {
+		return types.PeerStats{}
+	}
+	defer a.leave()
 	peers, err := a.mc.Node().Peers().ConnectedInfo()
 	if err != nil {
 		a.logger.Debug("failed to list connected peers", zap.Error(err))
@@ -327,6 +373,10 @@ func (a *Adapter) Peers() types.PeerStats {
 
 // PeerID returns the node's peer ID, or an empty one when it cannot tell.
 func (a *Adapter) PeerID() peer.ID {
+	if !a.enter() {
+		return ""
+	}
+	defer a.leave()
 	id, err := a.mc.Node().Debug().PeerID()
 	if err != nil {
 		a.logger.Debug("failed to read the peer ID", zap.Error(err))
@@ -337,6 +387,10 @@ func (a *Adapter) PeerID() peer.ID {
 
 // Metrics returns the node's metrics in the Prometheus text format.
 func (a *Adapter) Metrics() string {
+	if !a.enter() {
+		return ""
+	}
+	defer a.leave()
 	metrics, err := a.mc.Node().Debug().Metrics()
 	if err != nil {
 		a.logger.Debug("failed to read metrics", zap.Error(err))
