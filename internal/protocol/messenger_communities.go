@@ -4910,6 +4910,7 @@ func (m *Messenger) DeleteCommunityMemberMessages(request *requests.DeleteCommun
 	if err != nil {
 		return nil, err
 	}
+	request.MemberPubKey = cryptotypes.EncodeHex(crypto.FromECDSAPub(memberPubKey))
 
 	if community.IsMemberOwner(memberPubKey) && !m.IdentityPublicKey().Equal(memberPubKey) {
 		return nil, communities.ErrNotOwner

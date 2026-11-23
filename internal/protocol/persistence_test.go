@@ -2669,6 +2669,7 @@ func TestDeleteCommunityMemberMessagesScoped(t *testing.T) {
 		{name: "private chat", requested: []*protobuf.DeleteCommunityMemberMessage{{Id: "e", ChatId: "private"}}, wantError: true},
 		{name: "forged chat", requested: []*protobuf.DeleteCommunityMemberMessage{{Id: "d", ChatId: "channel-a"}}, wantError: true},
 		{name: "mixed batch", requested: []*protobuf.DeleteCommunityMemberMessage{{Id: "a", ChatId: "channel-a"}, {Id: "d", ChatId: "external"}}, wantError: true},
+		{name: "post and reply", requested: []*protobuf.DeleteCommunityMemberMessage{{Id: "a", ChatId: "channel-a"}, {Id: "reply", ChatId: "channel-a"}}, want: []string{"a", "reply"}},
 		{name: "rollback", requested: []*protobuf.DeleteCommunityMemberMessage{{Id: "a", ChatId: "channel-a"}, {Id: "b", ChatId: "channel-b"}}, wantError: true, rollback: true},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -2705,6 +2706,15 @@ func TestDeleteCommunityMemberMessagesScoped(t *testing.T) {
 				ID: "reply", LocalChatID: "channel-a", From: "other-author",
 				ChatMessage: &protobuf.ChatMessage{ChatId: "channel-a", ResponseTo: "a", Text: "reply"},
 			}}))
+			_, err = p.SavePinMessage(&common.PinMessage{
+				ID: "pin-a-channel-b", LocalChatID: "channel-b",
+				PinMessage: &protobuf.PinMessage{MessageId: "a", ChatId: "channel-b", Pinned: true},
+			})
+			require.NoError(t, err)
+			if test.name == "post and reply" {
+				_, err = db.Exec(`UPDATE user_messages SET source = ? WHERE id = ?`, testPK, "reply")
+				require.NoError(t, err)
+			}
 			if test.rollback {
 				_, err = db.Exec(`CREATE TRIGGER reject_delete BEFORE DELETE ON user_messages
 					WHEN OLD.id = 'b' BEGIN SELECT RAISE(ABORT, 'delete failed'); END`)
@@ -2731,7 +2741,18 @@ func TestDeleteCommunityMemberMessagesScoped(t *testing.T) {
 			for _, id := range []string{"a", "b", "c", "d", "e", "reply"} {
 				var messages, pins int
 				require.NoError(t, db.QueryRow("SELECT COUNT(*) FROM user_messages WHERE id = ?", id).Scan(&messages))
-				require.NoError(t, db.QueryRow("SELECT COUNT(*) FROM pin_messages WHERE message_id = ?", id).Scan(&pins))
+				chatID := map[string]string{
+					"a": "channel-a", "b": "channel-b", "c": "channel-a",
+					"d": "external", "e": "private",
+				}[id]
+				if chatID == "" {
+					pins = 0
+				} else {
+					require.NoError(t, db.QueryRow(
+						"SELECT COUNT(*) FROM pin_messages WHERE message_id = ? AND local_chat_id = ?",
+						id, chatID,
+					).Scan(&pins))
+				}
 				if slices.Contains(test.want, id) {
 					require.Zero(t, messages, id)
 					require.Zero(t, pins, id)
@@ -2742,10 +2763,17 @@ func TestDeleteCommunityMemberMessagesScoped(t *testing.T) {
 					}
 				}
 			}
-			if slices.Contains(test.want, "a") {
+			if slices.Contains(test.want, "a") &&
+				!slices.Contains(test.want, "reply") {
 				require.Len(t, replies, 1)
 				require.Equal(t, "reply", replies[0].ID)
 			}
+			var crossChatPins int
+			require.NoError(t, db.QueryRow(
+				"SELECT COUNT(*) FROM pin_messages WHERE message_id = ? AND local_chat_id = ?",
+				"a", "channel-b",
+			).Scan(&crossChatPins))
+			require.Equal(t, 1, crossChatPins)
 			if !test.wantError {
 				repeated, _, err := p.deleteCommunityMemberMessages(testPK, "community", test.requested)
 				require.NoError(t, err)

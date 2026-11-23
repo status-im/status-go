@@ -3550,24 +3550,11 @@ func (db sqlitePersistence) deleteCommunityMemberMessages(member, communityID st
 	}
 
 	for _, target := range deleted {
-		rows, queryErr := tx.Query(db.buildMessagesQuery("WHERE m1.response_to = ?"), target.Id)
-		if queryErr != nil {
-			return nil, nil, queryErr
-		}
-		updated, scanErr := getMessagesFromScanRows(db, rows, false)
-		err = errors.Join(scanErr, rows.Err(), rows.Close())
-		if err != nil {
-			return nil, nil, err
-		}
-		replies = append(replies, updated...)
-	}
-
-	for _, target := range deleted {
 		// Pin removal uses the same scoped message selection before deleting the message.
 		_, err = tx.Exec(`DELETE FROM pin_messages WHERE message_id IN (
 			SELECT m.id FROM user_messages m INNER JOIN chats ch ON ch.id = m.local_chat_id
 			WHERE m.id = ? AND m.chat_id = ? AND m.local_chat_id = ? AND m.source = ? AND ch.community_id = ?
-		)`, target.Id, target.ChatId, target.ChatId, member, communityID)
+		) AND local_chat_id = ?`, target.Id, target.ChatId, target.ChatId, member, communityID, target.ChatId)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -3578,6 +3565,19 @@ func (db sqlitePersistence) deleteCommunityMemberMessages(member, communityID st
 		if err != nil {
 			return nil, nil, err
 		}
+	}
+
+	for _, target := range deleted {
+		rows, queryErr := tx.Query(db.buildMessagesQuery("WHERE m1.response_to = ?"), target.Id)
+		if queryErr != nil {
+			return nil, nil, queryErr
+		}
+		updated, scanErr := getMessagesFromScanRows(db, rows, false)
+		err = errors.Join(scanErr, rows.Err(), rows.Close())
+		if err != nil {
+			return nil, nil, err
+		}
+		replies = append(replies, updated...)
 	}
 	return deleted, replies, nil
 }

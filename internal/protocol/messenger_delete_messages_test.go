@@ -490,7 +490,8 @@ func (s *MessengerDeleteMessagesSuite) TestDeleteAllMemberMessage() {
 	s.checkAllMembersHasMemberMessages(s.admin.IdentityPublicKeyString(), expectedMsgsToRemove, communityID)
 	s.checkAllMembersHasMemberMessages(s.owner.IdentityPublicKeyString(), expectedMsgsToRemove, communityID)
 
-	deleteMessagesRequest.MemberPubKey = s.owner.IdentityPublicKeyString()
+	memberPubKey := s.owner.IdentityPublicKeyString()
+	deleteMessagesRequest.MemberPubKey = memberPubKey[:2] + strings.ToUpper(memberPubKey[2:])
 	response, err = s.owner.DeleteCommunityMemberMessages(deleteMessagesRequest)
 	s.Require().NoError(err)
 	checkOwnerMessageDeleted := func(response *MessengerResponse) bool {
