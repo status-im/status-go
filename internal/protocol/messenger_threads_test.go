@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/status-im/status-go/internal/crypto"
+	"github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/protocol/common"
 	"github.com/status-im/status-go/internal/protocol/contacts"
 	"github.com/status-im/status-go/internal/protocol/protobuf"
@@ -1579,6 +1580,121 @@ func (s *MessengerThreadsSuite) TestMarkThreadReadClearsOnlyThreadMessages() {
 	s.Require().Equal(olderUnreadReply.Clock, thread.ReadMessagesAtClockValue)
 	s.Require().Equal(uint(0), thread.UnviewedMessagesCount)
 	s.Require().Equal(uint(0), thread.UnviewedMentionsCount)
+}
+
+func (s *MessengerThreadsSuite) TestMarkThreadMessageAsUnread() {
+	chat := CreatePublicChat("thread-unread", s.m.getTimesource())
+	chat.UnviewedMessagesCount = 1
+	s.Require().NoError(s.m.SaveChat(chat))
+
+	threadID, otherThreadID := "0x10", "0x11"
+	root := buildTestMessage(*chat)
+	root.ID, root.Seen, root.Timestamp = threadID, false, 1
+	otherRoot := buildTestMessage(*chat)
+	otherRoot.ID, otherRoot.Seen, otherRoot.Timestamp = otherThreadID, true, 1
+	older := buildTestMessage(*chat)
+	older.ID, older.Seen, older.Timestamp, older.ThreadId = "0x01", false, 1, &threadID
+	plain := buildTestMessage(*chat)
+	plain.ID, plain.Seen, plain.Timestamp, plain.ThreadId = "0x02", true, 3, &threadID
+	mention := buildTestMessage(*chat)
+	mention.ID, mention.Seen, mention.Timestamp, mention.ThreadId = "0x03", true, 2, &threadID
+	mention.Mentioned = true
+	other := buildTestMessage(*chat)
+	other.ID, other.Seen, other.Timestamp, other.ThreadId = "0x04", false, 3, &otherThreadID
+	s.Require().NoError(s.m.SaveMessages([]*common.Message{root, otherRoot, older, plain, mention, other}))
+	s.Require().NoError(s.m.persistence.UpsertThread(threadID, chat.ID, root.ID, "Thread"))
+	s.Require().NoError(s.m.persistence.UpsertThread(otherThreadID, chat.ID, otherRoot.ID, "Other"))
+
+	notification := &ActivityCenterNotification{
+		ID: []byte{3}, Type: ActivityCenterNotificationTypeMention, ChatID: chat.ID,
+		Message: mention, Timestamp: 3, UpdatedAt: 1, Read: true,
+	}
+	otherNotification := &ActivityCenterNotification{
+		ID: []byte{4}, Type: ActivityCenterNotificationTypeMention, ChatID: chat.ID,
+		Message: other, Timestamp: 3, UpdatedAt: 1, Read: true,
+	}
+	_, err := s.m.persistence.SaveActivityCenterNotification(notification, true)
+	s.Require().NoError(err)
+	_, err = s.m.persistence.SaveActivityCenterNotification(otherNotification, true)
+	s.Require().NoError(err)
+
+	_, err = s.m.persistence.ThreadWithSummaryByID(chat.ID, threadID)
+	s.Require().NoError(err)
+	response, err := s.m.MarkMessageAsUnread(chat.ID, plain.ID)
+	s.Require().NoError(err)
+	s.Require().Empty(response.GetSeenAndUnseenMessages())
+	s.Require().Len(response.Threads(), 1)
+	s.Require().Equal(uint(1), response.Threads()[0].UnviewedMessagesCount)
+	s.Require().Zero(response.Threads()[0].UnviewedMentionsCount)
+	s.Require().Empty(response.ActivityCenterNotifications())
+	response, err = s.m.MarkMessageAsUnread(chat.ID, mention.ID)
+	s.Require().NoError(err)
+	s.Require().Equal(uint(2), response.Threads()[0].UnviewedMessagesCount)
+	s.Require().Equal(uint(1), response.Threads()[0].UnviewedMentionsCount)
+	s.Require().Len(response.ActivityCenterNotifications(), 1)
+	s.Require().Equal(notification.ID, response.ActivityCenterNotifications()[0].ID)
+	s.Require().False(response.ActivityCenterNotifications()[0].Read)
+	reloadedOther, err := s.m.ActivityCenterNotification(otherNotification.ID)
+	s.Require().NoError(err)
+	s.Require().True(reloadedOther.Read)
+
+	for _, entry := range []struct {
+		id   string
+		seen bool
+	}{{root.ID, false}, {older.ID, true}, {plain.ID, false}, {mention.ID, false}, {other.ID, false}} {
+		stored, err := s.m.MessageByID(entry.id)
+		s.Require().NoError(err)
+		s.Require().Equal(entry.seen, stored.Seen, entry.id)
+	}
+
+	response, err = s.m.MarkMessageAsUnread(chat.ID, mention.ID)
+	s.Require().NoError(err)
+	s.Require().Equal(uint(2), response.Threads()[0].UnviewedMessagesCount)
+	storedChat, err := s.m.persistence.Chat(chat.ID)
+	s.Require().NoError(err)
+	s.Require().Equal(uint(1), storedChat.UnviewedMessagesCount)
+
+	thread, err := s.m.persistence.ThreadByID(chat.ID, threadID)
+	s.Require().NoError(err)
+	s.Require().Equal(uint(2), thread.UnviewedMessagesCount)
+	response, err = s.m.MarkThreadRead(context.Background(), chat.ID, threadID)
+	s.Require().NoError(err)
+	s.Require().Zero(response.Threads()[0].UnviewedMessagesCount)
+	storedRoot, err := s.m.MessageByID(root.ID)
+	s.Require().NoError(err)
+	s.Require().False(storedRoot.Seen)
+
+	_, err = s.m.MarkMessageAsUnread("wrong-chat", plain.ID)
+	s.Require().Error(err)
+	_, err = s.m.MarkMessageAsUnread(chat.ID, "missing")
+	s.Require().Error(err)
+
+	s.Require().NoError(s.m.persistence.MarkActivityCenterNotificationsRead(
+		[]types.HexBytes{notification.ID}, s.m.GetCurrentTimeInMillis()))
+	response, err = s.m.MarkMessageAsUnread(chat.ID, root.ID)
+	s.Require().NoError(err)
+	s.Require().Empty(response.Threads())
+	reloadedMention, err := s.m.ActivityCenterNotification(notification.ID)
+	s.Require().NoError(err)
+	s.Require().True(reloadedMention.Read)
+}
+
+func (s *MessengerThreadsSuite) TestMarkThreadMessageAsUnreadOneToOne() {
+	chat := CreateOneToOneChat("thread-unread-one-to-one", &s.m.identity.PublicKey, s.m.getTimesource())
+	s.Require().NoError(s.m.SaveChat(chat))
+	threadID := "0x20"
+	root := buildTestMessage(*chat)
+	root.ID, root.Seen = threadID, true
+	reply := buildTestMessage(*chat)
+	reply.ID, reply.Seen, reply.ThreadId = "0x21", true, &threadID
+	s.Require().NoError(s.m.SaveMessages([]*common.Message{root, reply}))
+	s.Require().NoError(s.m.persistence.UpsertThread(threadID, chat.ID, root.ID, "Thread"))
+
+	response, err := s.m.MarkMessageAsUnread(chat.ID, reply.ID)
+	s.Require().NoError(err)
+	s.Require().Len(response.Threads(), 1)
+	s.Require().Equal(uint(1), response.Threads()[0].UnviewedMessagesCount)
+	s.Require().Equal(uint(1), response.Threads()[0].UnviewedMentionsCount)
 }
 
 func (s *MessengerThreadsSuite) TestThreadReadWatermarkMarksOutOfOrderReplySeen() {
