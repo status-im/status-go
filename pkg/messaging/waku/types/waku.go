@@ -61,6 +61,9 @@ func (u *ConnStatusSubscription) Active() bool {
 func (u *ConnStatusSubscription) Unsubscribe() {
 	u.Lock()
 	defer u.Unlock()
+	if !u.active {
+		return
+	}
 	close(u.C)
 	u.active = false
 }

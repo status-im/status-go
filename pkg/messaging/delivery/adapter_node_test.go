@@ -10,6 +10,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
@@ -110,7 +111,9 @@ func TestAdapterExchangesMessagesOverLiblogosdelivery(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
 		hash, err := b.Send(ctx, pubsubTopic, topic.ContentTopic(), []byte("hello from b"), false, nil)
-		require.NoError(t, err)
+		if !assert.NoError(t, err) {
+			return false
+		}
 		hashes[cryptotypes.BytesToHash(hash)] = true
 		select {
 		case received = <-eventsA:

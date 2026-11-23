@@ -62,7 +62,7 @@ func newDeliveryTestBackend() (*deliveryTestBackend, error) {
 	if err != nil {
 		return nil, err
 	}
-	peerPort, err := freeTCPPort()
+	peerPort, err := freePort()
 	if err != nil {
 		return nil, err
 	}
@@ -77,11 +77,11 @@ func newDeliveryTestBackend() (*deliveryTestBackend, error) {
 		"local-storage-path": filepath.Join(dataDir, "peer"),
 	})
 	if err != nil {
-		return nil, err
+		return nil, errors.Join(err, os.RemoveAll(dataDir))
 	}
-	nodePort, err := freeTCPPort()
+	nodePort, err := freePort()
 	if err != nil {
-		return nil, err
+		return nil, errors.Join(err, peerNode.Stop(), os.RemoveAll(dataDir))
 	}
 	node, err := newTestDeliveryAdapter(bindings.Overrides{
 		"tcp-port":           nodePort,
@@ -89,7 +89,7 @@ func newDeliveryTestBackend() (*deliveryTestBackend, error) {
 		"entry-node":         []string{fmt.Sprintf("/ip4/127.0.0.1/tcp/%d/p2p/%s", peerPort, peerID)},
 	})
 	if err != nil {
-		return nil, err
+		return nil, errors.Join(err, peerNode.Stop(), os.RemoveAll(dataDir))
 	}
 	return &deliveryTestBackend{
 		Adapter:       node,
@@ -120,13 +120,23 @@ func newTestDeliveryAdapter(overrides bindings.Overrides) (*delivery.Adapter, er
 	return delivery.NewAdapter(cfg, zap.NewNop())
 }
 
-func freeTCPPort() (int, error) {
-	l, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		return 0, err
+// freePort returns a port free on both TCP and UDP: the node's QUIC
+// transport listens on the UDP port of the same number.
+func freePort() (int, error) {
+	for range 20 {
+		l, err := net.Listen("tcp", "127.0.0.1:0")
+		if err != nil {
+			return 0, err
+		}
+		port := l.Addr().(*net.TCPAddr).Port
+		u, err := net.ListenPacket("udp", fmt.Sprintf("127.0.0.1:%d", port))
+		_ = l.Close()
+		if err == nil {
+			_ = u.Close()
+			return port, nil
+		}
 	}
-	defer l.Close()
-	return l.Addr().(*net.TCPAddr).Port, nil
+	return 0, errors.New("no port free on both TCP and UDP")
 }
 
 // Start starts both nodes and waits until they are connected.
@@ -184,7 +194,7 @@ func (b *deliveryTestBackend) Subscribe(ctx context.Context, pubsubTopic string,
 	defer b.subscriptionsMu.Unlock()
 	var first []types.TopicType
 	for _, topic := range contentTopics {
-		key := types.TopicSubscription{PubsubTopic: pubsubTopic, ContentTopic: topic}
+		key := types.TopicSubscription{ContentTopic: topic}
 		b.subscriptions[key]++
 		if b.subscriptions[key] == 1 {
 			first = append(first, topic)
@@ -201,7 +211,7 @@ func (b *deliveryTestBackend) Unsubscribe(ctx context.Context, pubsubTopic strin
 	defer b.subscriptionsMu.Unlock()
 	var last []types.TopicType
 	for _, topic := range contentTopics {
-		key := types.TopicSubscription{PubsubTopic: pubsubTopic, ContentTopic: topic}
+		key := types.TopicSubscription{ContentTopic: topic}
 		if b.subscriptions[key] == 0 {
 			continue
 		}
