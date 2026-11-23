@@ -50,6 +50,9 @@ compatible: the bindings require the native `sds_set_persistence_callback`
 export. Both Nimble and Nix build the native library directly, without patches.
 SDS-R repair remains disabled.
 
+The SDS input temporarily includes the recovery branch ref so Nix can fetch its
+pinned commit before it reaches the upstream default branch.
+
 ### Build a library for the current platform
 
 ```shell

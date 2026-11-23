@@ -15,7 +15,7 @@ srcDir = "internal/nimble/src"
 requires "nim == 2.2.12"
 
 # nim-sds, whose C ABI go.mod's sds-go-bindings must match.
-requires "https://github.com/logos-messaging/nim-sds#b674beae72869d67a78c4fbc6f95ba28c14a72cd"
+requires "https://github.com/logos-messaging/nim-sds#8cb2c32356b6ebdb5cebdbec9fc76bc82790fa40"
 
 # The native token library, v0.2.0, whose Go wrapper go.mod pins at this commit.
 requires "https://github.com/status-im/nim-token-lists#4df3308a32b0f3da18ef0d37d26fa9f1195f8b9e"

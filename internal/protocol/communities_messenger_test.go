@@ -1879,6 +1879,9 @@ func (s *MessengerCommunitiesSuite) TestRequestAccessAgain() {
 	s.Require().Equal(community.ID(), aliceCommunity.ID())
 	s.Require().False(aliceCommunity.HasMember(&s.alice.identity.PublicKey))
 
+	// A new join request needs a later second-based clock than the first request.
+	time.Sleep(time.Until(time.Unix(int64(requestToJoin1.Clock)+1, 0)))
+
 	// Alice can request access again
 	request3 := s.createRequestToJoinCommunity(community.ID(), s.alice)
 	response, err = s.alice.RequestToJoinCommunity(request3)
@@ -1891,7 +1894,7 @@ func (s *MessengerCommunitiesSuite) TestRequestAccessAgain() {
 	s.Require().Equal(community.ID(), requestToJoin3.CommunityID)
 	s.Require().True(requestToJoin3.Our)
 	s.Require().NotEmpty(requestToJoin3.ID)
-	s.Require().NotEmpty(requestToJoin3.Clock)
+	s.Require().Greater(requestToJoin3.Clock, requestToJoin1.Clock)
 	s.Require().Equal(requestToJoin3.PublicKey, crypto.PubkeyToHex(&s.alice.identity.PublicKey))
 	s.Require().Equal(communities.RequestToJoinStatePending, requestToJoin3.State)
 
