@@ -602,11 +602,15 @@ class TestWakuextThreadSectionUnread:
 
         baseline = _personal_mentions(receiver, include_threads=True)
         await _post_thread_mention(sender, receiver, sender_chat_id, parent_id, receiver.public_key)
-        assert _personal_mentions(receiver, include_threads=True) == baseline
+        assert _thread(receiver.wakuext_service.chat_threads(receiver_chat_id), parent_id)["followed"] is True
+        assert _personal_mentions(receiver, include_threads=True) == baseline + 1
         assert _personal_mentions(receiver, include_threads=False) == baseline
 
-        receiver.wakuext_service.follow_thread(receiver_chat_id, parent_id)
-        assert _personal_mentions(receiver, include_threads=True) == baseline + 1
+        receiver.wakuext_service.unfollow_thread(receiver_chat_id, parent_id)
+        assert not _thread(receiver.wakuext_service.chat_threads(receiver_chat_id), parent_id)["followed"]
+        await _post_thread_mention(sender, receiver, sender_chat_id, parent_id, receiver.public_key)
+        assert _thread(receiver.wakuext_service.chat_threads(receiver_chat_id), parent_id)["followed"] is True
+        assert _personal_mentions(receiver, include_threads=True) == baseline + 2
         assert _personal_mentions(receiver, include_threads=False) == baseline
 
 
