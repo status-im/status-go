@@ -8,11 +8,12 @@ import (
 )
 
 var (
-	ErrEditThreadInvalidRequest = errors.New("edit-thread: invalid request")
-	ErrEditThreadInvalidChatID  = errors.New("edit-thread: invalid chat id")
-	ErrEditThreadInvalidID      = errors.New("edit-thread: invalid thread id")
-	ErrEditThreadInvalidName    = errors.New("edit-thread: invalid name")
-	ErrEditThreadNameTooLong    = errors.New("edit-thread: name exceeds 50 characters")
+	ErrEditThreadInvalidRequest         = errors.New("edit-thread: invalid request")
+	ErrEditThreadInvalidChatID          = errors.New("edit-thread: invalid chat id")
+	ErrEditThreadInvalidID              = errors.New("edit-thread: invalid thread id")
+	ErrEditThreadInvalidName            = errors.New("edit-thread: invalid name")
+	ErrEditThreadNameTooLong            = errors.New("edit-thread: name exceeds 50 characters")
+	ErrEditThreadNameTooLongForRenaming = errors.New("edit-thread: name exceeds 100 characters")
 )
 
 type EditThread struct {
@@ -31,12 +32,12 @@ func (e *EditThread) Validate() error {
 	if strings.TrimSpace(e.ThreadID) == "" {
 		return ErrEditThreadInvalidID
 	}
-	name, overlong := common.NormalizeThreadName(*e.Name, false)
+	name, overlong := common.NormalizeThreadNameForRenaming(*e.Name, false)
 	if name == "" {
 		return ErrEditThreadInvalidName
 	}
 	if overlong {
-		return ErrEditThreadNameTooLong
+		return ErrEditThreadNameTooLongForRenaming
 	}
 	return nil
 }

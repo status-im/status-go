@@ -439,7 +439,7 @@ future metadata fields can be added without changing the endpoint.
 }]
 ```
 
-- `name` collapses whitespace and must contain 1–50 Unicode grapheme clusters.
+- `name` collapses whitespace and must contain 1–100 Unicode grapheme clusters.
   Empty and overlong values are rejected; names are never silently truncated.
 - The root/parent message is not edited.
 - The creator who started the thread may edit it. Community owners, admins, and
@@ -458,7 +458,7 @@ message is created or changed.
 **Errors:**
 - `"edit-thread: invalid request"` — no supported metadata property was supplied.
 - `"edit-thread: invalid chat id"` / `"edit-thread: invalid thread id"` — identifier is missing.
-- `"edit-thread: invalid name"` / `"edit-thread: name exceeds 50 characters"` — invalid name.
+- `"edit-thread: invalid name"` / `"edit-thread: name exceeds 100 characters"` — invalid name.
 - `"only the thread creator or an admin can edit this thread"` — permission denied.
 - Existing thread feature, unsupported-chat, and missing chat/thread errors also apply.
 
