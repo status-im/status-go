@@ -3797,12 +3797,12 @@ func (db sqlitePersistence) MarkMessagesSeen(chatID string, ids []string) (uint6
 	return countWithMentions + countNoMentions, countWithMentions, err
 }
 
-func (db sqlitePersistence) GetMessageIdsWithGreaterTimestamp(chatID string, messageID string) ([]string, error) {
+func (db sqlitePersistence) GetMessageIdsWithGreaterTimestamp(chatID string, threadID string, messageID string) ([]string, error) {
 	var err error
 	var rows *sql.Rows
-	query := "SELECT id FROM user_messages WHERE local_chat_id = ? AND timestamp >= (SELECT timestamp FROM user_messages WHERE id = ?)"
+	query := "SELECT id FROM user_messages WHERE local_chat_id = ? AND COALESCE(thread_id, '') = ? AND timestamp >= (SELECT timestamp FROM user_messages WHERE id = ?)"
 
-	rows, err = db.db.Query(query, chatID, messageID)
+	rows, err = db.db.Query(query, chatID, threadID, messageID)
 
 	if err != nil {
 		return nil, err
@@ -3820,7 +3820,36 @@ func (db sqlitePersistence) GetMessageIdsWithGreaterTimestamp(chatID string, mes
 		ids = append(ids, messageID)
 	}
 
-	return ids, nil
+	return ids, rows.Err()
+}
+
+func (db sqlitePersistence) MarkThreadMessageAsUnread(chatID, threadID, messageID string) (err error) {
+	tx, err := db.db.BeginTx(context.Background(), &sql.TxOptions{})
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+		} else {
+			_ = tx.Rollback()
+		}
+	}()
+
+	var timestamp uint64
+	err = tx.QueryRow(`SELECT timestamp FROM user_messages WHERE local_chat_id = ? AND thread_id = ? AND id = ?`,
+		chatID, threadID, messageID).Scan(&timestamp)
+	if err != nil {
+		return err
+	}
+	_, err = tx.Exec(`UPDATE user_messages SET seen = 1 WHERE local_chat_id = ? AND thread_id = ? AND seen = 0`,
+		chatID, threadID)
+	if err != nil {
+		return err
+	}
+	_, err = tx.Exec(`UPDATE user_messages SET seen = 0 WHERE local_chat_id = ? AND thread_id = ? AND timestamp >= ?`,
+		chatID, threadID, timestamp)
+	return err
 }
 
 func (db sqlitePersistence) MarkMessageAsUnread(chatID string, messageID string) (uint64, uint64, error) {

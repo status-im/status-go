@@ -4232,20 +4232,50 @@ func (m *Messenger) markMessageAsUnreadImpl(chatID string, messageID string) (ui
 }
 
 func (m *Messenger) MarkMessageAsUnread(chatID string, messageID string) (*MessengerResponse, error) {
-	count, countWithMentions, err := m.markMessageAsUnreadImpl(chatID, messageID)
+	message, err := m.persistence.MessageByID(messageID)
 	if err != nil {
 		return nil, err
 	}
+	if message.LocalChatID != chatID {
+		return nil, fmt.Errorf("message %s does not belong to chat %s", messageID, chatID)
+	}
 
 	response := &MessengerResponse{}
-	response.AddSeenAndUnseenMessages(&SeenUnseenMessages{
-		ChatID:            chatID,
-		Count:             count,
-		CountWithMentions: countWithMentions,
-		Seen:              false,
-	})
+	threadID := ""
+	if m.featureFlags.Threads {
+		threadID = message.GetThreadId()
+	}
+	if threadID != "" {
+		thread, err := m.persistence.ThreadByID(chatID, threadID)
+		if err != nil {
+			return nil, err
+		}
+		if thread.Deleted {
+			return nil, ErrThreadDeleted
+		}
+		if err := m.persistence.MarkThreadMessageAsUnread(chatID, threadID, messageID); err != nil {
+			return nil, err
+		}
+		defer m.signalSession.SendSectionUnreadCountsChanged()
+		thread, err = m.persistence.ThreadWithSummaryByID(chatID, threadID)
+		if err != nil {
+			return nil, err
+		}
+		response.AddThread(thread)
+	} else {
+		count, countWithMentions, err := m.markMessageAsUnreadImpl(chatID, messageID)
+		if err != nil {
+			return nil, err
+		}
+		response.AddSeenAndUnseenMessages(&SeenUnseenMessages{
+			ChatID:            chatID,
+			Count:             count,
+			CountWithMentions: countWithMentions,
+			Seen:              false,
+		})
+	}
 
-	ids, err := m.persistence.GetMessageIdsWithGreaterTimestamp(chatID, messageID)
+	ids, err := m.persistence.GetMessageIdsWithGreaterTimestamp(chatID, threadID, messageID)
 	if err != nil {
 		return nil, err
 	}
