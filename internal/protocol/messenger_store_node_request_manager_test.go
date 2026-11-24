@@ -3,6 +3,7 @@ package protocol
 import (
 	"context"
 	"crypto/ecdsa"
+	"errors"
 	"fmt"
 	"runtime"
 	"testing"
@@ -13,6 +14,7 @@ import (
 	"github.com/status-im/status-go/internal/crypto"
 	"github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/protocol/communities"
+	"github.com/status-im/status-go/internal/protocol/identity"
 	"github.com/status-im/status-go/internal/protocol/protobuf"
 	"github.com/status-im/status-go/pkg/messaging"
 	wakutypes "github.com/status-im/status-go/pkg/messaging/waku/types"
@@ -182,8 +184,81 @@ func (s *StoreNodeRequestPageCheckSuite) TestReturnsNoCommunityWhenLaterPageFail
 		s.messagingEnv.SetProcessMailserverBatchHook(nil)
 	})
 
-	community, _, _ := s.m.storeNodeRequestsManager.FetchCommunity(context.Background(), s.communityID(), nil)
+	community, _, err := s.m.storeNodeRequestsManager.FetchCommunity(context.Background(), s.communityID(), nil)
 	s.Require().Nil(community)
+	s.Require().ErrorContains(err, "failed to validate community by ID")
+}
+
+// failStoreNodeQuery makes every store node query end with an error and no
+// page.
+func (s *StoreNodeRequestPageCheckSuite) failStoreNodeQuery() {
+	s.messagingEnv.SetProcessMailserverBatchHook(func(ctx context.Context, batch wakutypes.MailserverBatch, pageLimit uint64, pageCheck func(int) (bool, uint64), processEnvelopes bool) error {
+		return errors.New("store node unreachable")
+	})
+	s.T().Cleanup(func() {
+		s.messagingEnv.SetProcessMailserverBatchHook(nil)
+	})
+}
+
+// A request that could not reach a store node did not show that store nodes
+// lack the community.
+func (s *StoreNodeRequestPageCheckSuite) TestFetchCommunityReturnsErrorOfFailedQuery() {
+	s.failStoreNodeQuery()
+
+	community, _, err := s.m.storeNodeRequestsManager.FetchCommunity(context.Background(), s.communityID(), nil)
+	s.Require().Nil(community)
+	s.Require().ErrorContains(err, "store node unreachable")
+}
+
+// A community found is returned, also when the query failed afterwards.
+func (s *StoreNodeRequestPageCheckSuite) TestFetchCommunityReturnsCommunityFoundBeforeQueryFailed() {
+	s.messagingEnv.SetProcessMailserverBatchHook(func(ctx context.Context, batch wakutypes.MailserverBatch, pageLimit uint64, pageCheck func(int) (bool, uint64), processEnvelopes bool) error {
+		s.storeCommunity(5, 10)
+		next, _ := pageCheck(1)
+		s.False(next)
+		return errors.New("store node unreachable")
+	})
+	s.T().Cleanup(func() {
+		s.messagingEnv.SetProcessMailserverBatchHook(nil)
+	})
+
+	community, _, err := s.m.storeNodeRequestsManager.FetchCommunity(context.Background(), s.communityID(), nil)
+	s.Require().NoError(err)
+	s.Require().NotNil(community)
+	s.Require().Equal(uint64(5), community.Clock())
+}
+
+// A showcase community that cannot be fetched is shown as unproven.
+func (s *StoreNodeRequestPageCheckSuite) TestShowcaseKeepsCommunityThatCannotBeFetched() {
+	s.failStoreNodeQuery()
+	contactKey, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+
+	validated, err := s.m.validateCommunitiesMembership([]*identity.ProfileShowcaseCommunity{
+		{CommunityID: s.communityID()},
+	}, &contactKey.PublicKey)
+	s.Require().NoError(err)
+	s.Require().Len(validated, 1)
+	s.Require().Equal(identity.ProfileShowcaseMembershipStatusUnproven, validated[0].MembershipStatus)
+}
+
+func (s *StoreNodeRequestPageCheckSuite) TestPromoteSelfToControlNodeFailsForCommunityNotFound() {
+	s.messagingEnv.SetProcessMailserverBatchHook(func(ctx context.Context, batch wakutypes.MailserverBatch, pageLimit uint64, pageCheck func(int) (bool, uint64), processEnvelopes bool) error {
+		return nil
+	})
+	s.T().Cleanup(func() {
+		s.messagingEnv.SetProcessMailserverBatchHook(nil)
+	})
+
+	_, err := s.m.PromoteSelfToControlNode(crypto.CompressPubkey(&s.communityKey.PublicKey))
+	s.Require().ErrorIs(err, communities.ErrOrgNotFound)
+}
+
+func (s *StoreNodeRequestPageCheckSuite) TestPromoteSelfToControlNodeReturnsFetchError() {
+	s.failStoreNodeQuery()
+
+	_, err := s.m.PromoteSelfToControlNode(crypto.CompressPubkey(&s.communityKey.PublicKey))
+	s.Require().ErrorContains(err, "store node unreachable")
 }
 
 // The error of a failed page check is the error of the request, also when

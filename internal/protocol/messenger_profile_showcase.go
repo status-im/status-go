@@ -150,6 +150,8 @@ func (m *Messenger) validateCommunitiesMembership(communities []*identity.Profil
 		})
 		if err != nil {
 			m.logger.Warn("failed to fetch community for profile entry ", zap.Error(err))
+			communityEntry.MembershipStatus = identity.ProfileShowcaseMembershipStatusUnproven
+			validatedCommunities = append(validatedCommunities, communityEntry)
 			continue
 		}
 

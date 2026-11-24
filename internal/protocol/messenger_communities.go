@@ -4721,6 +4721,9 @@ func (m *Messenger) PromoteSelfToControlNode(communityID cryptotypes.HexBytes) (
 	if err != nil {
 		return nil, err
 	}
+	if community == nil {
+		return nil, communities.ErrOrgNotFound
+	}
 
 	if !communities.HasTokenOwnership(community.Description()) {
 		return nil, errors.New(ErrOwnerTokenNeeded)

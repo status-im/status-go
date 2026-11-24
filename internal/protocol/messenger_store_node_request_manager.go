@@ -66,6 +66,8 @@ func NewStoreNodeRequestManager(m *Messenger) *StoreNodeRequestManager {
 // the function will also wait for the store node response and return the fetched community.
 // Automatically waits for an available store node.
 // When a `nil` community and `nil` error is returned, that means the community wasn't found at the store node.
+// An error with no community tells that the request cannot show whether store nodes have it. A community
+// found is returned without the error of a later page.
 func (m *StoreNodeRequestManager) FetchCommunity(ctx context.Context, communityID string, opts []StoreNodeRequestOption) (*communities.Community, StoreNodeRequestStats, error) {
 	cfg := buildStoreNodeRequestConfig(opts)
 
@@ -78,10 +80,15 @@ func (m *StoreNodeRequestManager) FetchCommunity(ctx context.Context, communityI
 		if err != nil {
 			return nil, StoreNodeRequestStats{}, err
 		}
-		if res.community != nil {
-			return res.community, res.stats, res.err
+		if res.community == nil {
+			return nil, res.stats, res.err
 		}
-		return nil, StoreNodeRequestStats{}, nil
+		if res.err != nil {
+			m.logger.Warn("community found, but its store node request ended with an error",
+				zap.String("community", communityID),
+				zap.Error(res.err))
+		}
+		return res.community, res.stats, nil
 	}
 
 	if !cfg.WaitForResponse {
@@ -99,8 +106,8 @@ func (m *StoreNodeRequestManager) FetchCommunity(ctx context.Context, communityI
 }
 
 // requestCommunity runs a store node request for the community, or joins the
-// one in flight, and returns its result. Unlike FetchCommunity it keeps the
-// error of a request that brought no community.
+// one in flight, and returns its result, the error of the request included
+// when it also brought the community.
 func (m *StoreNodeRequestManager) requestCommunity(ctx context.Context, communityID string, cfg StoreNodeRequestConfig) (storeNodeRequestResult, error) {
 	sub, err := m.subscribeToRequest(ctx, storeNodeCommunityRequest, communityID, messagingtypes.DefaultShard(), cfg)
 	if err != nil {
