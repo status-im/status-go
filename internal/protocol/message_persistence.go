@@ -3501,7 +3501,11 @@ func (db sqlitePersistence) deleteCommunityMemberMessages(member, communityID st
 		}
 	}()
 
-	if len(requested) == 0 {
+	deleteAll := len(requested) == 0
+	const communityMemberMessagesSelection = `SELECT m.id FROM user_messages m
+		INNER JOIN chats ch ON ch.id = m.local_chat_id
+		WHERE ch.community_id = ? AND m.source = ? AND m.chat_id = ch.id`
+	if deleteAll {
 		rows, queryErr := tx.Query(`SELECT m.id, m.chat_id FROM user_messages m
 			INNER JOIN chats ch ON ch.id = m.local_chat_id
 			WHERE ch.community_id = ? AND m.source = ? AND m.chat_id = ch.id`, communityID, member)
@@ -3549,6 +3553,46 @@ func (db sqlitePersistence) deleteCommunityMemberMessages(member, communityID st
 		}
 	}
 
+	if deleteAll {
+		_, err = tx.Exec(`DELETE FROM pin_messages WHERE EXISTS (
+			SELECT 1 FROM user_messages m INNER JOIN chats ch ON ch.id = m.local_chat_id
+			WHERE m.id = pin_messages.message_id AND pin_messages.local_chat_id = m.chat_id
+			AND ch.community_id = ? AND m.source = ? AND m.chat_id = ch.id
+		)`, communityID, member)
+		if err != nil {
+			return nil, nil, err
+		}
+		_, err = tx.Exec(`DELETE FROM user_messages WHERE id IN (`+communityMemberMessagesSelection+`)`, communityID, member)
+		if err != nil {
+			return nil, nil, err
+		}
+		// Keep the current reply-refresh behavior, while avoiding one joined query per deleted message.
+		const replyQueryBatchSize = 500
+		for start := 0; start < len(deleted); start += replyQueryBatchSize {
+			end := start + replyQueryBatchSize
+			if end > len(deleted) {
+				end = len(deleted)
+			}
+			batch := deleted[start:end]
+			query := db.buildMessagesQuery(sqlutil.In("WHERE m1.response_to IN (%s)", len(batch)))
+			args := make([]interface{}, 0, len(batch))
+			for _, target := range batch {
+				args = append(args, target.Id)
+			}
+			rows, queryErr := tx.Query(query, args...)
+			if queryErr != nil {
+				return nil, nil, queryErr
+			}
+			updated, scanErr := getMessagesFromScanRows(db, rows, false)
+			err = errors.Join(scanErr, rows.Err(), rows.Close())
+			if err != nil {
+				return nil, nil, err
+			}
+			replies = append(replies, updated...)
+		}
+		return deleted, replies, nil
+	}
+
 	for _, target := range deleted {
 		// Pin removal uses the same scoped message selection before deleting the message.
 		_, err = tx.Exec(`DELETE FROM pin_messages WHERE message_id IN (
@@ -3565,9 +3609,7 @@ func (db sqlitePersistence) deleteCommunityMemberMessages(member, communityID st
 		if err != nil {
 			return nil, nil, err
 		}
-	}
 
-	for _, target := range deleted {
 		rows, queryErr := tx.Query(db.buildMessagesQuery("WHERE m1.response_to = ?"), target.Id)
 		if queryErr != nil {
 			return nil, nil, queryErr
