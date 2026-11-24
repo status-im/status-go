@@ -92,12 +92,53 @@ func (w *Waku) queueHistoryReconciliation(tracker *historyReconcileTracker, pend
 		zap.Bool("reliable", reliable),
 		zap.Time("from", window.From),
 		zap.Time("to", window.To))
+	queueHistoryWindow(pending, *window)
+}
+
+// queueHistoryWindow appends window to pending, merging it with the last
+// pending window when they overlap or touch, so callers receive one
+// continuous recovery range instead of a fragmented sequence.
+func queueHistoryWindow(pending *[]types.HistoryReconcileWindow, window types.HistoryReconcileWindow) {
 	if len(*pending) != 0 && !window.From.After((*pending)[len(*pending)-1].To) {
-		// Merge adjacent or overlapping windows so callers receive one
-		// continuous recovery range instead of a fragmented sequence.
 		(*pending)[len(*pending)-1].To = window.To
 	} else {
-		*pending = append(*pending, *window)
+		*pending = append(*pending, window)
+	}
+}
+
+// HistoryReconciler gives the history reconciliation windows (see
+// OnHistoryReconcileNeeded) of a backend that observes its own connectivity.
+type HistoryReconciler struct {
+	tracker historyReconcileTracker
+	pending []types.HistoryReconcileWindow
+}
+
+// NewHistoryReconciler starts tracking from now, reliable telling whether
+// connectivity is good enough to be confident no live message is missed.
+func NewHistoryReconciler(reliable bool, now time.Time) *HistoryReconciler {
+	return &HistoryReconciler{tracker: newHistoryReconcileTracker(reliable, now)}
+}
+
+// Observe records the connectivity at now and queues the window it calls for,
+// if any. A backend observes at least every few seconds.
+func (r *HistoryReconciler) Observe(reliable bool, now time.Time) {
+	if window := r.tracker.observe(reliable, now, historyReconcileMinInterval); window != nil {
+		queueHistoryWindow(&r.pending, *window)
+	}
+}
+
+// Next returns the oldest pending window, and false when there is none.
+func (r *HistoryReconciler) Next() (types.HistoryReconcileWindow, bool) {
+	if len(r.pending) == 0 {
+		return types.HistoryReconcileWindow{}, false
+	}
+	return r.pending[0], true
+}
+
+// Done drops the window Next returned.
+func (r *HistoryReconciler) Done() {
+	if len(r.pending) != 0 {
+		r.pending = r.pending[1:]
 	}
 }
 

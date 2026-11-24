@@ -289,8 +289,13 @@ func (t *Transport) handleReceivedMessage(msg *wakutypes.ReceivedMessage) {
 }
 
 // onOnePubsubTopic keeps the filters of one pubsub topic, the default shard
-// when any filter is on it. A message without a pubsub topic matches a chat
-// registered on several pubsub topics once per topic; this delivers it once.
+// when any filter is on it, else the lowest.
+//
+// A filter is per (pubsub topic, content topic, key), and a chat can have one
+// on several pubsub topics. A message that names its pubsub topic (go-waku)
+// matches only that one. A message without one (logos-delivery, which delivers
+// by content topic) would match each of them and reach the chat once per
+// filter; keeping one pubsub topic delivers it once, on a stable filter.
 func onOnePubsubTopic(filters []*Filter) []*Filter {
 	pubsubOf := func(filter *Filter) string {
 		if filter.PubsubTopic == "" {
