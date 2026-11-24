@@ -370,12 +370,13 @@ func (s *MessengerDeleteMessagesSuite) TestDeleteMessageScope() {
 
 	for _, test := range []struct {
 		name, id, chatID string
+		partial          bool
 	}{
-		{"direct-message", "direct", directChat.ID},
-		{"other-community", "other", otherChat.ID},
-		{"forged-community-chat", "direct", communityChat.ID},
-		{"forged-chat", "valid", otherChat.ID},
-		{"wrong-author", "wrong-author", communityChat.ID},
+		{"direct-message", "direct", directChat.ID, true},
+		{"other-community", "other", otherChat.ID, true},
+		{"forged-community-chat", "direct", communityChat.ID, true},
+		{"forged-chat", "valid", otherChat.ID, false},
+		{"wrong-author", "wrong-author", communityChat.ID, true},
 	} {
 		s.Run(test.name, func() {
 			state := s.bob.buildMessageState()
@@ -388,12 +389,21 @@ func (s *MessengerDeleteMessagesSuite) TestDeleteMessageScope() {
 				},
 			}
 			err := s.bob.HandleDeleteCommunityMemberMessages(context.Background(), state, request, nil)
-			s.Require().ErrorIs(err, ErrCommunityMessageScopeMismatch)
-			s.Require().Empty(state.Response.DeletedMessages())
+			if test.partial {
+				s.Require().NoError(err)
+				s.Require().Equal(map[string]string{"valid": communityChat.ID}, state.Response.DeletedMessages())
+			} else {
+				s.Require().ErrorIs(err, ErrCommunityMessageScopeMismatch)
+				s.Require().Empty(state.Response.DeletedMessages())
+			}
 			s.Require().Empty(state.Response.Messages())
 			for _, id := range []string{"valid", "direct", "other", "wrong-author"} {
 				_, err = s.bob.persistence.MessageByID(id)
-				s.Require().NoError(err)
+				if id == "valid" && test.partial {
+					s.Require().ErrorIs(err, common.ErrRecordNotFound)
+				} else {
+					s.Require().NoError(err)
+				}
 			}
 		})
 	}
