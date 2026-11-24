@@ -3038,7 +3038,12 @@ func (m *Messenger) BanUserFromCommunity(ctx context.Context, request *requests.
 	response.AddRosterChanges(changes)
 
 	if request.DeleteAllMessages && community.IsControlNode() {
-		deleteMessagesResponse, err := m.deleteCommunityMemberMessages(request.User.String(), request.CommunityID.String(), []*protobuf.DeleteCommunityMemberMessage{})
+		memberPubKey, err := crypto.HexToPubkey(request.User.String())
+		if err != nil {
+			return nil, err
+		}
+		memberID := cryptotypes.EncodeHex(crypto.FromECDSAPub(memberPubKey))
+		deleteMessagesResponse, err := m.deleteCommunityMemberMessages(memberID, request.CommunityID.String(), []*protobuf.DeleteCommunityMemberMessage{})
 		if err != nil {
 			return nil, err
 		}
@@ -3209,7 +3214,12 @@ func (m *Messenger) handleCommunityResponse(state *ReceivedMessageState, communi
 	if len(communityResponse.Changes.MembersBanned) > 0 {
 		for memberID, deleteAllMessages := range communityResponse.Changes.MembersBanned {
 			if deleteAllMessages {
-				response, err := m.deleteCommunityMemberMessages(memberID, community.IDString(), []*protobuf.DeleteCommunityMemberMessage{})
+				memberPubKey, err := crypto.HexToPubkey(memberID)
+				if err != nil {
+					return err
+				}
+				canonicalMemberID := cryptotypes.EncodeHex(crypto.FromECDSAPub(memberPubKey))
+				response, err := m.deleteCommunityMemberMessages(canonicalMemberID, community.IDString(), []*protobuf.DeleteCommunityMemberMessage{})
 				if err != nil {
 					return err
 				}
@@ -4979,7 +4989,8 @@ func (m *Messenger) HandleDeleteCommunityMemberMessages(ctx context.Context, sta
 		return communities.ErrNotOwner
 	}
 
-	deleteMessagesResponse, err := m.deleteCommunityMemberMessages(request.MemberId, community.IDString(), request.Messages)
+	canonicalMemberID := cryptotypes.EncodeHex(crypto.FromECDSAPub(memberPubKey))
+	deleteMessagesResponse, err := m.deleteCommunityMemberMessages(canonicalMemberID, community.IDString(), request.Messages)
 	if err != nil {
 		return err
 	}

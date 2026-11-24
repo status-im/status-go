@@ -559,22 +559,8 @@ func (m *Messenger) SendGroupChatMessage(request *requests.SendGroupChatMessage)
 	return m.sendChatMessage(context.Background(), message)
 }
 
-func (m *Messenger) deleteCommunityMemberMessages(member string, communityID string, deleteMessages []*protobuf.DeleteCommunityMemberMessage) (*MessengerResponse, error) {
-	request := &requests.DeleteCommunityMemberMessages{
-		CommunityID:  cryptotypes.FromHex(communityID),
-		MemberPubKey: member,
-		Messages:     deleteMessages,
-		DeleteAll:    len(deleteMessages) == 0,
-	}
-	if err := request.Validate(); err != nil {
-		return nil, err
-	}
-	memberPubKey, err := crypto.HexToPubkey(member)
-	if err != nil {
-		return nil, err
-	}
-	member = cryptotypes.EncodeHex(crypto.FromECDSAPub(memberPubKey))
-	messagesToDelete, updatedMessages, err := m.persistence.deleteCommunityMemberMessages(member, communityID, deleteMessages)
+func (m *Messenger) deleteCommunityMemberMessages(canonicalMemberID string, communityID string, deleteMessages []*protobuf.DeleteCommunityMemberMessage) (*MessengerResponse, error) {
+	messagesToDelete, updatedMessages, err := m.persistence.deleteCommunityMemberMessages(canonicalMemberID, communityID, deleteMessages)
 	if err != nil {
 		return nil, err
 	}
