@@ -1656,6 +1656,7 @@ func (m *Messenger) Shutdown() (err error) {
 	}
 	close(m.quit)
 	m.cancel()
+	m.curatedCommunitiesRefresh.shutdown()
 
 	m.sender.Stop()
 

@@ -6,6 +6,7 @@ import (
 	"maps"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"go.uber.org/zap"
 
@@ -94,6 +95,13 @@ type curatedCommunityResolver func(ctx context.Context, communityID string) (sto
 // maxConcurrentCuratedFetches bounds the entries a refresh fetches at once.
 const maxConcurrentCuratedFetches = 2
 
+// curatedDirectoryReadTimeout bounds the read of the directory contract.
+var curatedDirectoryReadTimeout = 30 * time.Second
+
+// curatedNotFoundRetryAfter is how long an entry that store nodes did not
+// have is skipped before it is fetched again.
+const curatedNotFoundRetryAfter = time.Hour
+
 // lastCuratedRefreshRunID numbers the runs of this process from 1.
 var lastCuratedRefreshRunID atomic.Uint64
 
@@ -107,17 +115,33 @@ type curatedCommunitiesRefresh struct {
 	stopped bool
 	// done is closed when the latest run has emitted its finished signal.
 	done chan struct{}
-	// notFound holds the entries that store nodes were asked for and did
-	// not have. They are not fetched again by this messenger.
-	notFound map[string]struct{}
+	// notFound holds when each entry that store nodes were asked for and did
+	// not have was marked. It is skipped for curatedNotFoundRetryAfter.
+	notFound map[string]time.Time
+	// now is time.Now unless a test sets it.
+	now func() time.Time
+}
+
+func (r *curatedCommunitiesRefresh) clock() time.Time {
+	if r.now != nil {
+		return r.now()
+	}
+	return time.Now()
 }
 
 func (r *curatedCommunitiesRefresh) isNotFound(communityID string) bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	_, notFound := r.notFound[communityID]
-	return notFound
+	markedAt, notFound := r.notFound[communityID]
+	if !notFound {
+		return false
+	}
+	if r.clock().Sub(markedAt) >= curatedNotFoundRetryAfter {
+		delete(r.notFound, communityID)
+		return false
+	}
+	return true
 }
 
 func (r *curatedCommunitiesRefresh) markNotFound(communityID string) {
@@ -125,18 +149,23 @@ func (r *curatedCommunitiesRefresh) markNotFound(communityID string) {
 	defer r.mu.Unlock()
 
 	if r.notFound == nil {
-		r.notFound = make(map[string]struct{})
+		r.notFound = make(map[string]time.Time)
 	}
-	r.notFound[communityID] = struct{}{}
+	r.notFound[communityID] = r.clock()
 }
 
 // begin starts a run, unless one is in flight and was not stopped: runID is
-// then the ID of that run. The new run must wait for previous before it
-// emits anything.
-func (r *curatedCommunitiesRefresh) begin(parent context.Context) (ctx context.Context, previous <-chan struct{}, done chan struct{}, runID uint64, started bool) {
+// then the ID of that run. Once parent is cancelled it starts and joins
+// nothing and runID is 0. A started run is added to wg under the same lock
+// as shutdown takes. The new run must wait for previous before it emits
+// anything.
+func (r *curatedCommunitiesRefresh) begin(parent context.Context, wg *sync.WaitGroup) (ctx context.Context, previous <-chan struct{}, done chan struct{}, runID uint64, started bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
+	if parent.Err() != nil {
+		return nil, nil, nil, 0, false
+	}
 	if r.cancel != nil && !r.stopped {
 		return nil, nil, nil, r.runID, false
 	}
@@ -146,7 +175,15 @@ func (r *curatedCommunitiesRefresh) begin(parent context.Context) (ctx context.C
 	r.stopped = false
 	r.done = make(chan struct{})
 	r.runID = lastCuratedRefreshRunID.Add(1)
+	wg.Add(1)
 	return ctx, previous, r.done, r.runID, true
+}
+
+// shutdown returns once no begin is adding a run to the wait group. Called
+// after the parent context is cancelled, no run is added after it returns.
+func (r *curatedCommunitiesRefresh) shutdown() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 }
 
 // release lets the next refresh start a run of its own.
@@ -180,9 +217,9 @@ func (r *curatedCommunitiesRefresh) stop() {
 // resolved, not found or failed. A refresh cancelled before it has its
 // directory emits no signal. Entries already stored are read with
 // CuratedCommunities. An entry that store nodes were asked for and did not
-// have is not found: it is fetched once per messenger and later refreshes skip
-// it without counting it. An entry whose ID is malformed is also not found,
-// and never fetched. An entry whose fetch returned an error, also because
+// have is not found: later refreshes skip it without counting it until
+// curatedNotFoundRetryAfter has passed. An entry whose ID is malformed is also
+// not found, and never fetched. An entry whose fetch returned an error, also because
 // store nodes may not be asked, is failed: the next refresh fetches it again,
 // as it does an entry whose fetch was interrupted, which is not counted. A
 // refresh requested while one is in flight joins it. Every run has an ID,
@@ -199,16 +236,11 @@ func (m *Messenger) StopCuratedCommunitiesRefresh() {
 }
 
 func (m *Messenger) refreshCuratedCommunities(directory curatedDirectoryReader, resolve curatedCommunityResolver) (uint64, error) {
-	if m.ctx.Err() != nil {
-		return 0, nil
-	}
-
-	ctx, previous, done, runID, started := m.curatedCommunitiesRefresh.begin(m.ctx)
+	ctx, previous, done, runID, started := m.curatedCommunitiesRefresh.begin(m.ctx, &m.shutdownWaitGroup)
 	if !started {
 		return runID, nil
 	}
 
-	m.shutdownWaitGroup.Add(1)
 	go func() {
 		defer panics.LogOnPanic()
 		defer m.shutdownWaitGroup.Done()
@@ -230,10 +262,8 @@ func (m *Messenger) refreshCuratedCommunities(directory curatedDirectoryReader, 
 			signals.CuratedCommunitiesRefreshStarted(runID, changed, directoryFailed)
 		}
 
-		resolved, notFound, failed := m.resolveCuratedCommunities(ctx, communityIDs, resolve)
+		resolved, notFound, failed, cancelled := m.resolveCuratedCommunities(ctx, communityIDs, resolve)
 
-		// Read before release, which cancels ctx.
-		cancelled := ctx.Err() != nil
 		m.curatedCommunitiesRefresh.release(done)
 		if signals != nil {
 			signals.CuratedCommunitiesRefreshFinished(runID, resolved, notFound, failed, cancelled)
@@ -245,14 +275,23 @@ func (m *Messenger) refreshCuratedCommunities(directory curatedDirectoryReader, 
 
 // updateCuratedDirectory stores the directory read from the contract and
 // returns its entries, and whether it differs from the directory stored
-// before. When the contract cannot be read or the directory cannot be stored
-// it has failed and returns the entries stored earlier, unchanged, or none
-// when they cannot be read either. Once ctx is cancelled it stores and
-// returns nothing.
+// before. An entry listed more than once is kept once. When the contract
+// cannot be read within curatedDirectoryReadTimeout or the directory cannot
+// be stored it has failed and returns the entries stored earlier, unchanged,
+// or none when they cannot be read either. Once ctx is cancelled it stores
+// and returns nothing.
 func (m *Messenger) updateCuratedDirectory(ctx context.Context, directory curatedDirectoryReader) (communityIDs []string, changed, failed bool) {
-	curatedCommunities, err := directory(ctx)
+	readCtx, cancelRead := context.WithTimeout(ctx, curatedDirectoryReadTimeout)
+	curatedCommunities, err := directory(readCtx)
+	cancelRead()
 	if ctx.Err() != nil {
 		return nil, false, false
+	}
+	if err == nil {
+		curatedCommunities = &communities.CuratedCommunities{
+			ContractCommunities:         uniqueCommunityIDs(curatedCommunities.ContractCommunities),
+			ContractFeaturedCommunities: uniqueCommunityIDs(curatedCommunities.ContractFeaturedCommunities),
+		}
 	}
 
 	stored, storedErr := m.communitiesManager.GetCuratedCommunities()
@@ -272,6 +311,20 @@ func (m *Messenger) updateCuratedDirectory(ctx context.Context, directory curate
 		return nil, false, true
 	}
 	return stored.ContractCommunities, false, true
+}
+
+// uniqueCommunityIDs keeps the first of each ID, in order.
+func uniqueCommunityIDs(ids []string) []string {
+	seen := make(map[string]struct{}, len(ids))
+	unique := make([]string, 0, len(ids))
+	for _, id := range ids {
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		unique = append(unique, id)
+	}
+	return unique
 }
 
 // sameCuratedDirectory tells whether both directories list the same entries
@@ -296,15 +349,18 @@ func sameCuratedDirectory(a, b *communities.CuratedCommunities) bool {
 // maxConcurrentCuratedFetches at a time, and counts each of them once.
 // Resolved: the fetch stored it. Not found: store nodes were asked without
 // error and did not have it, or its ID is malformed; it is neither fetched
-// nor counted again by this messenger. Failed: the fetch, or the check of
+// nor counted again for curatedNotFoundRetryAfter. Failed: the fetch, or the check of
 // what is stored, returned an error; the next refresh fetches the entry
 // again. A fetch interrupted by ctx is not counted, and no fetch starts once
 // ctx is cancelled. Entries already stored are not counted:
-// CuratedCommunities reads them. It returns when every fetch has returned.
-func (m *Messenger) resolveCuratedCommunities(ctx context.Context, communityIDs []string, resolve curatedCommunityResolver) (resolved, notFound, failed int) {
+// CuratedCommunities reads them. Interrupted tells whether ctx left an entry
+// unhandled. It returns when every fetch has returned.
+func (m *Messenger) resolveCuratedCommunities(ctx context.Context, communityIDs []string, resolve curatedCommunityResolver) (resolved, notFound, failed int, interrupted bool) {
 	var (
 		fetches sync.WaitGroup
 		mu      sync.Mutex
+		// skipped is set by the loop alone, interrupted under mu.
+		skipped bool
 	)
 	slots := make(chan struct{}, maxConcurrentCuratedFetches)
 
@@ -315,12 +371,14 @@ func (m *Messenger) resolveCuratedCommunities(ctx context.Context, communityIDs 
 		defer func() { <-slots }()
 
 		stored, err := resolve(ctx, communityID)
-		if ctx.Err() != nil {
-			return
-		}
 
 		mu.Lock()
 		defer mu.Unlock()
+
+		if ctx.Err() != nil {
+			interrupted = true
+			return
+		}
 
 		switch {
 		case stored:
@@ -340,6 +398,7 @@ func (m *Messenger) resolveCuratedCommunities(ctx context.Context, communityIDs 
 loop:
 	for _, communityID := range communityIDs {
 		if ctx.Err() != nil {
+			skipped = true
 			break
 		}
 		if m.curatedCommunitiesRefresh.isNotFound(communityID) {
@@ -373,10 +432,12 @@ loop:
 		select {
 		case slots <- struct{}{}:
 		case <-ctx.Done():
+			skipped = true
 			break loop
 		}
 		if ctx.Err() != nil {
 			<-slots
+			skipped = true
 			break
 		}
 
@@ -387,7 +448,7 @@ loop:
 
 	fetches.Wait()
 
-	return resolved, notFound, failed
+	return resolved, notFound, failed, interrupted || skipped
 }
 
 func (m *Messenger) isCommunityStored(communityID string) (bool, error) {

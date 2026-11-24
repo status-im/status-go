@@ -17,6 +17,7 @@ import (
 	"github.com/status-im/status-go/internal/contracts"
 	"github.com/status-im/status-go/internal/crypto"
 	"github.com/status-im/status-go/internal/crypto/types"
+	"github.com/status-im/status-go/internal/panics"
 	"github.com/status-im/status-go/internal/protocol/communities"
 	"github.com/status-im/status-go/internal/protocol/protobuf"
 	"github.com/status-im/status-go/internal/rpc/chain/ethclient"
@@ -223,6 +224,7 @@ func waitUnlessAborted(blocked, aborted <-chan struct{}) {
 func (s *MessengerCuratedRefreshSuite) waitIdle() {
 	idle := make(chan struct{})
 	go func() {
+		defer panics.LogOnPanic()
 		s.m.shutdownWaitGroup.Wait()
 		close(idle)
 	}()
@@ -750,8 +752,8 @@ func (s *MessengerCuratedRefreshSuite) TestRefreshFetchesUnknownEntryFromStoreNo
 	}, signals.recorded())
 }
 
-// An entry that store nodes do not have is fetched once per messenger: later
-// refreshes neither request it nor count it.
+// An entry that store nodes do not have is not fetched again for a while:
+// later refreshes neither request it nor count it.
 func (s *MessengerCuratedRefreshSuite) TestSecondRefreshDoesNotFetchNotFoundEntryAgain() {
 	signals := s.recordSignals()
 	batches := s.countStoreNodeBatches()
@@ -1111,13 +1113,13 @@ func (s *MessengerCuratedRefreshSuite) TestRefreshKeepsStoredDirectoryWhenStorin
 		ContractFeaturedCommunities: []string{known},
 	}))
 
-	// An entry listed twice cannot be stored.
+	s.failCuratedDirectoryStore()
 	unknown := s.newCommunityID()
 	resolve := func(ctx context.Context, id string) (bool, error) {
 		s.Fail("an entry of a directory that was not stored is not resolved")
 		return false, nil
 	}
-	s.Require().NoError(s.refresh(curatedDirectory("", unknown, unknown), resolve))
+	s.Require().NoError(s.refresh(curatedDirectory("", unknown), resolve))
 	s.waitFinished(signals)
 
 	s.Require().Equal([]curatedRefreshEvent{
@@ -1129,6 +1131,102 @@ func (s *MessengerCuratedRefreshSuite) TestRefreshKeepsStoredDirectoryWhenStorin
 	s.Require().NoError(err)
 	s.Require().Equal([]string{known}, response.ContractCommunities)
 	s.Require().Equal([]string{known}, response.ContractFeaturedCommunities)
+}
+
+// failCuratedDirectoryStore makes every later SetCuratedCommunities fail.
+func (s *MessengerCuratedRefreshSuite) failCuratedDirectoryStore() {
+	_, err := s.m.database.Exec(`CREATE TRIGGER fail_curated_store BEFORE INSERT ON curated_communities
+		BEGIN SELECT RAISE(ABORT, 'store refused by the test'); END`)
+	s.Require().NoError(err)
+}
+
+// A contract that lists an entry twice still has its directory stored, the
+// entry kept once and fetched once.
+func (s *MessengerCuratedRefreshSuite) TestRefreshStoresEntryListedTwiceOnce() {
+	signals := s.recordSignals()
+	first, second := s.newCommunityID(), s.newCommunityID()
+
+	var mu sync.Mutex
+	var attempted []string
+	resolve := func(ctx context.Context, id string) (bool, error) {
+		mu.Lock()
+		defer mu.Unlock()
+		attempted = append(attempted, id)
+		return false, nil
+	}
+	directory := func(context.Context) (*communities.CuratedCommunities, error) {
+		return &communities.CuratedCommunities{
+			ContractCommunities:         []string{first, second, first, second},
+			ContractFeaturedCommunities: []string{second, second},
+		}, nil
+	}
+	s.Require().NoError(s.refresh(directory, resolve))
+	s.waitFinished(signals)
+
+	s.Require().Equal([]curatedRefreshEvent{
+		{name: "started", changed: true},
+		{name: "finished", notFound: 2},
+	}, signals.recorded())
+	s.Require().ElementsMatch([]string{first, second}, attempted)
+
+	response, err := s.m.CuratedCommunities()
+	s.Require().NoError(err)
+	s.Require().ElementsMatch([]string{first, second}, response.ContractCommunities)
+	s.Require().Equal([]string{second}, response.ContractFeaturedCommunities)
+}
+
+// A contract call that never ends does not hold the refresh: it goes on with
+// the directory stored earlier.
+func (s *MessengerCuratedRefreshSuite) TestRefreshGivesUpOnDirectoryReadAfterTimeout() {
+	signals := s.recordSignals()
+	known := s.storeCommunity()
+	s.Require().NoError(s.m.communitiesManager.SetCuratedCommunities(&communities.CuratedCommunities{
+		ContractCommunities: []string{known},
+	}))
+
+	defer func(timeout time.Duration) { curatedDirectoryReadTimeout = timeout }(curatedDirectoryReadTimeout)
+	curatedDirectoryReadTimeout = 50 * time.Millisecond
+	hung := func(ctx context.Context) (*communities.CuratedCommunities, error) {
+		<-ctx.Done()
+		return nil, ctx.Err()
+	}
+	resolve := func(ctx context.Context, id string) (bool, error) {
+		return false, nil
+	}
+	s.Require().NoError(s.refresh(hung, resolve))
+	s.waitFinished(signals)
+
+	s.Require().Equal([]curatedRefreshEvent{
+		{name: "started", directoryFailed: true},
+		{name: "finished"},
+	}, signals.recorded())
+}
+
+// An entry that store nodes did not have is fetched again once
+// curatedNotFoundRetryAfter has passed.
+func (s *MessengerCuratedRefreshSuite) TestRefreshFetchesNotFoundEntryAgainLater() {
+	signals := s.recordSignals()
+	unknown := s.newCommunityID()
+	now := time.Now()
+	s.m.curatedCommunitiesRefresh.now = func() time.Time { return now }
+
+	var attempts int32
+	resolve := func(ctx context.Context, id string) (bool, error) {
+		atomic.AddInt32(&attempts, 1)
+		return false, nil
+	}
+	for _, elapsed := range []time.Duration{0, curatedNotFoundRetryAfter - time.Second, curatedNotFoundRetryAfter} {
+		now = now.Add(elapsed)
+		s.Require().NoError(s.refresh(curatedDirectory("", unknown), resolve))
+		s.waitFinished(signals)
+		s.waitIdle()
+	}
+
+	s.Require().Equal(int32(2), atomic.LoadInt32(&attempts))
+	events := signals.recorded()
+	s.Require().Equal(curatedRefreshEvent{name: "finished", notFound: 1}, events[1])
+	s.Require().Equal(curatedRefreshEvent{name: "finished"}, events[3])
+	s.Require().Equal(curatedRefreshEvent{name: "finished", notFound: 1}, events[5])
 }
 
 // The app reads the directory again when the refresh tells that it changed.
@@ -1151,9 +1249,13 @@ func (s *MessengerCuratedRefreshSuite) TestRefreshTellsWhetherDirectoryChanged()
 		curatedDirectory(second, second, first),
 		failingDirectory,
 		curatedDirectory(second, second),
-		// Listed twice: cannot be stored.
-		curatedDirectory(first, first, first),
+		// Listed twice: stored once.
+		curatedDirectory(second, second, second),
+		curatedDirectory(first, first),
 	} {
+		if len(signals.recorded()) == 16 {
+			s.failCuratedDirectoryStore()
+		}
 		s.Require().NoError(s.refresh(directory, resolve))
 		s.waitFinished(signals)
 		s.waitIdle()
@@ -1173,9 +1275,10 @@ func (s *MessengerCuratedRefreshSuite) TestRefreshTellsWhetherDirectoryChanged()
 		false, // the same entries in another order
 		false, // the contract cannot be read
 		true,  // an entry less
+		false, // the same entry, listed twice
 		false, // the directory cannot be stored
 	}, changed)
-	s.Require().Equal([]bool{false, false, false, false, false, true, false, true}, directoryFailed)
+	s.Require().Equal([]bool{false, false, false, false, false, true, false, false, true}, directoryFailed)
 }
 
 // With neither the contract nor the stored directory at hand the refresh

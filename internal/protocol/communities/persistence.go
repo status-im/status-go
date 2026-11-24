@@ -1732,6 +1732,9 @@ func (p *Persistence) GetCuratedCommunities() (*CuratedCommunities, error) {
 			result.ContractFeaturedCommunities = append(result.ContractFeaturedCommunities, communityID)
 		}
 	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
 
 	return result, nil
 }
