@@ -24,6 +24,84 @@ def contact_keys(contacts):
 class TestLocalBackup:
 
     @pytest.mark.init
+    @pytest.mark.spec("SC-THRD-36")
+    def test_local_backup_restores_threads_and_messages(self, backend_new_profile, backend_factory):
+        source = backend_new_profile("source")
+        community = source.wakuext_service.create_community("Thread backup", "Community with a thread")
+        community_chat_id = community["chats"][0]["id"]
+        source.wakuext_service.create_one_to_one_chat(test_one_to_one_chat_id, "")
+
+        expected = {}
+        for chat_id, label in (
+            (test_one_to_one_chat_id, "Direct chat"),
+            (community_chat_id, "Community channel"),
+        ):
+            parent_text = f"{label} parent"
+            parent_response = source.wakuext_service.send_chat_message(chat_id, parent_text)
+            parent = next(message for message in parent_response["messages"] if message["text"] == parent_text)
+            thread_id = parent["id"]
+            source.wakuext_service.create_thread(chat_id, thread_id)
+            thread_name = f"{label} renamed thread"
+            source.wakuext_service.edit_thread(chat_id, thread_id, thread_name)
+            reply_text = f"{label} reply"
+            reply_response = source.wakuext_service.send_chat_message(chat_id, reply_text, thread_id=thread_id)
+            reply = next(message for message in reply_response["messages"] if message["text"] == reply_text)
+            expected[chat_id] = (
+                thread_id,
+                thread_name,
+                parent_text,
+                reply["id"],
+                reply_text,
+            )
+
+        backup_dir = "/usr/status-user/backups"
+        source.settings_service.save_setting("backup-path", backup_dir)
+        source.settings_service.save_setting("messages-backup-enabled?", True)
+        backup_path = source.api_request_json("PerformLocalBackup", "")["filePath"]
+        backup_file = source.extract_data(backup_path)
+        assert backup_file is not None
+
+        restored = backend_factory("restored")
+        restored.init_status_backend()
+        restored.restore_account_and_login(
+            user=Account(
+                passphrase=source.mnemonic,
+                password=source.password,
+                private_key="",
+                address="",
+            )
+        )
+        restored.wait_for_login()
+        restored.wakuext_service.start_messenger()
+        assert restored.key_uid == source.key_uid
+        assert expected.keys().isdisjoint(chat["id"] for chat in restored.wakuext_service.chats())
+
+        restored.import_data(backup_file, backup_dir)
+        restored.api_request_json("LoadLocalBackup", {"filePath": backup_path})
+
+        assert expected.keys() <= {chat["id"] for chat in restored.wakuext_service.chats()}
+        for chat_id, (
+            thread_id,
+            thread_name,
+            parent_text,
+            reply_id,
+            reply_text,
+        ) in expected.items():
+            threads = restored.wakuext_service.chat_threads(chat_id)["threads"]
+            (thread,) = threads
+            assert thread["threadId"] == thread_id
+            assert thread["chatId"] == chat_id
+            assert thread["parentMessageId"] == thread_id
+            assert thread["name"] == thread_name
+
+            messages = restored.wakuext_service.chat_thread_messages(chat_id, thread_id)["messages"]
+            assert [(message["id"], message["text"], message["threadId"]) for message in messages] == [(reply_id, reply_text, thread_id)]
+            parent_messages = restored.wakuext_service.chat_messages(chat_id)["messages"]
+            parent_by_id = {message["id"]: message["text"] for message in parent_messages}
+            assert parent_by_id[thread_id] == parent_text
+            assert reply_id not in parent_by_id
+
+    @pytest.mark.init
     def test_local_backup(self, tmp_path, backend_factory):
         backend_client = backend_factory()
         backend_client.init_status_backend()
