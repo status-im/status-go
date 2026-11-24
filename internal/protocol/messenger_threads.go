@@ -191,7 +191,7 @@ func (m *Messenger) createThread(chatID string, parentMessageID string, name str
 			return nil, ErrThreadDeleted
 		}
 		if thread.CreatorID == contacts.ContactIDFromPublicKey(&m.identity.PublicKey) {
-			if err := m.dispatchThreadCreationMetadata(context.Background(), chat, thread.ThreadID, thread.Name); err != nil {
+			if err := m.sendThreadCreationMetadata(context.Background(), chat, thread.ThreadID, thread.Name, false); err != nil {
 				return nil, err
 			}
 			thread, err := m.persistence.ThreadWithSummaryByID(chatID, parentMessageID)
@@ -374,6 +374,10 @@ func (m *Messenger) applyPendingThreadMetadata(chat *Chat, threadID string, crea
 }
 
 func (m *Messenger) dispatchThreadCreationMetadata(ctx context.Context, chat *Chat, threadID, name string) error {
+	return m.sendThreadCreationMetadata(ctx, chat, threadID, name, true)
+}
+
+func (m *Messenger) sendThreadCreationMetadata(ctx context.Context, chat *Chat, threadID, name string, updateName bool) error {
 	clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
 	metadata := &ThreadMetadata{ThreadMetadata: &protobuf.ThreadMetadata{
 		Clock: clock, ChatId: chat.ID, ThreadId: threadID, Name: name,
@@ -383,12 +387,14 @@ func (m *Messenger) dispatchThreadCreationMetadata(ctx context.Context, chat *Ch
 	if err != nil {
 		return err
 	}
-	updated, err := m.persistence.UpdateThreadMetadata(chat.ID, threadID, name, clock)
-	if err != nil {
-		return err
-	}
-	if !updated {
-		return errors.New("thread creation metadata update was superseded")
+	if updateName {
+		updated, err := m.persistence.UpdateThreadMetadata(chat.ID, threadID, name, clock)
+		if err != nil {
+			return err
+		}
+		if !updated {
+			return errors.New("thread creation metadata update was superseded")
+		}
 	}
 	_, err = m.dispatchMessage(ctx, common.RawMessage{
 		LocalChatID: chat.ID, Payload: encoded,
@@ -405,12 +411,12 @@ func (m *Messenger) EditThread(ctx context.Context, request *requests.EditThread
 	if err := request.Validate(); err != nil {
 		return nil, err
 	}
-	name, overlong := common.NormalizeThreadName(*request.Name, false)
+	name, overlong := common.NormalizeThreadNameForRenaming(*request.Name, false)
 	if name == "" {
 		return nil, requests.ErrEditThreadInvalidName
 	}
 	if overlong {
-		return nil, requests.ErrEditThreadNameTooLong
+		return nil, requests.ErrEditThreadNameTooLongForRenaming
 	}
 	chat, ok := m.allChats.Load(request.ChatID)
 	if !ok {

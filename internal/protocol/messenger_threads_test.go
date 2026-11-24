@@ -271,14 +271,24 @@ func (s *MessengerThreadsSuite) TestEditThreadUpdatesMetadataWithoutChangingPare
 	_, err := s.m.CreateThread(chat.ID, parent.ID)
 	s.Require().NoError(err)
 
-	name := "  Renamed\nthread  "
+	normalizedName := strings.Repeat("👩🏽‍💻", common.MaxThreadNameLengthForRenaming)
+	name := " \n" + normalizedName + "\t "
 	response, err := s.m.EditThread(context.Background(), &requests.EditThread{
 		ChatID: chat.ID, ThreadID: parent.ID, Name: &name,
 	})
 	s.Require().NoError(err)
 	s.Require().Len(response.Threads(), 1)
-	s.Require().Equal("Renamed thread", response.Threads()[0].Name)
+	s.Require().Equal(normalizedName, response.Threads()[0].Name)
 	s.Require().NotEmpty(response.Threads()[0].CreatorID)
+
+	overlong := normalizedName + "a"
+	_, err = s.m.EditThread(context.Background(), &requests.EditThread{
+		ChatID: chat.ID, ThreadID: parent.ID, Name: &overlong,
+	})
+	s.Require().ErrorIs(err, requests.ErrEditThreadNameTooLongForRenaming)
+	thread, err := s.m.persistence.ThreadByID(chat.ID, parent.ID)
+	s.Require().NoError(err)
+	s.Require().Equal(normalizedName, thread.Name)
 
 	storedParent, err := s.m.MessageByID(parent.ID)
 	s.Require().NoError(err)
@@ -452,11 +462,25 @@ func (s *MessengerThreadsSuite) TestCreateThreadResendsMetadataWhenRetriedByCrea
 	s.Require().NoError(err)
 	s.Require().Len(response.Threads(), 1)
 
+	name := strings.Repeat("👩🏽‍💻", common.MaxThreadNameLengthForRenaming)
+	_, err = s.m.EditThread(context.Background(), &requests.EditThread{ChatID: chat.ID, ThreadID: "parent-id", Name: &name})
+	s.Require().NoError(err)
+	var renameClock uint64
+	s.Require().NoError(s.m.persistence.db.QueryRow(
+		`SELECT metadata_clock FROM threads WHERE chat_id = ? AND thread_id = ?`, chat.ID, "parent-id",
+	).Scan(&renameClock))
+
 	// Retrying as the creator resends creation metadata after a delivery failure.
 	response, err = s.m.CreateThread(chat.ID, "parent-id")
 	s.Require().NoError(err)
 	s.Require().Len(response.Threads(), 1)
 	s.Require().Equal("parent-id", response.Threads()[0].ThreadID)
+	s.Require().Equal(name, response.Threads()[0].Name)
+	var retryClock uint64
+	s.Require().NoError(s.m.persistence.db.QueryRow(
+		`SELECT metadata_clock FROM threads WHERE chat_id = ? AND thread_id = ?`, chat.ID, "parent-id",
+	).Scan(&retryClock))
+	s.Require().Equal(renameClock, retryClock)
 }
 
 func (s *MessengerThreadsSuite) TestCreateThreadFailsWhenFeatureFlagDisabled() {
@@ -1976,9 +2000,10 @@ func (s *MessengerThreadsSuite) newThreadMetadataHandler() (*ecdsa.PrivateKey, *
 func (s *MessengerThreadsSuite) TestThreadRenameBeforeCreationKeepsLatestName() {
 	creator, chat, handle := s.newThreadMetadataHandler()
 	creatorID := contacts.ContactIDFromPublicKey(&creator.PublicKey)
+	renamed := strings.Repeat("👩🏽‍💻", common.MaxThreadNameLengthForRenaming)
 
 	// The rename arrives before the thread exists and is buffered.
-	response, err := handle(&protobuf.ThreadMetadata{Clock: 20, ThreadId: "thread", Name: "Renamed"})
+	response, err := handle(&protobuf.ThreadMetadata{Clock: 20, ThreadId: "thread", Name: renamed})
 	s.Require().NoError(err)
 	s.Require().Empty(response.Threads())
 	_, err = s.m.persistence.ThreadByID(chat.ID, "thread")
@@ -1987,15 +2012,62 @@ func (s *MessengerThreadsSuite) TestThreadRenameBeforeCreationKeepsLatestName() 
 	response, err = handle(&protobuf.ThreadMetadata{Clock: 10, ThreadId: "thread", Name: "Created", CreatorId: creatorID})
 	s.Require().NoError(err)
 	s.Require().Len(response.Threads(), 1)
-	s.Require().Equal("Renamed", response.Threads()[0].Name)
+	s.Require().Equal(renamed, response.Threads()[0].Name)
 
 	thread, err := s.m.persistence.ThreadByID(chat.ID, "thread")
 	s.Require().NoError(err)
-	s.Require().Equal("Renamed", thread.Name)
+	s.Require().Equal(renamed, thread.Name)
 	s.Require().Equal(creatorID, thread.CreatorID)
 	pending, err := s.m.persistence.PendingThreadMetadata(chat.ID, "thread")
 	s.Require().NoError(err)
 	s.Require().Empty(pending)
+}
+
+func (s *MessengerThreadsSuite) TestThreadMetadataNameLimits() {
+	creator, chat, handle := s.newThreadMetadataHandler()
+	name := strings.Repeat("👩🏽‍💻", common.MaxThreadNameLengthForRenaming)
+	_, err := handle(&protobuf.ThreadMetadata{
+		Clock: 10, ThreadId: "thread", Name: name,
+		CreatorId: contacts.ContactIDFromPublicKey(&creator.PublicKey),
+	})
+	s.Require().NoError(err)
+	thread, err := s.m.persistence.ThreadByID(chat.ID, "thread")
+	s.Require().NoError(err)
+	s.Require().Equal(strings.Repeat("👩🏽‍💻", common.MaxThreadNameLength), thread.Name)
+
+	response, err := handle(&protobuf.ThreadMetadata{Clock: 20, ThreadId: "thread", Name: " \n" + name + "\t "})
+	s.Require().NoError(err)
+	s.Require().Len(response.Threads(), 1)
+	s.Require().Equal(name, response.Threads()[0].Name)
+
+	_, err = handle(&protobuf.ThreadMetadata{Clock: 30, ThreadId: "thread", Name: name + "a"})
+	s.Require().ErrorIs(err, requests.ErrEditThreadNameTooLongForRenaming)
+	thread, err = s.m.persistence.ThreadByID(chat.ID, "thread")
+	s.Require().NoError(err)
+	s.Require().Equal(name, thread.Name)
+}
+
+func (s *MessengerThreadsSuite) TestThreadCreationRetryPreservesRenameAndClock() {
+	creator, chat, handle := s.newThreadMetadataHandler()
+	creatorID := contacts.ContactIDFromPublicKey(&creator.PublicKey)
+	name := strings.Repeat("👩🏽‍💻", common.MaxThreadNameLengthForRenaming)
+
+	_, err := handle(&protobuf.ThreadMetadata{Clock: 10, ThreadId: "thread", Name: "Created", CreatorId: creatorID})
+	s.Require().NoError(err)
+	_, err = handle(&protobuf.ThreadMetadata{Clock: 20, ThreadId: "thread", Name: name})
+	s.Require().NoError(err)
+	_, err = handle(&protobuf.ThreadMetadata{Clock: 40, ThreadId: "thread", Name: name, CreatorId: creatorID})
+	s.Require().NoError(err)
+	thread, err := s.m.persistence.ThreadByID(chat.ID, "thread")
+	s.Require().NoError(err)
+	s.Require().Equal(name, thread.Name)
+
+	// A rename newer than the previous rename but older than the retry still wins.
+	_, err = handle(&protobuf.ThreadMetadata{Clock: 30, ThreadId: "thread", Name: "Later rename"})
+	s.Require().NoError(err)
+	thread, err = s.m.persistence.ThreadByID(chat.ID, "thread")
+	s.Require().NoError(err)
+	s.Require().Equal("Later rename", thread.Name)
 }
 
 func (s *MessengerThreadsSuite) TestThreadRenameOnPendingPlaceholderBeforeCreationKeepsLatestName() {

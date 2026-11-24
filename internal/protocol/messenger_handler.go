@@ -1915,6 +1915,7 @@ func (m *Messenger) HandleThreadMetadata(ctx context.Context, state *ReceivedMes
 	}
 
 	senderID := contacts.ContactIDFromPublicKey(metadata.SigPubKey)
+	updateName := true
 	if metadata.CreatorId != "" {
 		if metadata.CreatorId != senderID {
 			return errors.New("thread creator does not match signer")
@@ -1940,6 +1941,8 @@ func (m *Messenger) HandleThreadMetadata(ctx context.Context, state *ReceivedMes
 				return err
 			}
 		case existing.CreatorID == senderID:
+			// Creation retries only confirm provenance; renames have their own clock.
+			updateName = false
 		case existing.CreatorID != "":
 			return errors.New("thread creator cannot be changed")
 		case !existing.CreatorPending:
@@ -1957,12 +1960,12 @@ func (m *Messenger) HandleThreadMetadata(ctx context.Context, state *ReceivedMes
 			}
 		}
 	} else {
-		name, overlong := common.NormalizeThreadName(metadata.Name, false)
+		name, overlong := common.NormalizeThreadNameForRenaming(metadata.Name, false)
 		if name == "" {
 			return requests.ErrEditThreadInvalidName
 		}
 		if overlong {
-			return requests.ErrEditThreadNameTooLong
+			return requests.ErrEditThreadNameTooLongForRenaming
 		}
 		thread, err := m.persistence.ThreadByID(chat.ID, metadata.ThreadId)
 		if errors.Is(err, common.ErrRecordNotFound) {
@@ -1995,9 +1998,12 @@ func (m *Messenger) HandleThreadMetadata(ctx context.Context, state *ReceivedMes
 		state.Response.AddChat(chat)
 	}
 
-	updated, err := m.persistence.UpdateThreadMetadata(chat.ID, metadata.ThreadId, metadata.Name, metadata.Clock)
-	if err != nil {
-		return err
+	updated := false
+	if updateName {
+		updated, err = m.persistence.UpdateThreadMetadata(chat.ID, metadata.ThreadId, metadata.Name, metadata.Clock)
+		if err != nil {
+			return err
+		}
 	}
 	replayed := false
 	var deletedNotifications []*ActivityCenterNotification

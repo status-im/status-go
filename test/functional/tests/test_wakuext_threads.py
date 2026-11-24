@@ -399,8 +399,11 @@ class TestWakuextThreadRename:
     async def test_thread_rename_reaches_the_peer(self, sender, receiver):
         parent_text = f"parent-{uuid4()}"
         reply_text = f"reply-{uuid4()}"
-        renamed = f"Renamed-{uuid4()}"
+        renamed = f"Renamed-{uuid4()}".ljust(100, "x")
         sender_chat_id, receiver_chat_id, parent_id, _ = await _one_to_one_thread(sender, receiver, parent_text, reply_text)
+
+        with pytest.raises(ApiResponseError):
+            sender.wakuext_service.edit_thread(sender_chat_id, parent_id, renamed + "x")
 
         edited = sender.wakuext_service.edit_thread(sender_chat_id, parent_id, renamed)
         assert _thread(edited, parent_id)["name"] == renamed
