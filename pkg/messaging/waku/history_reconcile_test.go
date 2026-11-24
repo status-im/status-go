@@ -245,3 +245,20 @@ func TestQueueHistoryReconciliationMergesOverlappingWindows(t *testing.T) {
 	require.Equal(t, start, pending[0].From)
 	require.Equal(t, start.Add(historyReconcileMinInterval+2*time.Second), pending[0].To)
 }
+
+func TestHistoryReconcilerQueuesTheUnreliableWindow(t *testing.T) {
+	start := time.Now()
+	r := NewHistoryReconciler(false, start)
+	_, ok := r.Next()
+	require.False(t, ok)
+
+	r.Observe(true, start.Add(5*time.Second))
+	window, ok := r.Next()
+	require.True(t, ok)
+	require.Equal(t, start.Round(0), window.From)
+	require.Equal(t, start.Add(5*time.Second).Round(0), window.To)
+
+	r.Done()
+	_, ok = r.Next()
+	require.False(t, ok)
+}

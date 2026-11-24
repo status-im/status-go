@@ -2,7 +2,6 @@ package delivery
 
 import (
 	"context"
-	"crypto/rand"
 	"errors"
 	"fmt"
 	"sync"
@@ -20,12 +19,13 @@ import (
 	"github.com/status-im/status-go/internal/connection"
 	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/panics"
+	"github.com/status-im/status-go/pkg/messaging/waku"
 	"github.com/status-im/status-go/pkg/messaging/waku/types"
 )
 
 // ErrStoreQueryUnsupported is returned by StoreQuery: the Messaging API
 // recovers history itself and exposes no store query.
-var ErrStoreQueryUnsupported = errors.New("delivery: store queries are not exposed by the Messaging API")
+var ErrStoreQueryUnsupported = errors.New("store queries are not exposed by the Messaging API")
 
 // Adapter is the messaging backend over the logos-delivery Messaging API.
 // It satisfies types.Waku and transport.MessagingAPI.
@@ -59,7 +59,7 @@ type Adapter struct {
 func NewAdapter(cfg messaging.Config, logger *zap.Logger) (*Adapter, error) {
 	mc, err := messaging.New(cfg)
 	if err != nil {
-		return nil, fmt.Errorf("delivery: create node: %w", err)
+		return nil, fmt.Errorf("create node: %w", err)
 	}
 	return newAdapter(mc, logger), nil
 }
@@ -69,7 +69,7 @@ func newAdapter(mc *messaging.MessagingClient, logger *zap.Logger) *Adapter {
 		mc:                     mc,
 		logger:                 logger.Named("delivery"),
 		connSubscribers:        make(map[string]*types.ConnStatusSubscription),
-		historyReconcileNeeded: make(chan types.HistoryReconcileWindow),
+		historyReconcileNeeded: make(chan types.HistoryReconcileWindow, 16),
 		quit:                   make(chan struct{}),
 	}
 }
@@ -78,10 +78,11 @@ var _ types.Waku = (*Adapter)(nil)
 
 // Start starts the node and begins translating its events.
 func (a *Adapter) Start() error {
-	a.wg.Add(1)
+	a.wg.Add(2)
 	go a.eventLoop()
+	go a.historyReconcileLoop()
 	if err := a.mc.Start(); err != nil {
-		return fmt.Errorf("delivery: start: %w", err)
+		return fmt.Errorf("start: %w", err)
 	}
 	if err := a.readNodeInfo(); err != nil {
 		return errors.Join(err, a.mc.Stop())
@@ -92,15 +93,15 @@ func (a *Adapter) Start() error {
 func (a *Adapter) readNodeInfo() error {
 	size, err := a.mc.Node().Debug().MaxMessageSize()
 	if err != nil {
-		return fmt.Errorf("delivery: max message size: %w", err)
+		return fmt.Errorf("max message size: %w", err)
 	}
 	a.maxMessageSize.Store(uint32(size))
 	return nil
 }
 
-// enter reports whether the node may still be called. On true, the caller
-// holds the call guard until it calls leave.
-func (a *Adapter) enter() bool {
+// rLockCalls read-locks calls unless the Adapter is stopped, in which case it
+// returns false and holds no lock.
+func (a *Adapter) rLockCalls() bool {
 	a.calls.RLock()
 	if a.closed {
 		a.calls.RUnlock()
@@ -109,7 +110,7 @@ func (a *Adapter) enter() bool {
 	return true
 }
 
-func (a *Adapter) leave() { a.calls.RUnlock() }
+func (a *Adapter) rUnlockCalls() { a.calls.RUnlock() }
 
 // Stop stops the node and releases it, once the calls in flight return.
 // Later calls return the first result. The Adapter cannot be restarted.
@@ -154,10 +155,56 @@ func (a *Adapter) eventLoop() {
 	}
 }
 
+// historyReconcileLoop gives the Messenger the windows to fetch from store
+// while the node is not Connected, as the go-waku backend does.
+func (a *Adapter) historyReconcileLoop() {
+	defer panics.LogOnPanic()
+	defer a.wg.Done()
+
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
+	reconciler := waku.NewHistoryReconciler(a.reliablyConnected(), time.Now())
+	reconciler.Observe(a.reliablyConnected(), time.Now())
+	for {
+		var out chan<- types.HistoryReconcileWindow
+		next, ok := reconciler.Next()
+		if ok {
+			out = a.historyReconcileNeeded
+		}
+		select {
+		case <-a.quit:
+			return
+		case out <- next:
+			reconciler.Done()
+		case <-ticker.C:
+			reconciler.Observe(a.reliablyConnected(), time.Now())
+		}
+	}
+}
+
+func (a *Adapter) reliablyConnected() bool {
+	return a.ConnectionState() == types.ConnectionStateConnected
+}
+
+// handleEvent reports a node event. A received message carries no pubsub
+// topic: the Messaging API delivers by content topic.
 func (a *Adapter) handleEvent(ev messaging.Event) {
 	switch e := ev.(type) {
 	case messaging.MessageReceivedEvent:
-		a.handleReceived(e)
+		hash := decodeHash(e.MessageHash)
+		a.envelopeFeed.Send(types.EnvelopeEvent{
+			Event: types.EventEnvelopeAvailable,
+			Hash:  cryptotypes.BytesToHash(hash),
+			Data: &types.ReceivedMessage{
+				Hash:         hash,
+				ContentTopic: e.Message.ContentTopic,
+				Payload:      e.Message.Payload,
+				Ephemeral:    e.Message.Ephemeral,
+				Meta:         e.Message.Meta,
+				Version:      e.Message.Version,
+				Timestamp:    e.Message.Timestamp,
+			},
+		})
 	case messaging.MessagePropagatedEvent:
 		a.envelopeFeed.Send(types.EnvelopeEvent{
 			Event: types.EventEnvelopeSent,
@@ -174,41 +221,28 @@ func (a *Adapter) handleEvent(ev messaging.Event) {
 	}
 }
 
-// handleReceived reports a received message. It carries no pubsub topic: the
-// Messaging API delivers by content topic.
-func (a *Adapter) handleReceived(e messaging.MessageReceivedEvent) {
-	hash := decodeHash(e.MessageHash)
-	a.envelopeFeed.Send(types.EnvelopeEvent{
-		Event: types.EventEnvelopeAvailable,
-		Hash:  cryptotypes.BytesToHash(hash),
-		Data: &types.ReceivedMessage{
-			Hash:         hash,
-			ContentTopic: e.Message.ContentTopic,
-			Payload:      e.Message.Payload,
-			Ephemeral:    e.Message.Ephemeral,
-			Meta:         e.Message.Meta,
-			Version:      e.Message.Version,
-			Timestamp:    e.Message.Timestamp,
-		},
-	})
-}
-
 // Send queues a pre-encoded payload on contentTopic and returns its wire hash,
 // without waiting for the message to go out. Like the go-waku backend, it
 // reports the message as available right away: the node does not hand its own
 // messages to its subscribers.
 //
+// A message the node refuses (*messaging.SendError) fails the send: the node
+// queues nothing for it.
+//
 // pubsubTopic and priority are not honoured: the Messaging API derives the
 // shard from the content topic and has no send priority.
 func (a *Adapter) Send(ctx context.Context, pubsubTopic, contentTopic string, payload []byte, ephemeral bool, priority *int) ([]byte, error) {
-	if !a.enter() {
-		return nil, fmt.Errorf("delivery: send: %w", messaging.ErrClosed)
+	if !a.rLockCalls() {
+		return nil, fmt.Errorf("send: %w", messaging.ErrClosed)
 	}
 	messageHash, err := a.mc.Send(ctx, contentTopic, payload, ephemeral)
-	a.leave()
-	hash, err := a.sendOutcome(messageHash, err)
+	a.rUnlockCalls()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("send: %w", err)
+	}
+	hash := decodeHash(messageHash)
+	if hash == nil {
+		return nil, fmt.Errorf("send: unexpected message hash %q", messageHash)
 	}
 	a.envelopeFeed.Send(types.EnvelopeEvent{
 		Event: types.EventEnvelopeAvailable,
@@ -224,49 +258,16 @@ func (a *Adapter) Send(ctx context.Context, pubsubTopic, contentTopic string, pa
 	return hash, nil
 }
 
-// sendOutcome turns the node's answer to a send into the hash the transport
-// tracks. A refusal a later resend can clear is reported, as on the go-waku
-// backend, as a send that expired: under a hash of its own, which no message
-// on the network has.
-func (a *Adapter) sendOutcome(messageHash string, err error) ([]byte, error) {
-	var refused *messaging.SendError
-	if errors.As(err, &refused) && retryableRefusal(refused.Kind) {
-		a.logger.Debug("send refused", zap.String("kind", string(refused.Kind)), zap.String("reason", refused.Message))
-		hash := make([]byte, cryptotypes.HashLength)
-		if _, err := rand.Read(hash); err != nil {
-			return nil, fmt.Errorf("delivery: send: %w", err)
-		}
-		a.envelopeFeed.Send(types.EnvelopeEvent{Event: types.EventEnvelopeExpired, Hash: cryptotypes.BytesToHash(hash)})
-		return hash, nil
-	}
-	if err != nil {
-		return nil, fmt.Errorf("delivery: send: %w", err)
-	}
-	hash := decodeHash(messageHash)
-	if hash == nil {
-		return nil, fmt.Errorf("delivery: send: unexpected message hash %q", messageHash)
-	}
-	return hash, nil
-}
-
-func retryableRefusal(kind messaging.SendErrorKind) bool {
-	switch kind {
-	case messaging.SendNotConnected, messaging.SendQueueFull, messaging.SendRateLimited:
-		return true
-	}
-	return false
-}
-
 // Subscribe subscribes the content topics. The pubsub topic is ignored: the
 // transport counts subscriptions per content topic (see ContentTopicOnly).
 func (a *Adapter) Subscribe(ctx context.Context, pubsubTopic string, contentTopics []types.TopicType) error {
-	if !a.enter() {
-		return fmt.Errorf("delivery: subscribe: %w", messaging.ErrClosed)
+	if !a.rLockCalls() {
+		return fmt.Errorf("subscribe: %w", messaging.ErrClosed)
 	}
-	defer a.leave()
+	defer a.rUnlockCalls()
 	for _, topic := range contentTopics {
 		if err := a.mc.Subscribe(topic.ContentTopic()); err != nil {
-			return fmt.Errorf("delivery: subscribe %s: %w", topic.ContentTopic(), err)
+			return fmt.Errorf("subscribe %s: %w", topic.ContentTopic(), err)
 		}
 	}
 	return nil
@@ -274,13 +275,13 @@ func (a *Adapter) Subscribe(ctx context.Context, pubsubTopic string, contentTopi
 
 // Unsubscribe unsubscribes the content topics. The pubsub topic is ignored.
 func (a *Adapter) Unsubscribe(ctx context.Context, pubsubTopic string, contentTopics []types.TopicType) error {
-	if !a.enter() {
-		return fmt.Errorf("delivery: unsubscribe: %w", messaging.ErrClosed)
+	if !a.rLockCalls() {
+		return fmt.Errorf("unsubscribe: %w", messaging.ErrClosed)
 	}
-	defer a.leave()
+	defer a.rUnlockCalls()
 	for _, topic := range contentTopics {
 		if err := a.mc.Unsubscribe(topic.ContentTopic()); err != nil {
-			return fmt.Errorf("delivery: unsubscribe %s: %w", topic.ContentTopic(), err)
+			return fmt.Errorf("unsubscribe %s: %w", topic.ContentTopic(), err)
 		}
 	}
 	return nil
@@ -323,8 +324,8 @@ func (a *Adapter) SubscribeToConnStatusChanges() (*types.ConnStatusSubscription,
 	return sub, nil
 }
 
-// OnHistoryReconcileNeeded never fires: the node fills the gaps of an outage
-// from store itself and reports the messages as received.
+// OnHistoryReconcileNeeded returns the windows to fetch from store: while the
+// node is not Connected, and once more when it is again.
 func (a *Adapter) OnHistoryReconcileNeeded() <-chan types.HistoryReconcileWindow {
 	return a.historyReconcileNeeded
 }
@@ -340,7 +341,8 @@ func (a *Adapter) TrafficReport() types.TrafficReport { return types.TrafficRepo
 // ResetTrafficStats is a no-op, see TrafficReport.
 func (a *Adapter) ResetTrafficStats() {}
 
-// Pause is a no-op: the Messaging API cannot idle the node.
+// Pause is a no-op: the Messaging API cannot idle the node
+// (https://github.com/logos-messaging/logos-delivery/issues/4495).
 func (a *Adapter) Pause() error { return nil }
 
 // Resume is a no-op, see Pause.
@@ -350,15 +352,16 @@ func (a *Adapter) Resume() error { return nil }
 // from the host.
 func (a *Adapter) ConnectionChanged(connection.State) {}
 
-// ConfirmMessageDelivered is a no-op: the node confirms its sends itself.
+// ConfirmMessageDelivered is a no-op: the node confirms its sends itself. To
+// be removed with the other no-ops (https://github.com/status-im/status-go/issues/8103).
 func (a *Adapter) ConfirmMessageDelivered([]common.Hash) {}
 
 // Peers returns the node's connected peers, or none when it cannot tell.
 func (a *Adapter) Peers() types.PeerStats {
-	if !a.enter() {
+	if !a.rLockCalls() {
 		return types.PeerStats{}
 	}
-	defer a.leave()
+	defer a.rUnlockCalls()
 	peers, err := a.mc.Node().Peers().ConnectedInfo()
 	if err != nil {
 		a.logger.Debug("failed to list connected peers", zap.Error(err))
@@ -373,10 +376,10 @@ func (a *Adapter) Peers() types.PeerStats {
 
 // PeerID returns the node's peer ID, or an empty one when it cannot tell.
 func (a *Adapter) PeerID() peer.ID {
-	if !a.enter() {
+	if !a.rLockCalls() {
 		return ""
 	}
-	defer a.leave()
+	defer a.rUnlockCalls()
 	id, err := a.mc.Node().Debug().PeerID()
 	if err != nil {
 		a.logger.Debug("failed to read the peer ID", zap.Error(err))
@@ -387,10 +390,10 @@ func (a *Adapter) PeerID() peer.ID {
 
 // Metrics returns the node's metrics in the Prometheus text format.
 func (a *Adapter) Metrics() string {
-	if !a.enter() {
+	if !a.rLockCalls() {
 		return ""
 	}
-	defer a.leave()
+	defer a.rUnlockCalls()
 	metrics, err := a.mc.Node().Debug().Metrics()
 	if err != nil {
 		a.logger.Debug("failed to read metrics", zap.Error(err))
