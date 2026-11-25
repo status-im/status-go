@@ -13,14 +13,20 @@ import (
 	"github.com/status-im/status-go/internal/testutils"
 )
 
+type nodeLoginSeen struct {
+	Seq          uint64
+	Error        string
+	StateAtEvent LoginState
+}
+
 type LoginStateSuite struct {
 	suite.Suite
 
 	backend *StatusBackend
 	rootDir string
 
-	mu                  sync.Mutex
-	stateAtLoginSignals []LoginState
+	mu         sync.Mutex
+	nodeLogins []nodeLoginSeen
 }
 
 func TestLoginStateSuite(t *testing.T) {
@@ -28,20 +34,31 @@ func TestLoginStateSuite(t *testing.T) {
 }
 
 func (s *LoginStateSuite) SetupTest() {
-	s.stateAtLoginSignals = nil
+	s.nodeLogins = nil
 	s.rootDir = s.T().TempDir()
 	s.backend = NewStatusBackend(testutils.MustCreateTestLogger())
 	s.backend.UpdateRootDataDir(s.rootDir)
 	initializeApplicationWithMediaServerPortHelper(s.T(), s.backend, reserveLocalhostPort(s.T()))
 
 	signal.SetHandler(func(data []byte) {
-		if !strings.Contains(string(data), signal.EventLoggedIn) {
+		if !strings.Contains(string(data), `"type":"`+signal.EventLoggedIn+`"`) {
 			return
 		}
+		var envelope struct {
+			Event struct {
+				Seq   uint64 `json:"seq"`
+				Error string `json:"error"`
+			} `json:"event"`
+		}
+		s.Require().NoError(json.Unmarshal(data, &envelope))
 		state := s.backend.LoginState()
 		s.mu.Lock()
 		defer s.mu.Unlock()
-		s.stateAtLoginSignals = append(s.stateAtLoginSignals, state)
+		s.nodeLogins = append(s.nodeLogins, nodeLoginSeen{
+			Seq:          envelope.Event.Seq,
+			Error:        envelope.Event.Error,
+			StateAtEvent: state,
+		})
 	})
 }
 
@@ -50,10 +67,10 @@ func (s *LoginStateSuite) TearDownTest() {
 	_ = s.backend.Logout()
 }
 
-func (s *LoginStateSuite) statesAtLoginSignals() []LoginState {
+func (s *LoginStateSuite) seenNodeLogins() []nodeLoginSeen {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return append([]LoginState(nil), s.stateAtLoginSignals...)
+	return append([]nodeLoginSeen(nil), s.nodeLogins...)
 }
 
 func (s *LoginStateSuite) createAccountAndLogin() string {
@@ -69,36 +86,31 @@ func (s *LoginStateSuite) createAccountAndLogin() string {
 	return acc.KeyUID
 }
 
-func (s *LoginStateSuite) TestNoneBeforeAnyLogin() {
+func (s *LoginStateSuite) TestNoneWithSeqZeroBeforeAnyLogin() {
 	state := s.backend.LoginState()
 	s.Require().Equal(LoginStateNone, state.State)
+	s.Require().Equal(uint64(0), state.Seq)
 	s.Require().Nil(state.Account)
 }
 
-func (s *LoginStateSuite) TestInProgressFromAcceptedRequestUntilLoggedIn() {
-	s.backend.LoginRequestAccepted()
-	s.Require().Equal(LoginStateInProgress, s.backend.LoginState().State)
-	s.Require().Nil(s.backend.LoginState().Account)
-
+func (s *LoginStateSuite) TestLoggedInWithItsSeqBeforeNodeLogin() {
 	keyUID := s.createAccountAndLogin()
 
 	state := s.backend.LoginState()
 	s.Require().Equal(LoginStateLoggedIn, state.State)
+	s.Require().Equal(uint64(1), state.Seq)
 	s.Require().NotNil(state.Account)
 	s.Require().Equal(keyUID, state.Account.KeyUID)
 
-	atSignal := s.statesAtLoginSignals()
-	s.Require().Len(atSignal, 1)
-	s.Require().Equal(LoginStateLoggedIn, atSignal[0].State, "node.login must not arrive before the state says logged in")
+	seen := s.seenNodeLogins()
+	s.Require().Len(seen, 1)
+	s.Require().Equal(uint64(1), seen[0].Seq, "node.login carries the seq of its login")
+	s.Require().Equal(LoginStateLoggedIn, seen[0].StateAtEvent.State, "node.login must not arrive before the state says logged in")
 }
 
-func (s *LoginStateSuite) TestLoginAccountGoesThroughInProgress() {
+func (s *LoginStateSuite) TestEachLoginGetsTheNextSeq() {
 	keyUID := s.createAccountAndLogin()
 	s.Require().NoError(s.backend.Logout())
-	s.Require().Equal(LoginStateNone, s.backend.LoginState().State)
-
-	s.backend.LoginRequestAccepted()
-	s.Require().Equal(LoginStateInProgress, s.backend.LoginState().State)
 
 	s.Require().NoError(s.backend.LoginAccount(&requests.Login{
 		KeyUID:   keyUID,
@@ -107,14 +119,18 @@ func (s *LoginStateSuite) TestLoginAccountGoesThroughInProgress() {
 
 	state := s.backend.LoginState()
 	s.Require().Equal(LoginStateLoggedIn, state.State)
+	s.Require().Equal(uint64(2), state.Seq)
 	s.Require().Equal(keyUID, state.Account.KeyUID)
+
+	seen := s.seenNodeLogins()
+	s.Require().Len(seen, 2)
+	s.Require().Equal(uint64(2), seen[1].Seq)
 }
 
-func (s *LoginStateSuite) TestFailedLoginGoesBackToNone() {
+func (s *LoginStateSuite) TestFailedLoginGoesBackToNoneKeepingItsSeq() {
 	keyUID := s.createAccountAndLogin()
 	s.Require().NoError(s.backend.Logout())
 
-	s.backend.LoginRequestAccepted()
 	_ = s.backend.LoginAccount(&requests.Login{
 		KeyUID:   keyUID,
 		Password: "wrong-password",
@@ -122,33 +138,57 @@ func (s *LoginStateSuite) TestFailedLoginGoesBackToNone() {
 
 	state := s.backend.LoginState()
 	s.Require().Equal(LoginStateNone, state.State)
+	s.Require().Equal(uint64(2), state.Seq)
 	s.Require().Nil(state.Account)
 
-	atSignal := s.statesAtLoginSignals()
-	s.Require().Len(atSignal, 2)
-	s.Require().Equal(LoginStateNone, atSignal[1].State)
+	seen := s.seenNodeLogins()
+	s.Require().Len(seen, 2)
+	s.Require().NotEmpty(seen[1].Error)
+	s.Require().Equal(uint64(2), seen[1].Seq)
+	s.Require().Equal(LoginStateNone, seen[1].StateAtEvent.State)
 }
 
 func (s *LoginStateSuite) TestLogoutGoesBackToNone() {
 	s.createAccountAndLogin()
-	s.Require().Equal(LoginStateLoggedIn, s.backend.LoginState().State)
+	s.Require().Equal(LoginStateLoggedIn, s.backend.loginState.get())
 
 	_, err := s.backend.LogoutAndAdvanceSignalEpoch()
 	s.Require().NoError(err)
 
+	s.Require().Equal(LoginStateNone, s.backend.loginState.get())
+	s.Require().Equal(uint64(1), s.backend.LoginState().Seq)
+}
+
+func (s *LoginStateSuite) TestPostStartFailureSendsNodeLoginWithTheError() {
+	s.Require().NoError(s.backend.AcceptLoginRequest())
+
+	s.Require().Error(s.backend.LoggedIn("0xnot-opened", nil))
+
+	s.Require().Equal(LoginStateNone, s.backend.LoginState().State)
+	seen := s.seenNodeLogins()
+	s.Require().Len(seen, 1)
+	s.Require().NotEmpty(seen[0].Error)
+	s.Require().Equal(uint64(1), seen[0].Seq)
+}
+
+func (s *LoginStateSuite) TestLoginRequestRejectedWhileLoggedIn() {
+	s.createAccountAndLogin()
+
+	s.Require().ErrorIs(s.backend.AcceptLoginRequest(), ErrAlreadyLoggedIn)
+
 	state := s.backend.LoginState()
-	s.Require().Equal(LoginStateNone, state.State)
-	s.Require().Nil(state.Account)
+	s.Require().Equal(LoginStateLoggedIn, state.State)
+	s.Require().Equal(uint64(1), state.Seq)
 }
 
 func (s *LoginStateSuite) TestJSONContract() {
 	none, err := json.Marshal(LoginState{State: LoginStateNone})
 	s.Require().NoError(err)
-	s.Require().JSONEq(`{"state":"none"}`, string(none))
+	s.Require().JSONEq(`{"state":"none","seq":0}`, string(none))
 
-	inProgress, err := json.Marshal(LoginState{State: LoginStateInProgress})
+	inProgress, err := json.Marshal(LoginState{State: LoginStateInProgress, Seq: 3})
 	s.Require().NoError(err)
-	s.Require().JSONEq(`{"state":"inProgress"}`, string(inProgress))
+	s.Require().JSONEq(`{"state":"inProgress","seq":3}`, string(inProgress))
 
 	keyUID := s.createAccountAndLogin()
 	loggedIn, err := json.Marshal(s.backend.LoginState())
@@ -156,10 +196,12 @@ func (s *LoginStateSuite) TestJSONContract() {
 
 	var decoded struct {
 		State   string                     `json:"state"`
+		Seq     uint64                     `json:"seq"`
 		Account map[string]json.RawMessage `json:"account"`
 	}
 	s.Require().NoError(json.Unmarshal(loggedIn, &decoded))
 	s.Require().Equal("loggedIn", decoded.State)
+	s.Require().Equal(uint64(1), decoded.Seq)
 	s.Require().JSONEq(`"`+keyUID+`"`, string(decoded.Account["key-uid"]))
 
 	active, err := s.backend.GetActiveAccount()

@@ -403,8 +403,10 @@ func login(accountData, password, configJSON string) error {
 		}
 	}
 
-	statusBackend.LoginRequestAccepted()
-	backend.RunAsync(func() error {
+	if err := statusBackend.AcceptLoginRequest(); err != nil {
+		return err
+	}
+	runAsync(func() error {
 		logutils.ZapLogger().Debug("start a node with account", zap.String("key-uid", account.KeyUID))
 		err := statusBackend.UpdateNodeConfigFleet(account, password, &conf)
 		if err != nil {
@@ -469,8 +471,10 @@ func createAccountAndLogin(requestJSON string) string {
 		return makeJSONResponse(err)
 	}
 
-	statusBackend.LoginRequestAccepted()
-	backend.RunAsync(func() error {
+	if err := statusBackend.AcceptLoginRequest(); err != nil {
+		return makeJSONResponse(err)
+	}
+	runAsync(func() error {
 		logutils.ZapLogger().Debug("starting a node and creating config")
 		_, err := statusBackend.CreateAccountAndLogin(&request)
 		if err != nil {
@@ -508,8 +512,10 @@ func loginAccount(requestJSON string) string {
 		return makeJSONResponse(err)
 	}
 
-	statusBackend.LoginRequestAccepted()
-	backend.RunAsync(func() error {
+	if err := statusBackend.AcceptLoginRequest(); err != nil {
+		return makeJSONResponse(err)
+	}
+	runAsync(func() error {
 		err := statusBackend.LoginAccount(&request)
 		if err != nil {
 			logutils.ZapLogger().Error("loginAccount failed", zap.Error(err))
@@ -537,8 +543,10 @@ func restoreAccountAndLogin(requestJSON string) string {
 		return makeJSONResponse(err)
 	}
 
-	statusBackend.LoginRequestAccepted()
-	backend.RunAsync(func() error {
+	if err := statusBackend.AcceptLoginRequest(); err != nil {
+		return makeJSONResponse(err)
+	}
+	runAsync(func() error {
 		logutils.ZapLogger().Debug("starting a node and restoring account")
 
 		if request.Keycard != nil {
@@ -572,8 +580,10 @@ func LoginWithKeycard(accountData, password, keyHex string, configJSON string) s
 	if err != nil {
 		return makeJSONResponse(err)
 	}
-	statusBackend.LoginRequestAccepted()
-	backend.RunAsync(func() error {
+	if err := statusBackend.AcceptLoginRequest(); err != nil {
+		return makeJSONResponse(err)
+	}
+	runAsync(func() error {
 		logutils.ZapLogger().Debug("start a node with account", zap.String("key-uid", account.KeyUID))
 		err := statusBackend.StartNodeWithKey(account, password, keyHex, &conf)
 		if err != nil {

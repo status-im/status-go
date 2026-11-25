@@ -682,7 +682,7 @@ func (b *StatusBackend) SetupLogSettings() error {
 
 // Deprecated: Use StartNodeWithAccount instead.
 func (b *StatusBackend) StartNodeWithKey(acc multiaccounts.Account, password string, keyHex string, nodecfg *params.NodeConfig) error {
-	b.LoginRequestAccepted()
+	b.loginStarted()
 	if acc.KDFIterations == 0 {
 		kdfIterations, err := b.multiaccountsDB.GetAccountKDFIterationsNumber(acc.KeyUID)
 		if err != nil {
@@ -767,7 +767,7 @@ func (b *StatusBackend) overrideNetworks(conf *params.NodeConfig, walletConfig *
 }
 
 func (b *StatusBackend) LoginAccount(request *requests.Login) error {
-	b.LoginRequestAccepted()
+	b.loginStarted()
 	err := b.loginAccount(request)
 	if err != nil {
 		// Stop node for clean up
@@ -1108,7 +1108,7 @@ func (b *StatusBackend) Login(keyUID, password string) error {
 }
 
 func (b *StatusBackend) StartNodeWithAccount(acc multiaccounts.Account, password string, nodecfg *params.NodeConfig, chatKey *ecdsa.PrivateKey) error {
-	b.LoginRequestAccepted()
+	b.loginStarted()
 	err := b.startNodeWithAccount(acc, password, nodecfg, chatKey)
 	if err != nil {
 		// Stop node for clean up
@@ -1125,37 +1125,33 @@ func (b *StatusBackend) StartNodeWithAccount(acc multiaccounts.Account, password
 	return err
 }
 
-// LoggedIn reports the login outcome: the login state first, then node.login, so a
-// client reading the state on node.login sees the outcome.
+// LoggedIn reports the login outcome: the login state first, then node.login stamped
+// with the login's seq, so a client reading the state on node.login sees the outcome.
+// Every failure sends node.login with the error, so a login is in progress until its
+// node.login.
 func (b *StatusBackend) LoggedIn(keyUID string, err error) error {
 	if err != nil {
-		b.loginFinished(err)
-		signal.SendLoggedIn(nil, nil, nil, err)
-		return err
+		return b.loginFailed(err)
 	}
 	s, err := b.GetSettings()
 	if err != nil {
-		b.loginFinished(err)
-		return err
+		return b.loginFailed(err)
 	}
 
 	acc, err := b.getAccountByKeyUID(keyUID)
 	if err != nil {
-		b.loginFinished(err)
-		return err
+		return b.loginFailed(err)
 	}
 
 	ensUsernames, err := b.GetEnsUsernames()
 	if err != nil {
-		b.loginFinished(err)
-		return err
+		return b.loginFailed(err)
 	}
 	var ensUsernamesJSON json.RawMessage
 	if ensUsernames != nil {
 		ensUsernamesJSON, err = json.Marshal(ensUsernames)
 		if err != nil {
-			b.loginFinished(err)
-			return err
+			return b.loginFailed(err)
 		}
 	}
 
@@ -1164,10 +1160,16 @@ func (b *StatusBackend) LoggedIn(keyUID string, err error) error {
 		b.memRelease.scheduleAfterLogin(releaseAfterLoginDelay)
 		b.memRelease.watchTokenLists(b.statusNode.WalletFeed())
 	}
-	b.loginFinished(nil)
-	signal.SendLoggedIn(acc, s, ensUsernamesJSON, nil)
+	seq := b.loginFinished(nil)
+	signal.SendLoggedIn(seq, acc, s, ensUsernamesJSON, nil)
 	b.statusNode.StartTokenManager()
 	return nil
+}
+
+func (b *StatusBackend) loginFailed(err error) error {
+	seq := b.loginFinished(err)
+	signal.SendLoggedIn(seq, nil, nil, nil, err)
+	return err
 }
 
 func (b *StatusBackend) ExportUnencryptedDatabase(acc multiaccounts.Account, password, directory string) error {
@@ -2111,7 +2113,7 @@ func (b *StatusBackend) StartNodeWithChatKeyOrMnemonic(
 	keycardData *requests.KeycardData, // nil for regular account, not nil for account with already set keycard
 	restoreAccount bool,
 ) (_ *multiaccounts.Account, err error) {
-	b.LoginRequestAccepted()
+	b.loginStarted()
 	defer func() {
 		if err != nil {
 			b.loginFinished(err)
