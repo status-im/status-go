@@ -318,6 +318,16 @@ func (b *StatusBackend) CloseAccounts() error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
+	// Closing the database under a live profile would leave the multiaccounts RPC
+	// service with a handle to a closed database, and reopening it elsewhere does not
+	// repair that handle. The intended call order is Logout, CloseAccounts,
+	// InitializeApplication.
+	if b.account != nil {
+		return errors.New("cannot close accounts while a profile is active")
+	}
+	if b.statusNode != nil && b.statusNode.IsRunning() {
+		return errors.New("cannot close accounts while the node is running")
+	}
 	if b.multiaccountsDB == nil {
 		return nil
 	}
