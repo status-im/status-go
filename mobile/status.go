@@ -224,7 +224,7 @@ func closeAccounts() string {
 	if err := statusBackend.CloseAccounts(); err != nil {
 		return makeJSONResponse(err)
 	}
-	return "{}"
+	return makeJSONResponse(nil)
 }
 
 // DEPRECATED: use InitializeApplication
