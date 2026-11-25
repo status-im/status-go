@@ -2737,7 +2737,7 @@ func TestDeleteCommunityMemberMessagesScoped(t *testing.T) {
 				require.ElementsMatch(t, test.want, selectedIDs)
 			}
 
-			deleted, replies, err := p.deleteCommunityMemberMessages(testPK, "community", test.requested)
+			deleted, replies, err := p.deleteCommunityMemberMessages(testPK, "community", test.requested, nil)
 			if test.wantError {
 				require.Error(t, err)
 				if !test.rollback {
@@ -2799,12 +2799,42 @@ func TestDeleteCommunityMemberMessagesScoped(t *testing.T) {
 				require.Equal(t, 1, crossChatPins)
 			}
 			if !test.wantError {
-				repeated, _, err := p.deleteCommunityMemberMessages(testPK, "community", test.requested)
+				repeated, _, err := p.deleteCommunityMemberMessages(testPK, "community", test.requested, nil)
 				require.NoError(t, err)
 				require.Empty(t, repeated)
 			}
 		})
 	}
+}
+
+func TestCommunityMemberDeleteAllClockRollsBack(t *testing.T) {
+	db, err := openTestDB()
+	require.NoError(t, err)
+	defer db.Close()
+	p := newSQLitePersistence(db)
+	chat := &Chat{ID: testPublicChatID, CommunityID: "community"}
+	require.NoError(t, p.SaveChats([]*Chat{chat}))
+	require.NoError(t, createAndSaveMessage(p, "target", testPK, false, chat.CommunityID))
+	_, err = db.Exec(`CREATE TRIGGER reject_delete BEFORE DELETE ON user_messages
+		BEGIN SELECT RAISE(ABORT, 'delete failed'); END`)
+	require.NoError(t, err)
+
+	clock := &communityMemberDeleteAllClock{value: 10}
+	_, _, err = p.deleteCommunityMemberMessages(testPK, chat.CommunityID, nil, clock)
+	require.ErrorContains(t, err, "delete failed")
+	_, err = p.MessageByID("target")
+	require.NoError(t, err)
+
+	_, err = db.Exec(`DROP TRIGGER reject_delete`)
+	require.NoError(t, err)
+	deleted, _, err := p.deleteCommunityMemberMessages(testPK, chat.CommunityID, nil, clock)
+	require.NoError(t, err)
+	require.Len(t, deleted, 1)
+
+	localClock := &communityMemberDeleteAllClock{value: 10, outgoing: true}
+	_, _, err = p.deleteCommunityMemberMessages(testPK, chat.CommunityID, nil, localClock)
+	require.NoError(t, err)
+	require.EqualValues(t, 11, localClock.value)
 }
 
 func TestGetCommunityMemberMessagesID(t *testing.T) {

@@ -3487,9 +3487,14 @@ const communityMemberMessagesScope = `FROM user_messages m
 	INNER JOIN chats ch ON ch.id = m.local_chat_id
 	WHERE ch.community_id = ? AND m.source = ? AND m.chat_id = ch.id`
 
+type communityMemberDeleteAllClock struct {
+	value    int64
+	outgoing bool
+}
+
 // deleteCommunityMemberMessages skips out-of-scope targets so one stale or forged ID does not block valid deletions.
 // Missing IDs are idempotent no-ops; an empty list selects all messages by the member.
-func (db sqlitePersistence) deleteCommunityMemberMessages(member, communityID string, requested []*protobuf.DeleteCommunityMemberMessage) (deleted []*protobuf.DeleteCommunityMemberMessage, replies []*common.Message, err error) {
+func (db sqlitePersistence) deleteCommunityMemberMessages(member, communityID string, requested []*protobuf.DeleteCommunityMemberMessage, clock *communityMemberDeleteAllClock) (deleted []*protobuf.DeleteCommunityMemberMessage, replies []*common.Message, err error) {
 	tx, err := db.db.BeginTx(context.Background(), nil)
 	if err != nil {
 		return nil, nil, err
@@ -3507,6 +3512,22 @@ func (db sqlitePersistence) deleteCommunityMemberMessages(member, communityID st
 
 	deleteAll := len(requested) == 0
 	if deleteAll {
+		if clock != nil {
+			// Acquire the write lock and advance the clock in the same transaction as the deletion.
+			// Local operations allocate a newer clock even if the wall clock has not advanced.
+			err = tx.QueryRow(`INSERT INTO community_member_delete_all_clocks (community_id, member_id, clock)
+				VALUES (?, ?, ?)
+				ON CONFLICT (community_id, member_id) DO UPDATE
+				SET clock = max(excluded.clock, community_member_delete_all_clocks.clock + 1)
+				WHERE ? OR excluded.clock > community_member_delete_all_clocks.clock
+				RETURNING clock`, communityID, member, clock.value, clock.outgoing).Scan(&clock.value)
+			if errors.Is(err, sql.ErrNoRows) {
+				return nil, nil, nil
+			}
+			if err != nil {
+				return nil, nil, err
+			}
+		}
 		rows, queryErr := tx.Query(`SELECT m.id, m.chat_id `+communityMemberMessagesScope, communityID, member)
 		if queryErr != nil {
 			return nil, nil, queryErr

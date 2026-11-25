@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"slices"
@@ -3043,7 +3044,7 @@ func (m *Messenger) BanUserFromCommunity(ctx context.Context, request *requests.
 			return nil, err
 		}
 		memberID := cryptotypes.EncodeHex(crypto.FromECDSAPub(memberPubKey))
-		deleteMessagesResponse, err := m.deleteCommunityMemberMessages(memberID, request.CommunityID.String(), []*protobuf.DeleteCommunityMemberMessage{})
+		deleteMessagesResponse, _, err := m.deleteCommunityMemberMessages(memberID, request.CommunityID.String(), nil, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -3216,10 +3217,11 @@ func (m *Messenger) handleCommunityResponse(state *ReceivedMessageState, communi
 			if deleteAllMessages {
 				memberPubKey, err := crypto.HexToPubkey(memberID)
 				if err != nil {
-					return err
+					m.logger.Warn("skipping invalid banned member key", zap.String("memberID", memberID), zap.Error(err))
+					continue
 				}
 				canonicalMemberID := cryptotypes.EncodeHex(crypto.FromECDSAPub(memberPubKey))
-				response, err := m.deleteCommunityMemberMessages(canonicalMemberID, community.IDString(), []*protobuf.DeleteCommunityMemberMessage{})
+				response, _, err := m.deleteCommunityMemberMessages(canonicalMemberID, community.IDString(), nil, nil)
 				if err != nil {
 					return err
 				}
@@ -4898,6 +4900,19 @@ func (m *Messenger) GetCommunityMemberAllMessages(request *requests.CommunityMem
 
 }
 
+func authorizeCommunityMemberDeletion(community *communities.Community, signer, target *ecdsa.PublicKey) error {
+	if community.ControlNode().Equal(signer) {
+		return nil
+	}
+	if !community.IsPrivilegedMember(signer) {
+		return communities.ErrNotEnoughPermissions
+	}
+	if community.IsMemberOwner(target) && !signer.Equal(target) {
+		return communities.ErrNotOwner
+	}
+	return nil
+}
+
 func (m *Messenger) DeleteCommunityMemberMessages(request *requests.DeleteCommunityMemberMessages) (*MessengerResponse, error) {
 	if err := request.Validate(); err != nil {
 		return nil, err
@@ -4912,30 +4927,37 @@ func (m *Messenger) DeleteCommunityMemberMessages(request *requests.DeleteCommun
 		return nil, communities.ErrOrgNotFound
 	}
 
-	if !community.IsControlNode() && !community.IsPrivilegedMember(m.IdentityPublicKey()) {
-		return nil, communities.ErrNotEnoughPermissions
-	}
-
 	memberPubKey, err := crypto.HexToPubkey(request.MemberPubKey)
 	if err != nil {
 		return nil, err
 	}
-	request.MemberPubKey = cryptotypes.EncodeHex(crypto.FromECDSAPub(memberPubKey))
-
-	if community.IsMemberOwner(memberPubKey) && !m.IdentityPublicKey().Equal(memberPubKey) {
-		return nil, communities.ErrNotOwner
+	signer := m.identity
+	if community.IsControlNode() {
+		signer = community.PrivateKey()
 	}
+	if err := authorizeCommunityMemberDeletion(community, &signer.PublicKey, memberPubKey); err != nil {
+		return nil, err
+	}
+	memberID := cryptotypes.EncodeHex(crypto.FromECDSAPub(memberPubKey))
 
-	deleteMessagesResponse, err := m.deleteCommunityMemberMessages(request.MemberPubKey, request.CommunityID.String(), request.Messages)
+	clock := communityMemberDeleteAllClock{value: time.Now().UnixMilli(), outgoing: true}
+	deleteMessagesResponse, accepted, err := m.deleteCommunityMemberMessages(memberID, community.IDString(), request.Messages, &clock)
 	if err != nil {
 		return nil, err
 	}
 
+	if request.DeleteAll {
+		accepted = nil
+	} else if len(accepted) == 0 {
+		// An empty wire list means delete-all.
+		return deleteMessagesResponse, nil
+	}
+
 	deletedMessages := &protobuf.DeleteCommunityMemberMessages{
-		Clock:       uint64(time.Now().Unix()),
+		Clock:       uint64(clock.value),
 		CommunityId: community.ID(),
-		MemberId:    request.MemberPubKey,
-		Messages:    request.Messages,
+		MemberId:    memberID,
+		Messages:    accepted,
 	}
 
 	payload, err := proto.Marshal(deletedMessages)
@@ -4945,12 +4967,11 @@ func (m *Messenger) DeleteCommunityMemberMessages(request *requests.DeleteCommun
 
 	rawMessage := common.RawMessage{
 		Payload:             payload,
-		Sender:              community.PrivateKey(),
+		Sender:              signer,
 		SkipEncryptionLayer: true,
 		MessageType:         protobuf.ApplicationMetadataMessage_DELETE_COMMUNITY_MEMBER_MESSAGES,
 		PubsubTopic:         community.PubsubTopic(),
 	}
-
 	_, err = m.sender.SendPublic(context.Background(), community.IDString(), rawMessage)
 
 	return deleteMessagesResponse, err
@@ -4964,11 +4985,6 @@ func (m *Messenger) HandleDeleteCommunityMemberMessages(ctx context.Context, sta
 
 	if community == nil {
 		return communities.ErrOrgNotFound
-	}
-
-	isControlNode := community.ControlNode().Equal(state.CurrentMessageState.PublicKey)
-	if !isControlNode && !community.IsPrivilegedMember(state.CurrentMessageState.PublicKey) {
-		return communities.ErrNotAuthorized
 	}
 
 	deleteRequest := &requests.DeleteCommunityMemberMessages{
@@ -4985,12 +5001,28 @@ func (m *Messenger) HandleDeleteCommunityMemberMessages(ctx context.Context, sta
 	if err != nil {
 		return err
 	}
-	if community.IsMemberOwner(memberPubKey) && !isControlNode && !state.CurrentMessageState.PublicKey.Equal(memberPubKey) {
-		return communities.ErrNotOwner
+	signer := state.CurrentMessageState.PublicKey
+	if err := authorizeCommunityMemberDeletion(community, signer, memberPubKey); err != nil {
+		if errors.Is(err, communities.ErrNotEnoughPermissions) {
+			return communities.ErrNotAuthorized
+		}
+		return err
 	}
 
+	var clock *communityMemberDeleteAllClock
+	if deleteRequest.DeleteAll {
+		wireClock := request.Clock
+		if wireClock == 0 || wireClock >= math.MaxInt64 {
+			return fmt.Errorf("invalid community member delete-all clock: %d", wireClock)
+		}
+		// Older clients sent Unix seconds. Compare both formats as Unix milliseconds.
+		if wireClock < 1_000_000_000_000 {
+			wireClock *= 1000
+		}
+		clock = &communityMemberDeleteAllClock{value: int64(wireClock)}
+	}
 	canonicalMemberID := cryptotypes.EncodeHex(crypto.FromECDSAPub(memberPubKey))
-	deleteMessagesResponse, err := m.deleteCommunityMemberMessages(canonicalMemberID, community.IDString(), request.Messages)
+	deleteMessagesResponse, _, err := m.deleteCommunityMemberMessages(canonicalMemberID, community.IDString(), request.Messages, clock)
 	if err != nil {
 		return err
 	}

@@ -8,7 +8,6 @@ import (
 	"github.com/golang/protobuf/proto"
 
 	"github.com/status-im/status-go/internal/crypto"
-	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/logutils"
 	"github.com/status-im/status-go/internal/protocol/common"
 	"github.com/status-im/status-go/internal/protocol/contacts"
@@ -559,14 +558,14 @@ func (m *Messenger) SendGroupChatMessage(request *requests.SendGroupChatMessage)
 	return m.sendChatMessage(context.Background(), message)
 }
 
-func (m *Messenger) deleteCommunityMemberMessages(canonicalMemberID string, communityID string, deleteMessages []*protobuf.DeleteCommunityMemberMessage) (*MessengerResponse, error) {
-	messagesToDelete, updatedMessages, err := m.persistence.deleteCommunityMemberMessages(canonicalMemberID, communityID, deleteMessages)
+func (m *Messenger) deleteCommunityMemberMessages(canonicalMemberID string, communityID string, deleteMessages []*protobuf.DeleteCommunityMemberMessage, clock *communityMemberDeleteAllClock) (*MessengerResponse, []*protobuf.DeleteCommunityMemberMessage, error) {
+	messagesToDelete, updatedMessages, err := m.persistence.deleteCommunityMemberMessages(canonicalMemberID, communityID, deleteMessages, clock)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	response := &MessengerResponse{}
 	response.AddMessages(updatedMessages)
 	response.AddDeletedMessages(messagesToDelete)
-	return response, nil
+	return response, messagesToDelete, nil
 }
