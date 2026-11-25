@@ -2,6 +2,7 @@ package backend
 
 import (
 	"encoding/json"
+	"errors"
 	"strings"
 	"sync"
 	"testing"
@@ -241,4 +242,25 @@ func (s *LoginStateSuite) TestRekeyOfTheCurrentAccountStaysLoggedInWithItsSeq() 
 	s.Require().NotNil(state.Account)
 	s.Require().Equal(keyUID, state.Account.KeyUID)
 	s.Require().Len(s.seenNodeLogins(), 1, "the restart after re-encryption sends no node.login")
+}
+
+func (s *LoginStateSuite) TestAFailedPairingReceiveLogsOutItsLogin() {
+	keyUID := s.createAccountAndLogin()
+	s.Require().NoError(s.backend.Logout())
+	acc, err := s.backend.multiaccountsDB.GetAccount(keyUID)
+	s.Require().NoError(err)
+
+	s.Require().NoError(s.backend.LocalPairingStateManager.StartPairing("pairing-session"))
+	s.Require().NoError(s.backend.StartNodeWithAccount(*acc, testPassword, nil, nil))
+	s.Require().Equal(LoginStateLoggedIn, s.backend.LoginState().State)
+
+	s.Require().NoError(s.backend.EndPairingLogin())
+	s.backend.LocalPairingStateManager.StopPairing("pairing-session", errors.New("receive failed"))
+
+	state := s.backend.LoginState()
+	s.Require().Equal(LoginStateNone, state.State)
+	s.Require().Equal(uint64(2), state.Seq)
+	s.Require().Len(s.seenNodeLogins(), 1, "a pairing login sends no node.login")
+	_, err = s.backend.AcceptLoginRequest()
+	s.Require().NoError(err, "the next login is accepted")
 }
