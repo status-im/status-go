@@ -23,7 +23,7 @@ env:
   FUNCTIONAL_TESTS_DOCKER_IMAGE: status-backend-under-test
 jobs:
   image:
-    name: image (${{ matrix.tests }})
+    name: image (${{ matrix.tests }}, ${{ matrix.backend }})
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     strategy:
@@ -31,6 +31,7 @@ jobs:
       matrix:
         # As in `make test-functional USE_LOGOS_STORAGE=true` and `make test-functional-compatibility`.
         tests: [rpc, rpc-compat]
+        backend: [go-waku, logos-delivery]
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -57,13 +58,14 @@ jobs:
         env:
           FUNCTIONAL_TESTS_IMAGE_ONLY: true
           FUNCTIONAL_TESTS_PREBUILT_LIBS: .prebuilt-libs
+          FUNCTIONAL_TESTS_BUILD_TAGS: ${{ matrix.backend == 'logos-delivery' && 'gowaku_no_rln logos_delivery' || 'gowaku_no_rln' }}
           USE_LOGOS_STORAGE: ${{ matrix.tests == 'rpc' }}
         run: scripts/run_functional_tests.sh
       - name: Save the image
         run: docker save "$FUNCTIONAL_TESTS_DOCKER_IMAGE" | zstd -T0 -o "$RUNNER_TEMP/image.tar.zst"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: status-backend-image-${{ matrix.tests }}
+          name: status-backend-image-${{ matrix.tests }}-${{ matrix.backend }}
           path: ${{ runner.temp }}/image.tar.zst
           if-no-files-found: error
           # Already compressed.
@@ -73,7 +75,7 @@ jobs:
 
   # Needs docker on the host for Anvil and the Waku fleet, so it does not run in the toolchain container.
   rpc-tests:
-    name: rpc (${{ matrix.shard }}/5)
+    name: rpc (${{ matrix.backend }}, ${{ matrix.shard }}/5)
     needs: image
     runs-on: ubuntu-24.04
     timeout-minutes: 60
@@ -82,6 +84,7 @@ jobs:
       matrix:
         # Slices of the tests, see FUNCTIONAL_TESTS_SHARD in test/functional/conftest.py.
         shard: [1, 2, 3, 4, 5]
+        backend: [go-waku, logos-delivery]
     env:
       FUNCTIONAL_TESTS_SHARD: ${{ matrix.shard }}/5
       FUNCTIONAL_TESTS_SKIP_IMAGE_BUILD: true
@@ -94,13 +97,13 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/functional-tests
         with:
-          image-artifact: status-backend-image-rpc
+          image-artifact: status-backend-image-rpc-${{ matrix.backend }}
       - name: Functional tests
         run: make test-functional USE_LOGOS_STORAGE=true
       - uses: ./.github/actions/functional-tests/reports
         if: always()
         with:
-          name: functional-test-reports-rpc-${{ matrix.shard }}of5
+          name: functional-test-reports-rpc-${{ matrix.backend }}-${{ matrix.shard }}of5
   # The latest patch of the two previous minor versions, as scripts/run_functional_tests.sh picks them.
   peers:
     name: peer releases
@@ -127,7 +130,7 @@ jobs:
 
   # The compatibility tests against one previous release each; within a job they run one by one.
   rpc-compat-tests:
-    name: rpc-compat (${{ matrix.peer }}, ${{ matrix.shard }}/2)
+    name: rpc-compat (${{ matrix.backend }}, ${{ matrix.peer }}, ${{ matrix.shard }}/2)
     needs: [image, peers]
     runs-on: ubuntu-24.04
     timeout-minutes: 90
@@ -139,6 +142,7 @@ jobs:
       matrix:
         peer: ${{ fromJSON(needs.peers.outputs.refs) }}
         shard: [1, 2]
+        backend: [go-waku, logos-delivery]
     env:
       FUNCTIONAL_TESTS_SHARD: ${{ matrix.shard }}/2
       FUNCTIONAL_TESTS_SKIP_IMAGE_BUILD: true
@@ -156,7 +160,7 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/functional-tests
         with:
-          image-artifact: status-backend-image-rpc-compat
+          image-artifact: status-backend-image-rpc-compat-${{ matrix.backend }}
       - name: Pull the peer image
         id: peer
         env:
@@ -197,7 +201,7 @@ jobs:
       - uses: ./.github/actions/functional-tests/reports
         if: always()
         with:
-          name: functional-test-reports-rpc-compat-${{ matrix.peer }}-${{ matrix.shard }}of2
+          name: functional-test-reports-rpc-compat-${{ matrix.backend }}-${{ matrix.peer }}-${{ matrix.shard }}of2
   # Checks out nothing and runs no repository code, so the write token meets only docker.
   publish-peers:
     name: publish peer images

@@ -1,5 +1,5 @@
 name: Unit test slice
-description: Runs one slice of the unit tests on the prepared tree. Needs a checkout, MAKE_ARGS and UNIT_TEST_PART.
+description: Runs one slice of the unit tests on the prepared tree. Needs a checkout, MAKE_ARGS, UNIT_TEST_PART and UNIT_TEST_BACKEND (go-waku or logos-delivery).
 runs:
   using: composite
   steps:
@@ -14,8 +14,10 @@ runs:
     - name: Unit tests
       shell: bash
       run: |
-        echo "REPORT_NAME=unit-test-reports-${UNIT_TEST_PART//[:\/]/-}" >> "$GITHUB_ENV"
-        scripts/toolchain.sh make test-unit-prepared $MAKE_ARGS \
+        echo "REPORT_NAME=unit-test-reports-${UNIT_TEST_PART//[:\/]/-}-${UNIT_TEST_BACKEND}" >> "$GITHUB_ENV"
+        tags=()
+        [ "$UNIT_TEST_BACKEND" != logos-delivery ] || tags=("BUILD_TAGS=gowaku_no_rln logos_delivery")
+        scripts/toolchain.sh make test-unit-prepared $MAKE_ARGS "${tags[@]}" \
           NIM_TKL_LIB_DIR="$PWD/build/deps/tkl" NIM_TKL_INC_DIR="$PWD/build/deps/tkl"
     # With CI=true the test output goes to files, not to the job log.
     - name: Show test logs
