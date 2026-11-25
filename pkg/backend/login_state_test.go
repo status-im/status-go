@@ -8,9 +8,11 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
+	"github.com/status-im/status-go/internal/db/multiaccounts"
 	"github.com/status-im/status-go/internal/protocol/requests"
 	"github.com/status-im/status-go/internal/signal"
 	"github.com/status-im/status-go/internal/testutils"
+	"github.com/status-im/status-go/params"
 )
 
 type nodeLoginSeen struct {
@@ -160,9 +162,23 @@ func (s *LoginStateSuite) TestLogoutGoesBackToNone() {
 }
 
 func (s *LoginStateSuite) TestPostStartFailureSendsNodeLoginWithTheError() {
-	s.Require().NoError(s.backend.AcceptLoginRequest())
+	seq, err := s.backend.AcceptLoginRequest()
+	s.Require().NoError(err)
+	s.Require().Equal(uint64(1), seq)
 
 	s.Require().Error(s.backend.LoggedIn("0xnot-opened", nil))
+
+	s.Require().Equal(LoginStateNone, s.backend.LoginState().State)
+	seen := s.seenNodeLogins()
+	s.Require().Len(seen, 1)
+	s.Require().NotEmpty(seen[0].Error)
+	s.Require().Equal(uint64(1), seen[0].Seq)
+}
+
+func (s *LoginStateSuite) TestStartNodeWithKeyEarlyFailureSendsNodeLoginWithTheError() {
+	acc := multiaccounts.Account{KeyUID: "0x1234", KDFIterations: 1}
+
+	s.Require().Error(s.backend.StartNodeWithKey(acc, testPassword, "not-a-hex-key", &params.NodeConfig{}))
 
 	s.Require().Equal(LoginStateNone, s.backend.LoginState().State)
 	seen := s.seenNodeLogins()
@@ -174,7 +190,8 @@ func (s *LoginStateSuite) TestPostStartFailureSendsNodeLoginWithTheError() {
 func (s *LoginStateSuite) TestLoginRequestRejectedWhileLoggedIn() {
 	s.createAccountAndLogin()
 
-	s.Require().ErrorIs(s.backend.AcceptLoginRequest(), ErrAlreadyLoggedIn)
+	_, err := s.backend.AcceptLoginRequest()
+	s.Require().ErrorIs(err, ErrAlreadyLoggedIn)
 
 	state := s.backend.LoginState()
 	s.Require().Equal(LoginStateLoggedIn, state.State)

@@ -33,17 +33,23 @@ func TestLoginAccountIsInProgressFromTheRequestUntilNodeLogin(t *testing.T) {
 
 	request := `{"keyUid":"0x1234","password":"0xpassword","kdfIterations":1}`
 
-	var accepted APIResponse
+	var accepted struct {
+		Error string `json:"error"`
+		Seq   uint64 `json:"seq"`
+	}
 	require.NoError(t, json.Unmarshal([]byte(loginAccount(request)), &accepted))
 	require.Empty(t, accepted.Error)
+	require.Equal(t, uint64(1), accepted.Seq, "the accepted request returns its seq")
 	require.NotNil(t, pendingLogin, "the login runs asynchronously")
 
 	require.JSONEq(t, `{"state":"inProgress","seq":1}`, getLoginState(),
 		"in progress as soon as the request is accepted, before the login runs")
 
+	rejectedJSON := loginAccount(request)
 	var rejected APIResponse
-	require.NoError(t, json.Unmarshal([]byte(loginAccount(request)), &rejected))
-	require.Contains(t, rejected.Error, backend.ErrLoginInProgress.Error())
+	require.NoError(t, json.Unmarshal([]byte(rejectedJSON), &rejected))
+	require.Equal(t, backend.ErrLoginInProgress.Error(), rejected.Error)
+	require.NotContains(t, rejectedJSON, `"seq"`, "a rejected request has no seq")
 	require.JSONEq(t, `{"state":"inProgress","seq":1}`, getLoginState(), "a rejected request changes nothing")
 
 	_ = pendingLogin()

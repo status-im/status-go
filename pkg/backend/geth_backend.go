@@ -686,8 +686,7 @@ func (b *StatusBackend) StartNodeWithKey(acc multiaccounts.Account, password str
 	if acc.KDFIterations == 0 {
 		kdfIterations, err := b.multiaccountsDB.GetAccountKDFIterationsNumber(acc.KeyUID)
 		if err != nil {
-			b.loginFinished(err)
-			return err
+			return b.loginFailed(err)
 		}
 
 		acc.KDFIterations = kdfIterations
@@ -695,8 +694,7 @@ func (b *StatusBackend) StartNodeWithKey(acc multiaccounts.Account, password str
 
 	chatKey, err := ethcrypto.HexToECDSA(keyHex)
 	if err != nil {
-		b.loginFinished(err)
-		return err
+		return b.loginFailed(err)
 	}
 
 	err = b.startNodeWithAccount(acc, password, nodecfg, chatKey)
@@ -1128,7 +1126,8 @@ func (b *StatusBackend) StartNodeWithAccount(acc multiaccounts.Account, password
 // LoggedIn reports the login outcome: the login state first, then node.login stamped
 // with the login's seq, so a client reading the state on node.login sees the outcome.
 // Every failure sends node.login with the error, so a login is in progress until its
-// node.login.
+// node.login. Logins during local pairing don't go through here: they finish the login
+// state without a node.login.
 func (b *StatusBackend) LoggedIn(keyUID string, err error) error {
 	if err != nil {
 		return b.loginFailed(err)

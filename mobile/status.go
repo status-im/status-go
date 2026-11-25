@@ -388,23 +388,24 @@ func migrateKeyStoreDir(newDir string) string {
 }
 
 // login deprecated as Login and LoginWithConfig are deprecated
-func login(accountData, password, configJSON string) error {
+func login(accountData, password, configJSON string) (uint64, error) {
 	var account multiaccounts.Account
 	err := json.Unmarshal([]byte(accountData), &account)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	var conf params.NodeConfig
 	if configJSON != "" {
 		err = json.Unmarshal([]byte(configJSON), &conf)
 		if err != nil {
-			return err
+			return 0, err
 		}
 	}
 
-	if err := statusBackend.AcceptLoginRequest(); err != nil {
-		return err
+	seq, err := statusBackend.AcceptLoginRequest()
+	if err != nil {
+		return 0, err
 	}
 	runAsync(func() error {
 		logutils.ZapLogger().Debug("start a node with account", zap.String("key-uid", account.KeyUID))
@@ -423,7 +424,7 @@ func login(accountData, password, configJSON string) error {
 		return nil
 	})
 
-	return nil
+	return seq, nil
 }
 
 // Login loads a key file (for a given address), tries to decrypt it using the password,
@@ -432,11 +433,11 @@ func login(accountData, password, configJSON string) error {
 //
 // Deprecated: Use LoginAccount instead.
 func Login(accountData, password string) string {
-	err := login(accountData, password, "")
+	seq, err := login(accountData, password, "")
 	if err != nil {
 		return makeJSONResponse(err)
 	}
-	return makeJSONResponse(nil)
+	return makeLoginResponse(seq)
 }
 
 // LoginWithConfig loads a key file (for a given address), tries to decrypt it using the password,
@@ -446,11 +447,11 @@ func Login(accountData, password string) string {
 //
 // Deprecated: Use LoginAccount instead.
 func LoginWithConfig(accountData, password, configJSON string) string {
-	err := login(accountData, password, configJSON)
+	seq, err := login(accountData, password, configJSON)
 	if err != nil {
 		return makeJSONResponse(err)
 	}
-	return makeJSONResponse(nil)
+	return makeLoginResponse(seq)
 }
 
 func CreateAccountAndLogin(requestJSON string) string {
@@ -471,7 +472,8 @@ func createAccountAndLogin(requestJSON string) string {
 		return makeJSONResponse(err)
 	}
 
-	if err := statusBackend.AcceptLoginRequest(); err != nil {
+	seq, err := statusBackend.AcceptLoginRequest()
+	if err != nil {
 		return makeJSONResponse(err)
 	}
 	runAsync(func() error {
@@ -484,7 +486,7 @@ func createAccountAndLogin(requestJSON string) string {
 		logutils.ZapLogger().Debug("started a node, and created account")
 		return statusBackend.SetupLogSettings()
 	})
-	return makeJSONResponse(nil)
+	return makeLoginResponse(seq)
 }
 
 func AcceptTerms() string {
@@ -512,7 +514,8 @@ func loginAccount(requestJSON string) string {
 		return makeJSONResponse(err)
 	}
 
-	if err := statusBackend.AcceptLoginRequest(); err != nil {
+	seq, err := statusBackend.AcceptLoginRequest()
+	if err != nil {
 		return makeJSONResponse(err)
 	}
 	runAsync(func() error {
@@ -524,7 +527,7 @@ func loginAccount(requestJSON string) string {
 		logutils.ZapLogger().Debug("loginAccount started node")
 		return statusBackend.SetupLogSettings()
 	})
-	return makeJSONResponse(nil)
+	return makeLoginResponse(seq)
 }
 
 func RestoreAccountAndLogin(requestJSON string) string {
@@ -543,7 +546,8 @@ func restoreAccountAndLogin(requestJSON string) string {
 		return makeJSONResponse(err)
 	}
 
-	if err := statusBackend.AcceptLoginRequest(); err != nil {
+	seq, err := statusBackend.AcceptLoginRequest()
+	if err != nil {
 		return makeJSONResponse(err)
 	}
 	runAsync(func() error {
@@ -563,7 +567,7 @@ func restoreAccountAndLogin(requestJSON string) string {
 		return statusBackend.SetupLogSettings()
 	})
 
-	return makeJSONResponse(nil)
+	return makeLoginResponse(seq)
 }
 
 // LoginWithKeycard initializes an account with a chat key and encryption key used for PFS.
@@ -580,7 +584,8 @@ func LoginWithKeycard(accountData, password, keyHex string, configJSON string) s
 	if err != nil {
 		return makeJSONResponse(err)
 	}
-	if err := statusBackend.AcceptLoginRequest(); err != nil {
+	seq, err := statusBackend.AcceptLoginRequest()
+	if err != nil {
 		return makeJSONResponse(err)
 	}
 	runAsync(func() error {
@@ -593,7 +598,7 @@ func LoginWithKeycard(accountData, password, keyHex string, configJSON string) s
 		logutils.ZapLogger().Debug("started a node with", zap.String("key-uid", account.KeyUID))
 		return nil
 	})
-	return makeJSONResponse(nil)
+	return makeLoginResponse(seq)
 }
 
 func Logout() string {
@@ -884,6 +889,11 @@ func hashMessage(message string) string {
 		code = c
 	}
 	return prepareJSONResponseWithCode(fmt.Sprintf("0x%x", hash), err, code)
+}
+
+func makeLoginResponse(seq uint64) string {
+	outBytes, _ := json.Marshal(LoginResponse{Seq: seq})
+	return string(outBytes)
 }
 
 func makeJSONResponse(err error) string {

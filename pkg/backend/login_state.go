@@ -24,7 +24,8 @@ var (
 // node.login outcome, whoever sent the request, so a client can wait for or adopt a
 // login it didn't start. Seq is the login sequence number of the current or last login,
 // also stamped on its node.login, so a client can tell which login a node.login belongs
-// to. Account is set only when logged in.
+// to. Account is set only when logged in. Seq is per status-go process: kept in memory
+// and restarting at 0, so never persist it or compare seqs across a process restart.
 type LoginState struct {
 	State   LoginStateKind         `json:"state"`
 	Seq     uint64                 `json:"seq"`
@@ -37,18 +38,18 @@ type loginStateTracker struct {
 	seq   uint64
 }
 
-func (t *loginStateTracker) accept() error {
+func (t *loginStateTracker) accept() (uint64, error) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	switch t.state {
 	case LoginStateInProgress:
-		return ErrLoginInProgress
+		return 0, ErrLoginInProgress
 	case LoginStateLoggedIn:
-		return ErrAlreadyLoggedIn
+		return 0, ErrAlreadyLoggedIn
 	}
 	t.seq++
 	t.state = LoginStateInProgress
-	return nil
+	return t.seq, nil
 }
 
 // begin is accept for the backend entry points, which also run inside an accepted
@@ -84,10 +85,11 @@ func (t *loginStateTracker) snapshot() (LoginStateKind, uint64) {
 	return t.state, t.seq
 }
 
-// AcceptLoginRequest marks a login in progress with the next login sequence number.
-// Login API entry points call it before the login runs asynchronously. It rejects the
-// request, changing nothing, while a login is in progress or a session is logged in.
-func (b *StatusBackend) AcceptLoginRequest() error {
+// AcceptLoginRequest marks a login in progress with the next login sequence number and
+// returns it. Login API entry points call it before the login runs asynchronously. It
+// rejects the request, changing nothing, while a login is in progress or a session is
+// logged in.
+func (b *StatusBackend) AcceptLoginRequest() (uint64, error) {
 	return b.loginState.accept()
 }
 
