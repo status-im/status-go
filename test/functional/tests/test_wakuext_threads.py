@@ -11,6 +11,10 @@ from steps import async_messenger
 from waku_params import parametrize_waku_light_client, parametrize_waku_light_client_non_lc
 
 THREAD_NAME_LIMIT = 50
+THREAD_RENAME_LIMIT = 100
+PERSONAL_SECTION_ID = "personal"
+THREAD_EDIT_PERMISSION_ERROR = "only the thread creator or an admin can edit this thread"
+THREAD_DELETE_PERMISSION_ERROR = "only the thread creator or an admin can delete this thread"
 
 
 class ChatKind(str, Enum):
@@ -71,6 +75,51 @@ def _find_notification(response: dict, message_id: str) -> dict | None:
 
 def _mention(public_key: str) -> str:
     return f"Hello @{public_key} {uuid4()}"
+
+
+def _section_id(chat_kind: ChatKind, community_id: str) -> str:
+    if chat_kind == ChatKind.COMMUNITY:
+        return community_id
+    return PERSONAL_SECTION_ID
+
+
+def _section_counts(backend, section_id: str, *, include_threads: bool = True) -> tuple[int, int]:
+    sections = (backend.wakuext_service.section_unread_counts(include_threads) or {}).get("sections") or []
+    for section in sections:
+        if section.get("sectionId") == section_id:
+            return int(section.get("unviewedMessagesCount") or 0), int(section.get("unviewedMentionsCount") or 0)
+    raise AssertionError(f"section {section_id!r} not found in {sections}")
+
+
+def _personal_mentions(backend, *, include_threads: bool) -> int:
+    return _section_counts(backend, PERSONAL_SECTION_ID, include_threads=include_threads)[1]
+
+
+async def _wait_for_thread(backend, thread_id: str):
+    await backend.wait_for_signal(
+        SignalType.MESSAGES_NEW,
+        predicate=lambda signal: any(thread.get("threadId") == thread_id for thread in (signal.event.get("threads") or [])),
+        timeout=60,
+        check_buffer=True,
+    )
+
+
+async def _wait_for_thread_deleted(backend, thread_id: str):
+    await backend.wait_for_signal(
+        SignalType.MESSAGES_NEW,
+        predicate=lambda signal: any(thread.get("threadId") == thread_id and thread.get("deleted") for thread in (signal.event.get("threads") or [])),
+        timeout=60,
+        check_buffer=True,
+    )
+
+
+def _assert_thread_deleted_preserves_parent(backend, chat_id: str, parent_id: str, parent_text: str, reply_id: str | None = None):
+    assert _thread(backend.wakuext_service.chat_threads(chat_id), parent_id)["deleted"] is True
+    parent = backend.wakuext_service.message_by_message_id(parent_id)
+    assert parent["text"] == parent_text
+    assert not parent.get("deleted", False)
+    if reply_id is not None:
+        assert backend.wakuext_service.message_by_message_id(reply_id)["deleted"] is True
 
 
 def _activity_notifications(backend, activity_type: ActivityCenterNotificationType) -> dict:
@@ -231,12 +280,7 @@ class TestWakuextThreadExtras:
         assert not root.get("responseTo")
 
         await receiver.wait_for_signal(SignalType.MESSAGES_NEW, pattern=root["id"], timeout=60, check_buffer=True)
-        await receiver.wait_for_signal(
-            SignalType.MESSAGES_NEW,
-            predicate=lambda s: any(t.get("threadId") == root["id"] for t in (s.event.get("threads") or [])),
-            timeout=60,
-            check_buffer=True,
-        )
+        await _wait_for_thread(receiver, root["id"])
         chat_messages = receiver.wakuext_service.chat_messages(receiver_chat_id, limit=20).get("messages") or []
         assert any(message["id"] == root["id"] for message in chat_messages)
         assert not _texts(receiver.wakuext_service.chat_messages_in_thread(receiver_chat_id, root["id"], limit=20))
@@ -289,8 +333,10 @@ class TestWakuextThreadExtras:
         missed = receiver.wakuext_service.all_messages_from_thread_which_match_term(chat_id, parent_id, sibling_text, False)
         assert sibling_text not in _texts(missed)
 
+    @pytest.mark.spec("SC-THRD-03")
     @pytest.mark.spec("SC-THRD-06")
     @pytest.mark.spec("SC-THRD-10")
+    @pytest.mark.spec("SC-THRD-22")
     async def test_community_member_can_create_thread(self, sender, receiver):
         sender_chat_id, receiver_chat_id, _ = await _open_shared_chat(sender, receiver, ChatKind.COMMUNITY)
         parent_text = f"parent-{uuid4()}"
@@ -321,17 +367,28 @@ class TestWakuextThreadExtras:
         assert not root.get("responseTo")
 
         await sender.wait_for_signal(SignalType.MESSAGES_NEW, pattern=root["id"], timeout=60, check_buffer=True)
-        await sender.wait_for_signal(
-            SignalType.MESSAGES_NEW,
-            predicate=lambda s: any(t.get("threadId") == root["id"] for t in (s.event.get("threads") or [])),
-            timeout=60,
-            check_buffer=True,
-        )
+        await _wait_for_thread(sender, root["id"])
         assert _thread(sender.wakuext_service.chat_threads(sender_chat_id), root["id"])["name"] == thread_name
         assert not _texts(sender.wakuext_service.chat_messages_in_thread(sender_chat_id, root["id"], limit=20))
 
+        renamed = f"Admin-{uuid4()}".ljust(THREAD_RENAME_LIMIT, "x")
+        with pytest.raises(ApiResponseError):
+            sender.wakuext_service.edit_thread(sender_chat_id, parent_id, renamed + "x")
+        edited = sender.wakuext_service.edit_thread(sender_chat_id, parent_id, renamed)
+        assert _thread(edited, parent_id)["name"] == renamed
+        await receiver.wait_for_signal(SignalType.MESSAGES_NEW, pattern=renamed, timeout=60, check_buffer=True)
+        assert _thread(receiver.wakuext_service.chat_threads(receiver_chat_id), parent_id)["name"] == renamed
+
+        deleted = sender.wakuext_service.delete_thread(sender_chat_id, parent_id)
+        assert _thread(deleted, parent_id)["deleted"] is True
+        await _wait_for_thread_deleted(receiver, parent_id)
+        for backend, chat_id in ((sender, sender_chat_id), (receiver, receiver_chat_id)):
+            _assert_thread_deleted_preserves_parent(backend, chat_id, parent_id, parent_text, reply["id"])
+
+    @pytest.mark.spec("SC-THRD-03")
     @pytest.mark.spec("SC-THRD-06")
     @pytest.mark.spec("SC-THRD-10")
+    @pytest.mark.spec("SC-THRD-22")
     async def test_community_member_can_reply_in_admin_thread(self, sender, receiver):
         sender_chat_id, receiver_chat_id, _ = await _open_shared_chat(sender, receiver, ChatKind.COMMUNITY)
         parent_text = f"parent-{uuid4()}"
@@ -340,12 +397,7 @@ class TestWakuextThreadExtras:
         await receiver.wait_for_signal(SignalType.MESSAGES_NEW, pattern=parent_id, timeout=60, check_buffer=True)
 
         sender.wakuext_service.create_thread(sender_chat_id, parent_id)
-        await receiver.wait_for_signal(
-            SignalType.MESSAGES_NEW,
-            predicate=lambda s: any(t.get("threadId") == parent_id for t in (s.event.get("threads") or [])),
-            timeout=60,
-            check_buffer=True,
-        )
+        await _wait_for_thread(receiver, parent_id)
         assert _thread(receiver.wakuext_service.chat_threads(receiver_chat_id), parent_id)["parentMessageId"] == parent_id
 
         reply_text = f"reply-{uuid4()}"
@@ -356,6 +408,13 @@ class TestWakuextThreadExtras:
         await sender.wait_for_signal(SignalType.MESSAGES_NEW, pattern=reply["id"], timeout=60, check_buffer=True)
         assert reply_text in _texts(sender.wakuext_service.chat_messages_in_thread(sender_chat_id, parent_id, limit=20))
         assert reply_text not in _texts(sender.wakuext_service.chat_messages(sender_chat_id, limit=20))
+
+        rejected_name = f"Member-{uuid4()}"
+        with pytest.raises(ApiResponseError, match=THREAD_EDIT_PERMISSION_ERROR):
+            receiver.wakuext_service.edit_thread(receiver_chat_id, parent_id, rejected_name)
+        with pytest.raises(ApiResponseError, match=THREAD_DELETE_PERMISSION_ERROR):
+            receiver.wakuext_service.delete_thread(receiver_chat_id, parent_id)
+        assert _thread(sender.wakuext_service.chat_threads(sender_chat_id), parent_id).get("deleted", False) is False
 
 
 @pytest.mark.rpc
@@ -380,18 +439,9 @@ class TestWakuextThreadRename:
 
         deleted = sender.wakuext_service.delete_thread(sender_chat, parent_id)
         assert _thread(deleted, parent_id)["deleted"] is True
-        await receiver.wait_for_signal(
-            SignalType.MESSAGES_NEW,
-            predicate=lambda signal: any(t.get("threadId") == parent_id and t.get("deleted") for t in (signal.event.get("threads") or [])),
-            timeout=60,
-            check_buffer=True,
-        )
+        await _wait_for_thread_deleted(receiver, parent_id)
         for backend, chat_id in [(sender, sender_chat), (receiver, receiver_chat)]:
-            assert _thread(backend.wakuext_service.chat_threads(chat_id), parent_id)["deleted"] is True
-            parent = backend.wakuext_service.message_by_message_id(parent_id)
-            assert parent["text"] == parent_text
-            assert not parent.get("deleted", False)
-            assert backend.wakuext_service.message_by_message_id(reply_id)["deleted"] is True
+            _assert_thread_deleted_preserves_parent(backend, chat_id, parent_id, parent_text, reply_id)
             with pytest.raises(ApiResponseError):
                 backend.wakuext_service.send_chat_message(chat_id, "late reply", thread_id=parent_id)
 
@@ -399,7 +449,7 @@ class TestWakuextThreadRename:
     async def test_thread_rename_reaches_the_peer(self, sender, receiver):
         parent_text = f"parent-{uuid4()}"
         reply_text = f"reply-{uuid4()}"
-        renamed = f"Renamed-{uuid4()}".ljust(100, "x")
+        renamed = f"Renamed-{uuid4()}".ljust(THREAD_RENAME_LIMIT, "x")
         sender_chat_id, receiver_chat_id, parent_id, _ = await _one_to_one_thread(sender, receiver, parent_text, reply_text)
 
         with pytest.raises(ApiResponseError):
@@ -411,6 +461,23 @@ class TestWakuextThreadRename:
         await receiver.wait_for_signal(SignalType.MESSAGES_NEW, pattern=renamed, timeout=60, check_buffer=True)
         assert _thread(receiver.wakuext_service.chat_threads(receiver_chat_id), parent_id)["name"] == renamed
         assert receiver.wakuext_service.message_by_message_id(parent_id).get("text") == parent_text
+
+    @pytest.mark.spec("SC-THRD-26")
+    async def test_mark_thread_message_as_unread_updates_thread_not_parent_chat(self, sender, receiver):
+        parent_text = f"parent-{uuid4()}"
+        reply_text = f"reply-{uuid4()}"
+        _, receiver_chat, parent_id, reply_id = await _one_to_one_thread(sender, receiver, parent_text, reply_text)
+
+        receiver.wakuext_service.mark_all_read(receiver_chat)
+        assert receiver.wakuext_service.chat(receiver_chat).get("unviewedMessagesCount") == 0
+        marked = receiver.wakuext_service.mark_thread_read(receiver_chat, parent_id)
+        assert _thread(marked, parent_id)["unviewedMessagesCount"] == 0
+
+        receiver.wakuext_service.mark_message_as_unread(receiver_chat, reply_id)
+        thread = _thread(receiver.wakuext_service.chat_threads(receiver_chat), parent_id)
+        assert thread["unviewedMessagesCount"] == 1
+        assert receiver.wakuext_service.chat(receiver_chat).get("unviewedMessagesCount") == 0
+        assert receiver.wakuext_service.message_by_message_id(reply_id).get("seen") is False
 
     @pytest.mark.spec("SC-THRD-17")
     async def test_thread_follow_state(self, sender, receiver):
@@ -432,6 +499,18 @@ class TestWakuextThreadRename:
         await sender.wait_for_signal(SignalType.MESSAGES_NEW, pattern=reply_id, timeout=60, check_buffer=True)
         assert _thread(sender.wakuext_service.chat_threads(sender_chat), parent_id)["followed"] is False
 
+        # The parent author follows a thread created by someone else without replying.
+        author_parent_text = f"author-parent-{uuid4()}"
+        author_parent = _message_by_text(
+            receiver.wakuext_service.send_one_to_one_message(sender.public_key, author_parent_text),
+            author_parent_text,
+        )
+        await sender.wait_for_signal(SignalType.MESSAGES_NEW, pattern=author_parent["id"], timeout=60, check_buffer=True)
+        sender.wakuext_service.create_thread(receiver.public_key, author_parent["id"])
+        await _wait_for_thread(receiver, author_parent["id"])
+        assert _thread(receiver.wakuext_service.chat_threads(sender.public_key), author_parent["id"])["followed"] is True
+        assert _thread(sender.wakuext_service.chat_threads(receiver.public_key), author_parent["id"])["followed"] is True
+
 
 @pytest.mark.rpc
 @pytest.mark.asyncio
@@ -445,10 +524,14 @@ class TestWakuextThreadActivityCenter:
     async def receiver(self, async_backend_new_profile):
         return await async_backend_new_profile("receiver")
 
+    @pytest.mark.spec("SC-THRD-17")
+    @pytest.mark.spec("SC-THRD-26")
     @pytest.mark.spec("SC-THRD-27")
+    @pytest.mark.spec("SC-THRD-34")
     @pytest.mark.parametrize("chat_kind", [ChatKind.PRIVATE_GROUP, ChatKind.COMMUNITY], ids=lambda kind: kind.value)
     async def test_mention_and_reply_in_thread_expose_thread_name(self, sender, receiver, chat_kind):
-        sender_chat_id, receiver_chat_id, _ = await _open_shared_chat(sender, receiver, chat_kind)
+        sender_chat_id, receiver_chat_id, community_id = await _open_shared_chat(sender, receiver, chat_kind)
+        section_id = _section_id(chat_kind, community_id)
         parent_text = f"Release-{uuid4()}"
         mention_text = f"Hello @{receiver.public_key}"
         reply_text = f"reply-{uuid4()}"
@@ -464,15 +547,22 @@ class TestWakuextThreadActivityCenter:
         await sender.wait_for_signal(SignalType.MESSAGES_NEW, pattern=parent_id, timeout=60, check_buffer=True)
 
         sender.wakuext_service.create_thread(sender_chat_id, parent_id)
+        await _wait_for_thread(receiver, parent_id)
+        assert _thread(receiver.wakuext_service.chat_threads(receiver_chat_id), parent_id)["followed"] is True
         expected_name = parent_text[:THREAD_NAME_LIMIT]
+        _, mentions_before = _section_counts(receiver, section_id)
+        parent_unread_before = receiver.wakuext_service.chat(receiver_chat_id).get("unviewedMessagesCount")
 
         mention_response = sender.wakuext_service.send_chat_message(sender_chat_id, mention_text, thread_id=parent_id)
         mention_id = _message_by_text(mention_response, mention_text)["id"]
         await receiver.wait_for_signal(SignalType.MESSAGES_NEW, pattern=mention_id, timeout=60, check_buffer=True)
+        _, mentions_after = _section_counts(receiver, section_id)
+        assert mentions_after == mentions_before + 1
 
         reply_response = sender.wakuext_service.send_chat_message(sender_chat_id, reply_text, thread_id=parent_id, responseTo=parent_id)
         reply_id = _message_by_text(reply_response, reply_text)["id"]
         await receiver.wait_for_signal(SignalType.MESSAGES_NEW, pattern=reply_id, timeout=60, check_buffer=True)
+        assert receiver.wakuext_service.chat(receiver_chat_id).get("unviewedMessagesCount") == parent_unread_before
 
         mention = _mention_ac(receiver, mention_id)
         assert mention["type"] == ActivityCenterNotificationType.NOTIFICATION_TYPE_MENTION.value
@@ -505,7 +595,11 @@ class TestWakuextThreadMute:
     async def receiver(self, async_backend_new_profile, waku_light_client):
         return await async_backend_new_profile("receiver", waku_light_client=waku_light_client)
 
+    @pytest.mark.spec("SC-THRD-17")
     @pytest.mark.spec("SC-THRD-18")
+    @pytest.mark.spec("SC-THRD-26")
+    @pytest.mark.spec("SC-THRD-34")
+    @pytest.mark.spec("SC-THRD-37")
     async def test_muted_thread_silences_ordinary_messages_but_keeps_mentions(self, sender, receiver):
         sender_chat_id, receiver_chat_id, _ = await _open_shared_chat(sender, receiver, ChatKind.PRIVATE_GROUP)
         # The sender writes the parent, so its thread messages aren't replies to the receiver.
@@ -515,8 +609,28 @@ class TestWakuextThreadMute:
         await receiver.wait_for_signal(SignalType.MESSAGES_NEW, pattern=parent_id, timeout=60, check_buffer=True)
 
         sender.wakuext_service.create_thread(sender_chat_id, parent_id)
+        await _wait_for_thread(receiver, parent_id)
+        assert _thread(receiver.wakuext_service.chat_threads(receiver_chat_id), parent_id)["followed"] is False
+        unread_before_follow, mentions_before_follow = _section_counts(receiver, PERSONAL_SECTION_ID)
+        parent_unread_before_follow = receiver.wakuext_service.chat(receiver_chat_id).get("unviewedMessagesCount")
+
+        ordinary_before_follow = f"before-follow-{uuid4()}"
+        ordinary_before_follow_id = _message_by_text(
+            sender.wakuext_service.send_chat_message(sender_chat_id, ordinary_before_follow, thread_id=parent_id),
+            ordinary_before_follow,
+        )["id"]
+        await receiver.wait_for_signal(SignalType.MESSAGES_NEW, pattern=ordinary_before_follow_id, timeout=60, check_buffer=True)
+        assert _section_counts(receiver, PERSONAL_SECTION_ID) == (unread_before_follow, mentions_before_follow)
+        assert receiver.wakuext_service.chat(receiver_chat_id).get("unviewedMessagesCount") == parent_unread_before_follow
+        assert _thread(receiver.wakuext_service.chat_threads(receiver_chat_id), parent_id)["followed"] is False
+
         _, audible_id = await _post_thread_mention(sender, receiver, sender_chat_id, parent_id, receiver.public_key)
         assert _mention_ac(receiver, audible_id)["message"]["threadId"] == parent_id
+        assert _thread(receiver.wakuext_service.chat_threads(receiver_chat_id), parent_id)["followed"] is True
+        _, mentions_after_follow = _section_counts(receiver, PERSONAL_SECTION_ID)
+        assert mentions_after_follow == mentions_before_follow + 1
+        assert _thread(receiver.wakuext_service.unfollow_thread(receiver_chat_id, parent_id), parent_id)["followed"] is False
+        assert _thread(receiver.wakuext_service.follow_thread(receiver_chat_id, parent_id), parent_id)["followed"] is True
 
         assert (
             receiver.wakuext_service.mute_thread(
@@ -569,13 +683,6 @@ class TestWakuextThreadMute:
         assert _mention_ac(receiver, restored_id)["message"]["threadId"] == parent_id
 
 
-def _personal_mentions(backend, *, include_threads: bool) -> int:
-    for section in (backend.wakuext_service.section_unread_counts(include_threads=include_threads) or {}).get("sections") or []:
-        if section.get("sectionId") == "personal":
-            return section["unviewedMentionsCount"]
-    raise AssertionError("personal section not found")
-
-
 async def _thread_parent_message(sender, receiver, chat_kind: ChatKind) -> tuple[str, str, str | None]:
     sender_chat_id, _, community_id = await _open_shared_chat(sender, receiver, chat_kind)
     parent_text = f"parent-{uuid4()}"
@@ -613,12 +720,7 @@ class TestWakuextThreadSectionUnread:
         receiver.wakuext_service.mark_all_read(receiver_chat_id)
 
         sender.wakuext_service.create_thread(sender_chat_id, parent_id)
-        await receiver.wait_for_signal(
-            SignalType.MESSAGES_NEW,
-            predicate=lambda signal: any(t.get("threadId") == parent_id for t in (signal.event.get("threads") or [])),
-            timeout=60,
-            check_buffer=True,
-        )
+        await _wait_for_thread(receiver, parent_id)
         assert not _thread(receiver.wakuext_service.chat_threads(receiver_chat_id), parent_id)["followed"]
         receiver.wakuext_service.mark_all_read(receiver_chat_id)
 
