@@ -325,7 +325,8 @@ func (a *Adapter) SubscribeToConnStatusChanges() (*types.ConnStatusSubscription,
 }
 
 // OnHistoryReconcileNeeded returns the windows to fetch from store: while the
-// node is not Connected, and once more when it is again.
+// node is not Connected, and once more when it is again. Temporary, until
+// logos-delivery owns the history fetch (https://github.com/status-im/status-go/issues/8104).
 func (a *Adapter) OnHistoryReconcileNeeded() <-chan types.HistoryReconcileWindow {
 	return a.historyReconcileNeeded
 }

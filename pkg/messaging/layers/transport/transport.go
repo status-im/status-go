@@ -292,7 +292,8 @@ func (t *Transport) handleReceivedMessage(msg *wakutypes.ReceivedMessage) {
 // when any filter is on it, else the lowest.
 //
 // A filter is per (pubsub topic, content topic, key), and a chat can have one
-// on several pubsub topics. A message that names its pubsub topic (go-waku)
+// on several pubsub topics: the community control chat has one on shard 64 and
+// one on the default shard during the #7498 shard migration. A message that names its pubsub topic (go-waku)
 // matches only that one. A message without one (logos-delivery, which delivers
 // by content topic) would match each of them and reach the chat once per
 // filter; keeping one pubsub topic delivers it once, on a stable filter.

@@ -89,8 +89,9 @@ type CoreParams struct {
 
 	TimeSource timesource.Provider
 
-	// DataDir is where a logos-delivery backend keeps its state. The go-waku
-	// backend keeps none.
+	// DataDir is where a logos-delivery backend keeps its state, unencrypted:
+	// nothing sensitive while backfill-enabled is off. Enabling it needs this
+	// state moved to the encrypted DB (https://github.com/logos-messaging/logos-delivery/issues/4588).
 	DataDir string
 }
 
