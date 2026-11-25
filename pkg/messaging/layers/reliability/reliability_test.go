@@ -350,10 +350,10 @@ func TestReliabilityCloseWaitsForInFlightSDSOps(t *testing.T) {
 	lockHeld := make(chan struct{})
 	releaseLock := make(chan struct{})
 	go func() {
-		r.sdsOpsMu.RLock()
+		r.sdsOpsMu.Lock()
 		close(lockHeld)
 		<-releaseLock
-		r.sdsOpsMu.RUnlock()
+		r.sdsOpsMu.Unlock()
 	}()
 
 	<-lockHeld

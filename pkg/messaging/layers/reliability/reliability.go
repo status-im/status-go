@@ -75,10 +75,8 @@ type Reliability struct {
 
 	sdsManagerFactory sdsManagerFactoryFunc
 
-	// sdsOpsMu coordinates SDS manager calls with shutdown. SDS hot-path calls
-	// hold RLock for the full native call; Close holds Lock before Cleanup so
-	// Cleanup cannot race with in-flight SDS manager usage.
-	sdsOpsMu sync.RWMutex
+	// sdsOpsMu serializes SDS calls and channel recovery with manager shutdown.
+	sdsOpsMu sync.Mutex
 }
 
 func NewReliability(datasyncPersistence mvdsnode.Persistence, identity *ecdsa.PrivateKey, missingDepsHandler MissingDependenciesHandler, logger *zap.Logger, persistence ...sds.PersistenceCallbacks) (*Reliability, error) {

@@ -156,6 +156,11 @@ func TestSDSConcurrentCorruptStateRecovery(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(receiver.Close)
 
+	sender := newTestReliability(t)
+	t.Cleanup(sender.Close)
+	wrapped, _, err := sender.WrapPayloadForSDS([]byte("incoming"), "channel")
+	require.NoError(t, err)
+
 	const workers = 8
 	start := make(chan struct{})
 	results := make(chan error, workers)
@@ -166,6 +171,11 @@ func TestSDSConcurrentCorruptStateRecovery(t *testing.T) {
 			defer wg.Done()
 			defer panics.LogOnPanic()
 			<-start
+			if i%2 == 0 {
+				_, err := receiver.UnwrapPayloadFromSDS(wrapped)
+				results <- err
+				return
+			}
 			_, _, err := receiver.WrapPayloadForSDS([]byte(fmt.Sprintf("payload-%d", i)), "channel")
 			results <- err
 		}(i)
