@@ -1326,6 +1326,27 @@ func exportProfileDEK(requestJSON string) string {
 	return string(respJSON)
 }
 
+// SetZeroOnboardedProfilePassword sets the logged-in zero-onboarded profile's password (client-hashed) without the
+// current one, by re-wrapping the session's DEK, and clears the mark.
+func SetZeroOnboardedProfilePassword(requestJSON string) string {
+	return callWithResponse(setZeroOnboardedProfilePassword, requestJSON)
+}
+
+func setZeroOnboardedProfilePassword(requestJSON string) string {
+	var request requests.SetZeroOnboardedProfilePassword
+	err := json.Unmarshal([]byte(requestJSON), &request)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	if err := request.Validate(); err != nil {
+		return makeJSONResponse(err)
+	}
+
+	err = statusBackend.SetZeroOnboardedProfilePassword(request.KeyUID, request.NewPassword)
+	return makeJSONResponse(err)
+}
+
 // Deprecated: Use ConvertToKeycardAccountV2 instead.
 func ConvertToKeycardAccount(accountData, settingsJSON, keycardUID, password, newPassword string) string {
 	return convertToKeycardAccount(accountData, settingsJSON, keycardUID, password, newPassword)

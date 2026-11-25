@@ -1251,11 +1251,18 @@ func (b *StatusBackend) reEncryptKeyStoreDir(currentPassword string, newPassword
 //   - profile on the DEK scheme, rekey=true → deep rekey: fresh DEK, databases and keystore re-encrypted (new DEK is generated)
 //   - legacy profile → one-time migration to the DEK scheme (full re-encryption, new DEK is generated)
 func (b *StatusBackend) ChangeDatabasePassword(keyUID string, password string, newPassword string, rekey bool) error {
+	acc, err := b.multiaccountsDB.GetAccount(keyUID)
+	if err != nil {
+		return err
+	}
 	restart, err := b.changeDatabasePasswordSerialized(keyUID, password, newPassword, rekey)
 	if restart != nil {
 		restart()
 	}
-	return err
+	if err != nil || acc == nil || !acc.ZeroOnboarded {
+		return err
+	}
+	return b.clearZeroOnboarded(keyUID)
 }
 
 // changeDatabasePasswordSerialized holds the re-encryption lock for the whole mutation, returns the node-restart step
@@ -2128,6 +2135,10 @@ func (b *StatusBackend) StartNodeWithChatKeyOrMnemonic(
 	// very important to update root data dir here
 	b.UpdateRootDataDir(request.RootDataDir)
 
+	if err := b.validateZeroOnboardedCreation(request, keycardData, restoreAccount); err != nil {
+		return nil, err
+	}
+
 	var (
 		isKeycard               = request.KeycardInstanceUID != ""
 		keyUID                  string
@@ -2236,6 +2247,7 @@ func (b *StatusBackend) StartNodeWithChatKeyOrMnemonic(
 	if err != nil {
 		return nil, err
 	}
+	multiAccount.ZeroOnboarded = request.ZeroOnboarded
 
 	if multiAccount.Name == "" {
 		multiAccount.Name = settings.Name

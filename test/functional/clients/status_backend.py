@@ -375,6 +375,8 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
             "torrentConfigPort": 9025,
             "thirdpartyServicesEnabled": True,
         }
+        if kwargs.get("zero_onboarded"):
+            data["zeroOnboarded"] = True
 
         verify_ens = kwargs.get("verify_ens_contract_address")
         if verify_ens is not None:
@@ -768,6 +770,16 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
             "rekey": rekey,
         }
         return self.api_request_json(method, data)
+
+    def set_zero_onboarded_profile_password(self, new_password, key_uid=None):
+        method = "SetZeroOnboardedProfilePassword"
+        data = {
+            "keyUID": key_uid if key_uid is not None else self.key_uid,
+            "newPassword": new_password,
+        }
+        response = self.api_request_json(method, data)
+        self.password = new_password
+        return response
 
     def get_profile_encryption_info(self):
         method = "GetProfileEncryptionInfo"

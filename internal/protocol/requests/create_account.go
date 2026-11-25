@@ -100,6 +100,9 @@ type CreateAccount struct {
 	KeycardSecureChannelV2 bool `json:"keycardSecureChannelV2"`
 
 	ThirdpartyServicesEnabled bool `json:"thirdpartyServicesEnabled"`
+
+	// ZeroOnboarded is allowed only for the device's first, non-keycard, non-restored profile.
+	ZeroOnboarded bool `json:"zeroOnboarded"`
 }
 type WalletConfig struct {
 	TokensListsAutoRefreshInterval      int `json:"tokensListsAutoRefreshInterval"`      // in seconds

@@ -451,3 +451,74 @@ func TestDatabase_SaveAccountWithIdentityImages(t *testing.T) {
 	}
 	require.Equal(t, 2, matches)
 }
+
+func zeroOnboardedOf(t *testing.T, db *Database, keyUID string) bool {
+	acc, err := db.GetAccount(keyUID)
+	require.NoError(t, err)
+	accounts, err := db.GetAccounts()
+	require.NoError(t, err)
+	for _, a := range accounts {
+		if a.KeyUID == keyUID {
+			require.Equal(t, acc.ZeroOnboarded, a.ZeroOnboarded, "GetAccount and GetAccounts disagree")
+		}
+	}
+	return acc.ZeroOnboarded
+}
+
+func TestZeroOnboardedDefaultsToFalse(t *testing.T) {
+	db, stop := setupTestDB(t)
+	defer stop()
+
+	keyUID := "0xregular"
+	require.NoError(t, db.SaveAccount(Account{Name: "regular", KeyUID: keyUID}))
+	require.False(t, zeroOnboardedOf(t, db, keyUID))
+}
+
+func TestZeroOnboardedRoundTrip(t *testing.T) {
+	db, stop := setupTestDB(t)
+	defer stop()
+
+	keyUID := "0xzero"
+	require.NoError(t, db.SaveAccount(Account{Name: "zero", KeyUID: keyUID, ZeroOnboarded: true}))
+	require.True(t, zeroOnboardedOf(t, db, keyUID))
+}
+
+// SaveAccount runs with a stale struct on display-name changes; it must keep the stored mark.
+func TestSaveAccountPreservesStoredZeroOnboarded(t *testing.T) {
+	db, stop := setupTestDB(t)
+	defer stop()
+
+	zeroKeyUID := "0xzero"
+	require.NoError(t, db.SaveAccount(Account{Name: "zero", KeyUID: zeroKeyUID, ZeroOnboarded: true}))
+	require.NoError(t, db.SaveAccount(Account{Name: "renamed", KeyUID: zeroKeyUID, ZeroOnboarded: false}))
+	require.True(t, zeroOnboardedOf(t, db, zeroKeyUID))
+
+	regularKeyUID := "0xregular"
+	require.NoError(t, db.SaveAccount(Account{Name: "regular", KeyUID: regularKeyUID}))
+	require.NoError(t, db.SaveAccount(Account{Name: "renamed", KeyUID: regularKeyUID, ZeroOnboarded: true}))
+	require.False(t, zeroOnboardedOf(t, db, regularKeyUID))
+}
+
+func TestUpdateAccountLeavesZeroOnboarded(t *testing.T) {
+	db, stop := setupTestDB(t)
+	defer stop()
+
+	keyUID := "0xzero"
+	require.NoError(t, db.SaveAccount(Account{Name: "zero", KeyUID: keyUID, ZeroOnboarded: true}))
+	require.NoError(t, db.UpdateAccount(Account{Name: "updated", KeyUID: keyUID, ZeroOnboarded: false}))
+	require.True(t, zeroOnboardedOf(t, db, keyUID))
+}
+
+func TestClearZeroOnboarded(t *testing.T) {
+	db, stop := setupTestDB(t)
+	defer stop()
+
+	keyUID := "0xzero"
+	otherKeyUID := "0xother"
+	require.NoError(t, db.SaveAccount(Account{Name: "zero", KeyUID: keyUID, ZeroOnboarded: true}))
+	require.NoError(t, db.SaveAccount(Account{Name: "other", KeyUID: otherKeyUID, ZeroOnboarded: true}))
+
+	require.NoError(t, db.ClearZeroOnboarded(keyUID))
+	require.False(t, zeroOnboardedOf(t, db, keyUID))
+	require.True(t, zeroOnboardedOf(t, db, otherKeyUID))
+}
