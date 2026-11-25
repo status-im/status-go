@@ -229,3 +229,16 @@ func (s *LoginStateSuite) TestJSONContract() {
 	s.Require().NoError(err)
 	s.Require().JSONEq(string(activeJSON), string(accountJSON), "account has the GetActiveAccount shape")
 }
+
+func (s *LoginStateSuite) TestRekeyOfTheCurrentAccountStaysLoggedInWithItsSeq() {
+	keyUID := s.createAccountAndLogin()
+
+	s.Require().NoError(s.backend.ChangeDatabasePassword(keyUID, testPassword, "rekeyed-password", true))
+
+	state := s.backend.LoginState()
+	s.Require().Equal(LoginStateLoggedIn, state.State)
+	s.Require().Equal(uint64(1), state.Seq)
+	s.Require().NotNil(state.Account)
+	s.Require().Equal(keyUID, state.Account.KeyUID)
+	s.Require().Len(s.seenNodeLogins(), 1, "the restart after re-encryption sends no node.login")
+}

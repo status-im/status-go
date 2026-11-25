@@ -1304,6 +1304,8 @@ func (b *StatusBackend) restartNodeAfterReEncryption(acc *multiaccounts.Account,
 		b.logger.Error("failed to start node", zap.Error(err))
 		return
 	}
+	// The session continues across the restart: logged in again under the same seq, no node.login.
+	b.loginState.set(LoginStateLoggedIn)
 	b.statusNode.StartTokenManager()
 }
 
