@@ -471,6 +471,9 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestBecomeMemberPermissions(
 	// bob joins the community
 	s.advertiseCommunityTo(community, s.bob)
 	s.joinCommunity(community, s.bob)
+	firstJoinClock, err := s.owner.communitiesManager.GetCommunityRequestToJoinClock(&s.bob.identity.PublicKey, community.IDString())
+	s.Require().NoError(err)
+	s.Require().NotZero(firstJoinClock)
 
 	messages := []string{
 		"1-message", // RandomLettersString(10), // successful message on open community
@@ -573,8 +576,14 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestBecomeMemberPermissions(
 			sub.keyActions.CommunityKeyAction.ActionType == communities.EncryptionKeySendToMembers
 	})
 
+	// An eligible rejoin needs a later second-based clock than Bob's first request.
+	time.Sleep(time.Until(time.Unix(int64(firstJoinClock)+1, 0)))
+
 	// bob re-joins the community
 	s.joinCommunity(community, s.bob)
+	rejoinClock, err := s.owner.communitiesManager.GetCommunityRequestToJoinClock(&s.bob.identity.PublicKey, community.IDString())
+	s.Require().NoError(err)
+	s.Require().Greater(rejoinClock, firstJoinClock)
 
 	err = <-waitOnCommunityKeyToBeDistributedToBob
 	s.Require().NoError(err)

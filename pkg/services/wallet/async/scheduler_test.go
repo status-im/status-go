@@ -114,7 +114,7 @@ func TestScheduler_Enqueue_VerifyReplacementPolicyCancelOld(t *testing.T) {
 			// Wait for the first task to be cancelled by the second one
 			select {
 			case <-workCtx.Done():
-				require.ErrorAs(t, workCtx.Err(), &context.Canceled)
+				require.ErrorIs(t, workCtx.Err(), context.Canceled)
 
 				// Unblock the third Enqueue call
 				secondRunWG.Done()
@@ -132,7 +132,7 @@ func TestScheduler_Enqueue_VerifyReplacementPolicyCancelOld(t *testing.T) {
 				// First task was cancelled by the second one Enqueue call
 				stage4AsyncFirstTaskCanceledResponse = true
 
-				require.ErrorAs(t, err, &context.Canceled)
+				require.ErrorIs(t, err, context.Canceled)
 			case 1:
 				callChan <- stage2ThirdEnqueueOverwroteSecondTask
 
@@ -268,7 +268,11 @@ func TestScheduler_Enqueue_ValidateOrder(t *testing.T) {
 	taskSuccessChan := make(chan enqueueParams, len(enqueueSequence))
 	taskCanceledChan := make(chan enqueueParams, len(enqueueSequence))
 	taskFailedChan := make(chan enqueueParams, len(enqueueSequence))
-	resChan := make(chan enqueueParams, len(enqueueSequence))
+	type taskResponse struct {
+		expectedType TaskType
+		actualType   TaskType
+	}
+	resChan := make(chan taskResponse, len(enqueueSequence))
 
 	firstIgnoreNewProcessed := make(map[TaskType]bool)
 
@@ -287,7 +291,6 @@ func TestScheduler_Enqueue_ValidateOrder(t *testing.T) {
 
 			if p.taskType.Policy == ReplacementPolicyCancelOld && ctx.Err() != nil && errors.Is(ctx.Err(), context.Canceled) {
 				taskCanceledChan <- p
-				t.Logf("task canceled, task seq: %d, task type: %+v", currentIndex, p.taskType)
 				return nil, ctx.Err()
 			}
 
@@ -296,12 +299,9 @@ func TestScheduler_Enqueue_ValidateOrder(t *testing.T) {
 				return nil, errors.New("test error")
 			}
 			taskSuccessChan <- p
-			t.Logf("task executed successfully, task seq: %d, task type: %+v", currentIndex, p.taskType)
 			return 10 * (currentIndex + 1), nil
-		}, func(res interface{}, taskType TaskType, err error) {
-			require.Equal(t, p.taskType, taskType)
-			resChan <- p
-			t.Logf("response invoked, task seq: %d, task type: %+v, result: %+v", currentIndex, taskType, res)
+		}, func(_ interface{}, taskType TaskType, _ error) {
+			resChan <- taskResponse{expectedType: p.taskType, actualType: taskType}
 		})
 
 		if ignored {
@@ -339,8 +339,9 @@ func TestScheduler_Enqueue_ValidateOrder(t *testing.T) {
 			taskCanceledCount[p.taskType]++
 		case p := <-taskFailedChan:
 			taskFailedCount[p.taskType]++
-		case p := <-resChan:
-			resChanCount[p.taskType]++
+		case response := <-resChan:
+			require.Equal(t, response.expectedType, response.actualType)
+			resChanCount[response.actualType]++
 		case <-time.After(1 * time.Second):
 			require.Fail(t, "test not completed in time")
 		}
