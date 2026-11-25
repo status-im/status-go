@@ -314,6 +314,21 @@ func getActiveAccount() string {
 	return string(respJSON)
 }
 
+// GetLoginState returns the login state: {"state":"none"|"inProgress"|"loggedIn"},
+// with "account" (shaped as GetActiveAccount) only when logged in.
+func GetLoginState() string {
+	return callWithResponse(getLoginState)
+}
+
+func getLoginState() string {
+	respJSON, err := json.Marshal(statusBackend.LoginState())
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	return string(respJSON)
+}
+
 func KeyUID() string {
 	return callWithResponse(keyUID)
 }
@@ -388,6 +403,7 @@ func login(accountData, password, configJSON string) error {
 		}
 	}
 
+	statusBackend.LoginRequestAccepted()
 	backend.RunAsync(func() error {
 		logutils.ZapLogger().Debug("start a node with account", zap.String("key-uid", account.KeyUID))
 		err := statusBackend.UpdateNodeConfigFleet(account, password, &conf)
@@ -453,6 +469,7 @@ func createAccountAndLogin(requestJSON string) string {
 		return makeJSONResponse(err)
 	}
 
+	statusBackend.LoginRequestAccepted()
 	backend.RunAsync(func() error {
 		logutils.ZapLogger().Debug("starting a node and creating config")
 		_, err := statusBackend.CreateAccountAndLogin(&request)
@@ -491,6 +508,7 @@ func loginAccount(requestJSON string) string {
 		return makeJSONResponse(err)
 	}
 
+	statusBackend.LoginRequestAccepted()
 	backend.RunAsync(func() error {
 		err := statusBackend.LoginAccount(&request)
 		if err != nil {
@@ -519,6 +537,7 @@ func restoreAccountAndLogin(requestJSON string) string {
 		return makeJSONResponse(err)
 	}
 
+	statusBackend.LoginRequestAccepted()
 	backend.RunAsync(func() error {
 		logutils.ZapLogger().Debug("starting a node and restoring account")
 
@@ -553,6 +572,7 @@ func LoginWithKeycard(accountData, password, keyHex string, configJSON string) s
 	if err != nil {
 		return makeJSONResponse(err)
 	}
+	statusBackend.LoginRequestAccepted()
 	backend.RunAsync(func() error {
 		logutils.ZapLogger().Debug("start a node with account", zap.String("key-uid", account.KeyUID))
 		err := statusBackend.StartNodeWithKey(account, password, keyHex, &conf)
