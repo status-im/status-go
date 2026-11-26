@@ -2468,9 +2468,12 @@ func (m *Messenger) handleChatMessage(ctx context.Context, state *ReceivedMessag
 		return err
 	}
 
-	// Our own message, mark as sent
 	if isSyncMessage {
 		receivedMessage.OutgoingStatus = common.OutgoingStatusSent
+		if chat.OneToOne() && chat.ID == m.myHexIdentity() {
+			// This installation received the note, so its copy is delivered.
+			receivedMessage.OutgoingStatus = common.OutgoingStatusDelivered
+		}
 	} else if !receivedMessage.Seen && communityChatAccessible {
 		// Increase unviewed count
 		skipUpdateUnviewedCountForAlbums := false

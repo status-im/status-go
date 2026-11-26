@@ -1895,15 +1895,28 @@ func (m *Messenger) dispatchMessage(ctx context.Context, rawMessage common.RawMe
 			return rawMessage, errors.New("public key curve does not match")
 		}
 
-		//SendPrivate will alter message identity and possibly datasyncid, so we save an unchanged
-		//message for sending to paired devices later
-		specCopyForPairedDevices := rawMessage
-		if !crypto.IsPubKeyEqual(publicKey, &m.identity.PublicKey) || rawMessage.SkipEncryptionLayer {
-			id, err = m.sender.SendPrivate(ctx, publicKey, &rawMessage)
-
+		if crypto.IsPubKeyEqual(publicKey, &m.identity.PublicKey) && !rawMessage.SkipEncryptionLayer {
+			rawMessage.TrackSelfDelivery = rawMessage.MessageType == protobuf.ApplicationMetadataMessage_CHAT_MESSAGE
+			rawMessage.SendPushNotification = false
+			if m.hasPairedDevices() {
+				id, err = m.sender.SendPrivate(ctx, publicKey, &rawMessage)
+			} else {
+				// Use the normal private message ID and persistence hook with no recipients.
+				rawMessage.Sent = true
+				id, err = m.sender.SendGroup(ctx, nil, &rawMessage)
+			}
 			if err != nil {
 				return rawMessage, err
 			}
+			break
+		}
+
+		//SendPrivate will alter message identity and possibly datasyncid, so we save an unchanged
+		//message for sending to paired devices later
+		specCopyForPairedDevices := rawMessage
+		id, err = m.sender.SendPrivate(ctx, publicKey, &rawMessage)
+		if err != nil {
+			return rawMessage, err
 		}
 
 		err = m.sendToPairedDevices(ctx, specCopyForPairedDevices)
