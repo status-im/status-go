@@ -3486,7 +3486,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[types.ChatFilte
 		return nil, err
 	}
 	if err := m.persistence.MarkSDSMessagesProcessed(messageState.processedSDSMessages); err != nil {
-		return nil, errors.Wrap(err, "failed to persist processed SDS messages")
+		logger.Warn("failed to persist processed SDS messages", zap.Error(err))
 	}
 	if len(processedMessages) != 0 {
 		if err := m.messaging.ConfirmMessagesProcessed(processedMessages, m.getTimesource().GetCurrentTime()); err != nil {

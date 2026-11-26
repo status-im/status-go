@@ -67,11 +67,12 @@ func (s *MessengerSDSProcessingSuite) TestNonChatReplayAfterRestart() {
 				})
 				s.Require().NoError(err)
 			}
+			firstEnvelopeHash := crypto.Keccak256([]byte(chatID + "-1"))
 			attempt := 0
 			deliver := func() (*MessengerResponse, error) {
 				attempt++
 				hashSequence := attempt
-				if (failure == "handler" || failure == "save" || failure == "marker") && attempt == 2 {
+				if (failure == "handler" || failure == "save") && attempt == 2 {
 					hashSequence = 1
 				}
 				envelopes := []*messagingtypes.ReceivedMessage{{
@@ -101,23 +102,35 @@ func (s *MessengerSDSProcessingSuite) TestNonChatReplayAfterRestart() {
 					"CREATE TRIGGER fail_sds_processing BEFORE %s ON %s BEGIN SELECT RAISE(ABORT, 'injected processing failure'); END",
 					operation, table))
 				s.Require().NoError(err)
-				_, deliveryErr := deliver()
-				if failure != "handler" {
-					s.Require().Error(deliveryErr)
-				} else {
+				response, deliveryErr := deliver()
+				switch failure {
+				case "handler":
 					s.Require().NoError(deliveryErr)
+				case "save":
+					s.Require().Error(deliveryErr)
+				case "marker":
+					s.Require().NoError(deliveryErr)
+					s.Require().Len(response.EmojiReactions(), 1)
+					s.Require().Equal(1, logs.FilterMessage("failed to persist processed SDS messages").Len())
 				}
 				processed, err := s.m.persistence.IsSDSMessageProcessed(id)
 				s.Require().NoError(err)
 				s.Require().False(processed)
+				var confirmed bool
+				err = s.m.database.QueryRow("SELECT EXISTS(SELECT 1 FROM transport_message_cache WHERE id = ?)", cryptotypes.EncodeHex(firstEnvelopeHash)).Scan(&confirmed)
+				s.Require().NoError(err)
+				s.Require().Equal(failure == "marker", confirmed)
 				_, err = s.m.database.Exec("DROP TRIGGER fail_sds_processing")
 				s.Require().NoError(err)
+				if failure == "marker" {
+					return
+				}
 				restart()
 			}
 
 			response, err := deliver()
 			s.Require().NoError(err)
-			if failure != "save" && failure != "marker" {
+			if failure != "save" {
 				s.Require().Len(response.EmojiReactions(), 1)
 			}
 			processed, err := s.m.persistence.IsSDSMessageProcessed(id)
