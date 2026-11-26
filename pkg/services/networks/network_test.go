@@ -404,3 +404,68 @@ func (s *NetworkManagerTestSuite) TestSetActiveMaxNumberOfActiveNetworks() {
 	s.Require().NotNil(n)
 	s.False(n.IsActive)
 }
+
+func (s *NetworkManagerTestSuite) TestSetActiveLimitIsIndependentPerMode() {
+	const limit = 20
+
+	modes := []struct {
+		name     string
+		isTest   bool
+		chainIDs []uint64
+	}{
+		{name: "mainnet"},
+		{name: "testnet", isTest: true},
+	}
+	embedded := networks.BuildDefaultNetworks(&params.WalletConfig{}, false)
+	var fixtures []params.Network
+	for i := range modes {
+		mode := &modes[i]
+		for _, network := range embedded {
+			if network.IsTest == mode.isTest && network.IsDeactivatable && len(mode.chainIDs) <= limit {
+				network.IsActive = false
+				fixtures = append(fixtures, network)
+				mode.chainIDs = append(mode.chainIDs, network.ChainID)
+			}
+		}
+		for len(mode.chainIDs) <= limit {
+			chainID := uint64(900000 + len(fixtures))
+			network := testutil.CreateNetwork(chainID, fmt.Sprintf("Fixture %d", chainID), nil)
+			network.IsTest = mode.isTest
+			network.IsActive = false
+			fixtures = append(fixtures, *network)
+			mode.chainIDs = append(mode.chainIDs, chainID)
+		}
+	}
+	s.Require().NoError(db.NewNetworksPersistence(s.db).SetNetworks(fixtures))
+
+	for i, mode := range modes {
+		s.Run(mode.name, func() {
+			for _, chainID := range mode.chainIDs[:limit] {
+				s.Require().NoError(s.manager.SetActive(chainID, true), "chain %d", chainID)
+				s.Require().True(s.manager.Find(chainID).IsActive)
+			}
+
+			if i > 0 {
+				otherChainID := modes[i-1].chainIDs[limit]
+				s.Require().NoError(s.manager.SetActive(otherChainID, false))
+				s.Require().False(s.manager.Find(otherChainID).IsActive)
+			}
+
+			rejected := mode.chainIDs[limit]
+			s.Require().ErrorIs(s.manager.SetActive(rejected, true), networks.ErrActiveNetworksLimitReached)
+			s.Require().False(s.manager.Find(rejected).IsActive)
+
+			released := mode.chainIDs[0]
+			s.Require().NoError(s.manager.SetActive(released, false))
+			s.Require().False(s.manager.Find(released).IsActive)
+			s.Require().NoError(s.manager.SetActive(rejected, true))
+			s.Require().True(s.manager.Find(rejected).IsActive)
+
+			if i > 0 {
+				otherChainID := modes[i-1].chainIDs[limit]
+				s.Require().NoError(s.manager.SetActive(otherChainID, true))
+				s.Require().True(s.manager.Find(otherChainID).IsActive)
+			}
+		})
+	}
+}
