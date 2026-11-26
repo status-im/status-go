@@ -102,8 +102,12 @@ func (m *Messenger) sendSDSPeriodicSyncs(ctx context.Context) {
 
 func (m *Messenger) sendCommunitySDSSync(ctx context.Context, communityID cryptotypes.HexBytes, payload []byte) error {
 	return m.communitiesManager.WithJoinedCommunity(communityID, func(community *communities.Community) error {
-		// All community chats currently share this history, including restricted
-		// chats. The public sync exposes its metadata, but not message content.
-		return m.messaging.SendSDSSync(ctx, payload, community.PubsubTopic(), communitySDSSyncTopic(community.IDString()))
+		// Public communities expose sync metadata. Encrypted communities use
+		// their community-wide key for the shared history.
+		var groupID []byte
+		if community.Encrypted() {
+			groupID = community.ID()
+		}
+		return m.messaging.SendSDSSync(ctx, payload, community.PubsubTopic(), communitySDSSyncTopic(community.IDString()), groupID)
 	})
 }

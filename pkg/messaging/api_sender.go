@@ -25,8 +25,8 @@ func (a *API) TickSDS() ([]sds.TickEvent, error) {
 }
 
 // SendSDSSync sends a tick-generated metadata payload on the specified topic.
-func (a *API) SendSDSSync(ctx context.Context, payload []byte, pubsubTopic, syncTopic string) error {
-	return a.core.controller.Sender().SendSDSSync(ctx, payload, pubsubTopic, syncTopic)
+func (a *API) SendSDSSync(ctx context.Context, payload []byte, pubsubTopic, syncTopic string, groupID []byte) error {
+	return a.core.controller.Sender().SendSDSSync(ctx, payload, pubsubTopic, syncTopic, groupID)
 }
 
 func (a *API) SendPrivate(ctx context.Context, params types.SendPrivateParams) error {

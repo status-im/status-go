@@ -1,6 +1,7 @@
 package protocol
 
 import (
+	"bytes"
 	"crypto/ecdsa"
 	"fmt"
 	"strings"
@@ -36,9 +37,12 @@ func (v communitySDSAuthorizer) Authorize(message sds.AuthorizationMessage) (boo
 		if err != nil {
 			return false, err
 		}
-		sender, err := authenticatedSDSTransportSender(message)
+		sender, groupID, err := reliability.ParseSDSAuthorizationContext(message.AuthorizationContext)
 		if err != nil {
 			return false, err
+		}
+		if community.Encrypted() && !bytes.Equal(community.ID(), groupID) {
+			return false, nil
 		}
 		return isAuthorizedSDSCommunitySender(community, sender), nil
 	}
@@ -94,7 +98,7 @@ func (v communitySDSAuthorizer) Authorize(message sds.AuthorizationMessage) (boo
 	// AuthorizationContext is the Waku-authenticated signer of the full payload,
 	// including SDS IDs, dependencies, and acknowledgements. Require that signer
 	// to be a community participant, while allowing member repair forwarding.
-	transportSender, err := authenticatedSDSTransportSender(message)
+	transportSender, _, err := reliability.ParseSDSAuthorizationContext(message.AuthorizationContext)
 	if err != nil {
 		return false, err
 	}
@@ -105,14 +109,6 @@ func (v communitySDSAuthorizer) Authorize(message sds.AuthorizationMessage) (boo
 		return false, nil
 	}
 	return community.CanPost(application.SigPubKey, chat.CommunityChatID(), application.Type)
-}
-
-func authenticatedSDSTransportSender(message sds.AuthorizationMessage) (*ecdsa.PublicKey, error) {
-	sender, err := crypto.UnmarshalPubkey(message.AuthorizationContext)
-	if err != nil {
-		return nil, fmt.Errorf("invalid SDS transport sender: %w", err)
-	}
-	return sender, nil
 }
 
 func isAuthorizedSDSCommunitySender(community *communities.Community, sender *ecdsa.PublicKey) bool {

@@ -538,6 +538,39 @@ func (s *MessengerSDSProcessingSuite) TestSDSCommunitySyncMembership() {
 	s.Require().Error(err, "sync messages require an authenticated transport sender")
 }
 
+func (s *MessengerSDSProcessingSuite) TestSDSSyncAuthorizerRequiresCommunityEncryption() {
+	community, _ := s.sdsCommunity()
+	_, err := community.UpsertTokenPermission(&protobuf.CommunityTokenPermission{
+		Id: "members", Type: protobuf.CommunityTokenPermission_BECOME_MEMBER,
+	})
+	s.Require().NoError(err)
+	s.Require().NoError(s.m.communitiesManager.SaveCommunity(community))
+	outsider, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+
+	authorizer := communitySDSAuthorizer{messenger: s.m}
+	for _, tc := range []struct {
+		name    string
+		signer  *ecdsa.PublicKey
+		groupID []byte
+		allowed bool
+	}{
+		{"plaintext", &s.m.identity.PublicKey, nil, false},
+		{"different encryption group", &s.m.identity.PublicKey, []byte("different-group"), false},
+		{"non-member", &outsider.PublicKey, community.ID(), false},
+		{"authorized signer and group", &s.m.identity.PublicKey, community.ID(), true},
+	} {
+		s.Run(tc.name, func() {
+			allowed, err := authorizer.Authorize(sds.AuthorizationMessage{
+				ChannelID:            community.IDString(),
+				AuthorizationContext: reliability.BuildSDSAuthorizationContext(tc.signer, tc.groupID),
+			})
+			s.Require().NoError(err)
+			s.Require().Equal(tc.allowed, allowed)
+		})
+	}
+}
+
 func (s *MessengerSDSProcessingSuite) TestNonChatReplayAfterRestart() {
 	for _, failure := range []string{"none", "handler", "save", "marker", "legacy", "batch"} {
 		s.Run(failure, func() {

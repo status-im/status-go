@@ -363,6 +363,11 @@ func (s *SQLLitePersistenceTestSuite) TestGetHashRatchetKeyByID() {
 	s.Require().True(reflect.DeepEqual(key.Key, cachedKey.Key))
 	s.Require().EqualValues(0, cachedKey.SeqNo)
 
+	wrongGroup := &HashRatchetKeyCompatibility{GroupID: []byte{9}, keyID: key.keyID}
+	cachedKey, err = s.service.GetHashRatchetCache(wrongGroup, 1)
+	s.Require().NoError(err)
+	s.Require().Nil(cachedKey)
+
 	var newSeqNo uint32 = 1
 	newHash := []byte{10, 11, 12}
 	err = s.service.SaveHashRatchetKeyHash(key, newHash, newSeqNo)

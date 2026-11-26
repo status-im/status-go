@@ -9,6 +9,7 @@ import (
 	"math"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/brianvoe/gofakeit/v6"
 	"github.com/golang/protobuf/proto"
@@ -808,6 +809,76 @@ func (s *ProcessorSuite) TestSDSWrappedMessages() {
 	s.Require().NoError(err)
 	s.Require().Equal(anotherPayload, receivedMsg2.EncryptionLayer.Payload)
 	s.Require().False(receivedMsg2.SDSWrapped)
+}
+
+func (s *ProcessorSuite) TestEncryptedSDSSyncRetriesAfterKeyArrival() {
+	native, err := sds.NewReliabilityManager(s.logger, nil, sds.WithSyncInterval(time.Millisecond))
+	s.Require().NoError(err)
+	s.T().Cleanup(func() { s.Require().NoError(native.Cleanup()) })
+	const channelID = "encrypted-test-channel"
+	groupID := []byte("community-group")
+	s.Require().NoError(native.EnsureChannel(channelID))
+	var syncPayload []byte
+	s.Require().Eventually(func() bool {
+		events, err := native.Tick()
+		if err == nil && len(events) > 0 {
+			syncPayload = events[0].Payload
+		}
+		return len(syncPayload) > 0
+	}, time.Second, time.Millisecond)
+
+	authorizations := make(chan sds.AuthorizationMessage, 2)
+	s.Require().NoError(s.processor.stack.Reliability.SetSDSAuthorizer(processorSDSAuthorizerFunc(func(msg sds.AuthorizationMessage) (bool, error) {
+		authorizations <- msg
+		sender, decryptedGroup, err := reliability.ParseSDSAuthorizationContext(msg.AuthorizationContext)
+		return err == nil && sender != nil && bytes.Equal(groupID, decryptedGroup), err
+	})))
+
+	db, err := testutils.SetupTestMemorySQLDB(testutils.NewTestDBInitializer([]*bindata.AssetSource{
+		{Names: encryptionmigrations.AssetNames(), AssetFunc: encryptionmigrations.Asset},
+	}))
+	s.Require().NoError(err)
+	s.T().Cleanup(func() { s.Require().NoError(db.Close()) })
+	sender := encryption.New(encryption.NewSQLitePersistence(db), "sync-sender", s.logger, trace.NewNoopTracer())
+	key, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+	ratchet, err := sender.GenerateHashRatchetKey(groupID)
+	s.Require().NoError(err)
+	send := func(spec *encryption.ProtocolMessageSpec, hash byte) *types.HandleMessageResponse {
+		payload, err := proto.Marshal(spec.Message)
+		s.Require().NoError(err)
+		response, err := s.processor.ProcessMessage(&types.ReceivedMessage{
+			Sig: crypto.FromECDSAPub(&key.PublicKey), Hash: []byte{hash}, Payload: payload,
+		})
+		s.Require().NoError(err)
+		return response
+	}
+
+	plaintext, err := sender.BuildPublicMessage(key, syncPayload)
+	s.Require().NoError(err)
+	response := send(plaintext, 1)
+	s.Require().Empty(response.Messages)
+	s.Require().Equal([][]byte{{1}}, response.ConsumedEnvelopeHashes)
+	s.Require().Len(authorizations, 1)
+	senderKey, decryptedGroup, err := reliability.ParseSDSAuthorizationContext((<-authorizations).AuthorizationContext)
+	s.Require().NoError(err)
+	s.Require().True(crypto.IsPubKeyEqual(&key.PublicKey, senderKey))
+	s.Require().Empty(decryptedGroup)
+
+	encryptedSync, err := sender.BuildHashRatchetMessage(groupID, syncPayload)
+	s.Require().NoError(err)
+	s.Require().Nil(send(encryptedSync, 2), "the missing-key sync must be queued")
+	s.Require().Empty(authorizations)
+
+	keyExchange, err := sender.BuildHashRatchetKeyExchangeMessage(s.T().Context(), key, &s.processor.identity.PublicKey, groupID, []*encryption.HashRatchetKeyCompatibility{ratchet})
+	s.Require().NoError(err)
+	response = send(keyExchange, 3)
+	s.Require().Contains(response.ConsumedEnvelopeHashes, []byte{2})
+	s.Require().Len(authorizations, 1)
+	senderKey, decryptedGroup, err = reliability.ParseSDSAuthorizationContext((<-authorizations).AuthorizationContext)
+	s.Require().NoError(err)
+	s.Require().True(crypto.IsPubKeyEqual(&key.PublicKey, senderKey))
+	s.Require().Equal(groupID, decryptedGroup)
 }
 
 func (s *ProcessorSuite) TestSDSSyncConsumedWithoutContentEvidence() {

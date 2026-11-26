@@ -21,6 +21,7 @@ import (
 	"github.com/status-im/status-go/pkg/messaging/controller/utils"
 	encryption "github.com/status-im/status-go/pkg/messaging/layers/encryption"
 	"github.com/status-im/status-go/pkg/messaging/layers/encryption/sharedsecret"
+	"github.com/status-im/status-go/pkg/messaging/layers/reliability"
 	"github.com/status-im/status-go/pkg/messaging/layers/segmentation"
 	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
 	"github.com/status-im/status-go/pkg/pubsub"
@@ -372,6 +373,7 @@ func (r *Processor) processEncryptionLayer(ctx context.Context, m *messagingtype
 	switch err {
 	case nil:
 		m.EncryptionLayer.Payload = response.DecryptedMessage
+		m.EncryptionLayer.HashRatchetGroupID = response.HashRatchetGroupID
 		m.EncryptionLayer.Installations = adapters.FromEncryptionInstallations(response.Installations)
 		m.EncryptionLayer.HashRatchetInfo = adapters.FromEncryptionHashRatchets(response.HashRatchetInfo)
 
@@ -398,13 +400,13 @@ func (r *Processor) processSDSLayer(msg *messagingtypes.Message) error {
 	return r.processSDSLayerWithReliability(msg, r.stack.Reliability)
 }
 
-func (r *Processor) processSDSLayerWithReliability(msg *messagingtypes.Message, reliability sdsLayerReliability) error {
+func (r *Processor) processSDSLayerWithReliability(msg *messagingtypes.Message, sdsLayer sdsLayerReliability) error {
 	if len(msg.EncryptionLayer.Payload) <= 0 {
 		return nil
 	}
 
-	unwrappedPayload, sdsMessageID, channelID, isSDS, err := reliability.UnwrapPayloadFromSDSWithContext(
-		msg.EncryptionLayer.Payload, crypto.FromECDSAPub(msg.SigPubKey()),
+	unwrappedPayload, sdsMessageID, channelID, isSDS, err := sdsLayer.UnwrapPayloadFromSDSWithContext(
+		msg.EncryptionLayer.Payload, reliability.BuildSDSAuthorizationContext(msg.SigPubKey(), msg.EncryptionLayer.HashRatchetGroupID),
 	)
 	if err != nil {
 		return err
@@ -412,7 +414,7 @@ func (r *Processor) processSDSLayerWithReliability(msg *messagingtypes.Message, 
 
 	metadataOnly := isSDS && unwrappedPayload == nil
 	if isSDS && !metadataOnly {
-		if err := reliability.RecordSDSMessageReceived(channelID, sdsMessageID); err != nil {
+		if err := sdsLayer.RecordSDSMessageReceived(channelID, sdsMessageID); err != nil {
 			r.logger.Error("failed to persist received SDS message",
 				zap.String("channelID", channelID),
 				zap.String("messageID", types.EncodeHex(sdsMessageID)),
@@ -423,7 +425,7 @@ func (r *Processor) processSDSLayerWithReliability(msg *messagingtypes.Message, 
 		if msg.SegmentationLayer.Segmented {
 			envelopeHashes = msg.SegmentationLayer.Hashes
 		}
-		if err := reliability.RecordSDSRetrievalHints(channelID, sdsMessageID, envelopeHashes); err != nil {
+		if err := sdsLayer.RecordSDSRetrievalHints(channelID, sdsMessageID, envelopeHashes); err != nil {
 			r.logger.Error("failed to persist received SDS retrieval hints",
 				zap.String("channelID", channelID),
 				zap.String("messageID", types.EncodeHex(sdsMessageID)),
