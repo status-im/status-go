@@ -287,6 +287,7 @@ func (s *MessageSender) sendPrivate(
 			Payload:             wrappedMessage,
 			PubsubTopic:         rawMessage.PubsubTopic,
 			WithReliability:     rawMessage.ResendType == ResendTypeDataSync,
+			TrackSelfDelivery:   rawMessage.TrackSelfDelivery,
 			SkipEncryptionLayer: rawMessage.SkipEncryptionLayer,
 			SendOnPersonalTopic: rawMessage.SendOnPersonalTopic,
 			HashRatchetGroupID:  hashRatchetGroupID,

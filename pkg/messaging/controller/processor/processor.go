@@ -7,6 +7,7 @@ import (
 
 	"github.com/golang/protobuf/proto"
 	"github.com/pkg/errors"
+	mvdsproto "github.com/status-im/mvds/protobuf"
 	otelattribute "go.opentelemetry.io/otel/attribute"
 	oteltrace "go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
@@ -19,6 +20,7 @@ import (
 	"github.com/status-im/status-go/pkg/messaging/controller/utils"
 	encryption "github.com/status-im/status-go/pkg/messaging/layers/encryption"
 	"github.com/status-im/status-go/pkg/messaging/layers/encryption/sharedsecret"
+	"github.com/status-im/status-go/pkg/messaging/layers/reliability"
 	"github.com/status-im/status-go/pkg/messaging/layers/segmentation"
 	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
 	"github.com/status-im/status-go/pkg/pubsub"
@@ -316,6 +318,7 @@ func (r *Processor) processEncryptionLayer(ctx context.Context, m *messagingtype
 	switch err {
 	case nil:
 		m.EncryptionLayer.Payload = response.DecryptedMessage
+		m.EncryptionLayer.SenderInstallation = response.SenderInstallation
 		m.EncryptionLayer.Installations = adapters.FromEncryptionInstallations(response.Installations)
 		m.EncryptionLayer.HashRatchetInfo = adapters.FromEncryptionHashRatchets(response.HashRatchetInfo)
 
@@ -370,36 +373,72 @@ func (r *Processor) processReliabilityLayer(m *messagingtypes.Message, logger *z
 		return nil, nil, errReliabilityNotStarted
 	}
 
-	datasyncMessage, err := r.stack.Reliability.UnwrapAndAcknowledgeMessage(
-		m.SigPubKey(),
-		m.EncryptionLayer.Payload,
-	)
+	deliveries, err := r.unwrapMVDSMessage(m)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	var statusMessages []*messagingtypes.Message
-	for _, ds := range datasyncMessage.Messages {
-		message, err := m.Clone()
-		if err != nil {
-			return nil, nil, err
+	var ackedMessageIDs []types.HexBytes
+	for _, delivery := range deliveries {
+		for _, data := range delivery.payload.Messages {
+			message, err := m.Clone()
+			if err != nil {
+				return nil, nil, err
+			}
+			message.EncryptionLayer.Payload = data.Body
+			statusMessages = append(statusMessages, message)
 		}
-		message.EncryptionLayer.Payload = ds.Body
-		statusMessages = append(statusMessages, message)
-	}
-
-	ackedMessageIDs := make([]types.HexBytes, 0, len(datasyncMessage.Acks))
-	for _, ack := range datasyncMessage.Acks {
-		messageID, err := r.messageConfirmationStorage.MarkAsConfirmed(ack, true)
-		if err != nil {
-			logger.Info("got datasync acknowledge for message we don't have in db", zap.String("ack", hex.EncodeToString(ack)))
-			continue
+		for _, ack := range delivery.payload.Acks {
+			messageID, err := r.messageConfirmationStorage.MarkAsConfirmedFrom(ack, delivery.peer)
+			if err != nil {
+				logger.Info("got datasync acknowledge for message we don't have in db", zap.String("ack", hex.EncodeToString(ack)))
+				continue
+			}
+			if len(messageID) != 0 {
+				r.stack.Transport.ConfirmMessageDelivered(messageID.String())
+				ackedMessageIDs = append(ackedMessageIDs, messageID)
+			}
 		}
-
-		r.stack.Transport.ConfirmMessageDelivered(messageID.String())
-
-		ackedMessageIDs = append(ackedMessageIDs, messageID)
 	}
 
 	return statusMessages, ackedMessageIDs, nil
+}
+
+type mvdsDelivery struct {
+	payload *mvdsproto.Payload
+	peer    []byte
+}
+
+func (r *Processor) unwrapMVDSMessage(m *messagingtypes.Message) ([]mvdsDelivery, error) {
+	key := m.SigPubKey()
+	sender := m.EncryptionLayer.SenderInstallation
+	devices := r.stack.Encryption.GetMultiDevice()
+	local := devices.InstallationID()
+	payload := m.EncryptionLayer.Payload
+
+	if sender != "" && sender != local && key != nil && crypto.IsPubKeyEqual(key, &r.identity.PublicKey) {
+		installations, err := devices.GetOurInstallations(key)
+		if err != nil {
+			return nil, err
+		}
+		for _, installation := range installations {
+			if installation.ID != sender || installation.Version < encryption.InstallationMVDSVersion {
+				continue
+			}
+			// Pairing can be one-way. Receive data from the known sender and
+			// accept installation-scoped ACKs only from enabled targets.
+			scoped, legacy, err := r.stack.Reliability.ProcessInstallationPayload(local, sender, payload, installation.Enabled)
+			if err != nil {
+				return nil, err
+			}
+			peer := reliability.InstallationPeerID(key, sender)
+			return []mvdsDelivery{{legacy, crypto.CompressPubkey(key)}, {scoped, peer[:]}}, nil
+		}
+	}
+	packet, err := r.stack.Reliability.UnwrapAndAcknowledgeMessage(key, payload)
+	if err != nil {
+		return nil, err
+	}
+	return []mvdsDelivery{{packet, crypto.CompressPubkey(key)}}, nil
 }

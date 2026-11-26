@@ -9,6 +9,7 @@ import (
 
 	"github.com/status-im/status-go/internal/crypto"
 	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
+	"github.com/status-im/status-go/pkg/messaging/layers/encryption"
 	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
 	"github.com/status-im/status-go/pkg/pubsub"
 )
@@ -29,6 +30,22 @@ func (s *Sender) scheduleReliableSend(recipient *ecdsa.PublicKey, message []byte
 }
 
 func (s *Sender) SendPrivateReliability(recipient *ecdsa.PublicKey, wrappedPayload []byte, messages [][]byte) error {
+	if crypto.IsPubKeyEqual(recipient, &s.identity.PublicKey) {
+		// Serialize this with scheduling the legacy route and its confirmation.
+		s.installationSendMu.Lock()
+		defer s.installationSendMu.Unlock()
+		if len(messages) != 0 {
+			return s.sendLegacySelfMessages(wrappedPayload, messages)
+		}
+	}
+	spec, err := s.buildEncryptedMessage(s.identity, recipient, wrappedPayload)
+	if err != nil {
+		return errors.Wrap(err, "failed to build encrypted message")
+	}
+	return s.sendReliableEnvelope(recipient, spec, messages)
+}
+
+func (s *Sender) sendReliableEnvelope(recipient *ecdsa.PublicKey, spec *encryption.ProtocolMessageSpec, messages [][]byte) error {
 	messageIDs := make([]cryptotypes.HexBytes, 0, len(messages))
 	for _, msgPayload := range messages {
 		messageIDs = append(messageIDs, messagingtypes.MessageID(&s.identity.PublicKey, msgPayload))
@@ -37,12 +54,6 @@ func (s *Sender) SendPrivateReliability(recipient *ecdsa.PublicKey, wrappedPaylo
 		zap.Stringers("messageIDs", messageIDs),
 		zap.String("recipient", crypto.PubkeyToHex(recipient)),
 	)
-
-	spec, err := s.buildEncryptedMessage(s.identity, recipient, wrappedPayload)
-	if err != nil {
-		return errors.Wrap(err, "failed to build encrypted message")
-	}
-
 	payload, sharedSecretKey, err := s.processAndMarshalMessageSpec(spec)
 	if err != nil {
 		return errors.Wrap(err, "failed to process and marshal message spec")

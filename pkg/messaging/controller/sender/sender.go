@@ -3,6 +3,7 @@ package sender
 import (
 	"crypto/ecdsa"
 	"runtime/debug"
+	"sync"
 
 	"github.com/golang/protobuf/proto"
 	otelattribute "go.opentelemetry.io/otel/attribute"
@@ -19,8 +20,10 @@ import (
 )
 
 type Sender struct {
-	identity *ecdsa.PrivateKey
-	stack    *common.MessagingStack
+	identity           *ecdsa.PrivateKey
+	stack              *common.MessagingStack
+	confirmations      common.MessageConfirmationPersistence
+	installationSendMu sync.Mutex
 
 	publisher *pubsub.Publisher
 	logger    *zap.Logger
@@ -30,15 +33,17 @@ type Sender struct {
 func NewSender(
 	identity *ecdsa.PrivateKey,
 	stack *common.MessagingStack,
+	confirmations common.MessageConfirmationPersistence,
 	logger *zap.Logger,
 	tracer trace.Tracer,
 ) *Sender {
 	return &Sender{
-		identity:  identity,
-		stack:     stack,
-		logger:    logger.Named("sender"),
-		tracer:    tracer,
-		publisher: pubsub.NewPublisher(),
+		identity:      identity,
+		stack:         stack,
+		confirmations: confirmations,
+		logger:        logger.Named("sender"),
+		tracer:        tracer,
+		publisher:     pubsub.NewPublisher(),
 	}
 }
 

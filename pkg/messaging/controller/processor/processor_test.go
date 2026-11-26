@@ -185,6 +185,27 @@ func (s *ProcessorSuite) TestProcessMessage() {
 	s.Require().Equal(encodedPayload, decodedMessages[0].EncryptionLayer.Payload)
 }
 
+func (s *ProcessorSuite) TestPublicMessageDoesNotAuthenticateInstallation() {
+	local := s.processor.stack.Encryption.GetMultiDevice().InstallationID()
+	envelope := &encryption.ProtocolMessage{
+		InstallationId: "paired-device",
+		PublicMessage:  s.testPayload,
+		EncryptedMessage: map[string]*encryption.EncryptedMessageProtocol{
+			local: {DRHeader: &encryption.DRHeader{}},
+		},
+	}
+	payload, err := proto.Marshal(envelope)
+	s.Require().NoError(err)
+	response, err := s.processor.ProcessMessage(&types.ReceivedMessage{
+		Sig:     crypto.FromECDSAPub(&s.processor.identity.PublicKey),
+		Payload: payload,
+	})
+	s.Require().NoError(err)
+	s.Require().Len(response.Messages, 1)
+	s.Require().Equal(s.testPayload, response.Messages[0].EncryptionLayer.Payload)
+	s.Require().Empty(response.Messages[0].EncryptionLayer.SenderInstallation)
+}
+
 func (s *ProcessorSuite) TestProcessMessageDatasync() {
 	senderKey, err := crypto.GenerateKey()
 	s.Require().NoError(err)

@@ -49,7 +49,7 @@ func NewController(
 	return &Controller{
 		identity:                   identity,
 		stack:                      stack,
-		sender:                     sender.NewSender(identity, stack, logger, tracer),
+		sender:                     sender.NewSender(identity, stack, messageConfirmationStorage, logger, tracer),
 		processor:                  processor.NewProcessor(identity, stack, messageConfirmationStorage, hashRatchetStorage, logger, tracer),
 		messageConfirmationStorage: messageConfirmationStorage,
 		hashRatchetStorage:         hashRatchetStorage,
@@ -104,7 +104,11 @@ func (c *Controller) Stop() (rerr error) {
 }
 
 func (c *Controller) StartReliability() error {
-	return c.stack.Reliability.Start(c.sender.SendPrivateReliability)
+	return c.stack.Reliability.Start(c.sender.SendPrivateReliability, c.sender.SendInstallationReliability)
+}
+
+func (c *Controller) DropInstallationMessages(installation string) {
+	c.sender.DropInstallationMessages(installation)
 }
 
 func (c *Controller) StopReliability() {

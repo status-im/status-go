@@ -57,11 +57,12 @@ type Reliability struct {
 	// mu guards lifecycle transitions (Start/Stop/SetPaused/buildNode) so they
 	// don't interleave. The hot path (Unwrap / WrapAndQueue) never takes mu;
 	// datasync uses atomic loads and SDS uses sdsOpsMu.
-	mu       sync.Mutex
-	datasync atomic.Pointer[datasync.DataSync]
-	dispatch MessageDispatcher
-	paused   bool
-	tick     time.Duration // outbound-loop interval the active node was built with
+	mu                   sync.Mutex
+	datasync             atomic.Pointer[datasync.DataSync]
+	dispatch             MessageDispatcher
+	installationDispatch InstallationDispatcher
+	paused               bool
+	tick                 time.Duration // outbound-loop interval the active node was built with
 
 	missingDepsHandlerMu sync.RWMutex
 	missingDepsHandler   MissingDependenciesHandler
@@ -218,10 +219,13 @@ func (r *Reliability) handleMissingDependencies(messageID sds.MessageID, missing
 	}
 }
 
-func (r *Reliability) Start(dispatch MessageDispatcher) error {
+func (r *Reliability) Start(dispatch MessageDispatcher, installationDispatch ...InstallationDispatcher) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.dispatch = dispatch
+	if len(installationDispatch) != 0 {
+		r.installationDispatch = installationDispatch[0]
+	}
 	if r.sdsManager == nil {
 		if err := r.buildSdsManager(); err != nil {
 			return err
@@ -241,6 +245,18 @@ func (r *Reliability) Start(dispatch MessageDispatcher) error {
 // (SQLite) on construction, so the epoch counter survives a recreate; the
 // status-change channel is reused so peer-online events keep flowing.
 func (r *Reliability) buildNode(duration time.Duration) error {
+	ds, err := r.newDataSync(duration)
+	if err != nil {
+		return err
+	}
+	ds.Init(r.mvdsDispatch, r.logger)
+	ds.Start(duration)
+	r.tick = duration
+	r.datasync.Store(ds)
+	return nil
+}
+
+func (r *Reliability) newDataSync(duration time.Duration) (*datasync.DataSync, error) {
 	transport := datasync.NewNodeTransport()
 	var node *mvdsnode.Node
 	// The getter is installed before construction, but is only available after
@@ -265,14 +281,9 @@ func (r *Reliability) buildNode(duration time.Duration) error {
 		r.logger,
 	)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	ds := datasync.New(node, transport, true, r.logger)
-	ds.Init(r.mvdsDispatch, r.logger)
-	ds.Start(duration)
-	r.tick = duration
-	r.datasync.Store(ds)
-	return nil
+	return datasync.New(node, transport, true, r.logger), nil
 }
 
 // currentTick returns the outbound-loop interval the active mvds node was built
@@ -292,13 +303,16 @@ func (r *Reliability) mvdsDispatch(receiver mvdsstate.PeerID, payload *mvdsproto
 	if err != nil {
 		return errors.Wrap(err, "failed to marshal payload")
 	}
-	publicKey, err := datasyncpeer.IDToPublicKey(receiver)
-	if err != nil {
-		return errors.Wrap(err, "failed to convert id to public key")
-	}
 	messages := make([][]byte, 0, len(payload.Messages))
 	for _, msg := range payload.Messages {
 		messages = append(messages, msg.Body)
+	}
+	if receiver[0] == installationPeerPrefix && r.installationDispatch != nil {
+		return r.installationDispatch(receiver, marshalledPayload, messages)
+	}
+	publicKey, err := datasyncpeer.IDToPublicKey(receiver)
+	if err != nil {
+		return errors.Wrap(err, "failed to convert id to public key")
 	}
 	return r.dispatch(publicKey, marshalledPayload, messages)
 }
@@ -386,7 +400,10 @@ func (r *Reliability) WrapAndQueueMessageForDispatch(publicKey *ecdsa.PublicKey,
 		return mvdsstate.MessageID{}, errNotStarted
 	}
 	groupID := datasync.ToOneToOneGroupID(&r.identity.PublicKey, publicKey)
-	peerID := datasyncpeer.PublicKeyToPeerID(*publicKey)
+	return queueMessage(ds, groupID, datasyncpeer.PublicKeyToPeerID(*publicKey), message)
+}
+
+func queueMessage(ds *datasync.DataSync, groupID mvdsstate.GroupID, peerID mvdsstate.PeerID, message []byte) (mvdsstate.MessageID, error) {
 	exist, err := ds.IsPeerInGroup(groupID, peerID)
 	if err != nil {
 		return mvdsstate.MessageID{}, errors.Wrap(err, "failed to check if peer is in group")

@@ -155,7 +155,7 @@ func (s *ProtocolServiceTestSuite) TestSecretNegotiation() {
 	signedPreKey := signedPreKeys["1"]
 	s.Require().NotNil(signedPreKey)
 
-	s.Require().Equal(uint32(1), signedPreKey.GetProtocolVersion())
+	s.Require().Equal(uint32(protocolVersion), signedPreKey.GetProtocolVersion())
 
 	_, err = s.bob.HandleMessage(context.Background(), bobKey, &aliceKey.PublicKey, msgSpec.Message, []byte("message-id"))
 	s.NoError(err)

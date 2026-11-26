@@ -31,6 +31,7 @@ type SendPrivateParams struct {
 	Payload             []byte
 	PubsubTopic         string
 	WithReliability     bool
+	TrackSelfDelivery   bool
 	SendWithDH          bool
 	SkipEncryptionLayer bool
 	SendOnPersonalTopic bool

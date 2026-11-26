@@ -111,7 +111,7 @@ func (s *EncryptionServiceMultiDeviceSuite) TestProcessPublicBundle() {
 	s.Require().NoError(err)
 	s.Require().Equal(multidevice.Installation{
 		Identity: alice2Identity,
-		Version:  1,
+		Version:  protocolVersion,
 		ID:       "alice2",
 	}, *response[0])
 
@@ -120,7 +120,7 @@ func (s *EncryptionServiceMultiDeviceSuite) TestProcessPublicBundle() {
 	s.Require().NoError(err)
 	s.Require().Equal(multidevice.Installation{
 		Identity: alice3Identity,
-		Version:  1,
+		Version:  protocolVersion,
 		ID:       "alice3",
 	}, *response[0])
 
