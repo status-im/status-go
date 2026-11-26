@@ -248,6 +248,11 @@ func (c *Core) resolveSDSRetrievalHintForChannel(channelID, messageID string) []
 			return hint
 		}
 	}
+	// The transport monitor tracks the legacy publication. Its hashes would
+	// fetch from the wrong channel when a scoped copy has no persisted hint.
+	if reliability.IsTopicScopedChannelID(channelID) {
+		return nil
+	}
 	return buildSDSRetrievalHint(c.logger, c.stack.Transport, messageID)
 }
 

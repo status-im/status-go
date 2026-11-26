@@ -3519,8 +3519,9 @@ func (m *Messenger) processStatusMessage(
 		return errors.New("SDS application message could not be decoded")
 	}
 	// Chat messages already have a durable duplicate check in messageExists.
-	deduplicateSDS := msg.SDSWrapped && msg.ApplicationLayer.Type != protobuf.ApplicationMetadataMessage_CHAT_MESSAGE &&
-		m.shouldSkipDuplicate(msg.ApplicationLayer.Type)
+	// The two community topics can also carry oversized messages that bypass SDS.
+	deduplicateSDS := msg.ApplicationLayer.Type != protobuf.ApplicationMetadataMessage_CHAT_MESSAGE &&
+		m.shouldSkipDuplicate(msg.ApplicationLayer.Type) && (msg.SDSWrapped || types.IsCommunityChatTopic(filter.ChatID()))
 	if deduplicateSDS {
 		if messageState.processedSDSMessages[messageID] {
 			return nil

@@ -147,6 +147,16 @@ func (m *Messenger) filtersForChat(chatID string) (messagingtypes.ChatFilters, e
 
 		filters = m.messaging.ChatFiltersByIdentities(publicKeys)
 
+	} else if chat.CommunityChat() {
+		legacyTopic := messagingtypes.CommunityChatTopic(chat.CommunityID)
+		for _, topic := range []string{legacyTopic, messagingtypes.ScopedSDSContentTopic(legacyTopic), chatID} {
+			if filter := m.messaging.ChatFilterByChatID(topic); filter != nil {
+				filters = append(filters, filter)
+			}
+		}
+		if len(filters) == 0 {
+			return nil, ErrNoFiltersForChat
+		}
 	} else {
 		filter := m.messaging.ChatFilterByChatID(chatID)
 		if filter == nil {

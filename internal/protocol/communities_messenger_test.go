@@ -36,6 +36,9 @@ import (
 	v1protocol "github.com/status-im/status-go/internal/protocol/v1"
 	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/pkg/messaging"
+	"github.com/status-im/status-go/pkg/messaging/layers/encryption"
+	"github.com/status-im/status-go/pkg/messaging/layers/reliability"
+	reliabilitypb "github.com/status-im/status-go/pkg/messaging/layers/reliability/protobuf"
 	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
 	localnotifications "github.com/status-im/status-go/pkg/services/local-notifications"
 	"github.com/status-im/status-go/pkg/services/media"
@@ -633,6 +636,114 @@ func (s *MessengerCommunitiesSuite) TestCommunityLateJoinPostJoinDelivery() {
 		return false
 	}, "new message not received by late-joining member")
 	s.Require().NoError(err)
+}
+
+func (s *MessengerCommunitiesSuite) TestCommunitySDSBridgePublishesBothChannelsAndProcessesOnce() {
+	community, chat := s.createCommunity()
+	s.advertiseCommunityTo(community, s.owner, s.alice)
+	s.joinCommunity(community, s.owner, s.alice)
+
+	legacyTopic := community.UniversalChatID()
+	scopedTopic := messagingtypes.ScopedSDSContentTopic(legacyTopic)
+	filters, err := s.alice.filtersForChat(chat.ID)
+	s.Require().NoError(err)
+	var filterTopics []string
+	for _, filter := range filters {
+		filterTopics = append(filterTopics, filter.ChatID())
+	}
+	s.Require().Contains(filterTopics, legacyTopic)
+	s.Require().Contains(filterTopics, scopedTopic)
+
+	topics := []string{legacyTopic, scopedTopic}
+	channels := []string{community.IDString(), reliability.BuildChannelID(community.IDString(), legacyTopic)}
+	hints := reliability.NewSQLiteRetrievalHintPersistence(s.owner.database)
+	type receivedCopy struct {
+		filter   messagingtypes.ChatFilter
+		envelope *messagingtypes.ReceivedMessage
+	}
+	sendAndCollect := func(text string) (string, string, []receivedCopy) {
+		message := sendChatMessage(&s.Suite, s.owner, chat.ID, text)
+		raw, err := s.owner.RawMessageByID(message.ID)
+		s.Require().NoError(err)
+		application, err := v1protocol.WrapIntoAppLayerMessage(raw.Payload, raw.MessageType, s.owner.identity)
+		s.Require().NoError(err)
+		sdsID := cryptotypes.EncodeHex(crypto.Keccak256(application))
+		hashes := make([][]byte, len(channels))
+		for i, channel := range channels {
+			found, err := hints.LoadSDSRetrievalHints(channel, sdsID)
+			s.Require().NoError(err)
+			s.Require().Len(found, 1)
+			hashes[i] = found[0]
+		}
+		s.Require().NotEqual(hashes[0], hashes[1])
+
+		copies := make([]receivedCopy, len(topics))
+		err = testutils.RetryWithBackOff(func() error {
+			received, err := s.alice.messaging.RetrieveRawAll()
+			if err != nil {
+				return err
+			}
+			for filter, envelopes := range received {
+				for _, envelope := range envelopes {
+					for i, hash := range hashes {
+						if bytes.Equal(envelope.Hash, hash) {
+							s.Require().Equal(topics[i], filter.ChatID())
+							copies[i] = receivedCopy{filter: filter, envelope: envelope}
+						}
+					}
+				}
+			}
+			if copies[0].envelope == nil || copies[1].envelope == nil {
+				return errors.New("waiting for both SDS copies")
+			}
+			return nil
+		})
+		s.Require().NoError(err)
+		return message.ID, sdsID, copies
+	}
+
+	messageID, sdsMessageID, copies := sendAndCollect("publish once on each SDS channel")
+	_, _, followups := sendAndCollect("follow-up on each SDS channel")
+	missedReceiver, err := sds.NewReliabilityManager(s.alice.logger, nil)
+	s.Require().NoError(err)
+	s.T().Cleanup(func() { s.Require().NoError(missedReceiver.Cleanup()) })
+	for i, followup := range followups {
+		var encrypted encryption.ProtocolMessage
+		s.Require().NoError(proto.Unmarshal(followup.envelope.Payload, &encrypted))
+		unwrapped, err := missedReceiver.UnwrapReceivedMessage(encrypted.PublicMessage)
+		s.Require().NoError(err)
+		s.Require().Equal(channels[i], *unwrapped.ChannelId)
+		s.Require().NotNil(unwrapped.MissingDeps)
+		var dependencyHint *reliabilitypb.RetrievalHint
+		for _, dependency := range *unwrapped.MissingDeps {
+			if string(dependency.MessageID) == sdsMessageID {
+				dependencyHint = new(reliabilitypb.RetrievalHint)
+				s.Require().NoError(proto.Unmarshal(dependency.RetrievalHint, dependencyHint))
+				break
+			}
+		}
+		s.Require().NotNil(dependencyHint, "the earlier send must be recoverable on %s", channels[i])
+		s.Require().Equal([][]byte{[]byte(cryptotypes.EncodeHex(copies[i].envelope.Hash))}, dependencyHint.EnvelopeHashes)
+	}
+
+	deliver := func(copy receivedCopy) []*common.Message {
+		response, err := s.alice.handleRetrievedMessages(map[messagingtypes.ChatFilter][]*messagingtypes.ReceivedMessage{
+			copy.filter: {copy.envelope},
+		}, false, false)
+		s.Require().NoError(err)
+		return response.Messages()
+	}
+	messages := deliver(copies[1])
+	s.Require().Len(messages, 1)
+	s.Require().Equal(messageID, messages[0].ID)
+	s.Require().Empty(deliver(copies[0]))
+
+	receivedHints := reliability.NewSQLiteRetrievalHintPersistence(s.alice.database)
+	for i, channel := range channels {
+		got, err := receivedHints.LoadSDSRetrievalHints(channel, sdsMessageID)
+		s.Require().NoError(err)
+		s.Require().Equal([][]byte{copies[i].envelope.Hash}, got)
+	}
 }
 
 func (s *MessengerCommunitiesSuite) TestPinMessageInCommunityChat() {

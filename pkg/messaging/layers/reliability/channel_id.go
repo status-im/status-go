@@ -1,5 +1,7 @@
 package reliability
 
+import "strings"
+
 // BuildChannelID scopes community SDS history to a content topic. Messages
 // without a content topic retain the community-level channel.
 func BuildChannelID(communityID, contentTopic string) string {
@@ -8,4 +10,8 @@ func BuildChannelID(communityID, contentTopic string) string {
 	}
 
 	return communityID + ":" + contentTopic
+}
+
+func IsTopicScopedChannelID(channelID string) bool {
+	return strings.Contains(channelID, ":")
 }

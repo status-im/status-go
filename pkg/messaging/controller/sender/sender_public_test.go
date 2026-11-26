@@ -124,7 +124,7 @@ func TestSendPublicSDSHintSaveFailurePreservesSendCompletion(t *testing.T) {
 
 	require.NoError(t, sender.SendPublic(context.Background(), params))
 	require.Len(t, backend.hashes, 1)
-	require.Equal(t, publicSDSChannelID(params), hints.channelID)
+	require.Equal(t, params.CommunityID, hints.channelID)
 	require.Equal(t, cryptotypes.EncodeHex(sdsMessageID), hints.messageID)
 	require.Equal(t, backend.hashes, hints.hashes)
 	for _, id := range [][]byte{[]byte(messageID), sdsMessageID} {
@@ -241,7 +241,7 @@ func TestWrapPublicParamsForSDS_SkipSDS(t *testing.T) {
 		Payload:     payload,
 		CommunityID: "community-id",
 		SkipSDS:     true,
-	})
+	}, "community-id")
 
 	require.NoError(t, err)
 	require.Equal(t, payload, wrapped)
@@ -255,7 +255,7 @@ func TestWrapPublicParamsForSDS_WrapsCommunityPayload(t *testing.T) {
 	wrapped, messageID, err := wrapPublicParamsForSDS(zap.NewNop(), stub, messagingtypes.SendPublicParams{
 		Payload:     []byte("payload"),
 		CommunityID: "community-id",
-	})
+	}, "community-id")
 
 	require.NoError(t, err)
 	require.Equal(t, stub.wrappedPayload, wrapped)
@@ -266,11 +266,13 @@ func TestWrapPublicParamsForSDS_WrapsCommunityPayload(t *testing.T) {
 func TestWrapPublicParamsForSDS_ScopesPayloadToContentTopic(t *testing.T) {
 	stub := &sdsWrapperStub{wrappedPayload: []byte("wrapped-payload")}
 
-	_, _, err := wrapPublicParamsForSDS(zap.NewNop(), stub, messagingtypes.SendPublicParams{
+	params := messagingtypes.SendPublicParams{
 		Payload:      []byte("payload"),
 		CommunityID:  "community-id",
 		ContentTopic: "community-chat",
-	})
+	}
+	channelID := reliability.BuildChannelID(params.CommunityID, params.ContentTopic)
+	_, _, err := wrapPublicParamsForSDS(zap.NewNop(), stub, params, channelID)
 
 	require.NoError(t, err)
 	require.Equal(t, reliability.BuildChannelID("community-id", "community-chat"), stub.wantChannelID)
@@ -281,10 +283,11 @@ func TestWrapPublicParamsForSDS_DerivesCommunityIDFromPublicKey(t *testing.T) {
 	require.NoError(t, err)
 	stub := &sdsWrapperStub{wrappedPayload: []byte("wrapped-payload")}
 
-	_, _, err = wrapPublicParamsForSDS(zap.NewNop(), stub, messagingtypes.SendPublicParams{
+	params := messagingtypes.SendPublicParams{
 		Payload:            []byte("payload"),
 		CommunityPublicKey: &key.PublicKey,
-	})
+	}
+	_, _, err = wrapPublicParamsForSDS(zap.NewNop(), stub, params, publicSDSCommunityID(params))
 
 	require.NoError(t, err)
 	communityID := cryptotypes.EncodeHex(crypto.CompressPubkey(&key.PublicKey))

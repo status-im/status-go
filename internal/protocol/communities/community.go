@@ -27,6 +27,7 @@ import (
 	"github.com/status-im/status-go/internal/protocol/requests"
 	"github.com/status-im/status-go/internal/protocol/v1"
 	"github.com/status-im/status-go/internal/testutils/fake"
+	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
 	"github.com/status-im/status-go/pkg/multiformat"
 	"github.com/status-im/status-go/pkg/services/media"
 )
@@ -1415,7 +1416,7 @@ func (o *Community) MagnetlinkMessageChannelID() string {
 }
 
 func (o *Community) MemberUpdateChannelID() string {
-	return o.IDString() + "-memberUpdate"
+	return messagingtypes.CommunityChatTopic(o.IDString())
 }
 
 func (o *Community) PubsubTopic() string {

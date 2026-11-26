@@ -47,12 +47,12 @@ func wrapPayloadForPublicSDS(logger *zap.Logger, wrapper publicSDSWrapper, paylo
 	return sdsWrappedPayload, sdsMessageIDBytes, nil
 }
 
-func wrapPublicParamsForSDS(logger *zap.Logger, wrapper publicSDSWrapper, params messagingtypes.SendPublicParams) ([]byte, []byte, error) {
+func wrapPublicParamsForSDS(logger *zap.Logger, wrapper publicSDSWrapper, params messagingtypes.SendPublicParams, channelID string) ([]byte, []byte, error) {
 	if !sdsForCommunitiesEnabled || params.SkipSDS {
 		return params.Payload, nil, nil
 	}
 
-	return wrapPayloadForPublicSDS(logger, wrapper, params.Payload, publicSDSChannelID(params))
+	return wrapPayloadForPublicSDS(logger, wrapper, params.Payload, channelID)
 }
 
 func publicSDSCommunityID(params messagingtypes.SendPublicParams) string {
@@ -65,18 +65,8 @@ func publicSDSCommunityID(params messagingtypes.SendPublicParams) string {
 	return ""
 }
 
-func publicSDSChannelID(params messagingtypes.SendPublicParams) string {
-	communityID := publicSDSCommunityID(params)
-	if communityID == "" {
-		return ""
-	}
-
-	return reliability.BuildChannelID(communityID, params.ContentTopic)
-}
-
 func (s *Sender) SendPublic(ctx context.Context, params messagingtypes.SendPublicParams) error {
 	messageID := messagingtypes.MessageID(params.Sender, params.Payload)
-	var sdsMessageIDBytes []byte
 
 	logger := s.logger.Named("sendPublic").With(
 		zap.Stringer("messageID", messageID),
@@ -95,8 +85,31 @@ func (s *Sender) SendPublic(ctx context.Context, params messagingtypes.SendPubli
 		zap.Any("hashRatchet", params.HashRatchet),
 	)
 
+	legacyChannelID := publicSDSCommunityID(params)
+	if err := s.sendPublicOnChannel(ctx, logger, params, messageID, legacyChannelID, true); err != nil {
+		return err
+	}
+
+	// For one release, publish a second copy of community chat traffic on an
+	// independent topic, using the same signed application payload.
+	if sdsForCommunitiesEnabled && !params.SkipSDS && params.CommunityPublicKey == nil &&
+		legacyChannelID != "" && params.ContentTopic == messagingtypes.CommunityChatTopic(legacyChannelID) &&
+		(params.HashRatchet == nil || params.HashRatchet.KeyExType == messagingtypes.KeyExMsgNone) {
+		scopedChannelID := reliability.BuildChannelID(legacyChannelID, params.ContentTopic)
+		params.ContentTopic = messagingtypes.ScopedSDSContentTopic(params.ContentTopic)
+		if err := s.sendPublicOnChannel(ctx, logger, params, messageID, scopedChannelID, false); err != nil {
+			// The legacy copy has already been published and is still received
+			// by bridge clients. Avoid reporting it as a failed send.
+			logger.Warn("failed to publish topic-scoped SDS copy", zap.Error(err))
+		}
+	}
+	return nil
+}
+
+func (s *Sender) sendPublicOnChannel(ctx context.Context, logger *zap.Logger, params messagingtypes.SendPublicParams, messageID cryptotypes.HexBytes, channelID string, trackPublication bool) error {
+	var sdsMessageIDBytes []byte
 	var err error
-	params.Payload, sdsMessageIDBytes, err = wrapPublicParamsForSDS(logger, s.stack.Reliability, params)
+	params.Payload, sdsMessageIDBytes, err = wrapPublicParamsForSDS(logger, s.stack.Reliability, params, channelID)
 	if err != nil {
 		return err
 	}
@@ -169,8 +182,9 @@ func (s *Sender) SendPublic(ctx context.Context, params messagingtypes.SendPubli
 	)
 
 	if len(sdsMessageIDBytes) > 0 {
-		s.stack.Transport.TrackWithSDSAlias([]byte(messageID), sdsMessageIDBytes, hashes, wakuMessages)
-		channelID := publicSDSChannelID(params)
+		if trackPublication {
+			s.stack.Transport.TrackWithSDSAlias([]byte(messageID), sdsMessageIDBytes, hashes, wakuMessages)
+		}
 		if err := s.stack.Reliability.RecordSDSRetrievalHints(channelID, sdsMessageIDBytes, hashes); err != nil {
 			logger.Error("failed to persist sent SDS retrieval hints",
 				zap.String("channelID", channelID),
@@ -178,11 +192,11 @@ func (s *Sender) SendPublic(ctx context.Context, params messagingtypes.SendPubli
 				zap.Error(err),
 			)
 		}
-	} else {
+	} else if trackPublication {
 		s.stack.Transport.Track(messageID, hashes, wakuMessages)
 	}
 
-	if spec != nil {
+	if trackPublication && spec != nil {
 		pubsub.Publish(s.publisher, SentMessage{
 			Private:                false,
 			RecipientInstallations: spec.Installations,
