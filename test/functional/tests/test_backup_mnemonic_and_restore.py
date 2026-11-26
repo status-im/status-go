@@ -5,7 +5,6 @@ import string
 import pytest
 
 from clients.api import ApiResponseError
-from clients.signals import SignalType
 from resources.constants import user_mnemonic_12, user_mnemonic_15, user_mnemonic_24, user_keycard_1
 from resources.utils import assert_response_attributes
 
@@ -135,12 +134,6 @@ class TestBackupMnemonicAndRestore:
     def test_restored_on_existing_restored_account_fails(self, backend_recovered_profile):
         user = copy.deepcopy(user_mnemonic_12)
         restored_account = backend_recovered_profile("restored", user=user)
-        with restored_account.expect_signal(SignalType.NODE_LOGIN) as exp:
+
+        with pytest.raises(ApiResponseError, match="already logged in"):
             restored_account.restore_account_and_login(user=user)
-        signal = exp.result
-
-        assert user.profile_data is not None, "User profile_data should not be None"
-        key_uid = user.profile_data.get("key-uid", "")
-        expected_error = f"[validation] keypair already added -  keyuid: {key_uid}"
-
-        assert expected_error in signal.get("event").get("error")
