@@ -43,6 +43,12 @@ type Adapter struct {
 
 	maxMessageSize atomic.Uint32
 
+	// topics are the subscribed content topics, kept from before the node
+	// starts, which Start then subscribes.
+	topicsMu sync.Mutex
+	started  bool
+	topics   map[string]struct{}
+
 	// calls is held shared by every call into the node and exclusively by
 	// Stop, which must not release the node while one is in flight.
 	calls  sync.RWMutex
@@ -69,6 +75,7 @@ func newAdapter(mc *messaging.MessagingClient, logger *zap.Logger) *Adapter {
 		mc:                     mc,
 		logger:                 logger.Named("delivery"),
 		connSubscribers:        make(map[string]*types.ConnStatusSubscription),
+		topics:                 make(map[string]struct{}),
 		historyReconcileNeeded: make(chan types.HistoryReconcileWindow, 16),
 		quit:                   make(chan struct{}),
 	}
@@ -86,6 +93,14 @@ func (a *Adapter) Start() error {
 	}
 	if err := a.readNodeInfo(); err != nil {
 		return errors.Join(err, a.mc.Stop())
+	}
+	a.topicsMu.Lock()
+	defer a.topicsMu.Unlock()
+	a.started = true
+	for topic := range a.topics {
+		if err := a.mc.Subscribe(topic); err != nil {
+			return errors.Join(fmt.Errorf("subscribe %s: %w", topic, err), a.mc.Stop())
+		}
 	}
 	return nil
 }
@@ -258,17 +273,23 @@ func (a *Adapter) Send(ctx context.Context, pubsubTopic, contentTopic string, pa
 	return hash, nil
 }
 
-// Subscribe subscribes the content topics. The pubsub topic is ignored: the
+// Subscribe subscribes the content topics, or, before Start, has Start
+// subscribe them, as the go-waku backend does. The pubsub topic is ignored: the
 // transport counts subscriptions per content topic (see ContentTopicOnly).
 func (a *Adapter) Subscribe(ctx context.Context, pubsubTopic string, contentTopics []types.TopicType) error {
 	if !a.rLockCalls() {
 		return fmt.Errorf("subscribe: %w", messaging.ErrClosed)
 	}
 	defer a.rUnlockCalls()
+	a.topicsMu.Lock()
+	defer a.topicsMu.Unlock()
 	for _, topic := range contentTopics {
-		if err := a.mc.Subscribe(topic.ContentTopic()); err != nil {
-			return fmt.Errorf("subscribe %s: %w", topic.ContentTopic(), err)
+		if a.started {
+			if err := a.mc.Subscribe(topic.ContentTopic()); err != nil {
+				return fmt.Errorf("subscribe %s: %w", topic.ContentTopic(), err)
+			}
 		}
+		a.topics[topic.ContentTopic()] = struct{}{}
 	}
 	return nil
 }
@@ -279,10 +300,15 @@ func (a *Adapter) Unsubscribe(ctx context.Context, pubsubTopic string, contentTo
 		return fmt.Errorf("unsubscribe: %w", messaging.ErrClosed)
 	}
 	defer a.rUnlockCalls()
+	a.topicsMu.Lock()
+	defer a.topicsMu.Unlock()
 	for _, topic := range contentTopics {
-		if err := a.mc.Unsubscribe(topic.ContentTopic()); err != nil {
-			return fmt.Errorf("unsubscribe %s: %w", topic.ContentTopic(), err)
+		if a.started {
+			if err := a.mc.Unsubscribe(topic.ContentTopic()); err != nil {
+				return fmt.Errorf("unsubscribe %s: %w", topic.ContentTopic(), err)
+			}
 		}
+		delete(a.topics, topic.ContentTopic())
 	}
 	return nil
 }
