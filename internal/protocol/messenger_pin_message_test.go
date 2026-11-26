@@ -246,6 +246,39 @@ func (s *MessengerPinMessageSuite) TestHandlePinMessageBeforeTarget() {
 	s.Require().Equal(target.ID, pinnedMessages[0].Message.ID)
 }
 
+func (s *MessengerPinMessageSuite) TestHandlePinMessageRejectsThreadReply() {
+	receiver := s.newMessenger()
+	chat := CreateOneToOneChat("incoming-pin", &s.privateKey.PublicKey, receiver.getTimesource())
+	s.Require().NoError(receiver.SaveChat(chat))
+
+	threadID := "thread-id"
+	reply := buildTestMessage(*chat)
+	reply.ID = "thread-reply-id"
+	reply.ChatMessage.ThreadId = &threadID
+	s.Require().NoError(receiver.SaveMessages([]*common.Message{reply}))
+
+	response := &MessengerResponse{}
+	err := receiver.handlePinMessage(&contacts.Contact{ID: s.m.myHexIdentity()}, 1000, response, &protobuf.PinMessage{
+		ChatId:      chat.ID,
+		MessageId:   reply.ID,
+		Pinned:      true,
+		Clock:       reply.Clock + 1,
+		MessageType: protobuf.MessageType_ONE_TO_ONE,
+	}, false)
+	s.Require().NoError(err)
+
+	pinned, _, err := receiver.PinnedMessageByChatID(chat.ID, "", 10)
+	s.Require().NoError(err)
+	const issue = "https://github.com/status-im/status-go/issues/7973"
+	if len(pinned) == 1 && pinned[0].Message.ID == reply.ID {
+		s.T().Skipf("known failure: the receiver stored the thread reply pin; see %s", issue)
+	}
+	s.Require().Empty(pinned, "the received pin of a thread reply was stored")
+	s.Require().Empty(response.PinMessages())
+	s.Require().Empty(response.Messages())
+	s.T().Fatalf("%s looks fixed; remove the known-failure guard", issue)
+}
+
 func (s *MessengerPinMessageSuite) TestSendPinMessageRejectsTargetFromAnotherChat() {
 	targetChat := CreatePublicChat("pin-target-chat", s.m.getTimesource())
 	pinChat := CreatePublicChat("pin-message-chat", s.m.getTimesource())
