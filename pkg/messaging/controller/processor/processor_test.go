@@ -29,6 +29,7 @@ import (
 	encryption "github.com/status-im/status-go/pkg/messaging/layers/encryption"
 	encryptionmigrations "github.com/status-im/status-go/pkg/messaging/layers/encryption/migrations"
 	"github.com/status-im/status-go/pkg/messaging/layers/reliability"
+	reliabilitymigrations "github.com/status-im/status-go/pkg/messaging/layers/reliability/migrations"
 	reliabilitypb "github.com/status-im/status-go/pkg/messaging/layers/reliability/protobuf"
 	segmentation "github.com/status-im/status-go/pkg/messaging/layers/segmentation"
 	segmentationmigrations "github.com/status-im/status-go/pkg/messaging/layers/segmentation/migrations"
@@ -706,7 +707,14 @@ func (s *ProcessorSuite) TestSDSHintSaveFailureDoesNotPreventDelivery() {
 
 func (s *ProcessorSuite) TestSDSMissingDependencyTriggersFetchHintsAndRecoversPayloads() {
 	senderReliability := s.newStandaloneReliability()
-	receiverReliability := s.newStandaloneReliability()
+	db, err := testutils.SetupTestMemorySQLDB(testutils.NewTestDBInitializer([]*bindata.AssetSource{
+		{Names: reliabilitymigrations.AssetNames(), AssetFunc: reliabilitymigrations.Asset},
+	}))
+	s.Require().NoError(err)
+	s.T().Cleanup(func() { s.Require().NoError(db.Close()) })
+	receiverStore := reliability.NewSQLitePersistence(db)
+	receiverReliability := s.newStandaloneReliability(receiverStore)
+	receiverReliability.SetSDSRetrievalHintPersistence(receiverStore)
 	hintStore := &testSDSRetrievalHintPersistence{hints: make(map[string][][]byte)}
 	senderReliability.SetSDSRetrievalHintPersistence(hintStore)
 
@@ -768,9 +776,16 @@ func (s *ProcessorSuite) TestSDSMissingDependencyTriggersFetchHintsAndRecoversPa
 
 	newMessageFirst := types.Message{
 		EncryptionLayer: types.EncryptionLayer{Payload: wrappedNewPayload},
+		SegmentationLayer: types.SegmentationLayer{
+			Segmented: true,
+			Hashes:    [][]byte{[]byte("segment-a"), []byte("segment-b")},
+		},
 	}
 	err = s.processor.processSDSLayer(&newMessageFirst)
 	s.Require().NoError(err)
+	got, err := receiverStore.LoadSDSRetrievalHints(channelID, expectedNewMessageID)
+	s.Require().NoError(err)
+	s.Require().Empty(got, "buffered messages must not create durable hints")
 
 	err = testutils.RetryWithBackOff(func() error {
 		callsMu.Lock()
@@ -799,15 +814,20 @@ func (s *ProcessorSuite) TestSDSMissingDependencyTriggersFetchHintsAndRecoversPa
 
 	oldMessage := types.Message{
 		EncryptionLayer: types.EncryptionLayer{Payload: wrappedOldPayload},
+		TransportLayer:  types.TransportLayer{Hash: []byte("missing-envelope")},
 	}
 	err = s.processor.processSDSLayer(&oldMessage)
 	s.Require().NoError(err)
+	got, err = reliability.NewSQLitePersistence(db).LoadSDSRetrievalHints(channelID, expectedNewMessageID)
+	s.Require().NoError(err)
+	s.Require().Equal(newMessageFirst.SegmentationLayer.Hashes, got, "all segment hashes must survive promotion to history")
 	if bytes.Equal(oldMessage.EncryptionLayer.Payload, oldPayload) {
 		recovered["old"] = true
 	}
 
 	newMessageReplay := types.Message{
-		EncryptionLayer: types.EncryptionLayer{Payload: wrappedNewPayload},
+		EncryptionLayer:   types.EncryptionLayer{Payload: wrappedNewPayload},
+		SegmentationLayer: newMessageFirst.SegmentationLayer,
 	}
 	err = s.processor.processSDSLayer(&newMessageReplay)
 	s.Require().NoError(err)

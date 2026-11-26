@@ -1,17 +1,46 @@
 package reliability
 
 import (
+	"container/list"
 	"database/sql"
 	"fmt"
+	"sync"
 
 	"github.com/waku-org/sds-go-bindings/sds"
 )
 
 type SQLitePersistence struct {
 	db *sql.DB
+
+	// Serialize hint staging with the callbacks that promote or remove it.
+	hintsMu          sync.Mutex
+	pendingHints     list.List
+	pendingHintIndex map[sdsHintKey]*list.Element
 }
 
-func NewSQLitePersistence(db *sql.DB) sds.PersistenceCallbacks {
+type sdsHintKey struct {
+	channelID string
+	messageID string
+}
+
+type pendingSDSHint struct {
+	key    sdsHintKey
+	hashes [][]byte
+}
+
+const maxPendingSDSHints = 512
+
+var _ sds.PersistenceCallbacks = (*SQLitePersistence)(nil)
+var _ SDSRetrievalHintPersistence = (*SQLitePersistence)(nil)
+
+func NewSQLitePersistence(db *sql.DB) *SQLitePersistence {
+	return &SQLitePersistence{db: db, pendingHintIndex: make(map[sdsHintKey]*list.Element)}
+}
+
+// NewSQLiteRetrievalHintPersistence opens the durable hints independently of
+// an SDS manager. Share NewSQLitePersistence with the history callbacks when
+// hints for pending messages need to be carried into history.
+func NewSQLiteRetrievalHintPersistence(db *sql.DB) SDSRetrievalHintPersistence {
 	return &SQLitePersistence{db: db}
 }
 
@@ -29,37 +58,36 @@ func (p *SQLitePersistence) SaveChannelMeta(channelID string, meta []byte) error
 }
 
 func (p *SQLitePersistence) UpdateHistory(channelID string, update sds.HistoryUpdate) error {
+	p.hintsMu.Lock()
+	defer p.hintsMu.Unlock()
+
 	tx, err := p.db.Begin()
 	if err != nil {
 		return fmt.Errorf("begin SDS history update: %w", err)
 	}
+	defer func() { _ = tx.Rollback() }()
 	for _, messageID := range update.Evict {
 		if messageID == "" {
-			_ = tx.Rollback()
 			return fmt.Errorf("evict SDS history: empty message ID")
 		}
 		if _, err = tx.Exec(
 			`DELETE FROM sds_channel_history WHERE channel_id = ? AND message_id = ?`,
 			channelID, messageID,
 		); err != nil {
-			_ = tx.Rollback()
 			return fmt.Errorf("evict SDS history message %q: %w", messageID, err)
 		}
 		if _, err = tx.Exec(
 			`DELETE FROM sds_retrieval_hints WHERE channel_id = ? AND message_id = ?`,
 			channelID, messageID,
 		); err != nil {
-			_ = tx.Rollback()
 			return fmt.Errorf("evict SDS retrieval hints for message %q: %w", messageID, err)
 		}
 	}
 	for _, message := range update.Append {
 		if message.MessageID == "" {
-			_ = tx.Rollback()
 			return fmt.Errorf("append SDS history: empty message ID")
 		}
 		if len(message.Data) == 0 {
-			_ = tx.Rollback()
 			return fmt.Errorf("append SDS history message %q: empty serialized message", message.MessageID)
 		}
 		if _, err = tx.Exec(
@@ -70,12 +98,23 @@ func (p *SQLitePersistence) UpdateHistory(channelID string, update sds.HistoryUp
 				message = excluded.message`,
 			channelID, message.MessageID, message.LamportTimestamp, message.Data,
 		); err != nil {
-			_ = tx.Rollback()
 			return fmt.Errorf("append SDS history message %q: %w", message.MessageID, err)
+		}
+		key := sdsHintKey{channelID: channelID, messageID: message.MessageID}
+		if pending := p.pendingHintIndex[key]; pending != nil {
+			if err := insertSDSRetrievalHints(tx, key, pending.Value.(pendingSDSHint).hashes); err != nil {
+				return err
+			}
 		}
 	}
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("commit SDS history update: %w", err)
+	}
+	for _, messageID := range update.Evict {
+		p.removePendingHint(sdsHintKey{channelID: channelID, messageID: messageID})
+	}
+	for _, message := range update.Append {
+		p.removePendingHint(sdsHintKey{channelID: channelID, messageID: message.MessageID})
 	}
 	return nil
 }
@@ -121,6 +160,9 @@ func (p *SQLitePersistence) LoadChannel(channelID string) (sds.ChannelData, erro
 }
 
 func (p *SQLitePersistence) DropChannel(channelID string) error {
+	p.hintsMu.Lock()
+	defer p.hintsMu.Unlock()
+
 	tx, err := p.db.Begin()
 	if err != nil {
 		return fmt.Errorf("begin SDS channel drop: %w", err)
@@ -149,21 +191,15 @@ func (p *SQLitePersistence) DropChannel(channelID string) error {
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("commit SDS channel drop: %w", err)
 	}
+	for key := range p.pendingHintIndex {
+		if key.channelID == channelID {
+			p.removePendingHint(key)
+		}
+	}
 	return nil
 }
 
-type sqliteSDSRetrievalHintPersistence struct {
-	db *sql.DB
-}
-
-var _ SDSRetrievalHintPersistence = (*sqliteSDSRetrievalHintPersistence)(nil)
-
-// NewSQLiteRetrievalHintPersistence creates durable SDS retrieval-hint storage.
-func NewSQLiteRetrievalHintPersistence(db *sql.DB) SDSRetrievalHintPersistence {
-	return &sqliteSDSRetrievalHintPersistence{db: db}
-}
-
-func (p *sqliteSDSRetrievalHintPersistence) SaveSDSRetrievalHints(channelID, messageID string, envelopeHashes [][]byte) error {
+func (p *SQLitePersistence) SaveSDSRetrievalHints(channelID, messageID string, envelopeHashes [][]byte) error {
 	if channelID == "" {
 		return fmt.Errorf("save SDS retrieval hints: empty channel ID")
 	}
@@ -173,32 +209,75 @@ func (p *sqliteSDSRetrievalHintPersistence) SaveSDSRetrievalHints(channelID, mes
 	if len(envelopeHashes) == 0 {
 		return fmt.Errorf("save SDS retrieval hints for message %q: no envelope hashes", messageID)
 	}
+	for _, hash := range envelopeHashes {
+		if len(hash) == 0 {
+			return fmt.Errorf("save SDS retrieval hints for message %q: empty envelope hash", messageID)
+		}
+	}
 
+	p.hintsMu.Lock()
+	defer p.hintsMu.Unlock()
+
+	key := sdsHintKey{channelID: channelID, messageID: messageID}
 	tx, err := p.db.Begin()
 	if err != nil {
 		return fmt.Errorf("begin SDS retrieval hint save: %w", err)
 	}
-	for _, hash := range envelopeHashes {
-		if len(hash) == 0 {
-			_ = tx.Rollback()
-			return fmt.Errorf("save SDS retrieval hints for message %q: empty envelope hash", messageID)
-		}
-		if _, err := tx.Exec(
-			`INSERT OR IGNORE INTO sds_retrieval_hints (channel_id, message_id, envelope_hash)
-			VALUES (?, ?, ?)`,
-			channelID, messageID, hash,
-		); err != nil {
-			_ = tx.Rollback()
-			return fmt.Errorf("save SDS retrieval hint for message %q: %w", messageID, err)
-		}
+	defer func() { _ = tx.Rollback() }()
+	if err := insertSDSRetrievalHints(tx, key, envelopeHashes); err != nil {
+		return err
+	}
+	var inHistory bool
+	if err := tx.QueryRow(`SELECT EXISTS (
+		SELECT 1 FROM sds_channel_history WHERE channel_id = ? AND message_id = ?
+	)`, channelID, messageID).Scan(&inHistory); err != nil {
+		return fmt.Errorf("check SDS history for retrieval hints for message %q: %w", messageID, err)
 	}
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("commit SDS retrieval hint save: %w", err)
 	}
+	if !inHistory && p.pendingHintIndex != nil {
+		p.stagePendingHint(key, envelopeHashes)
+	}
 	return nil
 }
 
-func (p *sqliteSDSRetrievalHintPersistence) LoadSDSRetrievalHints(channelID, messageID string) ([][]byte, error) {
+func insertSDSRetrievalHints(tx *sql.Tx, key sdsHintKey, hashes [][]byte) error {
+	for _, hash := range hashes {
+		if _, err := tx.Exec(
+			`INSERT OR IGNORE INTO sds_retrieval_hints (channel_id, message_id, envelope_hash)
+			SELECT channel_id, message_id, ? FROM sds_channel_history
+			WHERE channel_id = ? AND message_id = ?`, hash, key.channelID, key.messageID,
+		); err != nil {
+			return fmt.Errorf("save SDS retrieval hint for message %q: %w", key.messageID, err)
+		}
+	}
+	return nil
+}
+
+func (p *SQLitePersistence) stagePendingHint(key sdsHintKey, hashes [][]byte) {
+	// Keep the first complete set of segment hashes for a pending message.
+	if p.pendingHintIndex[key] != nil {
+		return
+	}
+	if p.pendingHints.Len() == maxPendingSDSHints {
+		p.removePendingHint(p.pendingHints.Front().Value.(pendingSDSHint).key)
+	}
+	copied := make([][]byte, len(hashes))
+	for i, hash := range hashes {
+		copied[i] = append([]byte(nil), hash...)
+	}
+	p.pendingHintIndex[key] = p.pendingHints.PushBack(pendingSDSHint{key: key, hashes: copied})
+}
+
+func (p *SQLitePersistence) removePendingHint(key sdsHintKey) {
+	if elem := p.pendingHintIndex[key]; elem != nil {
+		p.pendingHints.Remove(elem)
+		delete(p.pendingHintIndex, key)
+	}
+}
+
+func (p *SQLitePersistence) LoadSDSRetrievalHints(channelID, messageID string) ([][]byte, error) {
 	if channelID == "" {
 		return nil, fmt.Errorf("load SDS retrieval hints: empty channel ID")
 	}
