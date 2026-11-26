@@ -137,6 +137,11 @@ func (m *Messenger) sendCurrentUserStatusToCommunity(ctx context.Context, commun
 	)
 	defer span.End()
 
+	// Start broadcasts the status to every joined community.
+	if !m.started {
+		return nil
+	}
+
 	shouldBroadcastUserStatus, err := m.settings.ShouldBroadcastUserStatus()
 	if err != nil {
 		logger.Debug("m.settings.ShouldBroadcastUserStatus error", zap.Error(err))
