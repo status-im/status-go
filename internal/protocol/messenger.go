@@ -1834,6 +1834,10 @@ func (m *Messenger) HasPairedDevices() bool {
 
 // sendToPairedDevices will check if we have any paired devices and send to them if necessary
 func (m *Messenger) sendToPairedDevices(ctx context.Context, spec common.RawMessage) error {
+	// Before Start, there is no node to send through.
+	if !m.started {
+		return nil
+	}
 	hasPairedDevices := m.hasPairedDevices()
 	// We send a message to any paired device
 	if hasPairedDevices {
