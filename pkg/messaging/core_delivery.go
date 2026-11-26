@@ -41,6 +41,10 @@ func deliveryConfig(params CoreParams) (bindings.Config, error) {
 	}
 	if params.WakuConfig.UDPPort != 0 {
 		overrides["discv5-udp-port"] = params.WakuConfig.UDPPort
+		// QUIC listens on the UDP port of the TCP one.
+		if params.WakuConfig.UDPPort == params.WakuConfig.Port {
+			overrides["quic-support"] = false
+		}
 	}
 	if params.DataDir != "" {
 		overrides["local-storage-path"] = params.DataDir
