@@ -8,3 +8,7 @@ wnode-data
 _assets/ci
 Dockerfile
 **/*.test
+# Nimble resolves dependencies inside the builder with container-local paths.
+/nimble.paths
+/nimbledeps/
+/nimble.develop

@@ -77,7 +77,7 @@ class TestLocalBackup:
             backend_client.wakuext_service.send_contact_request(contact, "Test message")
 
         # Create a community
-        backend_client.wakuext_service.create_community_from_payload(
+        result = backend_client.wakuext_service.create_community_from_payload(
             {
                 "name": "Test Community",
                 "description": "This is a test community",
@@ -96,6 +96,10 @@ class TestLocalBackup:
                 "pinMessageAllMembersEnabled": False,
             }
         )
+
+        assert result and len(result.get("communities") or []) == 1, "First community was not created"
+        joined_community_id = result["communities"][0].get("id")
+        assert joined_community_id, "First community ID was not returned"
 
         # Create another community
         result = backend_client.wakuext_service.create_community_from_payload(
@@ -121,11 +125,11 @@ class TestLocalBackup:
         communities = result.get("communities", [])
         assert communities is not None, "Community was not created (None)"
         assert len(communities) == 1, "Community was not created (empty)"
-        community_id = communities[0].get("id", "")
-        assert community_id != "", "Community ID was not returned"
+        left_community_id = communities[0].get("id", "")
+        assert left_community_id != "", "Second community ID was not returned"
 
         # Leave community
-        backend_client.wakuext_service.leave_community(community_id)
+        backend_client.wakuext_service.leave_community(left_community_id)
 
         # Create chats
         result = backend_client.wakuext_service.create_group_chat_with_members([], "test-group-chat")
@@ -192,15 +196,19 @@ class TestLocalBackup:
         assert result is not None, "Contacts were not restored"
         assert test_contacts <= contact_keys(result), "Contacts were not restored"
 
-        # Validate communities
+        # Validate the source communities by ID because the RPC does not guarantee order.
         result = backend_client.wakuext_service.communities()
-        assert result is not None, "Communities were not restored"
-        assert len(result) == 2, "Communities were not restored correctly"
-        assert result[0].get("name") == "Test Community", "Community name was not restored correctly"
-        assert result[0].get("description") == "This is a test community", "Community description was not restored correctly"
-        assert result[1].get("name") == "Test Community 2", "Second community name was not restored correctly"
-        assert result[1].get("description") == "This is another test community", "Second community description was not restored correctly"
-        assert not result[1].get("joined"), "Second community was not left correctly"
+        assert result is not None and len(result) == 2, "Expected two communities before backup"
+        communities_by_id = {community["id"]: community for community in result}
+        assert communities_by_id.keys() == {joined_community_id, left_community_id}
+        joined_community = communities_by_id[joined_community_id]
+        left_community = communities_by_id[left_community_id]
+        assert joined_community.get("name") == "Test Community"
+        assert joined_community.get("description") == "This is a test community"
+        assert joined_community.get("joined") is True
+        assert left_community.get("name") == "Test Community 2"
+        assert left_community.get("description") == "This is another test community"
+        assert left_community.get("joined") is False
 
         # Validate chats
         result = backend_client.wakuext_service.chats()
@@ -321,6 +329,7 @@ class TestLocalBackup:
         result = backend_client2.wakuext_service.joined_communities()
         assert result is not None, "Communities were not restored"
         assert len(result) == 1, "Communities were not restored correctly"
+        assert result[0].get("id") == joined_community_id, "Wrong community was restored as joined"
         assert result[0].get("name") == "Test Community", "Community name was not restored correctly"
         assert result[0].get("description") == "This is a test community", "Community description was not restored correctly"
 
