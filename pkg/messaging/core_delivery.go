@@ -11,20 +11,16 @@ import (
 
 	"github.com/status-im/status-go/pkg/messaging/delivery"
 	"github.com/status-im/status-go/pkg/messaging/waku"
-	"github.com/status-im/status-go/pkg/messaging/waku/fleets"
 )
 
-// deliveryPresets maps the fleets logos-delivery has a network preset for.
-var deliveryPresets = map[string]string{
-	fleets.StatusProd:    "status.prod",
-	fleets.StatusStaging: "status.staging",
-}
-
+// deliveryConfig selects the logos-delivery preset named after the fleet: a
+// built-in one, or one registered from a fleets file by
+// delivery.RegisterFleetPresets.
 func deliveryConfig(params CoreParams) (bindings.Config, error) {
-	preset, ok := deliveryPresets[params.Fleet]
-	if !ok {
-		return bindings.Config{}, fmt.Errorf("fleet %q has no logos-delivery preset", params.Fleet)
+	if params.Fleet == "" {
+		return bindings.Config{}, fmt.Errorf("no fleet to select a logos-delivery preset by")
 	}
+	preset := params.Fleet
 	mode := bindings.ModeCore
 	if params.Mode == waku.ModeEdge {
 		mode = bindings.ModeEdge
