@@ -147,6 +147,8 @@ type Messenger struct {
 	cancel            context.CancelFunc
 	shutdownWaitGroup sync.WaitGroup
 
+	curatedCommunitiesRefresh curatedCommunitiesRefresh
+
 	importingCommunities                     map[string]bool
 	importingChannels                        map[string]bool
 	importRateLimiter                        *rate.Limiter
@@ -689,9 +691,6 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 	m.startSyncSettingsLoop()
 	m.startSettingsChangesLoop()
 	m.startCommunityRekeyLoop()
-	if m.config.codeControlFlags.CuratedCommunitiesUpdateLoopEnabled {
-		m.startCuratedCommunitiesUpdateLoop()
-	}
 	m.startRequestMissingCommunityChannelsHRKeysLoop()
 
 	if err := m.cleanTopics(); err != nil {
@@ -1657,6 +1656,7 @@ func (m *Messenger) Shutdown() (err error) {
 	}
 	close(m.quit)
 	m.cancel()
+	m.curatedCommunitiesRefresh.shutdown()
 
 	m.sender.Stop()
 
