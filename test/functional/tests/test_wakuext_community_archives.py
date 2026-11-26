@@ -450,6 +450,9 @@ class TestCommunityArchives:
         member.wait_for_wakuext_ready(timeout=30, start_messenger=False)
         member.wakuext_service.start_messenger()
 
+        # The LogosStorage client starts once the messenger is online.
+        member.wait_for_logos_storage()
+
         # Re-connect member to community LogosStorage client
         info = creator.wakuext_service.debug()
         member.wakuext_service.connect(info["id"], info["addrs"])

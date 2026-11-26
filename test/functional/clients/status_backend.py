@@ -674,6 +674,16 @@ class StatusBackend(RpcClient, SignalClient, ApiClient):
             return
         raise TimeoutError(f"StatusBackend was not online after {timeout} seconds")
 
+    def wait_for_logos_storage(self, timeout=30):
+        start_time = time.time()
+        while True:
+            try:
+                return self.wakuext_service.debug()
+            except ApiResponseError as ex:
+                if time.time() - start_time > timeout:
+                    raise TimeoutError(f"LogosStorage client was not started after {timeout} seconds: {ex}")
+                time.sleep(0.5)
+
     def get_connection_string_for_bootstrapping_another_device(self, message_sync_enabled=False):
         method = "GetConnectionStringForBootstrappingAnotherDevice"
         data = {
