@@ -7,7 +7,11 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
+	"net"
+	"sync"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/brianvoe/gofakeit/v6"
 
@@ -17,6 +21,7 @@ import (
 
 	"go.uber.org/mock/gomock"
 
+	"github.com/waku-org/go-waku/waku/v2/node"
 	wps "github.com/waku-org/go-waku/waku/v2/peerstore"
 	"github.com/waku-org/go-waku/waku/v2/utils"
 
@@ -27,25 +32,185 @@ import (
 	"github.com/status-im/status-go/internal/pausable"
 )
 
+func TestBootstrapRecoveryBackoff(t *testing.T) {
+	var recovery bootstrapRecovery
+	now := time.Now()
+	require.False(t, recovery.due(now, 0, bootstrapRecoveryInitialBackoff, bootstrapRecoveryMaxBackoff))
+	delays := []time.Duration{
+		15 * time.Second, 30 * time.Second, time.Minute,
+		2 * time.Minute, 4 * time.Minute, 5 * time.Minute, 5 * time.Minute,
+	}
+	for _, delay := range delays {
+		now = now.Add(delay)
+		require.False(t, recovery.due(now.Add(-time.Nanosecond), 0, bootstrapRecoveryInitialBackoff, bootstrapRecoveryMaxBackoff))
+		require.True(t, recovery.due(now, 0, bootstrapRecoveryInitialBackoff, bootstrapRecoveryMaxBackoff))
+		require.False(t, recovery.due(now, 0, bootstrapRecoveryInitialBackoff, bootstrapRecoveryMaxBackoff))
+	}
+	require.False(t, recovery.due(now, 1, bootstrapRecoveryInitialBackoff, bootstrapRecoveryMaxBackoff))
+	require.False(t, recovery.due(now, 0, bootstrapRecoveryInitialBackoff, bootstrapRecoveryMaxBackoff))
+	require.True(t, recovery.due(now.Add(15*time.Second), 0, bootstrapRecoveryInitialBackoff, bootstrapRecoveryMaxBackoff))
+}
+
+func TestBootstrapRecoveryBackoffCapsClockRollback(t *testing.T) {
+	var recovery bootstrapRecovery
+	now := time.Now().Round(0)
+	require.False(t, recovery.due(now, 0, bootstrapRecoveryInitialBackoff, bootstrapRecoveryMaxBackoff))
+	require.True(t, recovery.due(now.Add(bootstrapRecoveryInitialBackoff), 0, bootstrapRecoveryInitialBackoff, bootstrapRecoveryMaxBackoff))
+
+	now = now.Add(-time.Hour)
+	require.False(t, recovery.due(now, 0, bootstrapRecoveryInitialBackoff, bootstrapRecoveryMaxBackoff))
+	require.True(t, recovery.due(now.Add(30*time.Second), 0, bootstrapRecoveryInitialBackoff, bootstrapRecoveryMaxBackoff))
+}
+
+func TestLightClientRecoversWithoutNetworkChange(t *testing.T) {
+	for _, paused := range []bool{false, true} {
+		t.Run(fmt.Sprintf("paused=%t", paused), func(t *testing.T) {
+			bootstrap, err := node.New(
+				node.WithHostAddress(&net.TCPAddr{IP: net.ParseIP("127.0.0.1")}),
+				node.WithClusterID(16),
+				node.WithShards([]uint16{32}),
+				node.WithPeerExchange(),
+				node.WithLightPush(),
+			)
+			require.NoError(t, err)
+			require.NoError(t, bootstrap.Start(context.Background()))
+			t.Cleanup(bootstrap.Stop)
+
+			tree, address := makeTestTree("recovery", []*enode.Node{bootstrap.ENR()}, nil)
+			w, err := New(nil, &Config{
+				Host:      "127.0.0.1",
+				ClusterID: 16,
+				Mode:      ModeEdge,
+				WakuNodes: []string{address},
+				Resolver:  mapResolver(tree.ToTXT("recovery")),
+			}, nil, nil)
+			require.NoError(t, err)
+			w.monitoringConfig = connectionMonitoringConfig{
+				interval:                  time.Second,
+				pausedLightClientInterval: 2 * time.Second,
+				recoveryInitialBackoff:    100 * time.Millisecond,
+				recoveryMaxBackoff:        500 * time.Millisecond,
+			}
+			require.NoError(t, w.Start())
+			t.Cleanup(func() { require.NoError(t, w.Stop()) })
+			require.Eventually(t, func() bool {
+				return w.lightClientServicePeerCount() > 0
+			}, 10*time.Second, 50*time.Millisecond)
+			if paused {
+				require.NoError(t, w.Pause())
+			}
+
+			w.node.DisconnectAllPeers()
+			require.Eventually(t, func() bool {
+				return len(w.Peers()) == 0
+			}, 5*time.Second, 50*time.Millisecond)
+			// Preserve the peerstore metadata to exercise unchanged-ENR recovery.
+			peerStore := w.node.Host().Peerstore().(wps.WakuPeerstore)
+			require.NoError(t, peerStore.SetOrigin(bootstrap.Host().ID(), wps.DNSDiscovery))
+			require.NoError(t, peerStore.SetENR(bootstrap.Host().ID(), bootstrap.ENR()))
+			w.node.Host().Peerstore().AddAddrs(bootstrap.Host().ID(), bootstrap.ListenAddresses(), time.Hour)
+			_, err = peerStore.ENR(bootstrap.Host().ID())
+			require.NoError(t, err, "bootstrap ENR metadata should be present")
+			require.NotEmpty(t, w.node.Host().Peerstore().Addrs(bootstrap.Host().ID()))
+
+			require.Eventually(t, func() bool {
+				return w.lightClientServicePeerCount() > 0
+			}, 5*time.Second, 50*time.Millisecond)
+
+			var concurrentDiscoveries sync.WaitGroup
+			for i := 0; i < 10; i++ {
+				concurrentDiscoveries.Add(1)
+				go func() {
+					defer concurrentDiscoveries.Done()
+					w.discoverAndConnect(address)
+				}()
+			}
+			require.NoError(t, w.Stop())
+			concurrentDiscoveries.Wait()
+		})
+	}
+}
+
 type failingDNSResolver struct {
-	err    error
-	called chan struct{}
+	called chan int
+	calls  atomic.Int32
 }
 
 func (r *failingDNSResolver) LookupTXT(context.Context, string) ([]string, error) {
+	call := int(r.calls.Add(1))
+	select {
+	case r.called <- call:
+	default:
+	}
+	return nil, errors.New("DNS unavailable")
+}
+
+func TestGoingOnlineKicksDNSRetryLoop(t *testing.T) {
+	resolver := &failingDNSResolver{called: make(chan int, 2)}
+	w, err := New(nil, &Config{Mode: ModeEdge, Resolver: resolver}, nil, nil)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		w.cancel()
+		w.wg.Wait()
+		w.envelopeCache.Stop()
+	})
+
+	const address = "enrtree://AIRVQ5DDA4FFWLRBCHJWUWOO6X6S4ZTZ5B667LQ6AJU6PEYDLRD5O@nodes.example.org"
+	w.discoverAndConnect(address)
+	select {
+	case <-resolver.called:
+	case <-time.After(5 * time.Second):
+		t.Fatal("initial DNS discovery did not start")
+	}
+
+	w.discoverAndConnect(address)
+	select {
+	case call := <-resolver.called:
+		require.Equal(t, 2, call)
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("going-online event did not wake DNS discovery from backoff")
+	}
+}
+
+type blockingDNSResolver struct {
+	called chan struct{}
+	calls  atomic.Int32
+}
+
+func (r *blockingDNSResolver) LookupTXT(ctx context.Context, _ string) ([]string, error) {
+	r.calls.Add(1)
 	select {
 	case r.called <- struct{}{}:
 	default:
 	}
-	return nil, r.err
+	<-ctx.Done()
+	return nil, ctx.Err()
+}
+
+func TestBootstrapRecoverySharesDNSRetryLoop(t *testing.T) {
+	resolver := &blockingDNSResolver{called: make(chan struct{}, 1)}
+	w, err := New(nil, &Config{Mode: ModeEdge, Resolver: resolver}, nil, nil)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		w.cancel()
+		w.wg.Wait()
+		w.envelopeCache.Stop()
+	})
+	for i := 0; i < 10; i++ {
+		w.discoverAndConnect("enrtree://AIRVQ5DDA4FFWLRBCHJWUWOO6X6S4ZTZ5B667LQ6AJU6PEYDLRD5O@nodes.example.org")
+	}
+	select {
+	case <-resolver.called:
+	case <-time.After(5 * time.Second):
+		t.Fatal("DNS discovery did not start")
+	}
+	w.cancel()
+	w.wg.Wait()
+	require.EqualValues(t, 1, resolver.calls.Load())
 }
 
 func TestNewRetrievesInitialDiscV5BootstrapNodes(t *testing.T) {
-	expectedErr := errors.New("DNS lookup failed")
-	resolver := &failingDNSResolver{
-		err:    expectedErr,
-		called: make(chan struct{}, 1),
-	}
+	resolver := &failingDNSResolver{called: make(chan int, 1)}
 	cfg := &Config{
 		DiscV5BootstrapNodes: []string{
 			"enrtree://AIRVQ5DDA4FFWLRBCHJWUWOO6X6S4ZTZ5B667LQ6AJU6PEYDLRD5O@nodes.example.org",

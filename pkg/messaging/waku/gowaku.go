@@ -38,6 +38,7 @@ import (
 	pkgerrors "github.com/pkg/errors"
 
 	"github.com/jellydator/ttlcache/v3"
+	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/peerstore"
 	"github.com/multiformats/go-multiaddr"
@@ -69,6 +70,7 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/protocol/filter"
 	"github.com/waku-org/go-waku/waku/v2/protocol/lightpush"
 	"github.com/waku-org/go-waku/waku/v2/protocol/peer_exchange"
+	"github.com/waku-org/go-waku/waku/v2/service"
 	"github.com/waku-org/go-waku/waku/v2/utils"
 
 	"github.com/waku-org/go-waku/waku/v2/node"
@@ -94,6 +96,10 @@ const maxRelayPeers = 300
 const randomPeersKeepAliveInterval = 5 * time.Second
 const allPeersKeepAliveInterval = 5 * time.Minute
 const pausedModePeerExchangeMinPeers = 3
+const bootstrapRecoveryInitialBackoff = 15 * time.Second
+const bootstrapRecoveryMaxBackoff = 5 * time.Minute
+const connectionMonitoringInterval = 5 * time.Second
+const pausedLightClientMonitoringInterval = 30 * time.Second
 
 const (
 	// Outgoing publications share one bucket across chat payloads and MVDS control traffic.
@@ -145,6 +151,9 @@ type Waku struct {
 	dnsAddressCache             map[string][]dnsdisc.DiscoveredNode // Map to store the multiaddresses returned by dns discovery
 	dnsAddressCacheLock         *sync.RWMutex                       // lock to handle access to the map
 	dnsDiscAsyncRetrievedSignal chan struct{}
+	dnsDiscoveryInProgress      sync.Map // enrtree address -> chan struct{}
+	lifecycleMu                 sync.Mutex
+	monitoringConfig            connectionMonitoringConfig
 
 	// Light-client filter protocol; tracks the wire subscriptions declared via
 	// SyncSubscriptions.
@@ -281,6 +290,7 @@ func New(nodeKey *ecdsa.PrivateKey, cfg *Config, logger *zap.Logger, ts timesour
 		dnsAddressCache:             make(map[string][]dnsdisc.DiscoveredNode),
 		dnsAddressCacheLock:         &sync.RWMutex{},
 		dnsDiscAsyncRetrievedSignal: make(chan struct{}),
+		monitoringConfig:            defaultConnectionMonitoringConfig(),
 		timesource:                  ts,
 		logger:                      logger,
 		onlineChecker:               onlinechecker.NewDefaultOnlineChecker(false).(*onlinechecker.DefaultOnlineChecker),
@@ -563,15 +573,34 @@ func dnsDiscoveryBackoff(attempt int) time.Duration {
 }
 
 func (w *Waku) discoverAndConnect(address string) {
+	kick := make(chan struct{}, 1)
+	w.lifecycleMu.Lock()
+	if w.ctx.Err() != nil {
+		w.lifecycleMu.Unlock()
+		return
+	}
+	if existing, loaded := w.dnsDiscoveryInProgress.LoadOrStore(address, kick); loaded {
+		select {
+		case existing.(chan struct{}) <- struct{}{}:
+		default:
+		}
+		w.lifecycleMu.Unlock()
+		return
+	}
+	w.wg.Add(1)
+	w.lifecycleMu.Unlock()
+
 	fnApply := func(d dnsdisc.DiscoveredNode, wg *sync.WaitGroup) {
 		defer wg.Done()
 		if len(d.PeerInfo.Addrs) != 0 {
-			go w.connect(d.PeerInfo, d.ENR, wps.DNSDiscovery)
+			w.connect(d.PeerInfo, d.ENR, wps.DNSDiscovery)
 		}
 	}
 
 	go func() {
 		defer panics.LogOnPanic()
+		defer w.wg.Done()
+		defer w.dnsDiscoveryInProgress.Delete(address)
 		// Retry on failure with exponential backoff: at cold start on Android,
 		// the device DNS resolver isn't always ready when statusgo starts and
 		// the enrtree:// lookup hits ::1:53 with "connection refused". Without
@@ -594,6 +623,9 @@ func (w *Waku) discoverAndConnect(address string) {
 			t := time.NewTimer(dnsDiscoveryBackoff(attempt))
 			select {
 			case <-t.C:
+			case <-kick:
+				t.Stop()
+				attempt = 0
 			case <-w.ctx.Done():
 				t.Stop()
 				return
@@ -637,9 +669,86 @@ func handlePeerAddress(addr string, handler peerAddressHandler) error {
 
 func (w *Waku) connect(peerInfo peer.AddrInfo, enr *enode.Node, origin wps.Origin) {
 	defer panics.LogOnPanic()
-	// Connection will be prunned eventually by the connection manager if needed
-	// The peer connector in go-waku uses connect, so it will execute identify as part of its
-	w.node.AddDiscoveredPeer(peerInfo.ID, peerInfo.Addrs, origin, w.cfg.DefaultShardedPubsubTopics, enr, true)
+	w.lifecycleMu.Lock()
+	defer w.lifecycleMu.Unlock()
+	if w.ctx.Err() != nil || w.node == nil ||
+		w.node.Host().Network().Connectedness(peerInfo.ID) == network.Connected {
+		return
+	}
+
+	w.node.AddDiscoveredPeer(peerInfo.ID, peerInfo.Addrs, origin, w.cfg.DefaultShardedPubsubTopics, enr, false)
+	w.node.PeerManager().Connect(&service.PeerData{
+		Origin:       origin,
+		AddrInfo:     peerInfo,
+		PubsubTopics: w.cfg.DefaultShardedPubsubTopics,
+		ENR:          enr,
+	})
+}
+
+type bootstrapRecovery struct {
+	nextAttempt time.Time
+	backoff     time.Duration
+}
+
+func (r *bootstrapRecovery) due(now time.Time, peerCount int, initialBackoff, maxBackoff time.Duration) bool {
+	// Android suspend time may not advance Go's monotonic clock.
+	now = now.Round(0)
+	if peerCount > 0 {
+		*r = bootstrapRecovery{}
+		return false
+	}
+	if r.nextAttempt.IsZero() {
+		r.backoff = initialBackoff
+		r.nextAttempt = now.Add(r.backoff)
+		return false
+	}
+	if now.Before(r.nextAttempt) {
+		if wait := r.nextAttempt.Sub(now); wait > r.backoff {
+			r.nextAttempt = now.Add(r.backoff)
+		}
+		return false
+	}
+	r.backoff *= 2
+	if r.backoff > maxBackoff {
+		r.backoff = maxBackoff
+	}
+	r.nextAttempt = now.Add(r.backoff)
+	return true
+}
+
+type connectionMonitoringConfig struct {
+	interval                  time.Duration
+	pausedLightClientInterval time.Duration
+	recoveryInitialBackoff    time.Duration
+	recoveryMaxBackoff        time.Duration
+}
+
+func defaultConnectionMonitoringConfig() connectionMonitoringConfig {
+	return connectionMonitoringConfig{
+		interval:                  connectionMonitoringInterval,
+		pausedLightClientInterval: pausedLightClientMonitoringInterval,
+		recoveryInitialBackoff:    bootstrapRecoveryInitialBackoff,
+		recoveryMaxBackoff:        bootstrapRecoveryMaxBackoff,
+	}
+}
+
+func (w *Waku) lightClientServicePeerCount() int {
+	peerCount := 0
+	for _, peerID := range w.node.Host().Network().Peers() {
+		protocols, err := w.node.Host().Peerstore().SupportsProtocols(
+			peerID,
+			filter.FilterSubscribeID_v20beta1,
+			lightpush.LightPushID_v20beta1,
+		)
+		if err != nil {
+			w.logger.Debug("failed to check light-client service protocols", zap.Stringer("peer", peerID), zap.Error(err))
+			continue
+		}
+		if len(protocols) > 0 {
+			peerCount++
+		}
+	}
+	return peerCount
 }
 
 func (w *Waku) runPeerExchangeLoop() {
@@ -1009,11 +1118,13 @@ func (w *Waku) startConnectionMonitoringLoop() {
 func (w *Waku) runConnectionMonitoringLoop() {
 	defer panics.LogOnPanic()
 	defer w.wg.Done()
-	ticker := time.NewTicker(5 * time.Second)
+	config := w.monitoringConfig
+	ticker := time.NewTicker(config.interval)
 	defer ticker.Stop()
 	sub := w.PauseBroadcaster.Subscribe()
 	defer sub.Unsubscribe()
 	paused := <-sub.C()
+	var recovery bootstrapRecovery
 	tracker := newHistoryReconcileTracker(w.reliablyConnected(), time.Now())
 	var pendingReconciliations []types.HistoryReconcileWindow
 
@@ -1024,7 +1135,10 @@ func (w *Waku) runConnectionMonitoringLoop() {
 	startupObservedAt := time.Now()
 	w.queueHistoryReconciliation(&tracker, &pendingReconciliations, tracker.reliable, startupObservedAt)
 	var tickerC <-chan time.Time
-	if !paused {
+	if !paused || w.cfg.IsLightClient() {
+		if paused {
+			ticker.Reset(config.pausedLightClientInterval)
+		}
 		tickerC = ticker.C
 	}
 	for {
@@ -1044,14 +1158,34 @@ func (w *Waku) runConnectionMonitoringLoop() {
 				return
 			}
 			paused = pausedState
-			if paused {
+			if paused && !w.cfg.IsLightClient() {
 				tickerC = nil
 			} else {
+				if paused {
+					ticker.Reset(config.pausedLightClientInterval)
+				} else {
+					ticker.Reset(config.interval)
+				}
 				tickerC = ticker.C
+			}
+			if !paused {
 				observeConnectionState()
 			}
 		case <-tickerC:
-			observeConnectionState()
+			// Run independently of peer exchange, whose network request may stall.
+			// Zero peers itself marks us offline, so onlineChecker cannot gate recovery.
+			servicePeerCount := 0
+			if w.cfg.IsLightClient() {
+				servicePeerCount = w.lightClientServicePeerCount()
+			}
+			if w.cfg.IsLightClient() && recovery.due(time.Now(), servicePeerCount, config.recoveryInitialBackoff, config.recoveryMaxBackoff) {
+				w.logger.Info("rediscovering bootstrap nodes after sustained zero peers",
+					zap.Duration("next-attempt-in", recovery.backoff))
+				w.discoverAndConnectPeers()
+			}
+			if !paused {
+				observeConnectionState()
+			}
 		case topicHealth := <-w.topicHealthStatusChan:
 			// go-waku reports per-shard mesh health (UnHealthy / MinimallyHealthy
 			// / SufficientlyHealthy); cache it so checkForConnectionChanges can
@@ -1241,11 +1375,14 @@ func (w *Waku) setupRelaySubscriptions() error {
 // Stops the background data propagation thread of the Waku protocol.
 func (w *Waku) Stop() error {
 	// never started || already stopped
+	w.lifecycleMu.Lock()
 	if w.node == nil || w.cancel == nil {
+		w.lifecycleMu.Unlock()
 		return nil
 	}
 
 	w.cancel()
+	w.lifecycleMu.Unlock()
 	defer func() {
 		w.cancel = nil
 	}()
