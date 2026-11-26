@@ -292,6 +292,30 @@ class TestWakuextThreadExtras:
         await receiver.wait_for_signal(SignalType.MESSAGES_NEW, pattern=reply["id"], timeout=60, check_buffer=True)
         assert reply_text in _texts(receiver.wakuext_service.chat_messages_in_thread(receiver_chat_id, root["id"], limit=20))
 
+    @pytest.mark.spec("SC-THRD-02")
+    async def test_start_thread_keeps_full_text_when_name_omitted(self, sender, receiver):
+        sender_chat_id = receiver.public_key
+        seed_text = f"seed-{uuid4()}"
+        sender.wakuext_service.send_one_to_one_message(receiver.public_key, seed_text)
+        await receiver.wait_for_signal(SignalType.MESSAGES_NEW, pattern=seed_text, timeout=60, check_buffer=True)
+
+        root_text = f"full-{uuid4()}-" + ("x" * THREAD_NAME_LIMIT)
+        started = sender.wakuext_service.start_thread_from_new_message(sender_chat_id, root_text, "")
+        assert len(started.get("messages") or []) == 1
+        root = _message_by_text(started, root_text)
+        assert root["text"] == root_text
+        thread = _thread(started, root["id"])
+        assert thread["name"] == root_text[:THREAD_NAME_LIMIT]
+        assert thread["parentMessageId"] == root["id"]
+        assert not root.get("threadId")
+
+        await receiver.wait_for_signal(SignalType.MESSAGES_NEW, pattern=root["id"], timeout=60, check_buffer=True)
+        received_messages = receiver.wakuext_service.chat_messages(sender.public_key, limit=20)
+        received_root = _message_by_text(received_messages, root_text)
+        assert received_root["id"] == root["id"]
+        assert received_root["text"] == root_text
+        assert _texts(received_messages).count(root_text) == 1
+
     @pytest.mark.spec("SC-THRD-23")
     async def test_thread_reply_reaction_stays_in_thread(self, sender, receiver):
         parent_text = f"parent-{uuid4()}"
