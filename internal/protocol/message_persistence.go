@@ -2778,6 +2778,25 @@ func (db sqlitePersistence) backedUpMessageToUserMessageValues(message *protobuf
 		return nil, err
 	}
 
+	rtl := common.IsRTL(message.Text)
+	lineCount := strings.Count(message.Text, "\n")
+	mentions, links := common.MentionsAndLinks(parsedText)
+	var serializedMentions []byte
+	if len(mentions) != 0 {
+		serializedMentions, err = json.Marshal(mentions)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	var serializedLinks []byte
+	if len(links) != 0 {
+		serializedLinks, err = json.Marshal(links)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	sticker := message.GetSticker()
 	if sticker == nil {
 		sticker = &protobuf.StickerMessage{}
@@ -2846,8 +2865,8 @@ func (db sqlitePersistence) backedUpMessageToUserMessageValues(message *protobuf
 		0,                             // audio_duration_ms
 		"",                            // audio_base64
 		"",                            // community_id
-		nil,                           // mentions
-		nil,                           // links
+		serializedMentions,            // mentions
+		serializedLinks,               // links
 		serializedUnfurledLinks,       // unfurled_links
 		serializedUnfurledStatusLinks, // unfurled_status_links
 		"",                            // replace
@@ -2855,8 +2874,8 @@ func (db sqlitePersistence) backedUpMessageToUserMessageValues(message *protobuf
 		false,                         // deleted
 		"",                            // deleted_by
 		false,                         // deleted_for_me
-		false,                         // rtl
-		0,                             // line_count
+		rtl,                           // rtl
+		lineCount,                     // line_count
 		message.GetResponseTo(),       // response_to
 		uint32(0),                     // gap_from
 		uint32(0),                     // gap_to

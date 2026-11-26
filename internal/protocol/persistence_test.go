@@ -60,6 +60,32 @@ func TestBackedUpMessagesPreserveThreadID(t *testing.T) {
 	require.Equal(t, "thread", reply.GetThreadId())
 }
 
+func TestBackedUpMessagesRestoreTextDerivedFields(t *testing.T) {
+	db, err := openTestDB()
+	require.NoError(t, err)
+	defer db.Close()
+	p := newSQLitePersistence(db)
+
+	mention := "0x04" + strings.Repeat("ab", 64)
+	text := "שלום @" + mention + " https://static.klipy.com/a.gif\nsecond line"
+	require.NoError(t, p.SaveBackedUpMessages([]*protobuf.BackedUpMessage{{
+		Id:          "restored",
+		ChatId:      testPublicChatID,
+		Text:        text,
+		ContentType: int64(protobuf.ChatMessage_TEXT_PLAIN),
+		MessageType: protobuf.MessageType_COMMUNITY_CHAT,
+		Clock:       1,
+		Timestamp:   1,
+	}}))
+
+	restored, err := p.MessageByID("restored")
+	require.NoError(t, err)
+	require.Equal(t, []string{"https://static.klipy.com/a.gif"}, restored.Links)
+	require.Equal(t, []string{mention}, restored.Mentions)
+	require.Equal(t, 1, restored.LineCount)
+	require.True(t, restored.RTL)
+}
+
 func TestBackedUpThreadsRoundTripAndMerge(t *testing.T) {
 	db, err := openTestDB()
 	require.NoError(t, err)

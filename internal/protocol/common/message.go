@@ -430,7 +430,7 @@ func (m *Message) UnmarshalJSON(data []byte) error {
 }
 
 // Check if the first character is Hebrew or Arabic or the RTL character
-func isRTL(s string) bool {
+func IsRTL(s string) bool {
 	first, _ := utf8.DecodeRuneInString(s)
 	return unicode.Is(unicode.Hebrew, first) ||
 		unicode.Is(unicode.Arabic, first) ||
@@ -603,6 +603,11 @@ func runMentionsAndLinksVisitor(parsedText ast.Node, identity string) *MentionsA
 	return visitor
 }
 
+func MentionsAndLinks(parsedText ast.Node) (mentions []string, links []string) {
+	visitor := runMentionsAndLinksVisitor(parsedText, "")
+	return visitor.mentions, visitor.links
+}
+
 func RunLinksVisitor(parsedText ast.Node) *LinksVisitor {
 	visitor := &LinksVisitor{}
 	ast.Walk(parsedText, visitor)
@@ -645,7 +650,7 @@ func (m *Message) PrepareContent(identity string) error {
 	m.ParsedTextAst = &parsedText
 	m.ParsedText = jsonParsedText
 	m.LineCount = strings.Count(m.Text, "\n")
-	m.RTL = isRTL(m.Text)
+	m.RTL = IsRTL(m.Text)
 	if err := m.parseImage(); err != nil {
 		return err
 	}
