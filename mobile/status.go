@@ -1703,9 +1703,10 @@ func inputConnectionStringForBootstrapping(cs, configJSON string) string {
 		return response.toJSON(err)
 	}
 
+	seqBefore := statusBackend.LoginState().Seq
 	err = pairing.StartUpReceivingClient(statusBackend, cs, &conf)
 	if err != nil {
-		if logoutErr := statusBackend.EndPairingLogin(); logoutErr != nil {
+		if logoutErr := statusBackend.EndPairingLogin(seqBefore); logoutErr != nil {
 			logutils.ZapLogger().Error("failed to log out after a failed pairing receive", zap.Error(logoutErr))
 		}
 		return response.toJSON(err)
@@ -1745,9 +1746,10 @@ func inputConnectionStringForBootstrappingV2(requestJSON string) string {
 		return response.toJSON(err)
 	}
 
+	seqBefore := statusBackend.LoginState().Seq
 	err = pairing.StartUpReceivingClient(statusBackend, request.ConnectionString, request.ReceiverClientConfig)
 	if err != nil {
-		if logoutErr := statusBackend.EndPairingLogin(); logoutErr != nil {
+		if logoutErr := statusBackend.EndPairingLogin(seqBefore); logoutErr != nil {
 			logutils.ZapLogger().Error("failed to log out after a failed pairing receive", zap.Error(logoutErr))
 		}
 		return response.toJSON(err)

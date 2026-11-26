@@ -117,11 +117,13 @@ func (b *StatusBackend) LoginState() LoginState {
 	return LoginState{State: state, Seq: seq, Account: acc}
 }
 
-// EndPairingLogin logs out the login a local pairing receiver made, if there is one.
-// Pairing logins send no node.login, so a session left logged in after a failed
-// receive would look like a login nobody can see finish.
-func (b *StatusBackend) EndPairingLogin() error {
-	if b.loginState.get() != LoginStateLoggedIn {
+// EndPairingLogin logs out the login a local pairing receiver made, if there is one:
+// a login started after seqBefore, the seq read before the receive. Pairing logins
+// send no node.login, so a session left logged in after a failed receive would look
+// like a login nobody can see finish. An earlier session is kept.
+func (b *StatusBackend) EndPairingLogin(seqBefore uint64) error {
+	state, seq := b.loginState.snapshot()
+	if state != LoginStateLoggedIn || seq == seqBefore {
 		return nil
 	}
 	return b.Logout()

@@ -250,11 +250,12 @@ func (s *LoginStateSuite) TestAFailedPairingReceiveLogsOutItsLogin() {
 	acc, err := s.backend.multiaccountsDB.GetAccount(keyUID)
 	s.Require().NoError(err)
 
+	seqBefore := s.backend.LoginState().Seq
 	s.Require().NoError(s.backend.LocalPairingStateManager.StartPairing("pairing-session"))
 	s.Require().NoError(s.backend.StartNodeWithAccount(*acc, testPassword, nil, nil))
 	s.Require().Equal(LoginStateLoggedIn, s.backend.LoginState().State)
 
-	s.Require().NoError(s.backend.EndPairingLogin())
+	s.Require().NoError(s.backend.EndPairingLogin(seqBefore))
 	s.backend.LocalPairingStateManager.StopPairing("pairing-session", errors.New("receive failed"))
 
 	state := s.backend.LoginState()
@@ -263,4 +264,17 @@ func (s *LoginStateSuite) TestAFailedPairingReceiveLogsOutItsLogin() {
 	s.Require().Len(s.seenNodeLogins(), 1, "a pairing login sends no node.login")
 	_, err = s.backend.AcceptLoginRequest()
 	s.Require().NoError(err, "the next login is accepted")
+}
+
+func (s *LoginStateSuite) TestAFailedPairingReceiveKeepsAnEarlierLogin() {
+	s.createAccountAndLogin()
+	seqBefore := s.backend.LoginState().Seq
+
+	s.Require().NoError(s.backend.LocalPairingStateManager.StartPairing("pairing-session"))
+	s.Require().NoError(s.backend.EndPairingLogin(seqBefore))
+	s.backend.LocalPairingStateManager.StopPairing("pairing-session", errors.New("receive failed"))
+
+	state := s.backend.LoginState()
+	s.Require().Equal(LoginStateLoggedIn, state.State)
+	s.Require().Equal(seqBefore, state.Seq)
 }
