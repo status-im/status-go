@@ -1657,37 +1657,13 @@ func (s *MessengerCommunitiesSuite) TestCancelRequestAccess() {
 	s.Require().Equal(cancelRequestToJoin2.CustomizationColor, s.alice.account.GetCustomizationColor())
 	s.Require().Equal(communities.RequestToJoinStateCanceled, cancelRequestToJoin2.State)
 
-	// A replay in a new transport envelope must leave the canceled request alone.
+	// The request reached the control node through Waku without entering SDS.
 	sentIDs, err := s.alice.RawMessagesIDsByType(protobuf.ApplicationMetadataMessage_COMMUNITY_REQUEST_TO_JOIN)
 	s.Require().NoError(err)
 	s.Require().Len(sentIDs, 1)
-	firstSend, err := s.alice.RawMessageByID(sentIDs[0])
+	processed, err := s.bob.persistence.IsSDSMessageProcessed(sentIDs[0])
 	s.Require().NoError(err)
-	processed, err := s.bob.persistence.IsSDSMessageProcessed(firstSend.ID)
-	s.Require().NoError(err)
-	s.Require().True(processed, "first send %s must have an SDS marker", firstSend.ID)
-	application, err := v1protocol.WrapIntoAppLayerMessage(firstSend.Payload, firstSend.MessageType, s.alice.identity)
-	s.Require().NoError(err)
-	replaySender, err := sds.NewReliabilityManager(s.alice.logger, nil)
-	s.Require().NoError(err)
-	wrapped, err := replaySender.WrapOutgoingMessage(application, sds.MessageID(cryptotypes.EncodeHex(crypto.Keccak256(application))), community.IDString())
-	s.Require().NoError(replaySender.Cleanup())
-	s.Require().NoError(err)
-	replayHash := crypto.Keccak256([]byte("replayed join request"))
-	response, err = s.bob.handleRetrievedMessages(map[messagingtypes.ChatFilter][]*messagingtypes.ReceivedMessage{
-		{}: {{
-			Sig:     crypto.FromECDSAPub(&s.alice.identity.PublicKey),
-			Dst:     crypto.FromECDSAPub(community.PublicKey()),
-			Hash:    replayHash,
-			Payload: wrapped,
-		}},
-	}, false, false)
-	s.Require().NoError(err)
-	s.Require().Empty(response.RequestsToJoinCommunity())
-	var confirmed bool
-	err = s.bob.database.QueryRow("SELECT EXISTS(SELECT 1 FROM transport_message_cache WHERE id = ?)", cryptotypes.EncodeHex(replayHash)).Scan(&confirmed)
-	s.Require().NoError(err)
-	s.Require().True(confirmed)
+	s.Require().False(processed)
 
 	// A new send with the exact same application clock must reach the control node.
 	response, err = s.alice.requestToJoinCommunity(request, clock)
@@ -1703,6 +1679,54 @@ func (s *MessengerCommunitiesSuite) TestCancelRequestAccess() {
 		return false
 	}, "control node did not receive a fresh request at the same clock")
 	s.Require().NoError(err)
+}
+
+func (s *MessengerCommunitiesSuite) TestAcceptLegacySDSWrappedJoinRequest() {
+	created, err := s.bob.CreateCommunity(&requests.CreateCommunity{
+		Membership:  protobuf.CommunityPermissions_MANUAL_ACCEPT,
+		Name:        "status",
+		Color:       "#ffffff",
+		Description: "legacy SDS join request",
+	}, true)
+	s.Require().NoError(err)
+	community := created.Communities()[0]
+	request := s.createRequestToJoinCommunity(community.ID(), s.alice)
+	join := s.alice.communitiesManager.CreateRequestToJoin(request, s.alice.account.GetCustomizationColor(), uint64(time.Now().Unix()))
+	payload, err := proto.Marshal(join.ToCommunityRequestToJoinProtobuf())
+	s.Require().NoError(err)
+	application, err := v1protocol.WrapIntoAppLayerMessage(payload, protobuf.ApplicationMetadataMessage_COMMUNITY_REQUEST_TO_JOIN, s.alice.identity)
+	s.Require().NoError(err)
+	legacySender, err := sds.NewReliabilityManager(s.alice.logger, nil)
+	s.Require().NoError(err)
+	defer func() { s.Require().NoError(legacySender.Cleanup()) }()
+	wrapped, err := legacySender.WrapOutgoingMessage(application, sds.MessageID(cryptotypes.EncodeHex(crypto.Keccak256(application))), community.IDString())
+	s.Require().NoError(err)
+
+	deliver := func(hash []byte) *MessengerResponse {
+		response, err := s.bob.handleRetrievedMessages(map[messagingtypes.ChatFilter][]*messagingtypes.ReceivedMessage{
+			{}: {{
+				Sig:     crypto.FromECDSAPub(&s.alice.identity.PublicKey),
+				Dst:     crypto.FromECDSAPub(community.PublicKey()),
+				Hash:    hash,
+				Payload: wrapped,
+			}},
+		}, false, false)
+		s.Require().NoError(err)
+		var confirmed bool
+		err = s.bob.database.QueryRow("SELECT EXISTS(SELECT 1 FROM transport_message_cache WHERE id = ?)", cryptotypes.EncodeHex(hash)).Scan(&confirmed)
+		s.Require().NoError(err)
+		s.Require().True(confirmed)
+		return response
+	}
+	response := deliver(crypto.Keccak256([]byte("legacy join request")))
+	s.Require().Len(response.RequestsToJoinCommunity(), 1)
+	s.Require().Equal(join.ID, response.RequestsToJoinCommunity()[0].ID)
+
+	// After cancellation, a replay from the legacy channel must leave the request canceled.
+	_, _, err = s.bob.communitiesManager.CancelRequestToJoin(&requests.CancelRequestToJoinCommunity{ID: join.ID})
+	s.Require().NoError(err)
+	response = deliver(crypto.Keccak256([]byte("replayed legacy join request")))
+	s.Require().Empty(response.RequestsToJoinCommunity())
 }
 
 func (s *MessengerCommunitiesSuite) TestRequestAccessAgain() {

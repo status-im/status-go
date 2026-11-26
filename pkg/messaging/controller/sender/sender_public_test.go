@@ -186,7 +186,7 @@ func TestWrapPayloadForPublicSDS_OversizedPayload(t *testing.T) {
 		err: errors.New("reMessageTooLarge: message exceeds allowed size"),
 	}
 
-	channelID := reliability.BuildChannelID(communityID, "")
+	channelID := reliability.BuildChannelID(communityID)
 	wrapped, messageID, err := wrapPayloadForPublicSDS(logger, stub, payload, channelID)
 
 	require.NoError(t, err)
@@ -204,7 +204,7 @@ func TestWrapPayloadForPublicSDS_WrapError(t *testing.T) {
 		err: errors.New("boom"),
 	}
 
-	channelID := reliability.BuildChannelID("community-id", "")
+	channelID := reliability.BuildChannelID("community-id")
 	wrapped, messageID, err := wrapPayloadForPublicSDS(logger, stub, payload, channelID)
 
 	require.Error(t, err)
@@ -260,10 +260,10 @@ func TestWrapPublicParamsForSDS_WrapsCommunityPayload(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, stub.wrappedPayload, wrapped)
 	require.Equal(t, stub.messageID, messageID)
-	require.Equal(t, reliability.BuildChannelID("community-id", ""), stub.wantChannelID)
+	require.Equal(t, reliability.BuildChannelID("community-id"), stub.wantChannelID)
 }
 
-func TestWrapPublicParamsForSDS_ScopesPayloadToContentTopic(t *testing.T) {
+func TestWrapPublicParamsForSDS_KeepsCommunityChannelWithContentTopic(t *testing.T) {
 	stub := &sdsWrapperStub{wrappedPayload: []byte("wrapped-payload")}
 
 	_, _, err := wrapPublicParamsForSDS(zap.NewNop(), stub, messagingtypes.SendPublicParams{
@@ -273,7 +273,7 @@ func TestWrapPublicParamsForSDS_ScopesPayloadToContentTopic(t *testing.T) {
 	})
 
 	require.NoError(t, err)
-	require.Equal(t, reliability.BuildChannelID("community-id", "community-chat"), stub.wantChannelID)
+	require.Equal(t, reliability.BuildChannelID("community-id"), stub.wantChannelID)
 }
 
 func TestWrapPublicParamsForSDS_DerivesCommunityIDFromPublicKey(t *testing.T) {
@@ -288,5 +288,5 @@ func TestWrapPublicParamsForSDS_DerivesCommunityIDFromPublicKey(t *testing.T) {
 
 	require.NoError(t, err)
 	communityID := cryptotypes.EncodeHex(crypto.CompressPubkey(&key.PublicKey))
-	require.Equal(t, reliability.BuildChannelID(communityID, ""), stub.wantChannelID)
+	require.Equal(t, reliability.BuildChannelID(communityID), stub.wantChannelID)
 }

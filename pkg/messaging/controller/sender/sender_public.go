@@ -55,23 +55,12 @@ func wrapPublicParamsForSDS(logger *zap.Logger, wrapper publicSDSWrapper, params
 	return wrapPayloadForPublicSDS(logger, wrapper, params.Payload, publicSDSChannelID(params))
 }
 
-func publicSDSCommunityID(params messagingtypes.SendPublicParams) string {
-	if len(params.CommunityID) > 0 {
-		return params.CommunityID
-	}
-	if params.CommunityPublicKey != nil {
-		return cryptotypes.EncodeHex(crypto.CompressPubkey(params.CommunityPublicKey))
-	}
-	return ""
-}
-
 func publicSDSChannelID(params messagingtypes.SendPublicParams) string {
-	communityID := publicSDSCommunityID(params)
-	if communityID == "" {
-		return ""
+	communityID := params.CommunityID
+	if communityID == "" && params.CommunityPublicKey != nil {
+		communityID = cryptotypes.EncodeHex(crypto.CompressPubkey(params.CommunityPublicKey))
 	}
-
-	return reliability.BuildChannelID(communityID, params.ContentTopic)
+	return reliability.BuildChannelID(communityID)
 }
 
 func (s *Sender) SendPublic(ctx context.Context, params messagingtypes.SendPublicParams) error {
