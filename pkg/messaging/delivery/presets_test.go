@@ -32,21 +32,25 @@ func testFleet(t *testing.T) fleets.Info {
 	}
 }
 
-func TestFleetPresetReplacesTheBaseNodes(t *testing.T) {
-	got := FleetPreset("status-go.test", testFleet(t))
+func TestFleetPresetUsesTheFleetNodes(t *testing.T) {
+	got := FleetPreset(testFleet(t))
 
 	require.Equal(t, bindings.PresetFields{
-		"base":                 bindings.PresetStatusStaging,
-		"clusterId":            uint16(16),
-		"entryNodes":           []string{testBootENR, testExtraENR},
-		"discv5BootstrapNodes": []string{},
-		"storeNodes":           []string{testStoreAddr},
+		"clusterId":         uint16(16),
+		"maxMessageSize":    "1024KiB",
+		"shardingConf":      []uint16{32},
+		"extraListenShards": []uint16{64},
+		"discv5Discovery":   true,
+		"entryNodes":        []string{testBootENR, testExtraENR},
+		"storeNodes":        []string{testStoreAddr},
 	}, got)
 }
 
-func TestFleetPresetOfAStatusFleetKeepsItsPreset(t *testing.T) {
-	require.Equal(t, bindings.PresetStatusProd, FleetPreset(fleets.StatusProd, testFleet(t))["base"])
-	require.Equal(t, bindings.PresetStatusStaging, FleetPreset(fleets.StatusStaging, testFleet(t))["base"])
+func TestRegisterFleetPresetsSkipsBuiltinPresets(t *testing.T) {
+	require.NoError(t, RegisterFleetPresets(fleets.Map{
+		fleets.StatusProd:    testFleet(t),
+		fleets.StatusStaging: testFleet(t),
+	}))
 }
 
 func TestRegisteredFleetPresetReachesTheNode(t *testing.T) {

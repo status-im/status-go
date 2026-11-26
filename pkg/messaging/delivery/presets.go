@@ -8,36 +8,32 @@ import (
 	"github.com/status-im/status-go/pkg/messaging/waku/fleets"
 )
 
-// fleetPresetBase maps a fleet to the logos-delivery preset its definition is
-// based on. A fleet without a matching preset is based on status.staging, the
-// network settings every Status fleet shares.
-var fleetPresetBase = map[string]string{
-	fleets.StatusProd:    bindings.PresetStatusProd,
-	fleets.StatusStaging: bindings.PresetStatusStaging,
+// builtinPresets are the fleets logos-delivery has a built-in preset for.
+var builtinPresets = map[string]bool{
+	fleets.StatusProd:    true,
+	fleets.StatusStaging: true,
 }
 
-// RegisterFleetPresets registers a logos-delivery network preset for each
-// fleet, named after the fleet, so a node joins it by the fleet's name. The
-// fleet's cluster id, nodes and store nodes replace the base preset's, so the
-// node reaches only the fleet's nodes.
+// RegisterFleetPresets registers a logos-delivery network preset, named after
+// the fleet, for each fleet logos-delivery has no built-in preset for, so a
+// node joins it by the fleet's name.
 func RegisterFleetPresets(fleetsMap fleets.Map) error {
 	for name, info := range fleetsMap {
-		if err := bindings.AddPreset(name, FleetPreset(name, info)); err != nil {
+		if builtinPresets[name] {
+			continue
+		}
+		if err := bindings.AddPreset(name, FleetPreset(info)); err != nil {
 			return fmt.Errorf("register the logos-delivery preset of fleet %q: %w", name, err)
 		}
 	}
 	return nil
 }
 
-// FleetPreset is the logos-delivery preset of the fleet name. Its waku and
+// FleetPreset is the logos-delivery preset of a fleet: the Status network
+// settings with the fleet's cluster id, nodes and store nodes. Its waku and
 // discv5 bootstrap nodes become entry nodes, which logos-delivery sorts by
 // kind: enrtree URLs, ENRs and multiaddrs.
-func FleetPreset(name string, info fleets.Info) bindings.PresetFields {
-	base, ok := fleetPresetBase[name]
-	if !ok {
-		base = bindings.PresetStatusStaging
-	}
-
+func FleetPreset(info fleets.Info) bindings.PresetFields {
 	entryNodes := []string{}
 	seen := map[string]bool{}
 	for _, node := range append(append([]string{}, info.WakuNodes...), info.DiscV5BootstrapNodes...) {
@@ -55,10 +51,12 @@ func FleetPreset(name string, info fleets.Info) bindings.PresetFields {
 	}
 
 	return bindings.PresetFields{
-		"base":                 base,
-		"clusterId":            info.ClusterID,
-		"entryNodes":           entryNodes,
-		"discv5BootstrapNodes": []string{},
-		"storeNodes":           storeNodes,
+		"clusterId":         info.ClusterID,
+		"maxMessageSize":    "1024KiB",
+		"shardingConf":      []uint16{32},
+		"extraListenShards": []uint16{64},
+		"discv5Discovery":   true,
+		"entryNodes":        entryNodes,
+		"storeNodes":        storeNodes,
 	}
 }
