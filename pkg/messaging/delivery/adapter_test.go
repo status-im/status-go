@@ -1,6 +1,7 @@
 package delivery
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -13,6 +14,16 @@ import (
 	"github.com/status-im/status-go/pkg/messaging/layers/transport"
 	"github.com/status-im/status-go/pkg/messaging/waku/types"
 )
+
+func TestSubscriptionsBeforeStartAreKept(t *testing.T) {
+	a := newAdapter(nil, zap.NewNop())
+	ctx := context.Background()
+	topics := []types.TopicType{{1, 2, 3, 4}, {5, 6, 7, 8}}
+
+	require.NoError(t, a.Subscribe(ctx, "", topics))
+	require.NoError(t, a.Unsubscribe(ctx, "", topics[1:]))
+	require.Equal(t, map[string]struct{}{topics[0].ContentTopic(): {}}, a.topics)
+}
 
 var (
 	_ transport.MessagingAPI     = (*Adapter)(nil)
