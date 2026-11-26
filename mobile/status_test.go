@@ -28,7 +28,7 @@ func TestSetSignalHandler(t *testing.T) {
 	testEnsUsernames := json.RawMessage(`{"test": "test"}`)
 
 	// Action
-	signal.SendLoggedIn(testAccount, testSettings, testEnsUsernames, nil)
+	signal.SendLoggedIn(0, testAccount, testSettings, testEnsUsernames, nil)
 
 	// Assertions
 	require.Contains(t, data, `"key-uid":"0x1"`, "Signal should contain the correct KeyUID")

@@ -32,6 +32,8 @@ type NodeCrashEvent struct {
 
 // NodeLoginEvent returns the result of the login event
 type NodeLoginEvent struct {
+	// Seq is the login sequence number of the login this event reports (GetLoginState).
+	Seq          uint64                 `json:"seq"`
 	Error        string                 `json:"error,omitempty"`
 	Settings     *settings.Settings     `json:"settings,omitempty"`
 	Account      *multiaccounts.Account `json:"account,omitempty"`
@@ -84,13 +86,13 @@ func (s Session) SendNodeStopped() {
 	s.send(EventNodeStopped, nil)
 }
 
-func SendLoggedIn(account *multiaccounts.Account, settings *settings.Settings, ensUsernames json.RawMessage, err error) {
-	CurrentSession().SendLoggedIn(account, settings, ensUsernames, err)
+func SendLoggedIn(seq uint64, account *multiaccounts.Account, settings *settings.Settings, ensUsernames json.RawMessage, err error) {
+	CurrentSession().SendLoggedIn(seq, account, settings, ensUsernames, err)
 }
 
 // SendLoggedIn sends in the session s.
-func (s Session) SendLoggedIn(account *multiaccounts.Account, settings *settings.Settings, ensUsernames json.RawMessage, err error) {
-	event := NodeLoginEvent{Settings: settings, Account: account, EnsUsernames: ensUsernames}
+func (s Session) SendLoggedIn(seq uint64, account *multiaccounts.Account, settings *settings.Settings, ensUsernames json.RawMessage, err error) {
+	event := NodeLoginEvent{Seq: seq, Settings: settings, Account: account, EnsUsernames: ensUsernames}
 	if err != nil {
 		event.Error = err.Error()
 	}

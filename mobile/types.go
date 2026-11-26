@@ -5,6 +5,13 @@ type APIResponse struct {
 	Error string `json:"error"`
 }
 
+// LoginResponse is the response of a login request. Seq is the login sequence number
+// the request was accepted with (GetLoginState, node.login), absent when rejected.
+type LoginResponse struct {
+	Error string `json:"error"`
+	Seq   uint64 `json:"seq,omitempty"`
+}
+
 // LogoutResponse is the response of Logout.
 type LogoutResponse struct {
 	Error       string `json:"error"`

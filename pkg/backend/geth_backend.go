@@ -116,6 +116,8 @@ type StatusBackend struct {
 
 	reEncryptionMu sync.Mutex
 
+	loginState loginStateTracker
+
 	shutdownTasks []func() error
 }
 
@@ -712,10 +714,11 @@ func (b *StatusBackend) SetupLogSettings() error {
 
 // Deprecated: Use StartNodeWithAccount instead.
 func (b *StatusBackend) StartNodeWithKey(acc multiaccounts.Account, password string, keyHex string, nodecfg *params.NodeConfig) error {
+	b.loginStarted()
 	if acc.KDFIterations == 0 {
 		kdfIterations, err := b.multiaccountsDB.GetAccountKDFIterationsNumber(acc.KeyUID)
 		if err != nil {
-			return err
+			return b.loginFailed(err)
 		}
 
 		acc.KDFIterations = kdfIterations
@@ -723,7 +726,7 @@ func (b *StatusBackend) StartNodeWithKey(acc multiaccounts.Account, password str
 
 	chatKey, err := ethcrypto.HexToECDSA(keyHex)
 	if err != nil {
-		return err
+		return b.loginFailed(err)
 	}
 
 	err = b.startNodeWithAccount(acc, password, nodecfg, chatKey)
@@ -733,6 +736,7 @@ func (b *StatusBackend) StartNodeWithKey(acc multiaccounts.Account, password str
 	}
 	// get logged in
 	if b.LocalPairingStateManager.IsPairing() {
+		b.loginFinished(err)
 		if err == nil {
 			b.statusNode.StartTokenManager()
 		}
@@ -793,6 +797,7 @@ func (b *StatusBackend) overrideNetworks(conf *params.NodeConfig, walletConfig *
 }
 
 func (b *StatusBackend) LoginAccount(request *requests.Login) error {
+	b.loginStarted()
 	err := b.loginAccount(request)
 	if err != nil {
 		// Stop node for clean up
@@ -800,6 +805,7 @@ func (b *StatusBackend) LoginAccount(request *requests.Login) error {
 		b.clearProfileSecretCache()
 	}
 	if b.LocalPairingStateManager.IsPairing() {
+		b.loginFinished(err)
 		if err == nil {
 			b.statusNode.StartTokenManager()
 		}
@@ -1132,6 +1138,7 @@ func (b *StatusBackend) Login(keyUID, password string) error {
 }
 
 func (b *StatusBackend) StartNodeWithAccount(acc multiaccounts.Account, password string, nodecfg *params.NodeConfig, chatKey *ecdsa.PrivateKey) error {
+	b.loginStarted()
 	err := b.startNodeWithAccount(acc, password, nodecfg, chatKey)
 	if err != nil {
 		// Stop node for clean up
@@ -1141,36 +1148,41 @@ func (b *StatusBackend) StartNodeWithAccount(acc multiaccounts.Account, password
 	if !b.LocalPairingStateManager.IsPairing() {
 		return b.LoggedIn(acc.KeyUID, err)
 	}
+	b.loginFinished(err)
 	if err == nil {
 		b.statusNode.StartTokenManager()
 	}
 	return err
 }
 
+// LoggedIn reports the login outcome: the login state first, then node.login stamped
+// with the login's seq, so a client reading the state on node.login sees the outcome.
+// Every failure sends node.login with the error, so a login is in progress until its
+// node.login. Logins during local pairing don't go through here: they finish the login
+// state without a node.login.
 func (b *StatusBackend) LoggedIn(keyUID string, err error) error {
 	if err != nil {
-		signal.SendLoggedIn(nil, nil, nil, err)
-		return err
+		return b.loginFailed(err)
 	}
 	s, err := b.GetSettings()
 	if err != nil {
-		return err
+		return b.loginFailed(err)
 	}
 
 	acc, err := b.getAccountByKeyUID(keyUID)
 	if err != nil {
-		return err
+		return b.loginFailed(err)
 	}
 
 	ensUsernames, err := b.GetEnsUsernames()
 	if err != nil {
-		return err
+		return b.loginFailed(err)
 	}
 	var ensUsernamesJSON json.RawMessage
 	if ensUsernames != nil {
 		ensUsernamesJSON, err = json.Marshal(ensUsernames)
 		if err != nil {
-			return err
+			return b.loginFailed(err)
 		}
 	}
 
@@ -1179,9 +1191,16 @@ func (b *StatusBackend) LoggedIn(keyUID string, err error) error {
 		b.memRelease.scheduleAfterLogin(releaseAfterLoginDelay)
 		b.memRelease.watchTokenLists(b.statusNode.WalletFeed())
 	}
-	signal.SendLoggedIn(acc, s, ensUsernamesJSON, nil)
+	seq := b.loginFinished(nil)
+	signal.SendLoggedIn(seq, acc, s, ensUsernamesJSON, nil)
 	b.statusNode.StartTokenManager()
 	return nil
+}
+
+func (b *StatusBackend) loginFailed(err error) error {
+	seq := b.loginFinished(err)
+	signal.SendLoggedIn(seq, nil, nil, nil, err)
+	return err
 }
 
 func (b *StatusBackend) ExportUnencryptedDatabase(acc multiaccounts.Account, password, directory string) error {
@@ -1317,6 +1336,8 @@ func (b *StatusBackend) restartNodeAfterReEncryption(acc *multiaccounts.Account,
 		b.logger.Error("failed to start node", zap.Error(err))
 		return
 	}
+	// The session continues across the restart: logged in again under the same seq, no node.login.
+	b.loginState.set(LoginStateLoggedIn)
 	b.statusNode.StartTokenManager()
 }
 
@@ -2124,7 +2145,14 @@ func (b *StatusBackend) StartNodeWithChatKeyOrMnemonic(
 	mnemonic string, // empty mnemonic is used for keycard account, not empty for regular account
 	keycardData *requests.KeycardData, // nil for regular account, not nil for account with already set keycard
 	restoreAccount bool,
-) (*multiaccounts.Account, error) {
+) (_ *multiaccounts.Account, err error) {
+	b.loginStarted()
+	defer func() {
+		if err != nil {
+			b.loginFinished(err)
+		}
+	}()
+
 	// very important to update root data dir here
 	b.UpdateRootDataDir(request.RootDataDir)
 
@@ -2706,6 +2734,7 @@ func (b *StatusBackend) logout(advanceSignalEpoch bool) (uint64, error) {
 	// node.stopped is the old session's last signal; everything the re-initialized
 	// backend emits below belongs to the new epoch.
 	err := b.stopSession()
+	b.loginState.set(LoginStateNone)
 	epoch := signal.Epoch()
 	if advanceSignalEpoch {
 		epoch = signal.AdvanceEpoch()
