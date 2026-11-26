@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"math"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -2638,6 +2639,7 @@ func createAndSaveMessage(p *sqlitePersistence, id string, from string, deleted 
 	return p.SaveMessages([]*common.Message{{
 		ID:          id,
 		From:        from,
+		LocalChatID: testPublicChatID,
 		CommunityID: communityID,
 		ChatMessage: &protobuf.ChatMessage{
 			Timestamp: uint64(time.Now().Unix()),
@@ -2646,6 +2648,193 @@ func createAndSaveMessage(p *sqlitePersistence, id string, from string, deleted 
 		},
 		Deleted: deleted,
 	}})
+}
+
+func TestDeleteCommunityMemberMessagesScoped(t *testing.T) {
+	for _, test := range []struct {
+		name      string
+		requested []*protobuf.DeleteCommunityMemberMessage
+		want      []string
+		wantError bool
+		rollback  bool
+	}{
+		{name: "one", requested: []*protobuf.DeleteCommunityMemberMessage{{Id: "a", ChatId: "channel-a"}}, want: []string{"a"}},
+		{name: "all", want: []string{"a", "b"}},
+		{name: "multiple channels", requested: []*protobuf.DeleteCommunityMemberMessage{{Id: "a", ChatId: "channel-a"}, {Id: "b", ChatId: "channel-b"}}, want: []string{"a", "b"}},
+		{name: "missing", requested: []*protobuf.DeleteCommunityMemberMessage{{Id: "absent", ChatId: "channel-a"}}},
+		{name: "duplicate and missing", requested: []*protobuf.DeleteCommunityMemberMessage{{Id: "a", ChatId: "channel-a"}, {Id: "absent", ChatId: "channel-a"}, {Id: "a", ChatId: "channel-a"}}, want: []string{"a"}},
+		{name: "wrong chat", requested: []*protobuf.DeleteCommunityMemberMessage{{Id: "a", ChatId: "channel-b"}}, wantError: true},
+		{name: "contradictory duplicate", requested: []*protobuf.DeleteCommunityMemberMessage{{Id: "a", ChatId: "channel-a"}, {Id: "a", ChatId: "channel-b"}}, wantError: true},
+		{name: "wrong author", requested: []*protobuf.DeleteCommunityMemberMessage{{Id: "c", ChatId: "channel-a"}}, wantError: true},
+		{name: "other community", requested: []*protobuf.DeleteCommunityMemberMessage{{Id: "d", ChatId: "external"}}, wantError: true},
+		{name: "private chat", requested: []*protobuf.DeleteCommunityMemberMessage{{Id: "e", ChatId: "private"}}, wantError: true},
+		{name: "forged chat", requested: []*protobuf.DeleteCommunityMemberMessage{{Id: "d", ChatId: "channel-a"}}, wantError: true},
+		{name: "mixed batch", requested: []*protobuf.DeleteCommunityMemberMessage{{Id: "a", ChatId: "channel-a"}, {Id: "d", ChatId: "external"}}, want: []string{"a"}},
+		{name: "post and reply", requested: []*protobuf.DeleteCommunityMemberMessage{{Id: "a", ChatId: "channel-a"}, {Id: "reply", ChatId: "channel-a"}}, want: []string{"a", "reply"}},
+		{name: "rollback", requested: []*protobuf.DeleteCommunityMemberMessage{{Id: "a", ChatId: "channel-a"}, {Id: "b", ChatId: "channel-b"}}, wantError: true, rollback: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			db, err := openTestDB()
+			require.NoError(t, err)
+			defer db.Close()
+			p := newSQLitePersistence(db)
+			require.NoError(t, p.SaveChats([]*Chat{
+				{ID: "channel-a", CommunityID: "community"},
+				{ID: "channel-b", CommunityID: "community"},
+				{ID: "external", CommunityID: "other-community"},
+				{ID: "private"},
+			}))
+			for _, message := range []struct{ id, chat, author string }{
+				{"a", "channel-a", testPK},
+				{"b", "channel-b", testPK},
+				{"c", "channel-a", "other-author"},
+				{"d", "external", testPK},
+				{"e", "private", testPK},
+			} {
+				require.NoError(t, p.SaveMessages([]*common.Message{{
+					ID: message.id, LocalChatID: message.chat, From: message.author,
+					// A message's community field must not override its actual chat.
+					CommunityID: "community",
+					ChatMessage: &protobuf.ChatMessage{ChatId: message.chat, Text: message.id},
+				}}))
+				_, err = p.SavePinMessage(&common.PinMessage{
+					ID: "pin-" + message.id, LocalChatID: message.chat,
+					PinMessage: &protobuf.PinMessage{MessageId: message.id, ChatId: message.chat, Pinned: true},
+				})
+				require.NoError(t, err)
+			}
+			require.NoError(t, p.SaveMessages([]*common.Message{{
+				ID: "wrong-local-chat", LocalChatID: "external", From: testPK,
+				ChatMessage: &protobuf.ChatMessage{ChatId: "channel-a", Text: "wrong-local-chat"},
+			}}))
+			_, err = db.Exec(`UPDATE user_messages SET local_chat_id = ? WHERE id = ?`, "external", "wrong-local-chat")
+			require.NoError(t, err)
+			require.NoError(t, p.SaveMessages([]*common.Message{{
+				ID: "reply", LocalChatID: "channel-a", From: "other-author",
+				ChatMessage: &protobuf.ChatMessage{ChatId: "channel-a", ResponseTo: "a", Text: "reply"},
+			}}))
+			_, err = p.SavePinMessage(&common.PinMessage{
+				ID: "pin-a-channel-b", LocalChatID: "channel-b",
+				PinMessage: &protobuf.PinMessage{MessageId: "a", ChatId: "channel-b", Pinned: true},
+			})
+			require.NoError(t, err)
+			if test.name == "post and reply" {
+				_, err = db.Exec(`UPDATE user_messages SET source = ? WHERE id = ?`, testPK, "reply")
+				require.NoError(t, err)
+			}
+			if test.rollback {
+				_, err = db.Exec(`CREATE TRIGGER reject_delete BEFORE DELETE ON user_messages
+					WHEN OLD.id = 'b' BEGIN SELECT RAISE(ABORT, 'delete failed'); END`)
+				require.NoError(t, err)
+			}
+			if test.name == "all" {
+				selected, err := p.GetCommunityMemberMessagesToDelete(testPK, "community")
+				require.NoError(t, err)
+				selectedIDs := make([]string, 0, len(selected))
+				for _, message := range selected {
+					selectedIDs = append(selectedIDs, message.Id)
+				}
+				require.ElementsMatch(t, test.want, selectedIDs)
+			}
+
+			deleted, replies, err := p.deleteCommunityMemberMessages(testPK, "community", test.requested, nil)
+			if test.wantError {
+				require.Error(t, err)
+				if !test.rollback {
+					require.ErrorIs(t, err, ErrCommunityMessageScopeMismatch)
+				}
+				require.Empty(t, deleted)
+				require.Empty(t, replies)
+			} else {
+				require.NoError(t, err)
+			}
+			var deletedIDs []string
+			for _, message := range deleted {
+				deletedIDs = append(deletedIDs, message.Id)
+				require.Contains(t, []string{"channel-a", "channel-b"}, message.ChatId)
+			}
+			require.ElementsMatch(t, test.want, deletedIDs)
+			for _, id := range []string{"a", "b", "c", "d", "e", "reply", "wrong-local-chat"} {
+				var messages, pins int
+				require.NoError(t, db.QueryRow("SELECT COUNT(*) FROM user_messages WHERE id = ?", id).Scan(&messages))
+				chatID := map[string]string{
+					"a": "channel-a", "b": "channel-b", "c": "channel-a",
+					"d": "external", "e": "private",
+				}[id]
+				if chatID == "" {
+					pins = 0
+				} else {
+					require.NoError(t, db.QueryRow(
+						"SELECT COUNT(*) FROM pin_messages WHERE message_id = ? AND local_chat_id = ?",
+						id, chatID,
+					).Scan(&pins))
+				}
+				if slices.Contains(test.want, id) {
+					require.Zero(t, messages, id)
+					require.Zero(t, pins, id)
+				} else {
+					require.Equal(t, 1, messages, id)
+					if id != "reply" && id != "wrong-local-chat" {
+						require.Equal(t, 1, pins, id)
+					}
+				}
+			}
+			if slices.Contains(test.want, "a") &&
+				!slices.Contains(test.want, "reply") {
+				require.Len(t, replies, 1)
+				require.Equal(t, "reply", replies[0].ID)
+				require.NotNil(t, replies[0].QuotedMessage)
+				require.Equal(t, "a", replies[0].QuotedMessage.ID)
+			} else if slices.Contains(test.want, "reply") {
+				require.Empty(t, replies)
+			}
+			var crossChatPins int
+			require.NoError(t, db.QueryRow(
+				"SELECT COUNT(*) FROM pin_messages WHERE message_id = ? AND local_chat_id = ?",
+				"a", "channel-b",
+			).Scan(&crossChatPins))
+			if slices.Contains(test.want, "a") {
+				require.Zero(t, crossChatPins)
+			} else {
+				require.Equal(t, 1, crossChatPins)
+			}
+			if !test.wantError {
+				repeated, _, err := p.deleteCommunityMemberMessages(testPK, "community", test.requested, nil)
+				require.NoError(t, err)
+				require.Empty(t, repeated)
+			}
+		})
+	}
+}
+
+func TestCommunityMemberDeleteAllClockRollsBack(t *testing.T) {
+	db, err := openTestDB()
+	require.NoError(t, err)
+	defer db.Close()
+	p := newSQLitePersistence(db)
+	chat := &Chat{ID: testPublicChatID, CommunityID: "community"}
+	require.NoError(t, p.SaveChats([]*Chat{chat}))
+	require.NoError(t, createAndSaveMessage(p, "target", testPK, false, chat.CommunityID))
+	_, err = db.Exec(`CREATE TRIGGER reject_delete BEFORE DELETE ON user_messages
+		BEGIN SELECT RAISE(ABORT, 'delete failed'); END`)
+	require.NoError(t, err)
+
+	clock := &communityMemberDeleteAllClock{value: 10}
+	_, _, err = p.deleteCommunityMemberMessages(testPK, chat.CommunityID, nil, clock)
+	require.ErrorContains(t, err, "delete failed")
+	_, err = p.MessageByID("target")
+	require.NoError(t, err)
+
+	_, err = db.Exec(`DROP TRIGGER reject_delete`)
+	require.NoError(t, err)
+	deleted, _, err := p.deleteCommunityMemberMessages(testPK, chat.CommunityID, nil, clock)
+	require.NoError(t, err)
+	require.Len(t, deleted, 1)
+
+	localClock := &communityMemberDeleteAllClock{value: 10, outgoing: true}
+	_, _, err = p.deleteCommunityMemberMessages(testPK, chat.CommunityID, nil, localClock)
+	require.NoError(t, err)
+	require.EqualValues(t, 11, localClock.value)
 }
 
 func TestGetCommunityMemberMessagesID(t *testing.T) {

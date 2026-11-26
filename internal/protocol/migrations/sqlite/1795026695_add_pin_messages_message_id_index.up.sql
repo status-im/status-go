@@ -1,0 +1,1 @@
+CREATE INDEX IF NOT EXISTS idx_pin_messages_message_id ON pin_messages(message_id);

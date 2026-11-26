@@ -3481,6 +3481,197 @@ func (db sqlitePersistence) DeleteMessages(ids []string) (err error) {
 	return err
 }
 
+var ErrCommunityMessageScopeMismatch = errors.New("message does not belong to the requested community, chat and member")
+
+const communityMemberMessagesScope = `FROM user_messages m
+	INNER JOIN chats ch ON ch.id = m.local_chat_id
+	WHERE ch.community_id = ? AND m.source = ? AND m.chat_id = ch.id`
+
+type communityMemberDeleteAllClock struct {
+	value    int64
+	outgoing bool
+}
+
+// deleteCommunityMemberMessages skips out-of-scope targets so one stale or forged ID does not block valid deletions.
+// Missing IDs are idempotent no-ops; an empty list selects all messages by the member.
+func (db sqlitePersistence) deleteCommunityMemberMessages(member, communityID string, requested []*protobuf.DeleteCommunityMemberMessage, clock *communityMemberDeleteAllClock) (deleted []*protobuf.DeleteCommunityMemberMessage, replies []*common.Message, err error) {
+	tx, err := db.db.BeginTx(context.Background(), nil)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+		} else {
+			err = errors.Join(err, tx.Rollback())
+		}
+		if err != nil {
+			deleted, replies = nil, nil
+		}
+	}()
+
+	deleteAll := len(requested) == 0
+	if deleteAll {
+		if clock != nil {
+			// Acquire the write lock and advance the clock in the same transaction as the deletion.
+			// Local operations allocate a newer clock even if the wall clock has not advanced.
+			err = tx.QueryRow(`INSERT INTO community_member_delete_all_clocks (community_id, member_id, clock)
+				VALUES (?, ?, ?)
+				ON CONFLICT (community_id, member_id) DO UPDATE
+				SET clock = max(excluded.clock, community_member_delete_all_clocks.clock + 1)
+				WHERE ? OR excluded.clock > community_member_delete_all_clocks.clock
+				RETURNING clock`, communityID, member, clock.value, clock.outgoing).Scan(&clock.value)
+			if errors.Is(err, sql.ErrNoRows) {
+				return nil, nil, nil
+			}
+			if err != nil {
+				return nil, nil, err
+			}
+		}
+		rows, queryErr := tx.Query(`SELECT m.id, m.chat_id `+communityMemberMessagesScope, communityID, member)
+		if queryErr != nil {
+			return nil, nil, queryErr
+		}
+		for rows.Next() {
+			message := &protobuf.DeleteCommunityMemberMessage{}
+			if err = rows.Scan(&message.Id, &message.ChatId); err != nil {
+				rows.Close()
+				return nil, nil, err
+			}
+			deleted = append(deleted, message)
+		}
+		err = errors.Join(rows.Err(), rows.Close())
+		if err != nil {
+			return nil, nil, err
+		}
+	} else {
+		seen := make(map[string]string, len(requested))
+		conflicting := make(map[string]struct{})
+		uniqueTargets := make([]*protobuf.DeleteCommunityMemberMessage, 0, len(requested))
+		for _, target := range requested {
+			if target == nil {
+				continue
+			}
+			if chatID, ok := seen[target.Id]; ok {
+				if chatID != target.ChatId {
+					conflicting[target.Id] = struct{}{}
+				}
+				continue
+			}
+			seen[target.Id] = target.ChatId
+			uniqueTargets = append(uniqueTargets, target)
+		}
+		scopeMismatch := len(conflicting) > 0
+		missingTarget := false
+		for _, target := range uniqueTargets {
+			if _, conflict := conflicting[target.Id]; conflict {
+				continue
+			}
+			var chatID, localChatID, author string
+			var storedCommunity sql.NullString
+			err = tx.QueryRow(`SELECT m.chat_id, m.local_chat_id, m.source, ch.community_id
+				FROM user_messages m LEFT JOIN chats ch ON ch.id = m.local_chat_id
+				WHERE m.id = ?`, target.Id).Scan(&chatID, &localChatID, &author, &storedCommunity)
+			if errors.Is(err, sql.ErrNoRows) {
+				err = nil
+				missingTarget = true
+				continue
+			}
+			if err != nil {
+				return nil, nil, err
+			}
+			if !storedCommunity.Valid || storedCommunity.String != communityID || chatID != localChatID || chatID != target.ChatId || author != member {
+				scopeMismatch = true
+				continue
+			}
+			deleted = append(deleted, &protobuf.DeleteCommunityMemberMessage{Id: target.Id, ChatId: chatID})
+		}
+		if scopeMismatch && len(deleted) == 0 && !missingTarget {
+			return nil, nil, ErrCommunityMessageScopeMismatch
+		}
+	}
+
+	deletedMessageIDs := make(map[string]struct{}, len(deleted))
+	for _, message := range deleted {
+		deletedMessageIDs[message.Id] = struct{}{}
+	}
+	appendSurvivingReplies := func(messages []*common.Message) {
+		for _, message := range messages {
+			if _, isDeleted := deletedMessageIDs[message.ID]; !isDeleted {
+				replies = append(replies, message)
+			}
+		}
+	}
+
+	// Refresh replies before deleting their quoted messages. Batch ID-based requests to stay below
+	// SQLite's bound-parameter limit; delete-all can use the scoped selection directly.
+	if deleteAll && len(deleted) > 0 {
+		rows, queryErr := tx.Query(db.buildMessagesQuery("WHERE m1.response_to IN (SELECT m.id "+communityMemberMessagesScope+")"), communityID, member)
+		if queryErr != nil {
+			return nil, nil, queryErr
+		}
+		updated, scanErr := getMessagesFromScanRows(db, rows, false)
+		err = errors.Join(scanErr, rows.Err(), rows.Close())
+		if err != nil {
+			return nil, nil, err
+		}
+		appendSurvivingReplies(updated)
+	} else if !deleteAll {
+		const replyQueryBatchSize = 500
+		for start := 0; start < len(deleted); start += replyQueryBatchSize {
+			end := start + replyQueryBatchSize
+			if end > len(deleted) {
+				end = len(deleted)
+			}
+			batch := deleted[start:end]
+			query := db.buildMessagesQuery(sqlutil.In("WHERE m1.response_to IN (%s)", len(batch)))
+			args := make([]interface{}, 0, len(batch))
+			for _, target := range batch {
+				args = append(args, target.Id)
+			}
+			rows, queryErr := tx.Query(query, args...)
+			if queryErr != nil {
+				return nil, nil, queryErr
+			}
+			updated, scanErr := getMessagesFromScanRows(db, rows, false)
+			err = errors.Join(scanErr, rows.Err(), rows.Close())
+			if err != nil {
+				return nil, nil, err
+			}
+			appendSurvivingReplies(updated)
+		}
+	}
+
+	if deleteAll {
+		_, err = tx.Exec(`DELETE FROM pin_messages WHERE message_id IN (SELECT m.id `+communityMemberMessagesScope+`)`, communityID, member)
+		if err != nil {
+			return nil, nil, err
+		}
+		_, err = tx.Exec(`DELETE FROM user_messages WHERE id IN (SELECT m.id `+communityMemberMessagesScope+`)`, communityID, member)
+		if err != nil {
+			return nil, nil, err
+		}
+		return deleted, replies, nil
+	}
+
+	for _, target := range deleted {
+		// Each target was validated in this transaction, so remove all pin rows by message ID.
+		_, err = tx.Exec(`DELETE FROM pin_messages WHERE message_id = ?`, target.Id)
+		if err != nil {
+			return nil, nil, err
+		}
+		_, err = tx.Exec(`DELETE FROM user_messages
+			WHERE id = ? AND chat_id = ? AND local_chat_id = ? AND source = ?
+			AND EXISTS (SELECT 1 FROM chats WHERE chats.id = user_messages.local_chat_id AND chats.community_id = ?)`,
+			target.Id, target.ChatId, target.ChatId, member, communityID)
+		if err != nil {
+			return nil, nil, err
+		}
+
+	}
+	return deleted, replies, nil
+}
+
 func (db sqlitePersistence) HideMessage(id string) error {
 	_, err := db.db.Exec(`UPDATE user_messages SET hide = 1, seen = 1 WHERE id = ?`, id)
 	return err
@@ -4787,9 +4978,7 @@ func (db sqlitePersistence) saveBridgeMessage(tx *sql.Tx, message *protobuf.Brid
 }
 
 func (db sqlitePersistence) GetCommunityMemberMessagesToDelete(member string, communityID string) ([]*protobuf.DeleteCommunityMemberMessage, error) {
-	rows, err := db.db.Query(`SELECT m.id, m.chat_id FROM user_messages as m
-		INNER JOIN chats AS ch ON ch.id = m.chat_id AND ch.community_id = ?
-		WHERE m.source = ?`, communityID, member)
+	rows, err := db.db.Query(`SELECT m.id, m.chat_id `+communityMemberMessagesScope, communityID, member)
 
 	if err != nil {
 		return nil, err
