@@ -333,6 +333,34 @@ class TestWakuextThreadExtras:
         missed = receiver.wakuext_service.all_messages_from_thread_which_match_term(chat_id, parent_id, sibling_text, False)
         assert sibling_text not in _texts(missed)
 
+    @pytest.mark.spec("SC-THRD-29")
+    @pytest.mark.xfail(
+        reason="Receiver-side thread search returns Chat not found; see https://github.com/status-im/status-go/issues/7974",
+        strict=True,
+        raises=ApiResponseError,
+    )
+    async def test_search_incoming_one_to_one_thread_reply(self, sender, receiver):
+        sender_chat_id, receiver_chat_id, _ = await _open_shared_chat(sender, receiver, ChatKind.ONE_TO_ONE)
+        parent_text = f"parent-{uuid4()}"
+        match = str(uuid4())
+        reply_text = f"reply-{match}"
+        sibling_text = f"sibling-{match}"
+
+        parent = sender.wakuext_service.send_one_to_one_message(sender_chat_id, parent_text)
+        thread_id = _message_by_text(parent, parent_text)["id"]
+        await receiver.wait_for_signal(SignalType.MESSAGES_NEW, pattern=thread_id, timeout=60, check_buffer=True)
+        sender.wakuext_service.create_thread(sender_chat_id, thread_id)
+
+        reply = sender.wakuext_service.send_chat_message(sender_chat_id, reply_text, thread_id=thread_id)
+        reply_id = _message_by_text(reply, reply_text)["id"]
+        await receiver.wait_for_signal(SignalType.MESSAGES_NEW, pattern=reply_id, timeout=60, check_buffer=True)
+        sibling = sender.wakuext_service.send_one_to_one_message(sender_chat_id, sibling_text)
+        sibling_id = _message_by_text(sibling, sibling_text)["id"]
+        await receiver.wait_for_signal(SignalType.MESSAGES_NEW, pattern=sibling_id, timeout=60, check_buffer=True)
+
+        found = receiver.wakuext_service.all_messages_from_thread_which_match_term(receiver_chat_id, thread_id, match, False)
+        assert [message["id"] for message in found["messages"]] == [reply_id]
+
     @pytest.mark.spec("SC-THRD-03")
     @pytest.mark.spec("SC-THRD-06")
     @pytest.mark.spec("SC-THRD-10")
