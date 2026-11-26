@@ -29,7 +29,7 @@ func (db sqlitePersistence) IsSDSMessageProcessed(messageID string) (bool, error
 	return processed, err
 }
 
-func (db sqlitePersistence) MarkSDSMessagesProcessed(messageIDs map[string]bool) error {
+func (db sqlitePersistence) MarkSDSMessagesProcessed(messageIDs map[string]bool, processedAt uint64) error {
 	if len(messageIDs) == 0 {
 		return nil
 	}
@@ -39,12 +39,17 @@ func (db sqlitePersistence) MarkSDSMessagesProcessed(messageIDs map[string]bool)
 	}
 	defer func() { _ = tx.Rollback() }()
 	for id := range messageIDs {
-		if _, err := tx.Exec(`INSERT INTO processed_sds_messages (message_id) VALUES (?)
-			ON CONFLICT(message_id) DO NOTHING`, id); err != nil {
+		if _, err := tx.Exec(`INSERT INTO processed_sds_messages (message_id, processed_at) VALUES (?, ?)
+			ON CONFLICT(message_id) DO NOTHING`, id, processedAt); err != nil {
 			return err
 		}
 	}
 	return tx.Commit()
+}
+
+func (db sqlitePersistence) CleanProcessedSDSMessages(before uint64) error {
+	_, err := db.db.Exec(`DELETE FROM processed_sds_messages WHERE processed_at < ?`, before)
+	return err
 }
 
 var basicMessagesSelectQuery = `

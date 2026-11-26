@@ -167,11 +167,55 @@ func (s *MessengerSDSProcessingSuite) TestCommunityDescriptionRetainsReplayExcep
 		EncryptionLayer: messagingtypes.EncryptionLayer{Payload: application},
 	}})
 	id := cryptotypes.EncodeHex(messages[0].ApplicationLayer.ID)
-	s.Require().NoError(s.m.persistence.MarkSDSMessagesProcessed(map[string]bool{id: true}))
+	s.Require().NoError(s.m.persistence.MarkSDSMessagesProcessed(map[string]bool{id: true}, s.m.getTimesource().GetCurrentTime()))
 	// Malformed protobuf must reach dispatch rather than being suppressed by
 	// the marker: descriptions can be retried after keys become available.
 	err = s.m.processStatusMessage(nil, s.m.buildMessageState(), messages[0], messagingtypes.ChatFilter{}, false, zap.NewNop())
 	s.Require().Error(err)
+}
+
+func (s *MessengerSDSProcessingSuite) TestChatMessagesUseUserMessagesForDeduplication() {
+	chat := CreatePublicChat("sds-chat-dedup", s.m.getTimesource())
+	s.Require().NoError(s.m.SaveChat(chat))
+	key, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+	sender, err := sds.NewReliabilityManager(zap.NewNop(), nil)
+	s.Require().NoError(err)
+	defer func() { s.Require().NoError(sender.Cleanup()) }()
+
+	for _, hasLegacyMarker := range []bool{false, true} {
+		message := buildTestMessage(*chat)
+		message.Text = fmt.Sprintf("chat message with legacy marker: %t", hasLegacyMarker)
+		body, err := proto.Marshal(message.ChatMessage)
+		s.Require().NoError(err)
+		application, err := v1protocol.WrapIntoAppLayerMessage(body, protobuf.ApplicationMetadataMessage_CHAT_MESSAGE, key)
+		s.Require().NoError(err)
+		id := messagingtypes.MessageID(&key.PublicKey, application).String()
+		if hasLegacyMarker {
+			s.Require().NoError(s.m.persistence.MarkSDSMessagesProcessed(map[string]bool{id: true}, s.m.getTimesource().GetCurrentTime()))
+		}
+		wrapped, err := sender.WrapOutgoingMessage(application, sds.MessageID(cryptotypes.EncodeHex(crypto.Keccak256(application))), chat.ID)
+		s.Require().NoError(err)
+		envelope := &messagingtypes.ReceivedMessage{
+			Sig:       crypto.FromECDSAPub(&key.PublicKey),
+			Hash:      crypto.Keccak256(wrapped),
+			Timestamp: uint32(s.m.getTimesource().GetCurrentTime() / 1000),
+			Payload:   wrapped,
+		}
+		deliver := func() *MessengerResponse {
+			response, err := s.m.handleRetrievedMessages(map[messagingtypes.ChatFilter][]*messagingtypes.ReceivedMessage{
+				{}: {envelope},
+			}, false, false)
+			s.Require().NoError(err)
+			return response
+		}
+		s.Require().Len(deliver().Messages(), 1)
+		processed, err := s.m.persistence.IsSDSMessageProcessed(id)
+		s.Require().NoError(err)
+		s.Require().Equal(hasLegacyMarker, processed)
+		envelope.Hash = crypto.Keccak256(envelope.Hash)
+		s.Require().Empty(deliver().Messages())
+	}
 }
 
 func TestProcessedSDSMessagePersistence(t *testing.T) {
@@ -182,16 +226,23 @@ func TestProcessedSDSMessagePersistence(t *testing.T) {
 	processed, err := persistence.IsSDSMessageProcessed("message")
 	require.NoError(t, err)
 	require.False(t, processed)
-	require.NoError(t, persistence.MarkSDSMessagesProcessed(map[string]bool{"message": true}))
-	require.NoError(t, persistence.MarkSDSMessagesProcessed(map[string]bool{"message": true}))
+	require.NoError(t, persistence.MarkSDSMessagesProcessed(map[string]bool{"message": true}, 100))
+	require.NoError(t, persistence.MarkSDSMessagesProcessed(map[string]bool{"message": true, "recent": true}, 200))
 	processed, err = newSQLitePersistence(db).IsSDSMessageProcessed("message")
+	require.NoError(t, err)
+	require.True(t, processed)
+	require.NoError(t, persistence.CleanProcessedSDSMessages(200))
+	processed, err = persistence.IsSDSMessageProcessed("message")
+	require.NoError(t, err)
+	require.False(t, processed)
+	processed, err = persistence.IsSDSMessageProcessed("recent")
 	require.NoError(t, err)
 	require.True(t, processed)
 
 	_, err = db.Exec(`CREATE TRIGGER fail_sds_marker BEFORE INSERT ON processed_sds_messages
 		BEGIN SELECT RAISE(ABORT, 'injected marker failure'); END`)
 	require.NoError(t, err)
-	require.Error(t, persistence.MarkSDSMessagesProcessed(map[string]bool{"retryable": true}))
+	require.Error(t, persistence.MarkSDSMessagesProcessed(map[string]bool{"retryable": true}, 200))
 	processed, err = persistence.IsSDSMessageProcessed("retryable")
 	require.NoError(t, err)
 	require.False(t, processed)

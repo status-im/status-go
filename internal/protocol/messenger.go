@@ -88,6 +88,9 @@ const communityAdvertiseIntervalSecond int64 = 24 * 60 * 60
 // messageCacheIntervalMs is how long we should keep processed messages in the cache, in ms
 var messageCacheIntervalMs uint64 = 1000 * 60 * 60 * 48
 
+// Keep application markers longer than the envelope cache to cover normal history catch-up.
+const processedSDSMessageRetention = 30 * 24 * time.Hour
+
 // Messenger is an entity managing chats and messages.
 // It acts as a bridge between the application and encryption
 // layers.
@@ -1288,8 +1291,14 @@ func (m *Messenger) handleEncryptionLayerSubscriptions(subscriptions *types.Encr
 					m.logger.Error("failed to publish contact code", zap.Error(err))
 				}
 				// we also piggy-back to clean up cached messages
-				if err := m.messaging.CleanMessagesProcessed(m.getTimesource().GetCurrentTime() - messageCacheIntervalMs); err != nil {
+				now := m.getTimesource().GetCurrentTime()
+				if err := m.messaging.CleanMessagesProcessed(now - messageCacheIntervalMs); err != nil {
 					m.logger.Error("failed to clean processed messages", zap.Error(err))
+				}
+				if retention := uint64(processedSDSMessageRetention.Milliseconds()); now > retention {
+					if err := m.persistence.CleanProcessedSDSMessages(now - retention); err != nil {
+						m.logger.Error("failed to clean processed SDS messages", zap.Error(err))
+					}
 				}
 
 			case keys := <-subscriptions.NewHashRatchetKeys:
@@ -3485,11 +3494,12 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[types.ChatFilte
 	if err != nil {
 		return nil, err
 	}
-	if err := m.persistence.MarkSDSMessagesProcessed(messageState.processedSDSMessages); err != nil {
+	processedAt := m.getTimesource().GetCurrentTime()
+	if err := m.persistence.MarkSDSMessagesProcessed(messageState.processedSDSMessages, processedAt); err != nil {
 		logger.Warn("failed to persist processed SDS messages", zap.Error(err))
 	}
 	if len(processedMessages) != 0 {
-		if err := m.messaging.ConfirmMessagesProcessed(processedMessages, m.getTimesource().GetCurrentTime()); err != nil {
+		if err := m.messaging.ConfirmMessagesProcessed(processedMessages, processedAt); err != nil {
 			logger.Warn("failed to confirm processed messages", zap.Error(err))
 		}
 	}
@@ -3508,7 +3518,9 @@ func (m *Messenger) processStatusMessage(
 	if msg.SDSWrapped && (len(msg.ApplicationLayer.ID) == 0 || msg.ApplicationLayer.Payload == nil) {
 		return errors.New("SDS application message could not be decoded")
 	}
-	deduplicateSDS := msg.SDSWrapped && m.shouldSkipDuplicate(msg.ApplicationLayer.Type)
+	// Chat messages already have a durable duplicate check in messageExists.
+	deduplicateSDS := msg.SDSWrapped && msg.ApplicationLayer.Type != protobuf.ApplicationMetadataMessage_CHAT_MESSAGE &&
+		m.shouldSkipDuplicate(msg.ApplicationLayer.Type)
 	if deduplicateSDS {
 		if messageState.processedSDSMessages[messageID] {
 			return nil
