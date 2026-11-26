@@ -18,5 +18,5 @@ func TopicsAsByteArrays(topics []messagingtypes.ContentTopic) [][]byte {
 // It corresponds to Community.UniversalChatID() which returns Community.MemberUpdateChannelID()
 // which is IDString() + "-memberUpdate".
 func UniversalChatIDFromCommunityID(communityID types.HexBytes) string {
-	return messagingtypes.CommunityChatTopic(types.EncodeHex(communityID))
+	return types.EncodeHex(communityID) + "-memberUpdate"
 }

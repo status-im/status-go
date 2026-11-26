@@ -2354,9 +2354,6 @@ func (m *Messenger) leaveCommunity(communityID cryptotypes.HexBytes) (*Messenger
 	if err != nil {
 		return nil, err
 	}
-	if _, err := m.messaging.RemoveFilterByChatID(messagingtypes.ScopedSDSContentTopic(community.UniversalChatID())); err != nil {
-		return nil, err
-	}
 
 	response.AddCommunity(community)
 	return response, nil
@@ -2373,9 +2370,6 @@ func (m *Messenger) kickedOutOfCommunity(communityID cryptotypes.HexBytes, spect
 	if !spectateMode {
 		err = m.DeleteProfileShowcaseCommunity(community)
 		if err != nil {
-			return nil, err
-		}
-		if _, err := m.messaging.RemoveFilterByChatID(messagingtypes.ScopedSDSContentTopic(community.UniversalChatID())); err != nil {
 			return nil, err
 		}
 	}
@@ -2559,7 +2553,6 @@ func (m *Messenger) DefaultFilters(o *communities.Community) messagingtypes.Chat
 	return messagingtypes.ChatsToInitialize{
 		{ChatID: cID, PubsubTopic: communityPubsubTopic},
 		{ChatID: memberUpdateChannelID, PubsubTopic: communityPubsubTopic},
-		{ChatID: messagingtypes.ScopedSDSContentTopic(memberUpdateChannelID), PubsubTopic: communityPubsubTopic},
 		{ChatID: uncompressedPubKey, PubsubTopic: messagingtypes.DefaultNonProtectedPubsubTopic()},
 		// Migration phase 1 (#7498): also listen for community control messages on
 		// the default shard (32), so that when publishing moves off the non-protected

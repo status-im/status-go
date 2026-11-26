@@ -4303,7 +4303,6 @@ func (m *Manager) GetOwnedCommunitiesUniversalChatIDs() (map[string]bool, error)
 	for _, c := range ownedCommunities {
 		if c.Joined() {
 			chatIDs[c.UniversalChatID()] = true
-			chatIDs[messagingtypes.ScopedSDSContentTopic(c.UniversalChatID())] = true
 		}
 	}
 	return chatIDs, nil

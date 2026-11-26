@@ -146,8 +146,6 @@ func (m *ArchiveManager) GetCommunityChatsFilters(communityID cryptotypes.HexByt
 	}
 
 	filters := messagingtypes.ChatFilters{}
-	scopedChatID := messagingtypes.ScopedSDSContentTopic(archiveutils.UniversalChatIDFromCommunityID(communityID))
-	chatIDs = append(chatIDs, scopedChatID)
 	for _, cid := range chatIDs {
 		filter := m.messaging.ChatFilterByChatID(cid)
 		if filter != nil {

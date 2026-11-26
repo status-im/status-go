@@ -118,14 +118,6 @@ func TestResolveSDSRetrievalHintUsesPersistedHashesAfterDeliveryConfirmation(t *
 	require.Equal(t, [][]byte{[]byte("0xaabb")}, hint.EnvelopeHashes)
 }
 
-func TestResolveSDSRetrievalHintDoesNotUseLegacyTransportForScopedChannel(t *testing.T) {
-	core := &Core{
-		config: config{logger: zap.NewNop()},
-		stack:  &common.MessagingStack{Reliability: &reliability.Reliability{}},
-	}
-	require.Nil(t, core.resolveSDSRetrievalHintForChannel(reliability.BuildChannelID("community", "chat"), "0x0102"))
-}
-
 func TestPublishSDSMessageDelivered_TrackedAliasPublishesApplicationMessageID(t *testing.T) {
 	publisher := pubsub.NewPublisher()
 	deliveredMessages, unsubscribe := pubsub.Subscribe[events.DeliveredMessage](publisher, 1)
