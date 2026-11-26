@@ -58,8 +58,8 @@ func readTimeAfterSleep(t *testing.T, asleep time.Duration) {
 	}
 }
 
-// Resolving a server name is not covered by the NTP query timeout, so the
-// offset computation must stop waiting on its own.
+// Resolving a server name must not keep the offset computation, or the NTP
+// query itself, waiting past their timeouts.
 func TestComputeOffsetStopsWaitingForNameResolution(t *testing.T) {
 	const deadline = 200 * time.Millisecond
 
@@ -87,8 +87,10 @@ func TestComputeOffsetStopsWaitingForNameResolution(t *testing.T) {
 		net.DefaultResolver = saved
 	})
 
+	queryDone := make(chan struct{})
 	query := func(host string, opt ntp.QueryOptions) (*ntp.Response, error) {
 		defer queries.Done()
+		defer close(queryDone)
 		return ntp.QueryWithOptions(host, opt)
 	}
 	queries.Add(1)
@@ -104,6 +106,14 @@ func TestComputeOffsetStopsWaitingForNameResolution(t *testing.T) {
 	case <-time.After(5 * deadline):
 		require.Positive(t, dials.Load(), "blocked before reaching the resolver")
 		t.Fatalf("computeOffset with a %v deadline still running after %v, stuck in name resolution", deadline, 5*deadline)
+	}
+
+	// The query itself must give up too, not only computeOffset: name
+	// resolution is bounded by the same timeout as the NTP exchange.
+	select {
+	case <-queryDone:
+	case <-time.After(DefaultRPCTimeout + time.Second):
+		t.Fatalf("NTP query still resolving the server name after %v, past its %v timeout", DefaultRPCTimeout+time.Second, DefaultRPCTimeout)
 	}
 }
 
