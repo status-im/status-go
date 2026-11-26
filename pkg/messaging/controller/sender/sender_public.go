@@ -84,11 +84,12 @@ func (s *Sender) SendSDSSync(ctx context.Context, payload []byte, pubsubTopic, s
 		return errors.Wrap(err, "failed to marshal SDS sync encryption layer")
 	}
 	_, _, err = s.sendPublic(ctx, s.logger.Named("sendSDSSync"), sendPublicParams{
-		payload:      payload,
-		pubsubTopic:  pubsubTopic,
-		contentTopic: syncTopic,
-		ephemeral:    true,
-		priority:     &messagingtypes.LowPriority,
+		payload:            payload,
+		pubsubTopic:        pubsubTopic,
+		contentTopic:       syncTopic,
+		ephemeral:          true,
+		priority:           &messagingtypes.LowPriority,
+		existingFilterOnly: true,
 	})
 	return errors.Wrap(err, "failed to send SDS sync")
 }
@@ -221,6 +222,7 @@ type sendPublicParams struct {
 	ephemeral          bool
 	priority           *messagingtypes.MessagePriority
 	communityPublicKey *ecdsa.PublicKey
+	existingFilterOnly bool
 }
 
 func (s *Sender) sendPublic(ctx context.Context, logger *zap.Logger, params sendPublicParams) ([][]byte, []*wakutypes.NewMessage, error) {
@@ -247,6 +249,8 @@ func (s *Sender) sendPublic(ctx context.Context, logger *zap.Logger, params send
 			logger.Debug("sending community public message")
 			span.AddEvent("sending community public message")
 			hash, err = s.stack.Transport.SendCommunityMessage(ctx, wakuMessage, params.communityPublicKey)
+		} else if params.existingFilterOnly {
+			hash, err = s.stack.Transport.SendPublicWithExistingFilter(ctx, wakuMessage, params.contentTopic)
 		} else {
 			logger.Debug("sending public message")
 			span.AddEvent("sending public message")

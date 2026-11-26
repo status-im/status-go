@@ -3699,6 +3699,21 @@ func (m *Manager) GetLastSeenArchiveLink(communityID cryptotypes.HexBytes) (stri
 	return m.persistence.GetLastSeenArchiveLink(communityID)
 }
 
+// WithJoinedCommunity runs fn under the same lock used by leave and kick.
+func (m *Manager) WithJoinedCommunity(id cryptotypes.HexBytes, fn func(*Community) error) error {
+	m.communityLock.Lock(id)
+	defer m.communityLock.Unlock(id)
+
+	community, err := m.GetByID(id)
+	if err != nil {
+		return err
+	}
+	if !community.Joined() {
+		return nil
+	}
+	return fn(community)
+}
+
 func (m *Manager) LeaveCommunity(id cryptotypes.HexBytes) (*Community, error) {
 	m.communityLock.Lock(id)
 	defer m.communityLock.Unlock(id)

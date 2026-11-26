@@ -99,15 +99,18 @@ func (f *FiltersManager) WatchersByTopic(pubsubTopic, contentTopic string) []*Fi
 		if filter.ContentTopic.ContentTopic() != contentTopic {
 			continue
 		}
-		filterPubsubTopic := filter.PubsubTopic
-		if filterPubsubTopic == "" {
-			filterPubsubTopic = waku.DefaultShardPubsubTopic()
-		}
-		if filterPubsubTopic == pubsubTopic {
+		if effectivePubsubTopic(filter.PubsubTopic) == pubsubTopic {
 			res = append(res, filter)
 		}
 	}
 	return res
+}
+
+func effectivePubsubTopic(pubsubTopic string) string {
+	if pubsubTopic == "" {
+		return waku.DefaultShardPubsubTopic()
+	}
+	return pubsubTopic
 }
 
 // AsymKey returns the asymmetric private key used to decode messages received
@@ -317,6 +320,22 @@ func (f *FiltersManager) FilterByChatID(chatID string) *Filter {
 	defer f.mutex.Unlock()
 
 	return f.filters[chatID]
+}
+
+func (f *FiltersManager) publicListeningFilter(chatID, pubsubTopic string) *Filter {
+	f.mutex.Lock()
+	defer f.mutex.Unlock()
+
+	filter := f.filters[chatID]
+	if filter == nil || !filter.IsPublic() || !filter.Listen {
+		return nil
+	}
+	if effectivePubsubTopic(filter.PubsubTopic) != effectivePubsubTopic(pubsubTopic) {
+		return nil
+	}
+
+	snapshot := *filter
+	return &snapshot
 }
 
 // Remove removes all the filtersToRemove

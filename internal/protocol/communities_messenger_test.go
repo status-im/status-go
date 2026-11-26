@@ -165,6 +165,33 @@ func (s *MessengerCommunitiesSuite) TestSDSSyncUsesSeparateCommunityTopic() {
 	}
 }
 
+func (s *MessengerCommunitiesSuite) TestSDSSyncSkipsCommunityAfterLeavingOrKick() {
+	community, _ := s.createCommunity()
+	s.advertiseCommunityTo(community, s.owner, s.alice)
+	s.advertiseCommunityTo(community, s.owner, s.bob)
+	s.joinCommunity(community, s.owner, s.alice)
+	s.joinCommunity(community, s.owner, s.bob)
+
+	// Keep the route that a tick could have obtained while both members were joined.
+	communityID := community.ID()
+	topic := communitySDSSyncTopic(community.IDString())
+	s.Require().NotNil(s.alice.messaging.ChatFilterByChatID(topic))
+	s.Require().NotNil(s.bob.messaging.ChatFilterByChatID(topic))
+
+	_, err := s.alice.leaveCommunity(communityID)
+	s.Require().NoError(err)
+	_, err = s.bob.kickedOutOfCommunity(communityID, true)
+	s.Require().NoError(err)
+
+	for _, member := range []*Messenger{s.alice, s.bob} {
+		s.Require().Nil(member.messaging.ChatFilterByChatID(topic))
+		// A send that reaches the sender would fail because the filter is gone.
+		err := member.sendCommunitySDSSync(s.T().Context(), communityID, []byte("stale sync"))
+		s.Require().NoError(err)
+		s.Require().Nil(member.messaging.ChatFilterByChatID(topic))
+	}
+}
+
 func (s *MessengerCommunitiesSuite) TestCreateCommunity_WithoutDefaultChannel() {
 
 	description := &requests.CreateCommunity{

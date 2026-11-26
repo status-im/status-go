@@ -6,7 +6,9 @@ import (
 
 	"go.uber.org/zap"
 
+	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/panics"
+	"github.com/status-im/status-go/internal/protocol/communities"
 	"github.com/status-im/status-go/pkg/messaging/layers/reliability"
 )
 
@@ -46,12 +48,7 @@ func (m *Messenger) sendSDSPeriodicSyncs(ctx context.Context) {
 		return
 	}
 
-	type syncRoute struct {
-		communityID string
-		pubsubTopic string
-		syncTopic   string
-	}
-	routes := make(map[string]syncRoute, len(communities))
+	routes := make(map[string]cryptotypes.HexBytes, len(communities))
 	for _, community := range communities {
 		if ctx.Err() != nil {
 			return
@@ -62,11 +59,7 @@ func (m *Messenger) sendSDSPeriodicSyncs(ctx context.Context) {
 				zap.String("communityID", community.IDString()), zap.Error(err))
 			continue
 		}
-		routes[channelID] = syncRoute{
-			communityID: community.IDString(),
-			pubsubTopic: community.PubsubTopic(),
-			syncTopic:   communitySDSSyncTopic(community.IDString()),
-		}
+		routes[channelID] = community.ID()
 	}
 
 	if ctx.Err() != nil {
@@ -80,7 +73,7 @@ func (m *Messenger) sendSDSPeriodicSyncs(ctx context.Context) {
 		if ctx.Err() != nil {
 			return
 		}
-		route, ok := routes[event.ChannelID]
+		communityID, ok := routes[event.ChannelID]
 		if !ok {
 			m.logger.Debug("skipping SDS sync for inactive community channel",
 				zap.String("channelID", event.ChannelID))
@@ -88,23 +81,29 @@ func (m *Messenger) sendSDSPeriodicSyncs(ctx context.Context) {
 		}
 		if event.Error != "" {
 			m.logger.Warn("failed to generate SDS sync",
-				zap.String("communityID", route.communityID),
+				zap.String("communityID", communityID.String()),
 				zap.String("channelID", event.ChannelID),
 				zap.String("error", event.Error))
 			continue
 		}
 		if len(event.Payload) == 0 {
 			m.logger.Warn("SDS tick returned an empty sync payload",
-				zap.String("communityID", route.communityID),
+				zap.String("communityID", communityID.String()),
 				zap.String("channelID", event.ChannelID))
 			continue
 		}
-		// All community chats currently share this history, including restricted
-		// chats. The public sync exposes its metadata, but not message content.
-		err := m.messaging.SendSDSSync(ctx, event.Payload, route.pubsubTopic, route.syncTopic)
+		err := m.sendCommunitySDSSync(ctx, communityID, event.Payload)
 		if err != nil && ctx.Err() == nil {
 			m.logger.Warn("failed to publish SDS sync",
-				zap.String("communityID", route.communityID), zap.Error(err))
+				zap.String("communityID", communityID.String()), zap.Error(err))
 		}
 	}
+}
+
+func (m *Messenger) sendCommunitySDSSync(ctx context.Context, communityID cryptotypes.HexBytes, payload []byte) error {
+	return m.communitiesManager.WithJoinedCommunity(communityID, func(community *communities.Community) error {
+		// All community chats currently share this history, including restricted
+		// chats. The public sync exposes its metadata, but not message content.
+		return m.messaging.SendSDSSync(ctx, payload, community.PubsubTopic(), communitySDSSyncTopic(community.IDString()))
+	})
 }
