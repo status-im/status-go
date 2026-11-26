@@ -576,11 +576,10 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestBecomeMemberPermissions(
 			sub.keyActions.CommunityKeyAction.ActionType == communities.EncryptionKeySendToMembers
 	})
 
-	// An eligible rejoin needs a later second-based clock than Bob's first request.
-	time.Sleep(time.Until(time.Unix(int64(firstJoinClock)+1, 0)))
-
 	// bob re-joins the community
-	s.joinCommunity(community, s.bob)
+	joinResponse, err := s.bob.requestToJoinCommunity(s.createRequestToJoinCommunity(community.ID(), s.bob), firstJoinClock+1)
+	s.Require().NoError(err)
+	waitForCommunityJoin(&s.Suite, s.owner, s.bob, joinResponse)
 	rejoinClock, err := s.owner.communitiesManager.GetCommunityRequestToJoinClock(&s.bob.identity.PublicKey, community.IDString())
 	s.Require().NoError(err)
 	s.Require().Greater(rejoinClock, firstJoinClock)

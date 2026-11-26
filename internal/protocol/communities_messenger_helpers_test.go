@@ -512,6 +512,10 @@ func joinCommunity(s *suite.Suite, communityID types.HexBytes, controlNode *Mess
 	requestToJoin := createRequestToJoinCommunity(s, communityID, user, password, addresses)
 	response, err := user.RequestToJoinCommunity(requestToJoin)
 	s.Require().NoError(err)
+	waitForCommunityJoin(s, controlNode, user, response)
+}
+
+func waitForCommunityJoin(s *suite.Suite, controlNode *Messenger, user *Messenger, response *MessengerResponse) {
 	s.Require().NotNil(response)
 	s.Require().Len(response.RequestsToJoinCommunity(), 1)
 	s.Require().Len(response.ActivityCenterNotifications(), 1)
@@ -522,7 +526,7 @@ func joinCommunity(s *suite.Suite, communityID types.HexBytes, controlNode *Mess
 	s.Require().Equal(notification.MembershipStatus, ActivityCenterMembershipStatusPending)
 
 	// Retrieve and accept join request
-	_, err = WaitOnMessengerResponse(controlNode, func(r *MessengerResponse) bool {
+	_, err := WaitOnMessengerResponse(controlNode, func(r *MessengerResponse) bool {
 		return len(r.Communities()) > 0 && r.Communities()[0].HasMember(&user.identity.PublicKey)
 	}, "control node did accept user request to join")
 	s.Require().NoError(err)

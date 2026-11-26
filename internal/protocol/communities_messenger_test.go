@@ -19,6 +19,7 @@ import (
 
 	"github.com/golang/protobuf/proto"
 	"github.com/stretchr/testify/suite"
+	"github.com/waku-org/sds-go-bindings/sds"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
 
@@ -1185,12 +1186,9 @@ func (s *MessengerCommunitiesSuite) TestDeletePendingRequestAccess() {
 	s.Require().Equal(notification.Type, ActivityCenterNotificationTypeCommunityMembershipRequest)
 	s.Require().True(notification.Deleted)
 
-	// Database clock changes do not change the original message's second-based clock.
-	time.Sleep(time.Until(time.Unix(int64(firstRequestClock)+1, 0)))
-
 	// Alice request to join community
 	request = s.createRequestToJoinCommunity(community.ID(), s.alice)
-	response, err = s.alice.RequestToJoinCommunity(request)
+	response, err = s.alice.requestToJoinCommunity(request, firstRequestClock+1)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 	s.Require().Len(response.RequestsToJoinCommunity(), 1)
@@ -1443,12 +1441,9 @@ func (s *MessengerCommunitiesSuite) TestDeletePendingRequestAccessWithDeclinedSt
 	notificationState := response.ActivityCenterState()
 	s.Require().False(notificationState.HasSeen)
 
-	// Database clock changes do not change the original message's second-based clock.
-	time.Sleep(time.Until(time.Unix(int64(firstRequestClock)+1, 0)))
-
 	// Alice request to join community
 	request = s.createRequestToJoinCommunity(community.ID(), s.alice)
-	response, err = s.alice.RequestToJoinCommunity(request)
+	response, err = s.alice.requestToJoinCommunity(request, firstRequestClock+1)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 	s.Require().Len(response.RequestsToJoinCommunity(), 1)
@@ -1532,8 +1527,9 @@ func (s *MessengerCommunitiesSuite) TestCancelRequestAccess() {
 	s.Require().NoError(err)
 
 	request := s.createRequestToJoinCommunity(community.ID(), s.alice)
+	clock := uint64(time.Now().Unix())
 	// We try to join the org
-	response, err = s.alice.RequestToJoinCommunity(request)
+	response, err = s.alice.requestToJoinCommunity(request, clock)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 	s.Require().Len(response.RequestsToJoinCommunity(), 1)
@@ -1660,6 +1656,53 @@ func (s *MessengerCommunitiesSuite) TestCancelRequestAccess() {
 	s.Require().Equal(cancelRequestToJoin2.PublicKey, crypto.PubkeyToHex(&s.alice.identity.PublicKey))
 	s.Require().Equal(cancelRequestToJoin2.CustomizationColor, s.alice.account.GetCustomizationColor())
 	s.Require().Equal(communities.RequestToJoinStateCanceled, cancelRequestToJoin2.State)
+
+	// A replay in a new transport envelope must leave the canceled request alone.
+	sentIDs, err := s.alice.RawMessagesIDsByType(protobuf.ApplicationMetadataMessage_COMMUNITY_REQUEST_TO_JOIN)
+	s.Require().NoError(err)
+	s.Require().Len(sentIDs, 1)
+	firstSend, err := s.alice.RawMessageByID(sentIDs[0])
+	s.Require().NoError(err)
+	processed, err := s.bob.persistence.IsSDSMessageProcessed(firstSend.ID)
+	s.Require().NoError(err)
+	s.Require().True(processed, "first send %s must have an SDS marker", firstSend.ID)
+	application, err := v1protocol.WrapIntoAppLayerMessage(firstSend.Payload, firstSend.MessageType, s.alice.identity)
+	s.Require().NoError(err)
+	replaySender, err := sds.NewReliabilityManager(s.alice.logger, nil)
+	s.Require().NoError(err)
+	wrapped, err := replaySender.WrapOutgoingMessage(application, sds.MessageID(cryptotypes.EncodeHex(crypto.Keccak256(application))), community.IDString())
+	s.Require().NoError(replaySender.Cleanup())
+	s.Require().NoError(err)
+	replayHash := crypto.Keccak256([]byte("replayed join request"))
+	response, err = s.bob.handleRetrievedMessages(map[messagingtypes.ChatFilter][]*messagingtypes.ReceivedMessage{
+		{}: {{
+			Sig:     crypto.FromECDSAPub(&s.alice.identity.PublicKey),
+			Dst:     crypto.FromECDSAPub(community.PublicKey()),
+			Hash:    replayHash,
+			Payload: wrapped,
+		}},
+	}, false, false)
+	s.Require().NoError(err)
+	s.Require().Empty(response.RequestsToJoinCommunity())
+	var confirmed bool
+	err = s.bob.database.QueryRow("SELECT EXISTS(SELECT 1 FROM transport_message_cache WHERE id = ?)", cryptotypes.EncodeHex(replayHash)).Scan(&confirmed)
+	s.Require().NoError(err)
+	s.Require().True(confirmed)
+
+	// A new send with the exact same application clock must reach the control node.
+	response, err = s.alice.requestToJoinCommunity(request, clock)
+	s.Require().NoError(err)
+	s.Require().Len(response.RequestsToJoinCommunity(), 1)
+	s.Require().Equal(clock, response.RequestsToJoinCommunity()[0].Clock)
+	_, err = WaitOnMessengerResponse(s.bob, func(response *MessengerResponse) bool {
+		for _, received := range response.RequestsToJoinCommunity() {
+			if received.Clock == clock && received.State == communities.RequestToJoinStatePending {
+				return true
+			}
+		}
+		return false
+	}, "control node did not receive a fresh request at the same clock")
+	s.Require().NoError(err)
 }
 
 func (s *MessengerCommunitiesSuite) TestRequestAccessAgain() {
@@ -1879,12 +1922,9 @@ func (s *MessengerCommunitiesSuite) TestRequestAccessAgain() {
 	s.Require().Equal(community.ID(), aliceCommunity.ID())
 	s.Require().False(aliceCommunity.HasMember(&s.alice.identity.PublicKey))
 
-	// A new join request needs a later second-based clock than the first request.
-	time.Sleep(time.Until(time.Unix(int64(requestToJoin1.Clock)+1, 0)))
-
 	// Alice can request access again
 	request3 := s.createRequestToJoinCommunity(community.ID(), s.alice)
-	response, err = s.alice.RequestToJoinCommunity(request3)
+	response, err = s.alice.requestToJoinCommunity(request3, requestToJoin1.Clock+1)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 	s.Require().Len(response.RequestsToJoinCommunity(), 1)
@@ -3609,7 +3649,7 @@ func (s *MessengerCommunitiesSuite) TestCommunityBanUserRequestToJoin() {
 
 	request := s.createRequestToJoinCommunity(community.ID(), s.alice)
 	// We try to join the org
-	rtj := s.alice.communitiesManager.CreateRequestToJoin(request, s.alice.account.GetCustomizationColor())
+	rtj := s.alice.communitiesManager.CreateRequestToJoin(request, s.alice.account.GetCustomizationColor(), uint64(time.Now().Unix()))
 
 	s.Require().NoError(err)
 

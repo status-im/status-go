@@ -176,6 +176,8 @@ message CommunityRequestToJoin {
   string display_name = 5;
   repeated RevealedAccount revealed_accounts = 6;
   uint32 customization_color = 7;
+  // Identifies a new send independently of the second-based clock.
+  bytes request_nonce = 8;
 }
 
 message CommunityEditSharedAddresses {
@@ -191,6 +193,7 @@ message CommunityCancelRequestToJoin {
   bytes community_id = 4;
   string display_name = 5;
   uint32 customization_color = 6;
+  bytes request_nonce = 7;
 }
 
 message CommunityUserKicked {
@@ -213,6 +216,7 @@ message CommunityRequestToJoinResponse {
 message CommunityRequestToLeave {
   uint64 clock = 1;
   bytes community_id = 2;
+  bytes request_nonce = 3;
 }
 
 message CommunityMessageArchiveLink {

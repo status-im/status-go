@@ -1451,6 +1451,10 @@ func (m *Messenger) SignData(signParams []personal.SignParams) ([]string, error)
 }
 
 func (m *Messenger) RequestToJoinCommunity(request *requests.RequestToJoinCommunity) (*MessengerResponse, error) {
+	return m.requestToJoinCommunity(request, uint64(time.Now().Unix()))
+}
+
+func (m *Messenger) requestToJoinCommunity(request *requests.RequestToJoinCommunity, clock uint64) (*MessengerResponse, error) {
 	// TODO: Because of changes that need to be done in tests, calling this function and providing `request` without `AddressesToReveal`
 	//       is not an error, but it should be.
 	logger := m.logger.Named("RequestToJoinCommunity")
@@ -1474,7 +1478,7 @@ func (m *Messenger) RequestToJoinCommunity(request *requests.RequestToJoinCommun
 		return nil, communities.ErrAlreadyJoined
 	}
 
-	requestToJoin := m.communitiesManager.CreateRequestToJoin(request, m.account.GetCustomizationColor())
+	requestToJoin := m.communitiesManager.CreateRequestToJoin(request, m.account.GetCustomizationColor(), clock)
 
 	if len(request.AddressesToReveal) > 0 {
 		revealedAddresses := make([]gethcommon.Address, 0)
@@ -1504,6 +1508,7 @@ func (m *Messenger) RequestToJoinCommunity(request *requests.RequestToJoinCommun
 		return nil, err
 	}
 
+	nonce := uuid.New()
 	requestToJoinProto := &protobuf.CommunityRequestToJoin{
 		Clock:              requestToJoin.Clock,
 		EnsName:            requestToJoin.ENSName,
@@ -1511,6 +1516,7 @@ func (m *Messenger) RequestToJoinCommunity(request *requests.RequestToJoinCommun
 		CommunityId:        request.CommunityID,
 		RevealedAccounts:   requestToJoin.RevealedAccounts,
 		CustomizationColor: multiaccountscommon.ColorToIDFallbackToBlue(requestToJoin.CustomizationColor),
+		RequestNonce:       nonce[:],
 	}
 
 	community, _, err = m.communitiesManager.SaveRequestToJoinAndCommunity(requestToJoin, community)
@@ -1906,12 +1912,14 @@ func (m *Messenger) CancelRequestToJoinCommunity(ctx context.Context, request *r
 		return nil, err
 	}
 
+	nonce := uuid.New()
 	cancelRequestToJoinProto := &protobuf.CommunityCancelRequestToJoin{
 		Clock:              community.Clock(),
 		EnsName:            requestToJoin.ENSName,
 		DisplayName:        displayName,
 		CommunityId:        community.ID(),
 		CustomizationColor: multiaccountscommon.ColorToIDFallbackToBlue(requestToJoin.CustomizationColor),
+		RequestNonce:       nonce[:],
 	}
 
 	payload, err := proto.Marshal(cancelRequestToJoinProto)
@@ -2274,9 +2282,11 @@ func (m *Messenger) LeaveCommunity(communityID cryptotypes.HexBytes) (*Messenger
 	}
 
 	if !community.IsControlNode() {
+		nonce := uuid.New()
 		requestToLeaveProto := &protobuf.CommunityRequestToLeave{
-			Clock:       uint64(time.Now().Unix()),
-			CommunityId: communityID,
+			Clock:        uint64(time.Now().Unix()),
+			CommunityId:  communityID,
+			RequestNonce: nonce[:],
 		}
 
 		payload, err := proto.Marshal(requestToLeaveProto)
@@ -3489,7 +3499,10 @@ func (m *Messenger) sendSharedAddressToControlNode(receiver *ecdsa.PublicKey, co
 
 	requestToJoin.Clock = uint64(time.Now().Unix())
 	requestToJoin.State = communities.RequestToJoinStateAwaitingAddresses
-	payload, err := proto.Marshal(requestToJoin.ToCommunityRequestToJoinProtobuf())
+	nonce := uuid.New()
+	requestToJoinProto := requestToJoin.ToCommunityRequestToJoinProtobuf()
+	requestToJoinProto.RequestNonce = nonce[:]
+	payload, err := proto.Marshal(requestToJoinProto)
 	if err != nil {
 		return nil, err
 	}
