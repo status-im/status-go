@@ -164,15 +164,18 @@ func (s *MessengerSDSProcessingSuite) TestSDSCommunityPostingPermissions() {
 	envelope.Signature = nil
 	unsigned, err := proto.Marshal(envelope)
 	s.Require().NoError(err)
-	_, err = authorizer.Authorize(sds.AuthorizationMessage{ChannelID: channelID, Content: unsigned})
-	s.Require().Error(err)
+	allowed, err = authorizer.Authorize(sds.AuthorizationMessage{ChannelID: channelID, Content: unsigned})
+	s.Require().NoError(err)
+	s.Require().False(allowed)
 	envelope.Signature = []byte{1}
 	invalidSignature, err := proto.Marshal(envelope)
 	s.Require().NoError(err)
-	_, err = authorizer.Authorize(sds.AuthorizationMessage{ChannelID: channelID, Content: invalidSignature})
-	s.Require().Error(err)
-	_, err = authorizer.Authorize(sds.AuthorizationMessage{ChannelID: channelID, Content: []byte{0xff}})
-	s.Require().Error(err)
+	allowed, err = authorizer.Authorize(sds.AuthorizationMessage{ChannelID: channelID, Content: invalidSignature})
+	s.Require().NoError(err)
+	s.Require().False(allowed)
+	allowed, err = authorizer.Authorize(sds.AuthorizationMessage{ChannelID: channelID, Content: []byte{0xff}})
+	s.Require().NoError(err)
+	s.Require().False(allowed)
 }
 
 func (s *MessengerSDSProcessingSuite) TestSDSUnauthorizedMetadataDoesNotChangeState() {
@@ -241,11 +244,14 @@ func (s *MessengerSDSProcessingSuite) TestSDSUnauthorizedMetadataDoesNotChangeSt
 	s.Require().Empty(dependencyHits, "rejected envelope must not count as dependency evidence")
 }
 
-func (s *MessengerSDSProcessingSuite) TestSDSAuthorizationFailureRetriesOnNextRetrieve() {
+func (s *MessengerSDSProcessingSuite) TestSDSCommunityChatRetriesWhenLoaded() {
 	community, chat := s.sdsCommunity()
 	channelID := reliability.BuildChannelID(community.IDString())
+	now := time.Now()
 	application := s.sdsApplication(&protobuf.ChatMessage{
-		ChatId: chat.ID, MessageType: protobuf.MessageType_COMMUNITY_CHAT, Text: "retry after authorization loads",
+		ChatId: chat.ID, MessageType: protobuf.MessageType_COMMUNITY_CHAT,
+		Text: "retry after authorization loads", Clock: uint64(now.UnixMilli()), Timestamp: uint64(now.UnixMilli()),
+		ContentType: protobuf.ChatMessage_TEXT_PLAIN,
 	}, protobuf.ApplicationMetadataMessage_CHAT_MESSAGE, s.m.identity)
 	messageID := cryptotypes.EncodeHex(crypto.Keccak256(application))
 	sender, err := sds.NewReliabilityManager(zap.NewNop(), nil)
@@ -254,17 +260,10 @@ func (s *MessengerSDSProcessingSuite) TestSDSAuthorizationFailureRetriesOnNextRe
 	s.Require().NoError(err)
 	s.Require().NoError(sender.Cleanup())
 
-	var authorizationCalls int
-	s.Require().NoError(s.m.messaging.SetSDSAuthorizer(messengerSDSAuthorizerFunc(func(sds.AuthorizationMessage) (bool, error) {
-		authorizationCalls++
-		if authorizationCalls == 1 {
-			return false, fmt.Errorf("community description not loaded yet")
-		}
-		return true, nil
-	})))
+	s.m.allChats.Delete(chat.ID)
 	hash := crypto.Keccak256(wrapped)
 	received := &messagingtypes.ReceivedMessage{
-		Sig: crypto.FromECDSAPub(&s.m.identity.PublicKey), Hash: hash, Payload: wrapped,
+		Sig: crypto.FromECDSAPub(&s.m.identity.PublicKey), Timestamp: uint32(now.Unix()), Hash: hash, Payload: wrapped,
 	}
 	filter := messagingtypes.NewChatFilter(&messagingtypes.ChatFilterConfig{ChatID: chat.ID})
 	input := map[messagingtypes.ChatFilter][]*messagingtypes.ReceivedMessage{
@@ -273,12 +272,12 @@ func (s *MessengerSDSProcessingSuite) TestSDSAuthorizationFailureRetriesOnNextRe
 
 	_, err = s.m.handleRetrievedMessages(input, false, false)
 	s.Require().NoError(err)
-	s.Require().Equal(1, authorizationCalls)
 	s.Require().Len(s.m.sdsValidationRetries, 1)
 
-	_, err = s.m.handleRetrievedMessages(nil, false, false)
+	s.m.allChats.Store(chat.ID, chat)
+	response, err := s.m.handleRetrievedMessages(nil, false, false)
 	s.Require().NoError(err)
-	s.Require().Equal(2, authorizationCalls)
+	s.Require().Len(response.Messages(), 1)
 	s.Require().Empty(s.m.sdsValidationRetries)
 	s.Require().Empty(s.m.sdsValidationRetrySince)
 
@@ -534,8 +533,9 @@ func (s *MessengerSDSProcessingSuite) TestSDSCommunitySyncMembership() {
 			}
 		})
 	}
-	_, err = (communitySDSAuthorizer{messenger: s.m}).Authorize(sds.AuthorizationMessage{ChannelID: channelID})
-	s.Require().Error(err, "sync messages require an authenticated transport sender")
+	allowed, err := (communitySDSAuthorizer{messenger: s.m}).Authorize(sds.AuthorizationMessage{ChannelID: channelID})
+	s.Require().NoError(err)
+	s.Require().False(allowed, "sync messages require an authenticated transport sender")
 }
 
 func (s *MessengerSDSProcessingSuite) TestSDSSyncAuthorizerRequiresCommunityEncryption() {
@@ -792,31 +792,87 @@ func TestProcessedSDSMessagePersistence(t *testing.T) {
 	require.False(t, processed)
 }
 
-func (s *MessengerSDSProcessingSuite) TestInvalidApplicationMessageRemainsRetryable() {
+func (s *MessengerSDSProcessingSuite) TestMalformedSDSMessagesAreRejectedWithoutRetry() {
+	community, _ := s.sdsCommunity()
+	channelID := reliability.BuildChannelID(community.IDString())
 	sender, err := sds.NewReliabilityManager(zap.NewNop(), nil)
 	s.Require().NoError(err)
-	wrapped, err := sender.WrapOutgoingMessage([]byte{0xff}, "malformed-application", "sds-malformed")
+	s.T().Cleanup(func() { s.Require().NoError(sender.Cleanup()) })
+	malformedChat, err := v1protocol.WrapIntoAppLayerMessage(
+		[]byte{0xff}, protobuf.ApplicationMetadataMessage_CHAT_MESSAGE, s.m.identity,
+	)
 	s.Require().NoError(err)
-	s.Require().NoError(sender.Cleanup())
+	persistence := reliability.NewSQLitePersistence(s.m.database)
+	before, err := persistence.LoadChannel(channelID)
+	s.Require().NoError(err)
+	cache := transport.NewSQLiteProcessedMessageIDsCachePersistence(s.m.database)
+	hints := reliability.NewSQLiteRetrievalHintPersistence(s.m.database)
+
+	for _, tc := range []struct {
+		name    string
+		content []byte
+	}{
+		{"malformed application", []byte{0xff}},
+		{"malformed chat payload", malformedChat},
+	} {
+		s.Run(tc.name, func() {
+			id := cryptotypes.EncodeHex(crypto.Keccak256(tc.content))
+			wrapped, err := sender.WrapOutgoingMessage(tc.content, sds.MessageID(id), channelID)
+			s.Require().NoError(err)
+			hash := crypto.Keccak256(wrapped)
+			envelope := &messagingtypes.ReceivedMessage{
+				Sig: crypto.FromECDSAPub(&s.m.identity.PublicKey), Hash: hash, Payload: wrapped,
+			}
+
+			response, err := s.m.handleRetrievedMessages(map[messagingtypes.ChatFilter][]*messagingtypes.ReceivedMessage{
+				{}: {envelope},
+			}, false, false)
+			s.Require().NoError(err)
+			s.Require().Empty(response.Messages())
+			s.Require().Empty(s.m.sdsValidationRetries)
+			s.Require().Empty(s.m.sdsValidationRetrySince)
+
+			hashID := cryptotypes.EncodeHex(hash)
+			processed, err := cache.Hits([]string{hashID})
+			s.Require().NoError(err)
+			s.Require().True(processed[hashID])
+			dependencyHits, err := cache.DependencyHits([]string{hashID})
+			s.Require().NoError(err)
+			s.Require().Empty(dependencyHits)
+			received, err := hints.IsSDSMessageReceived(channelID, id)
+			s.Require().NoError(err)
+			s.Require().False(received)
+			after, err := persistence.LoadChannel(channelID)
+			s.Require().NoError(err)
+			s.Require().Equal(before, after)
+		})
+	}
+}
+
+func (s *MessengerSDSProcessingSuite) TestSDSUnknownCommunitySyncRequiresLocalFilterToRetry() {
 	key, err := crypto.GenerateKey()
 	s.Require().NoError(err)
-	core, logs := observer.New(zap.DebugLevel)
-	oldLogger := s.m.logger
-	s.m.logger = zap.New(core)
-	defer func() { s.m.logger = oldLogger }()
-	envelope := &messagingtypes.ReceivedMessage{
-		Sig:     crypto.FromECDSAPub(&key.PublicKey),
-		Hash:    crypto.Keccak256(wrapped),
-		Payload: wrapped,
+	channelID := cryptotypes.EncodeHex(crypto.CompressPubkey(&key.PublicKey))
+	authorizer := communitySDSAuthorizer{messenger: s.m}
+	message := sds.AuthorizationMessage{
+		ChannelID: channelID, AuthorizationContext: crypto.FromECDSAPub(&key.PublicKey),
 	}
 
-	for i := 0; i < 2; i++ {
-		response, err := s.m.handleRetrievedMessages(map[messagingtypes.ChatFilter][]*messagingtypes.ReceivedMessage{
-			{}: {envelope},
-		}, false, false)
-		s.Require().NoError(err)
-		s.Require().Empty(response.Messages())
-	}
-	s.Require().Equal(2, logs.FilterMessage("deferring SDS envelope until authorization can be retried").Len(),
-		"the malformed envelope must not be transport-confirmed after its first delivery")
+	allowed, err := authorizer.Authorize(message)
+	s.Require().NoError(err)
+	s.Require().False(allowed)
+
+	_, err = s.m.messaging.InitPublicChats(messagingtypes.ChatsToInitialize{
+		{ChatID: communitySDSSyncTopic(channelID)},
+	})
+	s.Require().NoError(err)
+	allowed, err = authorizer.Authorize(message)
+	s.Require().ErrorIs(err, communities.ErrOrgNotFound)
+	s.Require().False(allowed)
+
+	// A missing signer is permanent even while the community is loading.
+	message.AuthorizationContext = nil
+	allowed, err = authorizer.Authorize(message)
+	s.Require().NoError(err)
+	s.Require().False(allowed)
 }

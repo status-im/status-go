@@ -3,6 +3,7 @@ package protocol
 import (
 	"bytes"
 	"crypto/ecdsa"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -10,6 +11,7 @@ import (
 	"github.com/waku-org/sds-go-bindings/sds"
 
 	"github.com/status-im/status-go/internal/crypto"
+	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
 	"github.com/status-im/status-go/internal/protocol/common"
 	"github.com/status-im/status-go/internal/protocol/communities"
 	"github.com/status-im/status-go/internal/protocol/protobuf"
@@ -24,7 +26,7 @@ func (v communitySDSAuthorizer) Authorize(message sds.AuthorizationMessage) (boo
 	m := v.messenger
 	communityID, _, _ := strings.Cut(message.ChannelID, ":")
 	// Community IDs are 0x-prefixed, hex-encoded compressed public keys.
-	communityChannel := strings.HasPrefix(communityID, "0x") && len(communityID) == 68
+	communityChannel := strings.HasPrefix(communityID, "0x") && len(communityID) == pkStringLength
 
 	if len(message.Content) == 0 {
 		if !communityChannel {
@@ -33,12 +35,12 @@ func (v communitySDSAuthorizer) Authorize(message sds.AuthorizationMessage) (boo
 		if message.ChannelID != reliability.BuildChannelID(communityID) {
 			return false, nil
 		}
-		community, err := m.communitiesManager.GetByIDString(communityID)
-		if err != nil {
-			return false, err
-		}
 		sender, groupID, err := reliability.ParseSDSAuthorizationContext(message.AuthorizationContext)
 		if err != nil {
+			return false, nil
+		}
+		community, err := v.loadCommunity(communityID, communitySDSSyncTopic(communityID), false)
+		if err != nil || community == nil {
 			return false, err
 		}
 		if community.Encrypted() && !bytes.Equal(community.ID(), groupID) {
@@ -49,7 +51,7 @@ func (v communitySDSAuthorizer) Authorize(message sds.AuthorizationMessage) (boo
 
 	application, err := common.ParseApplicationLayer(message.Content)
 	if err != nil {
-		return false, fmt.Errorf("invalid SDS application message: %w", err)
+		return false, nil
 	}
 	var chatMessage interface {
 		proto.Message
@@ -76,39 +78,57 @@ func (v communitySDSAuthorizer) Authorize(message sds.AuthorizationMessage) (boo
 		return !communityChannel, nil
 	}
 	if err := proto.Unmarshal(application.Payload, chatMessage); err != nil {
-		return false, fmt.Errorf("invalid SDS chat message: %w", err)
+		return false, nil
 	}
 	if chatMessage.GetMessageType() != protobuf.MessageType_COMMUNITY_CHAT {
 		return !communityChannel, nil
 	}
-	if application.SigPubKey == nil {
-		return false, fmt.Errorf("SDS community message has no application signature")
-	}
-	chat, ok := m.allChats.Load(chatMessage.GetChatId())
-	if !ok || chat.ChatType != ChatTypeCommunityChat || chat.CommunityID == "" {
-		return false, fmt.Errorf("SDS community message targets an unknown community chat")
-	}
-	if message.ChannelID != reliability.BuildChannelID(chat.CommunityID) {
+	if application.SigPubKey == nil || !communityChannel || message.ChannelID != reliability.BuildChannelID(communityID) {
 		return false, nil
 	}
-	community, err := m.communitiesManager.GetByIDString(chat.CommunityID)
-	if err != nil {
-		return false, err
+	chatID := chatMessage.GetChatId()
+	if len(chatID) <= pkStringLength || !strings.HasPrefix(chatID, communityID) {
+		return false, nil
 	}
-	// AuthorizationContext is the Waku-authenticated signer of the full payload,
-	// including SDS IDs, dependencies, and acknowledgements. Require that signer
-	// to be a community participant, while allowing member repair forwarding.
+	chat, knownChat := m.allChats.Load(chatID)
+	if knownChat && (chat.ChatType != ChatTypeCommunityChat || chat.CommunityID != communityID) {
+		return false, nil
+	}
+
+	// The Waku signer authenticated the full SDS payload. An authorized member
+	// may forward another member's signed application message during repair.
 	transportSender, _, err := reliability.ParseSDSAuthorizationContext(message.AuthorizationContext)
 	if err != nil {
-		return false, err
-	}
-	if !isAuthorizedSDSCommunitySender(community, transportSender) {
 		return false, nil
 	}
-	if community.IsBanned(application.SigPubKey) {
+	community, err := v.loadCommunity(communityID, communityID, knownChat)
+	if err != nil || community == nil {
+		return false, err
+	}
+	if !isAuthorizedSDSCommunitySender(community, transportSender) || community.IsBanned(application.SigPubKey) {
+		return false, nil
+	}
+	if !knownChat {
+		if community.Joined() || community.Spectated() {
+			return false, fmt.Errorf("SDS community chat %q is not loaded yet", chatID)
+		}
 		return false, nil
 	}
 	return community.CanPost(application.SigPubKey, chat.CommunityChatID(), application.Type)
+}
+
+// loadCommunity permits a missing record to be retried when a local chat or
+// subscription indicates that the client expects state for this community.
+func (v communitySDSAuthorizer) loadCommunity(id, filterID string, knownChat bool) (*communities.Community, error) {
+	decodedID, err := cryptotypes.DecodeHex(id)
+	if err != nil {
+		return nil, nil
+	}
+	community, err := v.messenger.communitiesManager.GetByID(decodedID)
+	if errors.Is(err, communities.ErrOrgNotFound) && !knownChat && v.messenger.messaging.ChatFilterByChatID(filterID) == nil {
+		return nil, nil
+	}
+	return community, err
 }
 
 func isAuthorizedSDSCommunitySender(community *communities.Community, sender *ecdsa.PublicKey) bool {
