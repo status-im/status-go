@@ -67,7 +67,11 @@ func NewAdapter(cfg messaging.Config, logger *zap.Logger) (*Adapter, error) {
 	if err != nil {
 		return nil, fmt.Errorf("create node: %w", err)
 	}
-	return newAdapter(mc, logger), nil
+	a := newAdapter(mc, logger)
+	if err := a.readNodeInfo(); err != nil {
+		return nil, errors.Join(err, mc.Close())
+	}
+	return a, nil
 }
 
 func newAdapter(mc *messaging.MessagingClient, logger *zap.Logger) *Adapter {
@@ -90,9 +94,6 @@ func (a *Adapter) Start() error {
 	go a.historyReconcileLoop()
 	if err := a.mc.Start(); err != nil {
 		return fmt.Errorf("start: %w", err)
-	}
-	if err := a.readNodeInfo(); err != nil {
-		return errors.Join(err, a.mc.Stop())
 	}
 	a.topicsMu.Lock()
 	defer a.topicsMu.Unlock()
@@ -357,7 +358,7 @@ func (a *Adapter) OnHistoryReconcileNeeded() <-chan types.HistoryReconcileWindow
 	return a.historyReconcileNeeded
 }
 
-// MaxMessageSize returns the node's message size limit, read when it started.
+// MaxMessageSize returns the node's message size limit, read when it was created.
 func (a *Adapter) MaxMessageSize() uint32 {
 	return a.maxMessageSize.Load()
 }
