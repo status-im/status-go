@@ -45,6 +45,11 @@ type InitializeApplication struct {
 	// PushNotificationsConfigFilePath specifies the file path for configuring push notifications servers.
 	// File structure must be as params.PushNotificationsFleet.
 	PushFleetsConfigFilePath string `json:"pushFleetsConfigFilePath"`
+
+	// MessagingBackend, when set, is the messaging backend of every login,
+	// whatever the profile's setting: "go-waku" or "logos-delivery".
+	// It is not saved.
+	MessagingBackend string `json:"messagingBackend"`
 }
 
 func (i *InitializeApplication) Validate() error {

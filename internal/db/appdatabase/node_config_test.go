@@ -56,6 +56,7 @@ func randomNodeConfig() *params.NodeConfig {
 		},
 		WakuV2Config: params.WakuV2Config{
 			LightClient: randomBool(),
+			Backend:     randomString(),
 		},
 		LogosStorageConfig: params.LogosStorageConfig{
 			Enabled: randomBool(),
@@ -107,6 +108,17 @@ func TestSaveNodeConfig(t *testing.T) {
 	dbNodeConfig, err := nodecfg.GetNodeConfigFromDB(db)
 	require.NoError(t, err)
 	require.Equal(t, *nodeConfig, *dbNodeConfig)
+}
+
+func TestSetMessagingBackend(t *testing.T) {
+	db := setupTestDB(t)
+	require.NoError(t, nodecfg.SaveNodeConfig(db, randomNodeConfig()))
+
+	require.NoError(t, nodecfg.SetMessagingBackend(db, "logos-delivery"))
+
+	dbNodeConfig, err := nodecfg.GetNodeConfigFromDB(db)
+	require.NoError(t, err)
+	require.Equal(t, "logos-delivery", dbNodeConfig.WakuV2Config.Backend)
 }
 
 func TestMigrateNodeConfig(t *testing.T) {

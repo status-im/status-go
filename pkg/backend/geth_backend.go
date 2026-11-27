@@ -108,6 +108,7 @@ type StatusBackend struct {
 	pprof                    pprofServer
 	memRelease               *memoryReleaser
 	sentryDSN                string
+	messagingBackend         string
 
 	logger            *zap.Logger
 	preLoginLogConfig *logutils.PreLoginLogConfig
@@ -2387,6 +2388,10 @@ func (b *StatusBackend) loadNodeConfig(inputNodeCfg *params.NodeConfig) error {
 
 	b.config = conf
 
+	if b.messagingBackend != "" {
+		b.config.WakuV2Config.Backend = b.messagingBackend
+	}
+
 	if inputNodeCfg != nil && inputNodeCfg.RuntimeLogLevel != "" {
 		b.config.LogLevel = inputNodeCfg.RuntimeLogLevel
 	}
@@ -3018,6 +3023,14 @@ func (b *StatusBackend) getWalletDBPath(keyUID string) (string, error) {
 	}
 
 	return filepath.Join(b.rootDataDir, fmt.Sprintf("%s-wallet.db", keyUID)), nil
+}
+
+// SetMessagingBackend makes backend the messaging backend of every login,
+// whatever the profile's setting. An empty backend clears it.
+func (b *StatusBackend) SetMessagingBackend(backend string) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.messagingBackend = backend
 }
 
 func (b *StatusBackend) SetSentryDSN(dsn string) {

@@ -50,6 +50,10 @@ type WakuV2Config struct {
 
 	// AutoUpdate instructs the node to update their own ip address and port with the values seen by other nodes
 	AutoUpdate bool
+
+	// Backend is the messaging backend: "go-waku" or "logos-delivery". Empty
+	// is the default of the build.
+	Backend string
 }
 
 // ----------

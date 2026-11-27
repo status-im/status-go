@@ -40,6 +40,7 @@ import (
 	m_requests "github.com/status-im/status-go/mobile/requests"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/pkg/backend"
+	"github.com/status-im/status-go/pkg/messaging"
 	"github.com/status-im/status-go/pkg/multiformat"
 	"github.com/status-im/status-go/pkg/services/media"
 	"github.com/status-im/status-go/pkg/services/pairing"
@@ -131,6 +132,15 @@ func initializeApplication(requestJSON string) string {
 			return makeJSONResponse(err)
 		}
 	}
+
+	messagingBackend := request.MessagingBackend
+	if messagingBackend == "" {
+		messagingBackend = os.Getenv("STATUS_MESSAGING_BACKEND")
+	}
+	if _, err := messaging.ParseBackend(messagingBackend); err != nil {
+		return makeJSONResponse(err)
+	}
+	statusBackend.SetMessagingBackend(messagingBackend)
 
 	if request.PushFleetsConfigFilePath != "" {
 		err = params.LoadPushFleetsFromFile(request.PushFleetsConfigFilePath)
