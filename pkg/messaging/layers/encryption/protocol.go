@@ -24,7 +24,9 @@ import (
 //go:generate protoc "--go_prefix=go tool" --go_out=. ./protocol_message.proto
 
 const (
-	protocolVersion                = 1
+	// Versions 1 and 2 appear in earlier encrypted bundles and pairing records.
+	InstallationMVDSVersion        = 3
+	protocolVersion                = InstallationMVDSVersion
 	sharedSecretNegotiationVersion = 1
 	partitionedTopicMinVersion     = 1
 	defaultMinVersion              = 0
@@ -205,6 +207,19 @@ func (p *Protocol) BuildEncryptedMessage(myIdentityKey *ecdsa.PrivateKey, public
 		return nil, err
 	}
 
+	return p.buildEncryptedMessage(myIdentityKey, publicKey, activeInstallations, payload)
+}
+
+// BuildInstallationMessage uses the existing direct session for an explicit
+// set of devices. In particular it must never fall back to profile-wide DH.
+func (p *Protocol) BuildInstallationMessage(identity *ecdsa.PrivateKey, installations []*multidevice.Installation, payload []byte) (*ProtocolMessageSpec, error) {
+	if len(installations) == 0 {
+		return nil, ErrDeviceNotFound
+	}
+	return p.buildEncryptedMessage(identity, &identity.PublicKey, installations, payload)
+}
+
+func (p *Protocol) buildEncryptedMessage(myIdentityKey *ecdsa.PrivateKey, publicKey *ecdsa.PublicKey, activeInstallations []*multidevice.Installation, payload []byte) (*ProtocolMessageSpec, error) {
 	// Encrypt payload
 	encryptedMessagesByInstalls, installations, err := p.encryptor.EncryptPayload(publicKey, myIdentityKey, activeInstallations, payload)
 	if err != nil {
@@ -667,10 +682,13 @@ type HashRatchetInfo struct {
 	KeyID   []byte
 }
 type DecryptMessageResponse struct {
-	DecryptedMessage []byte
-	Installations    []*multidevice.Installation
-	SharedSecrets    []*sharedsecret.Secret
-	HashRatchetInfo  []*HashRatchetInfo
+	// SenderInstallation is set only after decrypting a Double Ratchet
+	// message addressed to this installation.
+	SenderInstallation string
+	DecryptedMessage   []byte
+	Installations      []*multidevice.Installation
+	SharedSecrets      []*sharedsecret.Secret
+	HashRatchetInfo    []*HashRatchetInfo
 }
 
 func (p *Protocol) HandleHashRatchetKeysPayload(ctx context.Context, groupID []byte, encodedKeys []byte, myIdentityKey *ecdsa.PrivateKey, theirIdentityKey *ecdsa.PublicKey) ([]*HashRatchetInfo, error) {
@@ -829,7 +847,7 @@ func (p *Protocol) HandleMessage(
 
 	// Decrypt message
 	if encryptedMessage := protocolMessage.GetEncryptedMessage(); encryptedMessage != nil {
-		message, err := p.encryptor.DecryptPayload(
+		message, senderInstallation, err := p.encryptor.DecryptPayload(
 			ctx,
 			myIdentityKey,
 			theirPublicKey,
@@ -889,6 +907,7 @@ func (p *Protocol) HandleMessage(
 			response.SharedSecrets = []*sharedsecret.Secret{sharedSecret}
 		}
 		response.DecryptedMessage = message
+		response.SenderInstallation = senderInstallation
 		return response, nil
 	}
 

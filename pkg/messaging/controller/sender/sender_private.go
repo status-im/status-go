@@ -27,6 +27,12 @@ func (s *Sender) SendPrivate(ctx context.Context, params messagingtypes.SendPriv
 		zap.String("pubsubTopic", params.PubsubTopic),
 	)
 
+	if params.WithReliability && crypto.IsPubKeyEqual(&params.Sender.PublicKey, &s.identity.PublicKey) &&
+		crypto.IsPubKeyEqual(params.Recipient, &s.identity.PublicKey) && !params.SendWithDH &&
+		!params.SkipEncryptionLayer && len(params.HashRatchetGroupID) == 0 {
+		return s.scheduleInstallationSend(params, messageID)
+	}
+
 	if params.WithReliability {
 		logger.Debug("scheduling reliable send")
 		reliabilityIDs, err := s.scheduleReliableSend(params.Recipient, params.Payload)

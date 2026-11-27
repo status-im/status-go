@@ -240,7 +240,7 @@ func (s *encryptor) GetMessage(msgs map[string]*EncryptedMessageProtocol) *Encry
 }
 
 // DecryptPayload decrypts the payload of a EncryptedMessageProtocol, given an identity private key and the sender's public key
-func (s *encryptor) DecryptPayload(ctx context.Context, myIdentityKey *ecdsa.PrivateKey, theirIdentityKey *ecdsa.PublicKey, theirInstallationID string, msgs map[string]*EncryptedMessageProtocol, messageID []byte) ([]byte, error) {
+func (s *encryptor) DecryptPayload(ctx context.Context, myIdentityKey *ecdsa.PrivateKey, theirIdentityKey *ecdsa.PublicKey, theirInstallationID string, msgs map[string]*EncryptedMessageProtocol, messageID []byte) ([]byte, string, error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
@@ -259,13 +259,13 @@ func (s *encryptor) DecryptPayload(ctx context.Context, myIdentityKey *ecdsa.Pri
 	// We should not be sending a signal if it's coming from us, as we receive our own messages
 	if msg == nil && !samePublicKeys(*theirIdentityKey, myIdentityKey.PublicKey) {
 		s.logger.Debug("message is coming from someone else, but not targeting our installation id")
-		return nil, ErrDeviceNotFound
+		return nil, "", ErrDeviceNotFound
 	} else if msg == nil && theirInstallationID != s.config.InstallationID {
 		s.logger.Debug("message is coming from same public key, but different installation id")
-		return nil, ErrNotPairedDevice
+		return nil, "", ErrNotPairedDevice
 	} else if msg == nil && theirInstallationID == s.config.InstallationID {
 		s.logger.Debug("message is coming from us and is nil")
-		return nil, nil
+		return nil, "", nil
 	}
 
 	payload := msg.GetPayload()
@@ -275,18 +275,18 @@ func (s *encryptor) DecryptPayload(ctx context.Context, myIdentityKey *ecdsa.Pri
 		theirEphemeralKey, err := crypto.DecompressPubkey(x3dhHeader.GetKey())
 
 		if err != nil {
-			return nil, err
+			return nil, "", err
 		}
 
 		symmetricKey, err := s.keyFromPassiveX3DH(myIdentityKey, theirIdentityKey, theirEphemeralKey, bundleID)
 		if err != nil {
-			return nil, err
+			return nil, "", err
 		}
 
 		theirIdentityKeyC := crypto.CompressPubkey(theirIdentityKey)
 		err = s.persistence.AddRatchetInfo(symmetricKey, theirIdentityKeyC, bundleID, nil, theirInstallationID)
 		if err != nil {
-			return nil, err
+			return nil, "", err
 		}
 	}
 
@@ -305,18 +305,18 @@ func (s *encryptor) DecryptPayload(ctx context.Context, myIdentityKey *ecdsa.Pri
 		drInfo, err := s.persistence.GetRatchetInfo(drHeader.GetId(), theirIdentityKeyC, theirInstallationID)
 		if err != nil {
 			s.logger.Error("could not get ratchet info", zap.Error(err))
-			return nil, err
+			return nil, "", err
 		}
 
 		// We mark the exchange as successful so we stop sending x3dh header
 		if err = s.persistence.RatchetInfoConfirmed(drHeader.GetId(), theirIdentityKeyC, theirInstallationID); err != nil {
 			s.logger.Error("could not confirm ratchet info", zap.Error(err))
-			return nil, err
+			return nil, "", err
 		}
 
 		if drInfo == nil {
 			s.logger.Error("could not find a session")
-			return nil, errSessionNotFound
+			return nil, "", errSessionNotFound
 		}
 
 		confirmationData := &confirmationData{
@@ -325,16 +325,24 @@ func (s *encryptor) DecryptPayload(ctx context.Context, myIdentityKey *ecdsa.Pri
 		}
 		s.messageIDs[confirmationIDString(messageID)] = confirmationData
 
-		return s.decryptUsingDR(theirIdentityKey, drInfo, drMessage)
+		decrypted, err := s.decryptUsingDR(theirIdentityKey, drInfo, drMessage)
+		if err != nil {
+			return nil, "", err
+		}
+		if msg == msgs[s.config.InstallationID] {
+			return decrypted, theirInstallationID, nil
+		}
+		return decrypted, "", nil
 	}
 
 	// Try DH
 	if header := msg.GetDHHeader(); header != nil {
 		decompressedKey, err := crypto.DecompressPubkey(header.GetKey())
 		if err != nil {
-			return nil, err
+			return nil, "", err
 		}
-		return crypto.DecryptWithDH(myIdentityKey, decompressedKey, payload)
+		decrypted, err := crypto.DecryptWithDH(myIdentityKey, decompressedKey, payload)
+		return decrypted, "", err
 	}
 
 	// Try Hash Ratchet
@@ -353,10 +361,10 @@ func (s *encryptor) DecryptPayload(ctx context.Context, myIdentityKey *ecdsa.Pri
 
 		decryptedPayload, err := s.DecryptWithHR(ctx, ratchet, header.SeqNo, payload)
 
-		return decryptedPayload, err
+		return decryptedPayload, "", err
 	}
 
-	return nil, errors.New("no key specified")
+	return nil, "", errors.New("no key specified")
 }
 
 func (s *encryptor) createNewSession(drInfo *RatchetInfo, sk []byte, keyPair crypto.DHPair) (dr.Session, error) {

@@ -31,9 +31,10 @@ type SegmentationLayer struct {
 // also its presence does not guarantee encryption.
 type EncryptionLayer struct {
 	// Payload after having been processed by the encryption layer
-	Payload         []byte `json:"-"`
-	Installations   []*Installation
-	HashRatchetInfo []*HashRatchetInfo
+	Payload            []byte `json:"-"`
+	SenderInstallation string `json:"-"`
+	Installations      []*Installation
+	HashRatchetInfo    []*HashRatchetInfo
 }
 
 // Message encapsulates layers of the protocol

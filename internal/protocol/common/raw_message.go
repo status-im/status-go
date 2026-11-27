@@ -24,6 +24,7 @@ type RawMessage struct {
 	// payloads, but RawMessage-based retries remain possible via ResendTypeRawMessage.
 	SkipEncryptionLayer   bool
 	SendPushNotification  bool
+	TrackSelfDelivery     bool
 	MessageType           protobuf.ApplicationMetadataMessage_Type
 	Payload               []byte
 	Sender                *ecdsa.PrivateKey

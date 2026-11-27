@@ -71,7 +71,7 @@ func (s *SQLLitePersistenceTestSuite) TestPublicBundle() {
 	key, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 
-	actualBundle, err := s.service.GetPublicBundle(&key.PublicKey, []*multidevice.Installation{{ID: "1", Version: 1}})
+	actualBundle, err := s.service.GetPublicBundle(&key.PublicKey, []*multidevice.Installation{{ID: "1", Version: protocolVersion}})
 	s.Require().NoError(err, "Error was not returned even though bundle is not there")
 	s.Nil(actualBundle)
 
@@ -82,7 +82,7 @@ func (s *SQLLitePersistenceTestSuite) TestPublicBundle() {
 	err = s.service.AddPublicBundle(bundle)
 	s.Require().NoError(err)
 
-	actualBundle, err = s.service.GetPublicBundle(&key.PublicKey, []*multidevice.Installation{{ID: "1", Version: 1}})
+	actualBundle, err = s.service.GetPublicBundle(&key.PublicKey, []*multidevice.Installation{{ID: "1", Version: protocolVersion}})
 	s.Require().NoError(err)
 	s.Equal(bundle.GetIdentity(), actualBundle.GetIdentity(), "It sets the right identity")
 	s.Equal(bundle.GetSignedPreKeys(), actualBundle.GetSignedPreKeys(), "It sets the right prekeys")
@@ -92,7 +92,7 @@ func (s *SQLLitePersistenceTestSuite) TestUpdatedBundle() {
 	key, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 
-	actualBundle, err := s.service.GetPublicBundle(&key.PublicKey, []*multidevice.Installation{{ID: "1", Version: 1}})
+	actualBundle, err := s.service.GetPublicBundle(&key.PublicKey, []*multidevice.Installation{{ID: "1", Version: protocolVersion}})
 	s.Require().NoError(err, "Error was not returned even though bundle is not there")
 	s.Nil(actualBundle)
 
@@ -114,7 +114,7 @@ func (s *SQLLitePersistenceTestSuite) TestUpdatedBundle() {
 	err = s.service.AddPublicBundle(bundle)
 	s.Require().NoError(err)
 
-	actualBundle, err = s.service.GetPublicBundle(&key.PublicKey, []*multidevice.Installation{{ID: "1", Version: 1}})
+	actualBundle, err = s.service.GetPublicBundle(&key.PublicKey, []*multidevice.Installation{{ID: "1", Version: protocolVersion}})
 	s.Require().NoError(err)
 	s.Equal(bundle.GetIdentity(), actualBundle.GetIdentity(), "It sets the right identity")
 	s.Equal(bundle.GetSignedPreKeys(), actualBundle.GetSignedPreKeys(), "It sets the right prekeys")
@@ -124,7 +124,7 @@ func (s *SQLLitePersistenceTestSuite) TestOutOfOrderBundles() {
 	key, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 
-	actualBundle, err := s.service.GetPublicBundle(&key.PublicKey, []*multidevice.Installation{{ID: "1", Version: 1}})
+	actualBundle, err := s.service.GetPublicBundle(&key.PublicKey, []*multidevice.Installation{{ID: "1", Version: protocolVersion}})
 	s.Require().NoError(err, "Error was not returned even though bundle is not there")
 	s.Nil(actualBundle)
 
@@ -151,7 +151,7 @@ func (s *SQLLitePersistenceTestSuite) TestOutOfOrderBundles() {
 	err = s.service.AddPublicBundle(bundle1)
 	s.Require().NoError(err)
 
-	actualBundle, err = s.service.GetPublicBundle(&key.PublicKey, []*multidevice.Installation{{ID: "1", Version: 1}})
+	actualBundle, err = s.service.GetPublicBundle(&key.PublicKey, []*multidevice.Installation{{ID: "1", Version: protocolVersion}})
 	s.Require().NoError(err)
 	s.Equal(bundle2.GetIdentity(), actualBundle.GetIdentity(), "It sets the right identity")
 	s.Equal(bundle2.GetSignedPreKeys()["1"].GetVersion(), uint32(1))
@@ -162,7 +162,7 @@ func (s *SQLLitePersistenceTestSuite) TestMultiplePublicBundle() {
 	key, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 
-	actualBundle, err := s.service.GetPublicBundle(&key.PublicKey, []*multidevice.Installation{{ID: "1", Version: 1}})
+	actualBundle, err := s.service.GetPublicBundle(&key.PublicKey, []*multidevice.Installation{{ID: "1", Version: protocolVersion}})
 	s.Require().NoError(err, "Error was not returned even though bundle is not there")
 	s.Nil(actualBundle)
 
@@ -188,7 +188,7 @@ func (s *SQLLitePersistenceTestSuite) TestMultiplePublicBundle() {
 	s.Require().NoError(err)
 
 	// Returns the most recent bundle
-	actualBundle, err = s.service.GetPublicBundle(&key.PublicKey, []*multidevice.Installation{{ID: "1", Version: 1}})
+	actualBundle, err = s.service.GetPublicBundle(&key.PublicKey, []*multidevice.Installation{{ID: "1", Version: protocolVersion}})
 	s.Require().NoError(err)
 
 	s.Equal(bundle.GetIdentity(), actualBundle.GetIdentity(), "It sets the identity")
@@ -200,7 +200,7 @@ func (s *SQLLitePersistenceTestSuite) TestMultiDevicePublicBundle() {
 	key, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 
-	actualBundle, err := s.service.GetPublicBundle(&key.PublicKey, []*multidevice.Installation{{ID: "1", Version: 1}})
+	actualBundle, err := s.service.GetPublicBundle(&key.PublicKey, []*multidevice.Installation{{ID: "1", Version: protocolVersion}})
 	s.Require().NoError(err, "Error was not returned even though bundle is not there")
 	s.Nil(actualBundle)
 

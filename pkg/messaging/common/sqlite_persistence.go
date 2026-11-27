@@ -90,6 +90,24 @@ func (p *SQLiteMessageConfirmationPersistence) MarkAsConfirmed(dataSyncID []byte
 	return
 }
 
+// MarkAsConfirmedFrom accepts an ACK only from the route the message was sent to.
+func (p *SQLiteMessageConfirmationPersistence) MarkAsConfirmedFrom(dataSyncID, recipient []byte) (cryptotypes.HexBytes, error) {
+	var messageID []byte
+	err := p.db.QueryRow(`UPDATE raw_message_confirmations
+		SET confirmed_at = ?
+		WHERE datasync_id = ? AND public_key = ? AND confirmed_at = 0
+		RETURNING CASE WHEN EXISTS (
+			SELECT 1 FROM raw_message_confirmations AS prior
+			WHERE prior.message_id = raw_message_confirmations.message_id
+				AND prior.public_key != raw_message_confirmations.public_key
+				AND prior.confirmed_at > 0
+		) THEN NULL ELSE message_id END`, time.Now().Unix(), dataSyncID, recipient).Scan(&messageID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	return messageID, err
+}
+
 type SQLiteHashRatchetPersistence struct {
 	db *sql.DB
 }

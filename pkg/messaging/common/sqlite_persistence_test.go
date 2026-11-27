@@ -135,6 +135,44 @@ func TestConfirmationsAtLeastOne(t *testing.T) {
 	require.Equal(t, cryptotypes.HexBytes(messageID1), messageID)
 }
 
+func TestInstallationConfirmations(t *testing.T) {
+	db, err := testutils.SetupTestMemorySQLDB(testutils.NewTestDBInitializer([]*bindata.AssetSource{
+		{Names: migrations.AssetNames(), AssetFunc: migrations.Asset},
+	}))
+	require.NoError(t, err)
+	persistence := NewSQLiteMessageConfirmationPersistence(db)
+
+	messageID := cryptotypes.HexBytes("self-message")
+	ackA, ackB := []byte("delivery-a"), []byte("delivery-b")
+	installationA, installationB := []byte("installation-a"), []byte("installation-b")
+	require.NoError(t, persistence.InsertPendingConfirmation(&MessageConfirmation{
+		MessageID: messageID, DataSyncID: ackA, PublicKey: installationA,
+	}))
+	require.NoError(t, persistence.InsertPendingConfirmation(&MessageConfirmation{
+		MessageID: messageID, DataSyncID: ackB, PublicKey: installationB,
+	}))
+
+	id, err := persistence.MarkAsConfirmedFrom(ackB, installationA)
+	require.NoError(t, err)
+	require.Empty(t, id)
+
+	id, err = persistence.MarkAsConfirmedFrom(ackA, installationA)
+	require.NoError(t, err)
+	require.Equal(t, messageID, id)
+
+	for _, ack := range []struct{ delivery, installation []byte }{
+		{ackA, installationA}, {ackB, installationB},
+	} {
+		id, err = persistence.MarkAsConfirmedFrom(ack.delivery, ack.installation)
+		require.NoError(t, err)
+		require.Empty(t, id)
+	}
+
+	var confirmed int
+	require.NoError(t, db.QueryRow("SELECT count(*) FROM raw_message_confirmations WHERE confirmed_at > 0").Scan(&confirmed))
+	require.Equal(t, 2, confirmed)
+}
+
 func TestSaveHashRatchetMessage(t *testing.T) {
 	db, err := testutils.SetupTestMemorySQLDB(testutils.NewTestDBInitializer([]*bindata.AssetSource{
 		{

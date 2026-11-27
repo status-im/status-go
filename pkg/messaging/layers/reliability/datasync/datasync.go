@@ -8,6 +8,7 @@ import (
 	"github.com/golang/protobuf/proto"
 	datasyncnode "github.com/status-im/mvds/node"
 	"github.com/status-im/mvds/protobuf"
+	"github.com/status-im/mvds/state"
 	datasynctransport "github.com/status-im/mvds/transport"
 	"go.uber.org/zap"
 
@@ -30,23 +31,26 @@ func New(node *datasyncnode.Node, transport *NodeTransport, sendingEnabled bool,
 
 // Unwrap tries to unwrap datasync message and passes back the message to datasync in order to acknowledge any potential message and mark messages as acknowledged
 func (d *DataSync) Unwrap(sender *ecdsa.PublicKey, payload []byte) (*protobuf.Payload, error) {
-	logger := d.logger.With(zap.String("site", "Handle"))
-
-	datasyncMessage, err := unwrap(payload)
-	// If it failed to decode is not a protobuf message, if it successfully decoded but body is empty, is likedly a protobuf wrapped message
-	if err != nil {
-		logger.Debug("Unwrapping datasync message failed", zap.Error(err))
-		return nil, err
-	} else if !datasyncMessage.IsValid() {
-		return nil, errors.New("handling non-datasync message")
-	} else {
-		logger.Debug("handling datasync message")
-		if d.sendingEnabled.Load() {
-			d.add(sender, &datasyncMessage)
-		}
+	if sender == nil {
+		return nil, errors.New("MVDS message has no sender")
 	}
+	datasyncMessage, err := DecodePayload(payload)
+	if err != nil {
+		return nil, err
+	}
+	return d.ProcessPayload(datasyncpeer.PublicKeyToPeerID(*sender), &datasyncMessage)
+}
 
-	return &datasyncMessage, nil
+func (d *DataSync) ProcessPayload(sender state.PeerID, datasyncMessage *protobuf.Payload) (*protobuf.Payload, error) {
+	logger := d.logger.With(zap.String("site", "Handle"))
+	if !datasyncMessage.IsValid() {
+		return nil, errors.New("handling non-datasync message")
+	}
+	logger.Debug("handling datasync message")
+	if d.sendingEnabled.Load() {
+		d.AddPacket(datasynctransport.Packet{Sender: sender, Payload: datasyncMessage})
+	}
+	return datasyncMessage, nil
 }
 
 func (d *DataSync) Stop() {
@@ -57,15 +61,7 @@ func (d *DataSync) SetSendingEnabled(v bool) {
 	d.sendingEnabled.Store(v)
 }
 
-func (d *DataSync) add(publicKey *ecdsa.PublicKey, datasyncMessage *protobuf.Payload) {
-	packet := datasynctransport.Packet{
-		Sender:  datasyncpeer.PublicKeyToPeerID(*publicKey),
-		Payload: datasyncMessage,
-	}
-	d.NodeTransport.AddPacket(packet)
-}
-
-func unwrap(payload []byte) (datasyncPayload protobuf.Payload, err error) {
+func DecodePayload(payload []byte) (datasyncPayload protobuf.Payload, err error) {
 	err = proto.Unmarshal(payload, &datasyncPayload)
 	return
 }

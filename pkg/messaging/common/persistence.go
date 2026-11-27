@@ -8,6 +8,7 @@ import (
 type MessageConfirmationPersistence interface {
 	InsertPendingConfirmation(confirmation *MessageConfirmation) error
 	MarkAsConfirmed(dataSyncID []byte, atLeastOne bool) (messageID cryptotypes.HexBytes, err error)
+	MarkAsConfirmedFrom(dataSyncID, recipient []byte) (cryptotypes.HexBytes, error)
 }
 
 type HashRatchetPersistence interface {
@@ -23,7 +24,7 @@ type MessageConfirmation struct {
 	DataSyncID []byte
 	// MessageID is the message id of the message
 	MessageID []byte
-	// PublicKey is the compressed receiver public key
+	// PublicKey is the compressed receiver public key or installation-scoped peer ID
 	PublicKey []byte
 	// ConfirmedAt is the unix timestamp in seconds of when the message was confirmed
 	ConfirmedAt int64
