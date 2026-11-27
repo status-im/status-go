@@ -8,6 +8,7 @@ import (
 	pkgerrors "github.com/pkg/errors"
 
 	"github.com/status-im/status-go/internal/crypto"
+	"github.com/status-im/status-go/pkg/messaging/delivery"
 	"github.com/status-im/status-go/pkg/messaging/waku/fleets"
 )
 
@@ -33,9 +34,13 @@ var defaultPushNotificationServers = []*ecdsa.PublicKey{
 }
 
 // LoadWakuFleetsFromFile replaces the supported fleets with definitions read
-// from a JSON file (whose structure must match FleetsMap).
+// from a JSON file (whose structure must match FleetsMap), and registers a
+// logos-delivery network preset for each of them.
 func LoadWakuFleetsFromFile(filepath string) error {
-	return fleets.LoadFromFile(filepath)
+	if err := fleets.LoadFromFile(filepath); err != nil {
+		return err
+	}
+	return delivery.RegisterFleetPresets(fleets.Supported())
 }
 
 func loadPushFleetsFromFile(filepath string) ([]string, error) {

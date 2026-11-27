@@ -13,21 +13,18 @@ import (
 )
 
 func TestDeliveryConfigUsesTheFleetPreset(t *testing.T) {
-	for fleet, preset := range map[string]string{
-		fleets.StatusProd:    "status.prod",
-		fleets.StatusStaging: "status.staging",
-	} {
+	for _, fleet := range []string{fleets.StatusProd, fleets.StatusStaging, "status-go.test"} {
 		cfg, err := deliveryConfig(CoreParams{Fleet: fleet, Mode: waku.ModeEdge, DataDir: "/data"})
 		require.NoError(t, err)
 
-		require.Equal(t, preset, cfg.Preset)
+		require.Equal(t, fleet, cfg.Preset)
 		require.Equal(t, bindings.ModeEdge, cfg.Mode)
 		require.Equal(t, bindings.Overrides{"reliability": false, "backfill-enabled": false, "configured-store-nodes-only": true, "local-storage-path": "/data"}, cfg.MessagingOverrides)
 	}
 }
 
-func TestDeliveryConfigRejectsFleetWithoutPreset(t *testing.T) {
-	_, err := deliveryConfig(CoreParams{Fleet: "unknown.fleet"})
+func TestDeliveryConfigRejectsNoFleet(t *testing.T) {
+	_, err := deliveryConfig(CoreParams{})
 	require.Error(t, err)
 }
 

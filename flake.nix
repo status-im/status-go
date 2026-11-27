@@ -35,7 +35,7 @@
     nim-sds.url = "git+https://github.com/logos-messaging/nim-sds?submodules=1&rev=8f7fee08f0256c1788089e756182c8be0a621930";
     # nimble 0.20.1 in the nixpkgs above cannot resolve nim-sds through the bindings.
     nixpkgs-nimble.url = "github:NixOS/nixpkgs/34ab99075ac4f7e40cf037eef32cb1c360bb85e9";
-    logos-delivery.url = "git+https://github.com/logos-messaging/logos-delivery?submodules=1&rev=529d01710fbd231e0f23356e1880a03cc25c1d44";
+    logos-delivery.url = "git+https://github.com/logos-messaging/logos-delivery?submodules=1&rev=b3bcd23b56db43400a26d1c740bd6855c7ff9c04";
   };
 
   outputs = { self, nixpkgs, logos-storage-nim, nim-sds, nim-token-lists, nixpkgs-nimble, logos-delivery }:
