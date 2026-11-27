@@ -17,7 +17,7 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 env:
   # Same image as the compose file default.
-  WAKU_IMAGE: quay.io/wakuorg/nwaku-pr:v0.41.0
+  WAKU_IMAGE: quay.io/wakuorg/nwaku-pr:4876
   # The test clients name their containers after it.
   BUILD_ID: ${{ github.run_id }}
   FUNCTIONAL_TESTS_DOCKER_IMAGE: status-backend-under-test
