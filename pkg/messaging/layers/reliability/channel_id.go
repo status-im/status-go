@@ -1,8 +1,6 @@
 package reliability
 
-// BuildChannelID returns the SDS channel ID format for community public
-// messages. Keep the format centralized so sender/receiver code changes in one
-// place.
+// BuildChannelID keeps the community's SDS history on its existing wire channel.
 func BuildChannelID(communityID string) string {
 	return communityID
 }

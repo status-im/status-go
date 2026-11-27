@@ -115,13 +115,14 @@ func createMigrationTables(database *sql.DB, maxVersion uint) error {
 }
 
 type sqlitePersistence struct {
-	db *sql.DB
+	db         *sql.DB
+	sdsStorage *reliability.SQLitePersistence
 }
 
 var _ Persistence = (*sqlitePersistence)(nil)
 
 func newSQLitePersistence(db *sql.DB) Persistence {
-	return &sqlitePersistence{db: db}
+	return &sqlitePersistence{db: db, sdsStorage: reliability.NewSQLitePersistence(db)}
 }
 
 type sqliteTransportPersistence struct {
@@ -155,7 +156,11 @@ func (p *sqlitePersistence) EncryptionStorage() encryption.Persistence {
 }
 
 func (p *sqlitePersistence) SDSPersistenceStorage() sds.PersistenceCallbacks {
-	return reliability.NewSQLitePersistence(p.db)
+	return p.sdsStorage
+}
+
+func (p *sqlitePersistence) SDSEnvelopeHashesStorage() reliability.SDSRetrievalHintPersistence {
+	return p.sdsStorage
 }
 
 func (p *sqlitePersistence) MessageConfirmationStorage() common.MessageConfirmationPersistence {

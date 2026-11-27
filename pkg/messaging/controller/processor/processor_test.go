@@ -18,6 +18,7 @@ import (
 	"github.com/stretchr/testify/suite"
 	"github.com/waku-org/sds-go-bindings/sds"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zaptest/observer"
 
 	"github.com/status-im/status-go/internal/crypto"
 	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
@@ -28,6 +29,7 @@ import (
 	encryption "github.com/status-im/status-go/pkg/messaging/layers/encryption"
 	encryptionmigrations "github.com/status-im/status-go/pkg/messaging/layers/encryption/migrations"
 	"github.com/status-im/status-go/pkg/messaging/layers/reliability"
+	reliabilitymigrations "github.com/status-im/status-go/pkg/messaging/layers/reliability/migrations"
 	reliabilitypb "github.com/status-im/status-go/pkg/messaging/layers/reliability/protobuf"
 	segmentation "github.com/status-im/status-go/pkg/messaging/layers/segmentation"
 	segmentationmigrations "github.com/status-im/status-go/pkg/messaging/layers/segmentation/migrations"
@@ -47,6 +49,24 @@ type ProcessorSuite struct {
 	processor   *Processor
 	testPayload []byte
 	logger      *zap.Logger
+}
+
+type testSDSRetrievalHintPersistence struct {
+	hints     map[string][][]byte
+	saveError error
+}
+
+func (p *testSDSRetrievalHintPersistence) SaveSDSRetrievalHints(channelID, messageID string, envelopeHashes [][]byte) error {
+	if p.saveError != nil {
+		return p.saveError
+	}
+	key := channelID + ":" + messageID
+	p.hints[key] = append(p.hints[key], envelopeHashes...)
+	return nil
+}
+
+func (p *testSDSRetrievalHintPersistence) LoadSDSRetrievalHints(channelID, messageID string) ([][]byte, error) {
+	return p.hints[channelID+":"+messageID], nil
 }
 
 func (s *ProcessorSuite) newStandaloneReliability(persistence ...sds.PersistenceCallbacks) *reliability.Reliability {
@@ -556,9 +576,147 @@ func (s *ProcessorSuite) TestSDSWrappedMessages() {
 	s.Require().False(receivedMsg2.SDSWrapped)
 }
 
+func (s *ProcessorSuite) TestProcessSDSLayerRecordsReceivedEnvelopeHashes() {
+	hintStore := &testSDSRetrievalHintPersistence{hints: make(map[string][][]byte)}
+	s.processor.stack.Reliability.SetSDSRetrievalHintPersistence(hintStore)
+
+	senderReliability := s.newStandaloneReliability()
+	const channelID = "community123general"
+	for _, test := range []struct {
+		name           string
+		payload        []byte
+		segmented      bool
+		transportHash  []byte
+		segmentHashes  [][]byte
+		expectedHashes [][]byte
+	}{
+		{
+			name:           "unsegmented",
+			payload:        []byte("received regular message"),
+			transportHash:  []byte("transport-hash"),
+			expectedHashes: [][]byte{[]byte("transport-hash")},
+		},
+		{
+			name:          "segmented",
+			payload:       []byte("received segmented message"),
+			segmented:     true,
+			transportHash: []byte("first-segment"),
+			segmentHashes: [][]byte{
+				[]byte("first-segment"),
+				[]byte("second-segment"),
+			},
+			expectedHashes: [][]byte{
+				[]byte("first-segment"),
+				[]byte("second-segment"),
+			},
+		},
+	} {
+		s.Run(test.name, func() {
+			wrapped, _, err := senderReliability.WrapPayloadForSDS(test.payload, channelID)
+			s.Require().NoError(err)
+
+			message := types.Message{
+				TransportLayer: types.TransportLayer{Hash: test.transportHash},
+				SegmentationLayer: types.SegmentationLayer{
+					Segmented: test.segmented,
+					Hashes:    test.segmentHashes,
+				},
+				EncryptionLayer: types.EncryptionLayer{Payload: wrapped},
+			}
+			s.Require().NoError(s.processor.processSDSLayer(&message))
+			s.Require().Equal(test.payload, message.EncryptionLayer.Payload)
+
+			messageID := cryptotypes.EncodeHex(crypto.Keccak256(test.payload))
+			got, err := hintStore.LoadSDSRetrievalHints(channelID, messageID)
+			s.Require().NoError(err)
+			s.Require().Equal(test.expectedHashes, got)
+		})
+	}
+}
+
+func (s *ProcessorSuite) TestSDSHintSaveFailureDoesNotPreventDelivery() {
+	for _, segmented := range []bool{false, true} {
+		name := "unsegmented"
+		if segmented {
+			name = "segmented"
+		}
+		s.Run(name, func() {
+			saveError := errors.New("injected hint save failure")
+			s.processor.stack.Reliability.SetSDSRetrievalHintPersistence(&testSDSRetrievalHintPersistence{
+				saveError: saveError,
+			})
+			core, logs := observer.New(zap.ErrorLevel)
+			s.processor.logger = zap.New(core)
+
+			payload := []byte("received SDS message with failed hint persistence: " + name)
+			const channelID = "community123general"
+			sender := s.newStandaloneReliability()
+			wrapped, messageID, err := sender.WrapPayloadForSDS(payload, channelID)
+			s.Require().NoError(err)
+			segments := [][]byte{wrapped}
+			if segmented {
+				segments, err = s.processor.stack.Segmentation.Segment(wrapped, (len(wrapped)+1)/2)
+				s.Require().NoError(err)
+				s.Require().Len(segments, 2)
+			}
+			key, err := crypto.GenerateKey()
+			s.Require().NoError(err)
+			hashes := make([][]byte, len(segments))
+			for i, segment := range segments {
+				hashes[i] = crypto.Keccak256(segment)
+				response, err := s.processor.ProcessMessage(&types.ReceivedMessage{
+					Sig:     crypto.FromECDSAPub(&key.PublicKey),
+					Hash:    hashes[i],
+					Payload: segment,
+				})
+				s.Require().NoError(err)
+				if i < len(segments)-1 {
+					s.Require().Nil(response)
+					continue
+				}
+				s.Require().NotNil(response)
+				s.Require().Len(response.Messages, 1)
+				message := response.Messages[0]
+				s.Require().Equal(payload, message.EncryptionLayer.Payload)
+				s.Require().True(message.SDSWrapped)
+				s.Require().Equal(segmented, message.SegmentationLayer.Segmented)
+				if segmented {
+					s.Require().True(message.SegmentationLayer.Completed)
+					s.Require().ElementsMatch(hashes, message.SegmentationLayer.Hashes)
+				}
+			}
+
+			entries := logs.FilterMessage("failed to persist received SDS retrieval hints").All()
+			s.Require().Len(entries, 1)
+			s.Require().Equal(channelID, entries[0].ContextMap()["channelID"])
+			s.Require().Equal(cryptotypes.EncodeHex(messageID), entries[0].ContextMap()["messageID"])
+			s.Require().Equal(saveError.Error(), entries[0].ContextMap()["error"])
+
+			if segmented {
+				response, err := s.processor.ProcessMessage(&types.ReceivedMessage{
+					Sig:     crypto.FromECDSAPub(&key.PublicKey),
+					Hash:    hashes[0],
+					Payload: segments[0],
+				})
+				s.Require().NoError(err)
+				s.Require().Nil(response, "completed segments must not deliver the message again")
+			}
+		})
+	}
+}
+
 func (s *ProcessorSuite) TestSDSMissingDependencyTriggersFetchHintsAndRecoversPayloads() {
 	senderReliability := s.newStandaloneReliability()
-	receiverReliability := s.newStandaloneReliability()
+	db, err := testutils.SetupTestMemorySQLDB(testutils.NewTestDBInitializer([]*bindata.AssetSource{
+		{Names: reliabilitymigrations.AssetNames(), AssetFunc: reliabilitymigrations.Asset},
+	}))
+	s.Require().NoError(err)
+	s.T().Cleanup(func() { s.Require().NoError(db.Close()) })
+	receiverStore := reliability.NewSQLitePersistence(db)
+	receiverReliability := s.newStandaloneReliability(receiverStore)
+	receiverReliability.SetSDSRetrievalHintPersistence(receiverStore)
+	hintStore := &testSDSRetrievalHintPersistence{hints: make(map[string][][]byte)}
+	senderReliability.SetSDSRetrievalHintPersistence(hintStore)
 
 	channelID := "community123general"
 	oldPayload := []byte("old-community-message")
@@ -568,9 +726,16 @@ func (s *ProcessorSuite) TestSDSMissingDependencyTriggersFetchHintsAndRecoversPa
 	expectedNewMessageID := cryptotypes.EncodeHex(crypto.Keccak256(newPayload))
 	expectedOldHint := "store-hash-" + expectedOldMessageID
 
+	s.Require().NoError(senderReliability.RecordSDSRetrievalHints(
+		channelID,
+		crypto.Keccak256(oldPayload),
+		[][]byte{[]byte(expectedOldHint)},
+	))
 	senderReliability.SetRetrievalHintProvider(func(messageID string) []byte {
+		hashes, err := senderReliability.SDSEnvelopeHashes(channelID, messageID)
+		s.Require().NoError(err)
 		hint, err := proto.Marshal(&reliabilitypb.RetrievalHint{
-			EnvelopeHashes: [][]byte{[]byte("store-hash-" + messageID)},
+			EnvelopeHashes: hashes,
 		})
 		s.Require().NoError(err)
 		return hint
@@ -611,9 +776,16 @@ func (s *ProcessorSuite) TestSDSMissingDependencyTriggersFetchHintsAndRecoversPa
 
 	newMessageFirst := types.Message{
 		EncryptionLayer: types.EncryptionLayer{Payload: wrappedNewPayload},
+		SegmentationLayer: types.SegmentationLayer{
+			Segmented: true,
+			Hashes:    [][]byte{[]byte("segment-a"), []byte("segment-b")},
+		},
 	}
 	err = s.processor.processSDSLayer(&newMessageFirst)
 	s.Require().NoError(err)
+	got, err := receiverStore.LoadSDSRetrievalHints(channelID, expectedNewMessageID)
+	s.Require().NoError(err)
+	s.Require().Empty(got, "buffered messages must not create durable hints")
 
 	err = testutils.RetryWithBackOff(func() error {
 		callsMu.Lock()
@@ -642,15 +814,20 @@ func (s *ProcessorSuite) TestSDSMissingDependencyTriggersFetchHintsAndRecoversPa
 
 	oldMessage := types.Message{
 		EncryptionLayer: types.EncryptionLayer{Payload: wrappedOldPayload},
+		TransportLayer:  types.TransportLayer{Hash: []byte("missing-envelope")},
 	}
 	err = s.processor.processSDSLayer(&oldMessage)
 	s.Require().NoError(err)
+	got, err = reliability.NewSQLitePersistence(db).LoadSDSRetrievalHints(channelID, expectedNewMessageID)
+	s.Require().NoError(err)
+	s.Require().Equal(newMessageFirst.SegmentationLayer.Hashes, got, "all segment hashes must survive promotion to history")
 	if bytes.Equal(oldMessage.EncryptionLayer.Payload, oldPayload) {
 		recovered["old"] = true
 	}
 
 	newMessageReplay := types.Message{
-		EncryptionLayer: types.EncryptionLayer{Payload: wrappedNewPayload},
+		EncryptionLayer:   types.EncryptionLayer{Payload: wrappedNewPayload},
+		SegmentationLayer: newMessageFirst.SegmentationLayer,
 	}
 	err = s.processor.processSDSLayer(&newMessageReplay)
 	s.Require().NoError(err)

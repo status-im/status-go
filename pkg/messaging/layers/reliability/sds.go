@@ -85,6 +85,8 @@ func (r *Reliability) recoverCorruptSDSChannel(manager *sds.ReliabilityManager, 
 
 // Wrap message with SDS protocol https://github.com/vacp2p/rfc-index/blob/main/vac/raw/sds.md
 func (r *Reliability) WrapPayloadForSDS(payload []byte, channelID string) ([]byte, []byte, error) {
+	// SDS asks for retrieval hints during wrapping, but its callback has no
+	// channel argument. Serialize wraps so the callback can use this channel.
 	r.sdsOpsMu.Lock()
 	defer r.sdsOpsMu.Unlock()
 
@@ -92,6 +94,14 @@ func (r *Reliability) WrapPayloadForSDS(payload []byte, channelID string) ([]byt
 	if manager == nil {
 		return nil, nil, ErrSDSManagerUnavailable
 	}
+	r.sdsChannelMu.Lock()
+	r.activeSDSChannelID = channelID
+	r.sdsChannelMu.Unlock()
+	defer func() {
+		r.sdsChannelMu.Lock()
+		r.activeSDSChannelID = ""
+		r.sdsChannelMu.Unlock()
+	}()
 
 	sdsMessageID := crypto.Keccak256(payload)
 
@@ -118,33 +128,55 @@ func (r *Reliability) WrapPayloadForSDS(payload []byte, channelID string) ([]byt
 }
 
 func (r *Reliability) UnwrapPayloadFromSDS(wrappedPayload []byte) ([]byte, error) {
+	payload, _, _, _, err := r.UnwrapPayloadFromSDSWithMetadata(wrappedPayload)
+	return payload, err
+}
+
+func (r *Reliability) UnwrapPayloadFromSDSWithMetadata(wrappedPayload []byte) (
+	payload []byte,
+	messageID []byte,
+	channelID string,
+	isSDS bool,
+	err error,
+) {
 	r.sdsOpsMu.Lock()
 	defer r.sdsOpsMu.Unlock()
 
 	manager := r.sdsManager
 	if manager == nil {
-		return nil, ErrSDSManagerUnavailable
+		return nil, nil, "", false, ErrSDSManagerUnavailable
 	}
 
 	unwrappedMessage, err := manager.UnwrapReceivedMessage(wrappedPayload)
 	if err != nil {
 		if errors.Is(err, sds.ErrNotSDS) {
 			// Legacy messages are not necessarily SDS-wrapped.
-			return wrappedPayload, nil
+			return wrappedPayload, nil, "", false, nil
 		}
 		if err = r.recoverCorruptSDSChannel(manager, err); err != nil {
-			return nil, errors.Wrap(err, "failed to unwrap message with SDS")
+			return nil, nil, "", false, errors.Wrap(err, "failed to unwrap message with SDS")
 		}
 		unwrappedMessage, err = manager.UnwrapReceivedMessage(wrappedPayload)
 		if err != nil {
-			return nil, errors.Wrap(err, "failed to unwrap message with SDS after recovery")
+			return nil, nil, "", false, errors.Wrap(err, "failed to unwrap message with SDS after recovery")
 		}
 	}
 
-	missingDeps := *unwrappedMessage.MissingDeps
+	if unwrappedMessage == nil || unwrappedMessage.Message == nil || *unwrappedMessage.Message == nil {
+		return nil, nil, "", false, errors.New("SDS unwrap returned no message")
+	}
+	if unwrappedMessage.ChannelId == nil || *unwrappedMessage.ChannelId == "" {
+		return nil, nil, "", false, errors.New("SDS unwrap returned no channel ID")
+	}
+
+	var missingDeps []sds.HistoryEntry
+	if unwrappedMessage.MissingDeps != nil {
+		missingDeps = *unwrappedMessage.MissingDeps
+	}
 	if len(missingDeps) > 0 {
 		r.logger.Debug("missing deps with SDS", zap.Any("missing-deps", missingDeps))
 	}
 
-	return *unwrappedMessage.Message, nil
+	payload = *unwrappedMessage.Message
+	return payload, crypto.Keccak256(payload), *unwrappedMessage.ChannelId, true, nil
 }
