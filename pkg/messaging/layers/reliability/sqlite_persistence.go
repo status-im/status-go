@@ -5,12 +5,16 @@ import (
 	"database/sql"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/waku-org/sds-go-bindings/sds"
+
+	"github.com/status-im/status-go/pkg/messaging/types"
 )
 
 type SQLitePersistence struct {
-	db *sql.DB
+	db  *sql.DB
+	now func() time.Time
 
 	// Serialize hint staging with the callbacks that promote or remove it.
 	hintsMu          sync.Mutex
@@ -34,14 +38,14 @@ var _ sds.PersistenceCallbacks = (*SQLitePersistence)(nil)
 var _ SDSRetrievalHintPersistence = (*SQLitePersistence)(nil)
 
 func NewSQLitePersistence(db *sql.DB) *SQLitePersistence {
-	return &SQLitePersistence{db: db, pendingHintIndex: make(map[sdsHintKey]*list.Element)}
+	return &SQLitePersistence{db: db, now: time.Now, pendingHintIndex: make(map[sdsHintKey]*list.Element)}
 }
 
 // NewSQLiteRetrievalHintPersistence opens the durable hints independently of
 // an SDS manager. Share NewSQLitePersistence with the history callbacks when
 // hints for pending messages need to be carried into history.
 func NewSQLiteRetrievalHintPersistence(db *sql.DB) SDSRetrievalHintPersistence {
-	return &SQLitePersistence{db: db}
+	return &SQLitePersistence{db: db, now: time.Now}
 }
 
 func (p *SQLitePersistence) SaveChannelMeta(channelID string, meta []byte) error {
@@ -195,6 +199,44 @@ func (p *SQLitePersistence) DropChannel(channelID string) error {
 		if key.channelID == channelID {
 			p.removePendingHint(key)
 		}
+	}
+	return nil
+}
+
+func (p *SQLitePersistence) SaveSDSMessageReceived(channelID, messageID string) error {
+	if channelID == "" || messageID == "" {
+		return fmt.Errorf("save received SDS message: empty channel or message ID")
+	}
+	_, err := p.db.Exec(
+		`INSERT OR IGNORE INTO sds_received_messages (channel_id, message_id, received_at) VALUES (?, ?, ?)`,
+		channelID, messageID, p.now().Unix(),
+	)
+	if err != nil {
+		return fmt.Errorf("save received SDS message: %w", err)
+	}
+	return nil
+}
+
+func (p *SQLitePersistence) IsSDSMessageReceived(channelID, messageID string) (bool, error) {
+	var received bool
+	err := p.db.QueryRow(
+		`SELECT EXISTS(SELECT 1 FROM sds_received_messages
+		 WHERE channel_id = ? AND message_id = ? AND received_at > ?)`,
+		channelID, messageID, p.now().Add(-types.StoreMessageRetention).Unix(),
+	).Scan(&received)
+	if err != nil {
+		return false, fmt.Errorf("check received SDS message: %w", err)
+	}
+	return received, nil
+}
+
+func (p *SQLitePersistence) DeleteExpiredSDSReceivedMessages() error {
+	_, err := p.db.Exec(
+		`DELETE FROM sds_received_messages WHERE received_at <= ?`,
+		p.now().Add(-types.StoreMessageRetention).Unix(),
+	)
+	if err != nil {
+		return fmt.Errorf("delete expired received SDS messages: %w", err)
 	}
 	return nil
 }

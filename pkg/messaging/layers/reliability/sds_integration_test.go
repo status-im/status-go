@@ -112,7 +112,7 @@ func TestSDSCorruptStateRecovery(t *testing.T) {
 				require.NoError(t, err)
 				receiver, err := NewReliability(
 					mvdsnode.NewSQLitePersistence(db), key,
-					func(string, []string, string) error { return nil },
+					func(string, []MissingDependency, string) error { return nil },
 					zap.NewNop(), persistence,
 				)
 				require.NoError(t, err)
@@ -150,7 +150,7 @@ func TestSDSConcurrentCorruptStateRecovery(t *testing.T) {
 	require.NoError(t, err)
 	receiver, err := NewReliability(
 		mvdsnode.NewSQLitePersistence(db), key,
-		func(string, []string, string) error { return nil },
+		func(string, []MissingDependency, string) error { return nil },
 		zap.NewNop(), persistence,
 	)
 	require.NoError(t, err)
@@ -219,7 +219,7 @@ func TestSDSPersistenceRecoveryFailuresRemainRetryable(t *testing.T) {
 			require.NoError(t, err)
 			receiver, err := NewReliability(
 				mvdsnode.NewSQLitePersistence(db), key,
-				func(string, []string, string) error { return nil },
+				func(string, []MissingDependency, string) error { return nil },
 				zap.NewNop(), persistence,
 			)
 			require.NoError(t, err)
@@ -283,7 +283,7 @@ func TestSDSDuplicateIsNotReaddedAfterManagerRestart(t *testing.T) {
 		receiver, err := NewReliability(
 			mvdsnode.NewSQLitePersistence(db),
 			key,
-			func(string, []string, string) error { return nil },
+			func(string, []MissingDependency, string) error { return nil },
 			zap.NewNop(),
 			persistence,
 		)
