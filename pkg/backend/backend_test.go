@@ -730,10 +730,13 @@ func TestLoginAccount(t *testing.T) {
 	require.True(t, acc.HasAcceptedTerms)
 
 	waitForLogin(c)
+	require.NoError(t, nodecfg.SetMessagingBackend(testContext.backend.appDB, "logos-delivery"))
 	require.NoError(t, testContext.backend.Logout())
 	require.NoError(t, testContext.backend.StopNode())
 
 	testContext.backend.UpdateRootDataDir(testContext.config.RootDataDir)
+	testContext.backend.SetMessagingBackend("go-waku")
+	t.Cleanup(func() { testContext.backend.SetMessagingBackend("") })
 
 	accounts, err := testContext.backend.GetAccounts()
 	require.NoError(t, err)
@@ -754,9 +757,15 @@ func TestLoginAccount(t *testing.T) {
 	waitForLogin(c)
 	require.Equal(t, nameserver, testContext.backend.config.WakuV2Config.Nameserver)
 
+	// The messaging backend override wins over the profile's setting, unsaved
+	require.Equal(t, "go-waku", testContext.backend.config.WakuV2Config.Backend)
+	persistedConfig, err := testContext.backend.GetNodeConfig()
+	require.NoError(t, err)
+	require.Equal(t, "logos-delivery", persistedConfig.WakuV2Config.Backend)
+
 	// A non-empty LogFilePath overrides and persists the profile's log directory
 	require.Equal(t, migratedLogDir, testContext.backend.config.LogDir)
-	persistedConfig, err := testContext.backend.GetNodeConfig()
+	persistedConfig, err = testContext.backend.GetNodeConfig()
 	require.NoError(t, err)
 	require.Equal(t, migratedLogDir, persistedConfig.LogDir)
 

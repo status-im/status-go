@@ -1,0 +1,1 @@
+ALTER TABLE wakuv2_config ADD COLUMN backend VARCHAR NOT NULL DEFAULT "";

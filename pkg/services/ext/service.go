@@ -78,6 +78,8 @@ type EnvelopeEventsHandler interface {
 type Service struct {
 	pausable.PauseBroadcaster
 	messaging *messaging.API
+	// messagingBackend is the backend of messaging.
+	messagingBackend messaging.Backend
 	// Written under messengerMu (Init, Stop). The service's own methods, the
 	// pause/resume hooks and work on other goroutines (the wallet's community and
 	// collectible info) read it through currentMessenger(), since Stop clears it while
@@ -192,6 +194,11 @@ func (s *Service) InitProtocol(params InitProtocolParams) error {
 		tracer = trace.NewTracer(otel.Tracer(name))
 	}
 
+	backend, err := messaging.ParseBackend(s.config.WakuV2Config.Backend)
+	if err != nil {
+		return err
+	}
+
 	messaging, err := messaging.NewCore(
 		messaging.CoreParams{
 			Identity:       params.Identity,
@@ -199,6 +206,7 @@ func (s *Service) InitProtocol(params InitProtocolParams) error {
 			WakuConfig:     s.config.WakuV2Config,
 			Fleet:          s.config.ClusterConfig.Fleet,
 			Mode:           messaging.ModeFromLightClient(s.config.WakuV2Config.LightClient),
+			Backend:        backend,
 			InstallationID: s.config.ShhextConfig.InstallationID,
 			TimeSource:     params.TimeSource,
 			DataDir:        filepath.Join(dataDir, "logos-delivery", params.Account.KeyUID),
@@ -213,6 +221,7 @@ func (s *Service) InitProtocol(params InitProtocolParams) error {
 		return err
 	}
 	s.messaging = messaging.API()
+	s.messagingBackend = backend.Resolve()
 
 	ensVerifier := ens.New(
 		s.logger,

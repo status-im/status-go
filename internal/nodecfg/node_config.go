@@ -150,6 +150,11 @@ func insertWakuV2ConfigPreMigration(tx *sql.Tx, c *params.NodeConfig) error {
 	return nil
 }
 
+func updateWakuV2ConfigBackend(tx *sql.Tx, c *params.NodeConfig) error {
+	_, err := tx.Exec(`UPDATE wakuv2_config SET backend = ? WHERE synthetic_id = 'id'`, c.WakuV2Config.Backend)
+	return err
+}
+
 func insertWakuV2ConfigPostMigration(tx *sql.Tx, c *params.NodeConfig) error {
 	// cluster_id is no longer carried on ClusterConfig; keep the column populated
 	// from the selected fleet so the DB schema is unchanged (no migration).
@@ -187,6 +192,7 @@ func nodeConfigNormalInserts() []insertFn {
 		insertClusterConfig,
 		insertShhExtConfig,
 		insertWakuV2ConfigPreMigration,
+		updateWakuV2ConfigBackend,
 		insertTorrentConfig,
 		insertLogosStorageConfig,
 		insertWakuV2ConfigPostMigration,
@@ -372,8 +378,9 @@ func loadNodeConfig(tx *sql.Tx) (*params.NodeConfig, error) {
 		}
 	}
 
-	err = tx.QueryRow(`SELECT light_client FROM wakuv2_config WHERE synthetic_id = 'id'`).Scan(
+	err = tx.QueryRow(`SELECT light_client, backend FROM wakuv2_config WHERE synthetic_id = 'id'`).Scan(
 		&nodecfg.WakuV2Config.LightClient,
+		&nodecfg.WakuV2Config.Backend,
 	)
 	if err != nil && err != sql.ErrNoRows {
 		return nil, err
@@ -429,6 +436,12 @@ func GetNodeConfigFromDB(db *sql.DB) (*params.NodeConfig, error) {
 
 func SetLightClient(db *sql.DB, enabled bool) error {
 	_, err := db.Exec(`UPDATE wakuv2_config SET light_client = ?`, enabled)
+	return err
+}
+
+// SetMessagingBackend sets the messaging backend the next login creates.
+func SetMessagingBackend(db *sql.DB, backend string) error {
+	_, err := db.Exec(`UPDATE wakuv2_config SET backend = ?`, backend)
 	return err
 }
 

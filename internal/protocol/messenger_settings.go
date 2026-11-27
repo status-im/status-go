@@ -12,6 +12,10 @@ func (m *Messenger) SetLightClient(request *requests.SetLightClient) error {
 	return nodecfg.SetLightClient(m.database, request.Enabled)
 }
 
+func (m *Messenger) SetMessagingBackend(request *requests.SetMessagingBackend) error {
+	return nodecfg.SetMessagingBackend(m.database, request.Backend)
+}
+
 func (m *Messenger) SetSyncingOnMobileNetwork(request *requests.SetSyncingOnMobileNetwork) error {
 	if err := request.Validate(); err != nil {
 		return err

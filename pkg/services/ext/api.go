@@ -13,6 +13,7 @@ import (
 	"github.com/status-im/status-go/internal/db/multiaccounts/settings"
 	"github.com/status-im/status-go/internal/logutils"
 	"github.com/status-im/status-go/internal/protocol/contacts"
+	"github.com/status-im/status-go/pkg/messaging"
 	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
 	"github.com/status-im/status-go/pkg/services/browsers"
 	"github.com/status-im/status-go/pkg/services/personal"
@@ -1465,6 +1466,19 @@ func (api *PublicAPI) FetchMessages(request *requests.FetchMessages) error {
 
 func (api *PublicAPI) SetLightClient(request *requests.SetLightClient) error {
 	return api.service.messenger.SetLightClient(request)
+}
+
+// SetMessagingBackend sets the messaging backend the next login creates.
+func (api *PublicAPI) SetMessagingBackend(request *requests.SetMessagingBackend) error {
+	if _, err := messaging.ParseBackend(request.Backend); err != nil {
+		return err
+	}
+	return api.service.messenger.SetMessagingBackend(request)
+}
+
+// MessagingBackend returns the messaging backend of this login.
+func (api *PublicAPI) MessagingBackend() string {
+	return api.service.messagingBackend.String()
 }
 
 // Deprecated: Use SetLogLevel from status.go instead. BTW, mobile don't use this anymore.

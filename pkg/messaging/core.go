@@ -87,6 +87,9 @@ type CoreParams struct {
 	Fleet string
 	Mode  Mode
 
+	// Backend is the transport NewCore creates.
+	Backend Backend
+
 	TimeSource timesource.Provider
 
 	// DataDir is where a logos-delivery backend keeps its state, unencrypted:
@@ -258,7 +261,7 @@ func NewCore(params CoreParams, options ...Options) (*Core, error) {
 		return nil, errors.New("persistence is not configured")
 	}
 
-	switch DefaultBackend {
+	switch params.Backend.Resolve() {
 	case BackendLogosDelivery:
 		backend, err := newDeliveryBackend(params, config.logger)
 		if err != nil {
