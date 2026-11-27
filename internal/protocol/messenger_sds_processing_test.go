@@ -265,6 +265,7 @@ func (s *MessengerSDSProcessingSuite) TestInvalidApplicationMessageRemainsRetrya
 		Hash:    crypto.Keccak256(wrapped),
 		Payload: wrapped,
 	}
+
 	for i := 0; i < 2; i++ {
 		response, err := s.m.handleRetrievedMessages(map[messagingtypes.ChatFilter][]*messagingtypes.ReceivedMessage{
 			{}: {envelope},

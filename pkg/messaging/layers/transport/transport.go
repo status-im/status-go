@@ -542,6 +542,21 @@ func (t *Transport) SendPublic(ctx context.Context, newMessage *wakutypes.NewMes
 		return nil, err
 	}
 
+	return t.sendPublicWithFilter(ctx, newMessage, filter)
+}
+
+// SendPublicWithExistingFilter publishes using a listening filter without
+// creating or acquiring a subscription.
+func (t *Transport) SendPublicWithExistingFilter(ctx context.Context, newMessage *wakutypes.NewMessage, chatName string) ([]byte, error) {
+	filter := t.filters.publicListeningFilter(chatName, newMessage.PubsubTopic)
+	if filter == nil {
+		return nil, errors.New("no public listening filter for chat and pubsub topic")
+	}
+
+	return t.sendPublicWithFilter(ctx, newMessage, filter)
+}
+
+func (t *Transport) sendPublicWithFilter(ctx context.Context, newMessage *wakutypes.NewMessage, filter *Filter) ([]byte, error) {
 	symKey, ok := t.filters.SymKey(filter.FilterID)
 	if !ok {
 		return nil, errors.New("no sym key found for filter")

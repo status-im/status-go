@@ -63,6 +63,37 @@ func publicSDSChannelID(params messagingtypes.SendPublicParams) string {
 	return reliability.BuildChannelID(communityID)
 }
 
+// SendSDSSync publishes a tick-generated metadata payload without tracking it as
+// an application message.
+func (s *Sender) SendSDSSync(ctx context.Context, payload []byte, pubsubTopic, syncTopic string) error {
+	if syncTopic == "" {
+		return errors.New("SDS sync topic is empty")
+	}
+	if len(payload) == 0 {
+		return errors.New("SDS sync payload is empty")
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	spec, err := s.stack.Encryption.BuildPublicMessage(s.identity, payload)
+	if err != nil {
+		return errors.Wrap(err, "failed to wrap SDS sync in encryption layer")
+	}
+	payload, err = proto.Marshal(spec.Message)
+	if err != nil {
+		return errors.Wrap(err, "failed to marshal SDS sync encryption layer")
+	}
+	_, _, err = s.sendPublic(ctx, s.logger.Named("sendSDSSync"), sendPublicParams{
+		payload:            payload,
+		pubsubTopic:        pubsubTopic,
+		contentTopic:       syncTopic,
+		ephemeral:          true,
+		priority:           &messagingtypes.LowPriority,
+		existingFilterOnly: true,
+	})
+	return errors.Wrap(err, "failed to send SDS sync")
+}
+
 func (s *Sender) SendPublic(ctx context.Context, params messagingtypes.SendPublicParams) error {
 	messageID := messagingtypes.MessageID(params.Sender, params.Payload)
 	var sdsMessageIDBytes []byte
@@ -191,6 +222,7 @@ type sendPublicParams struct {
 	ephemeral          bool
 	priority           *messagingtypes.MessagePriority
 	communityPublicKey *ecdsa.PublicKey
+	existingFilterOnly bool
 }
 
 func (s *Sender) sendPublic(ctx context.Context, logger *zap.Logger, params sendPublicParams) ([][]byte, []*wakutypes.NewMessage, error) {
@@ -217,6 +249,8 @@ func (s *Sender) sendPublic(ctx context.Context, logger *zap.Logger, params send
 			logger.Debug("sending community public message")
 			span.AddEvent("sending community public message")
 			hash, err = s.stack.Transport.SendCommunityMessage(ctx, wakuMessage, params.communityPublicKey)
+		} else if params.existingFilterOnly {
+			hash, err = s.stack.Transport.SendPublicWithExistingFilter(ctx, wakuMessage, params.contentTopic)
 		} else {
 			logger.Debug("sending public message")
 			span.AddEvent("sending public message")
