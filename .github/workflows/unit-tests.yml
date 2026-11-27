@@ -93,7 +93,7 @@ jobs:
 
   # Slices of the suite, see UNIT_TEST_PART in scripts/run_unit_tests.sh.
   tests:
-    name: ${{ matrix.part }}
+    name: ${{ matrix.part }} (${{ matrix.backend }})
     needs: prepare
     runs-on: ubuntu-24.04
     timeout-minutes: 60
@@ -114,8 +114,10 @@ jobs:
           - protocol:8/10
           - protocol:9/10
           - protocol:10/10
+        backend: [go-waku, logos-delivery]
     env:
       UNIT_TEST_PART: ${{ matrix.part }}
+      UNIT_TEST_BACKEND: ${{ matrix.backend }}
       UNIT_TEST_USE_DEVELOPMENT_LOGGER: false
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4

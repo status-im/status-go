@@ -7,6 +7,11 @@ from utils.retry_utils import retry_call
 from utils import fake
 
 
+def request_to_join_state(signal):
+    requests = signal.get("event", {}).get("requestsToJoinCommunity") or [{}]
+    return requests[0].get("state")
+
+
 @pytest.mark.rpc
 class TestCommunityMembershipRequests:
     @pytest.fixture()
@@ -52,8 +57,7 @@ class TestCommunityMembershipRequests:
 
         with creator.expect_signal(
             SignalType.MESSAGES_NEW,
-            accept_fn=lambda signal: signal.get("event", {}).get("requestsToJoinCommunity")[0].get("state")
-            == RequestToJoinState.RequestToJoinStateCanceled.value,
+            accept_fn=lambda signal: request_to_join_state(signal) == RequestToJoinState.RequestToJoinStateCanceled.value,
         ):
             pass
 
@@ -107,8 +111,7 @@ class TestCommunityMembershipRequests:
 
         with requester.expect_signal(
             SignalType.MESSAGES_NEW,
-            accept_fn=lambda signal: signal.get("event", {}).get("requestsToJoinCommunity")[0].get("state")
-            == RequestToJoinState.RequestToJoinStateAccepted.value,
+            accept_fn=lambda signal: request_to_join_state(signal) == RequestToJoinState.RequestToJoinStateAccepted.value,
         ):
             pass
 
