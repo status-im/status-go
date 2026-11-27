@@ -35,9 +35,10 @@
     nim-sds.url = "git+https://github.com/logos-messaging/nim-sds?submodules=1&rev=8f7fee08f0256c1788089e756182c8be0a621930";
     # nimble 0.20.1 in the nixpkgs above cannot resolve nim-sds through the bindings.
     nixpkgs-nimble.url = "github:NixOS/nixpkgs/34ab99075ac4f7e40cf037eef32cb1c360bb85e9";
+    logos-delivery.url = "git+https://github.com/logos-messaging/logos-delivery?submodules=1&rev=529d01710fbd231e0f23356e1880a03cc25c1d44";
   };
 
-  outputs = { self, nixpkgs, logos-storage-nim, nim-sds, nim-token-lists, nixpkgs-nimble }:
+  outputs = { self, nixpkgs, logos-storage-nim, nim-sds, nim-token-lists, nixpkgs-nimble, logos-delivery }:
   let
     stableSystems = [
       "x86_64-linux" "aarch64-linux"
@@ -64,6 +65,10 @@
             libtkl = final.callPackage ./nix/pkgs/libtkl { src = nim-token-lists; };
             libsds     = useTmpdirForNimCache nim-sds.packages.${system}.libsds;
             libstorage = useTmpdirForNimCache logos-storage-nim.packages.${system}.libstorage;
+            liblogosdelivery = final.callPackage ./nix/pkgs/liblogosdelivery {
+              liblogosdelivery = logos-delivery.packages.${system}.liblogosdelivery;
+              sealScript = ./scripts/seal_nim_lib.sh;
+            };
             nimble = nixpkgs-nimble.legacyPackages.${system}.nimble.overrideAttrs (_: {
               version = "0.26.1";
               src = final.fetchFromGitHub {
@@ -89,6 +94,7 @@
     in {
       status-go-library = statusGo.library;
       libtkl = pkgs.libtkl;
+      liblogosdelivery = pkgs.liblogosdelivery;
       status-go-mobile-android = statusGo.mobile.android {};
       status-go-mobile-ios = statusGo.mobile.ios {};
     });

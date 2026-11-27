@@ -11,7 +11,7 @@ in pkgs.mkShell {
     git jq which gcc rustc cargo openjdk openssl nim nimble go
     golangci-lint gopls
     protobuf_36
-    libsds libstorage libtkl
+    libsds libstorage libtkl liblogosdelivery
   ] ++ lib.optionals (isDarwin) [
     pkgs.xcodeWrapper
   ];
@@ -27,6 +27,7 @@ in pkgs.mkShell {
     export LOGOS_STORAGE_INC_DIR="${pkgs.libstorage}/include"
     export NIM_SDS_INC_DIR="${pkgs.libsds}/include"
     export NIM_SDS_LIB_DIR="${pkgs.libsds}/lib"
+    export NIM_DELIVERY_LIB_DIR="${pkgs.liblogosdelivery}/lib"
 
     export LD_LIBRARY_PATH="${lib.makeLibraryPath (with pkgs; [libsds libstorage])}"
   '' + lib.optionalString (!isDarwin && isAarch64) ''
