@@ -88,6 +88,11 @@ type CoreParams struct {
 	Mode  Mode
 
 	TimeSource timesource.Provider
+
+	// DataDir is where a logos-delivery backend keeps its state, unencrypted:
+	// nothing sensitive while backfill-enabled is off. Enabling it needs this
+	// state moved to the encrypted DB (https://github.com/logos-messaging/logos-delivery/issues/4588).
+	DataDir string
 }
 
 func newCore(waku wakutypes.Waku, params CoreParams, config *config) (*Core, error) {
@@ -253,6 +258,24 @@ func NewCore(params CoreParams, options ...Options) (*Core, error) {
 		return nil, errors.New("persistence is not configured")
 	}
 
+	switch DefaultBackend {
+	case BackendLogosDelivery:
+		backend, err := newDeliveryBackend(params, config.logger)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to create logos-delivery backend")
+		}
+		core, err := newCore(backend, params, config)
+		if err != nil {
+			_ = backend.Stop()
+			return nil, err
+		}
+		return core, nil
+	default:
+		return newGoWakuCore(params, config)
+	}
+}
+
+func newGoWakuCore(params CoreParams, config *config) (*Core, error) {
 	waku, err := newWaku(wakuParams{
 		nodeKey:        params.NodeKey,
 		fleet:          params.Fleet,
@@ -414,7 +437,9 @@ func (c *Core) startWakuMetrics() error {
 		}
 
 		// TODO: Remove type assertion once Waku metrics are fully integrated into the Messaging module.
-		c.waku.(*waku.Waku).SetMetricsHandler(wakuMetricsHandler)
+		if w, ok := c.waku.(*waku.Waku); ok {
+			w.SetMetricsHandler(wakuMetricsHandler)
+		}
 
 		c.wakumetrics = wakuMetricsHandler
 	}
@@ -424,7 +449,10 @@ func (c *Core) startWakuMetrics() error {
 
 func (c *Core) metrics() string {
 	// TODO: Remove type assertion once Waku metrics are fully integrated into the Messaging module.
-	return c.waku.(*waku.Waku).Metrics()
+	if m, ok := c.waku.(interface{ Metrics() string }); ok {
+		return m.Metrics()
+	}
+	return ""
 }
 
 func (c *Core) generateHashRatchetKey(groupID []byte) error {
