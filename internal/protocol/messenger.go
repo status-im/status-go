@@ -890,6 +890,11 @@ func (m *Messenger) buildContactCodeAdvertisement() (*protobuf.ContactCodeAdvert
 // publishContactCode sends a public message wrapped in the encryption
 // layer, which will propagate our bundle
 func (m *Messenger) publishContactCode() error {
+	// Published once the messenger, started, goes online.
+	if !m.started {
+		m.shouldPublishContactCode = true
+		return nil
+	}
 	m.logger.Debug("sending contact code")
 
 	ctx, span := m.tracer.Start(context.Background(), "Messenger.publishContactCode")
@@ -1834,6 +1839,10 @@ func (m *Messenger) HasPairedDevices() bool {
 
 // sendToPairedDevices will check if we have any paired devices and send to them if necessary
 func (m *Messenger) sendToPairedDevices(ctx context.Context, spec common.RawMessage) error {
+	// Before Start, there is no node to send through.
+	if !m.started {
+		return nil
+	}
 	hasPairedDevices := m.hasPairedDevices()
 	// We send a message to any paired device
 	if hasPairedDevices {

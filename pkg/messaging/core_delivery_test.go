@@ -39,3 +39,18 @@ func TestDeliveryConfigTurnsQUICOffOnTheDiscv5Port(t *testing.T) {
 	require.NoError(t, err)
 	require.NotContains(t, cfg.MessagingOverrides, "quic-support")
 }
+
+func TestDeliveryConfigAdvertisesTheInterfaceIPOnlyWhenAsked(t *testing.T) {
+	cfg, err := deliveryConfig(CoreParams{Fleet: fleets.StatusProd})
+	require.NoError(t, err)
+	require.NotContains(t, cfg.MessagingOverrides, "nat")
+
+	ip, err := interfaceIPv4()
+	if err != nil {
+		t.Skip("the host has no non-loopback IPv4 address")
+	}
+	t.Setenv(advertiseInterfaceIPEnv, "1")
+	cfg, err = deliveryConfig(CoreParams{Fleet: fleets.StatusProd})
+	require.NoError(t, err)
+	require.Equal(t, "extip:"+ip.String(), cfg.MessagingOverrides["nat"])
+}
