@@ -23,15 +23,14 @@ import (
 	"github.com/status-im/status-go/pkg/messaging/waku/types"
 )
 
-// ErrStoreQueryUnsupported is returned by StoreQuery: the Messaging API
-// recovers history itself and exposes no store query.
-var ErrStoreQueryUnsupported = errors.New("store queries are not exposed by the Messaging API")
-
 // Adapter is the messaging backend over the logos-delivery Messaging API.
 // It satisfies types.Waku and transport.MessagingAPI.
 type Adapter struct {
 	mc     *messaging.MessagingClient
 	logger *zap.Logger
+
+	storeRequestor waku.StoreRequestor
+	storeClient    *waku.StoreClient
 
 	envelopeFeed event.Feed
 
@@ -67,22 +66,25 @@ func NewAdapter(cfg messaging.Config, logger *zap.Logger) (*Adapter, error) {
 	if err != nil {
 		return nil, fmt.Errorf("create node: %w", err)
 	}
-	a := newAdapter(mc, logger)
+	a := newAdapter(mc, nodeStoreRequestor{mc}, logger)
 	if err := a.readNodeInfo(); err != nil {
 		return nil, errors.Join(err, mc.Close())
 	}
 	return a, nil
 }
 
-func newAdapter(mc *messaging.MessagingClient, logger *zap.Logger) *Adapter {
-	return &Adapter{
+func newAdapter(mc *messaging.MessagingClient, storeRequestor waku.StoreRequestor, logger *zap.Logger) *Adapter {
+	a := &Adapter{
 		mc:                     mc,
 		logger:                 logger.Named("delivery"),
+		storeRequestor:         storeRequestor,
 		connSubscribers:        make(map[string]*types.ConnStatusSubscription),
 		topics:                 make(map[string]struct{}),
 		historyReconcileNeeded: make(chan types.HistoryReconcileWindow, 16),
 		quit:                   make(chan struct{}),
 	}
+	a.storeClient = waku.NewStoreClientOver(storeRequestor, storeProcessor{a}, a.logger)
+	return a
 }
 
 var _ types.Waku = (*Adapter)(nil)
@@ -112,6 +114,15 @@ func (a *Adapter) readNodeInfo() error {
 		return fmt.Errorf("max message size: %w", err)
 	}
 	a.maxMessageSize.Store(uint32(size))
+	storenodes, err := a.mc.Node().Debug().StoreNodes()
+	if err != nil {
+		return fmt.Errorf("store nodes: %w", err)
+	}
+	storenodeInfos, err := peer.AddrInfosFromP2pAddrs(storenodes...)
+	if err != nil {
+		return fmt.Errorf("store nodes: %w", err)
+	}
+	a.storeClient.SetStorenodes(storenodeInfos)
 	return nil
 }
 
@@ -428,17 +439,6 @@ func (a *Adapter) Metrics() string {
 		return ""
 	}
 	return metrics
-}
-
-// StoreQuery always fails with ErrStoreQueryUnsupported.
-func (a *Adapter) StoreQuery(
-	ctx context.Context,
-	batch types.MailserverBatch,
-	pageLimit uint64,
-	shouldProcessNextPage func(int) (bool, uint64),
-	processEnvelopes bool,
-) error {
-	return ErrStoreQueryUnsupported
 }
 
 func decodeHash(s string) []byte {

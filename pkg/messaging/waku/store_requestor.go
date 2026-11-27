@@ -11,15 +11,15 @@ import (
 	"github.com/status-im/status-go/internal/panics"
 )
 
-// storeRequestor performs one raw store-query request against a single storenode.
+// StoreRequestor performs one raw store-query request against a single storenode.
 // It is the only seam that talks to the store transport, which keeps the pager
 // unit-testable and lets Phase 2 swap go-waku's store client for the Logos
 // Delivery store FFI here without touching the pager.
-type storeRequestor interface {
-	query(ctx context.Context, peerInfo peer.AddrInfo, request *storepb.StoreQueryRequest) (messages []*storepb.WakuMessageKeyValue, cursor []byte, err error)
+type StoreRequestor interface {
+	Query(ctx context.Context, peerInfo peer.AddrInfo, request *storepb.StoreQueryRequest) (messages []*storepb.WakuMessageKeyValue, cursor []byte, err error)
 }
 
-// wakuStoreRequestor is the go-waku-backed storeRequestor: the request rides the
+// wakuStoreRequestor is the go-waku-backed StoreRequestor: the request rides the
 // go-waku node's libp2p host (this is the remaining go-waku/libp2p coupling that
 // Phase 2 removes).
 type wakuStoreRequestor struct {
@@ -31,10 +31,10 @@ type rawStoreRequester interface {
 	RequestRaw(ctx context.Context, peerInfo peer.AddrInfo, request *storepb.StoreQueryRequest) (store.Result, error)
 }
 
-// query returns as soon as ctx is done. RequestRaw only uses ctx to open the
+// Query returns as soon as ctx is done. RequestRaw only uses ctx to open the
 // stream, so after cancellation the request keeps running in the background until
 // the storenode replies or the connection drops.
-func (r wakuStoreRequestor) query(ctx context.Context, peerInfo peer.AddrInfo, request *storepb.StoreQueryRequest) ([]*storepb.WakuMessageKeyValue, []byte, error) {
+func (r wakuStoreRequestor) Query(ctx context.Context, peerInfo peer.AddrInfo, request *storepb.StoreQueryRequest) ([]*storepb.WakuMessageKeyValue, []byte, error) {
 	type reply struct {
 		result store.Result
 		err    error

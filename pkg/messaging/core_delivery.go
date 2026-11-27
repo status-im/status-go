@@ -30,8 +30,9 @@ func deliveryConfig(params CoreParams) (bindings.Config, error) {
 		mode = bindings.ModeEdge
 	}
 	overrides := bindings.Overrides{
-		"reliability":      false,
-		"backfill-enabled": false,
+		"reliability":                 false,
+		"backfill-enabled":            false,
+		"configured-store-nodes-only": true,
 	}
 	if params.NodeKey != nil {
 		overrides["nodekey"] = hex.EncodeToString(crypto.FromECDSA(params.NodeKey))
