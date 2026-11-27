@@ -471,6 +471,39 @@ func (s *MessengerLocalBackupSuite) TestLocalBackup() {
 	s.Require().Equal(bob2.selfContact.ID, pinnedMessages[0].PinnedBy)
 }
 
+func (s *MessengerLocalBackupSuite) TestSelfChatWithoutPairedDevices() {
+	origin := s.m
+	chatID := origin.myHexIdentity()
+	_, err := origin.CreateOneToOneChat(&requests.CreateOneToOneChat{ID: types.FromHex(chatID)})
+	s.Require().NoError(err)
+	s.Require().False(origin.hasPairedDevices())
+	s.Require().NoError(origin.settings.SaveSetting(settings.MessagesBackupEnabled.GetReactName(), true))
+
+	var ids []string
+	for range 2 {
+		message := buildTestMessage(*origin.Chat(chatID))
+		response, err := origin.SendChatMessage(context.Background(), message)
+		s.Require().NoError(err)
+		s.Require().Len(response.Messages(), 1)
+		saved := response.Messages()[0]
+		s.Require().NotEmpty(saved.ID)
+		s.Require().Equal(common.OutgoingStatusSent, saved.OutgoingStatus)
+		ids = append(ids, saved.ID)
+	}
+	s.Require().NotEqual(ids[0], ids[1])
+
+	backup, err := origin.ExportBackup()
+	s.Require().NoError(err)
+	restored := s.anotherMessenger()
+	s.Require().NoError(restored.ImportBackup(backup))
+	s.Require().NotNil(restored.Chat(chatID))
+	for _, id := range ids {
+		message, err := restored.persistence.MessageByID(id)
+		s.Require().NoError(err)
+		s.Require().Equal(chatID, message.LocalChatID)
+	}
+}
+
 func (s *MessengerLocalBackupSuite) TestExportBackup_ExcludesNonCanonicalSelfContact() {
 	canonicalSelfID := s.m.myHexIdentity()
 	nonCanonicalSelfID := "0X" + strings.ToUpper(canonicalSelfID[2:])

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -11,6 +12,7 @@ import (
 	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/internal/testutils/fake"
 	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
+	"github.com/status-im/status-go/pkg/services/media"
 )
 
 func TestMessengerSyncProfilePictureSuite(t *testing.T) {
@@ -29,7 +31,12 @@ func (s *MessengerSyncProfilePictureSuite) TestSyncProfilePicture() {
 	// pair
 	theirMessenger := s.anotherMessenger()
 
-	err := theirMessenger.SetInstallationMetadata(theirMessenger.installationID, &messagingtypes.InstallationMetadata{
+	mediaServer, err := media.NewServer(theirMessenger.database, nil, nil, nil)
+	s.Require().NoError(err)
+	mediaServer.SetURLStateForTest(&net.TCPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 12345}, 0, nil)
+	theirMessenger.SetMediaServer(mediaServer)
+
+	err = theirMessenger.SetInstallationMetadata(theirMessenger.installationID, &messagingtypes.InstallationMetadata{
 		Name:       "their-name",
 		DeviceType: "their-device-type",
 	})
@@ -94,6 +101,10 @@ func (s *MessengerSyncProfilePictureSuite) TestSyncProfilePicture() {
 	s.Require().NoError(err)
 	s.Require().Equal(2, len(syncedImages))
 	s.Require().Equal(2, len(response.IdentityImages))
+	for _, image := range response.IdentityImages {
+		s.Require().Equal(mediaServer.MakeAccountImageURL(keyUID, image.Name, highClock), image.LocalURL)
+		s.Require().Contains(image.LocalURL, "127.0.0.1:12345")
+	}
 
 	// Check that we don't update images with earlier clock values
 

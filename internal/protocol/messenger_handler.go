@@ -728,11 +728,17 @@ func (m *Messenger) HandleSyncProfilePictures(ctx context.Context, state *Receiv
 		return nil
 	}
 
-	err = m.multiAccounts.StoreIdentityImages(message.KeyUid, idImages[:i], false)
-	if err == nil {
-		state.Response.IdentityImages = idImages[:i]
+	syncedImages := idImages[:i]
+	if err := m.multiAccounts.StoreIdentityImages(message.KeyUid, syncedImages, false); err != nil {
+		return err
 	}
-	return err
+	if m.httpServer != nil {
+		for j, image := range syncedImages {
+			syncedImages[j].LocalURL = m.httpServer.MakeAccountImageURL(message.KeyUid, image.Name, image.Clock)
+		}
+	}
+	state.Response.IdentityImages = syncedImages
+	return nil
 }
 
 func (m *Messenger) HandleSyncChat(ctx context.Context, state *ReceivedMessageState, message *protobuf.SyncChat, statusMessage *common.StatusMessage) error {
@@ -2468,9 +2474,12 @@ func (m *Messenger) handleChatMessage(ctx context.Context, state *ReceivedMessag
 		return err
 	}
 
-	// Our own message, mark as sent
 	if isSyncMessage {
 		receivedMessage.OutgoingStatus = common.OutgoingStatusSent
+		if chat.OneToOne() && chat.ID == m.myHexIdentity() {
+			// This installation received the note, so its copy is delivered.
+			receivedMessage.OutgoingStatus = common.OutgoingStatusDelivered
+		}
 	} else if !receivedMessage.Seen && communityChatAccessible {
 		// Increase unviewed count
 		skipUpdateUnviewedCountForAlbums := false

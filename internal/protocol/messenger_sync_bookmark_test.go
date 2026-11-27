@@ -10,6 +10,9 @@ import (
 
 	"github.com/status-im/status-go/internal/connection"
 	"github.com/status-im/status-go/internal/crypto"
+	cryptotypes "github.com/status-im/status-go/internal/crypto/types"
+	"github.com/status-im/status-go/internal/protocol/common"
+	"github.com/status-im/status-go/internal/protocol/requests"
 	"github.com/status-im/status-go/internal/testutils"
 	"github.com/status-im/status-go/pkg/messaging/layers/reliability"
 	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
@@ -178,14 +181,62 @@ func (s *MessengerSyncBookmarkSuite) TestPairedInstallationsRetryIndependently()
 		return err == nil && pending == 0
 	}, 10*time.Second, 100*time.Millisecond)
 
-	// A queued sync for a device that is disabled must stop retrying.
-	bookmark = browsers.Bookmark{Name: "pending delivery", URL: "https://example.com"}
-	s.Require().NoError(origin.SyncBookmark(ctx, &bookmark, origin.dispatchMessage))
+	// Self-chat uses the same delivery route and identifies a visible message
+	// for delivery confirmation.
+	_, err = origin.CreateOneToOneChat(&requests.CreateOneToOneChat{ID: cryptotypes.FromHex(origin.myHexIdentity())})
+	s.Require().NoError(err)
+	message := buildTestMessage(*origin.Chat(origin.myHexIdentity()))
+	message.Text = "self-chat"
+	response, err := origin.SendChatMessage(ctx, message)
+	s.Require().NoError(err)
+	s.Require().Len(response.Messages(), 1)
+	id := response.Messages()[0].ID
+	_, err = WaitOnMessengerResponse(online, func(r *MessengerResponse) bool {
+		for _, item := range r.Messages() {
+			if item.ID == id {
+				return item.Seen && item.LocalChatID == origin.myHexIdentity()
+			}
+		}
+		return false
+	}, "online installation did not receive self-message")
+	s.Require().NoError(err)
+	received, err := online.persistence.MessageByID(id)
+	s.Require().NoError(err)
+	s.Require().Equal(common.OutgoingStatusDelivered, received.OutgoingStatus)
+	s.Require().Eventually(func() bool {
+		_, _ = origin.RetrieveAll()
+		outgoing, err := origin.persistence.MessageByID(id)
+		return err == nil && outgoing.OutgoingStatus == common.OutgoingStatusDelivered
+	}, 10*time.Second, 100*time.Millisecond)
+
 	var pending int
+	err = origin.database.QueryRow("SELECT count(*) FROM mvds_states WHERE peer_id = ?", offlinePeer[:]).Scan(&pending)
+	s.Require().NoError(err)
+	s.Require().Equal(1, pending)
 	s.Require().NoError(origin.DisableInstallation(offline.installationID))
 	err = origin.database.QueryRow("SELECT count(*) FROM mvds_states WHERE peer_id = ?", offlinePeer[:]).Scan(&pending)
 	s.Require().NoError(err)
 	s.Require().Zero(pending)
+
+	_, err = origin.EditMessage(ctx, &requests.EditMessage{ID: cryptotypes.FromHex(id), Text: "edited self-chat"})
+	s.Require().NoError(err)
+	_, err = WaitOnMessengerResponse(online, func(response *MessengerResponse) bool {
+		for _, item := range response.Messages() {
+			if item.ID == id {
+				return item.Text == "edited self-chat"
+			}
+		}
+		return false
+	}, "online installation did not receive self-chat edit")
+	s.Require().NoError(err)
+
+	_, err = origin.DeleteMessageAndSend(ctx, id)
+	s.Require().NoError(err)
+	s.Require().Eventually(func() bool {
+		_, _ = online.RetrieveAll()
+		item, err := online.persistence.MessageByID(id)
+		return err == nil && item.Deleted
+	}, 10*time.Second, 100*time.Millisecond)
 
 	// Emulate an older peer's advertised version. Both peers use the same
 	// profile key, but only the upgraded one should get a scoped entry.
