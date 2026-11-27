@@ -49,6 +49,7 @@ type MessageSentHandler func(messageID string)
 type Reliability struct {
 	identity              *ecdsa.PrivateKey
 	mvdsPersistence       mvdsnode.Persistence
+	sdsPersistence        sds.PersistenceCallbacks
 	mvdsStatusChangeEvent chan mvdsnode.PeerStatusChangeEvent
 	peerActivity          peerActivity
 	sdsManager            *sds.ReliabilityManager
@@ -74,17 +75,28 @@ type Reliability struct {
 
 	sdsManagerFactory sdsManagerFactoryFunc
 
-	// sdsOpsMu coordinates SDS manager calls with shutdown. SDS hot-path calls
-	// hold RLock for the full native call; Close holds Lock before Cleanup so
-	// Cleanup cannot race with in-flight SDS manager usage.
-	sdsOpsMu sync.RWMutex
+	// sdsOpsMu serializes SDS calls and channel recovery with manager shutdown.
+	sdsOpsMu sync.Mutex
 }
 
-func NewReliability(datasyncPersistence mvdsnode.Persistence, identity *ecdsa.PrivateKey, missingDepsHandler MissingDependenciesHandler, logger *zap.Logger) (*Reliability, error) {
-	newSDSManager := func(logger *zap.Logger) (*sds.ReliabilityManager, error) {
-		return sds.NewReliabilityManager(logger, nil)
+func NewReliability(datasyncPersistence mvdsnode.Persistence, identity *ecdsa.PrivateKey, missingDepsHandler MissingDependenciesHandler, logger *zap.Logger, persistence ...sds.PersistenceCallbacks) (*Reliability, error) {
+	if len(persistence) > 1 {
+		return nil, errors.New("at most one SDS persistence callback set is allowed")
 	}
-	return newReliabilityWithSDSFactory(datasyncPersistence, identity, missingDepsHandler, logger, newSDSManager)
+	var sdsPersistence sds.PersistenceCallbacks
+	if len(persistence) == 1 {
+		sdsPersistence = persistence[0]
+	}
+	return newReliabilityWithSDSFactory(
+		datasyncPersistence,
+		identity,
+		missingDepsHandler,
+		logger,
+		sdsPersistence,
+		func(logger *zap.Logger, persistence sds.PersistenceCallbacks) (*sds.ReliabilityManager, error) {
+			return sds.NewReliabilityManager(logger, persistence)
+		},
+	)
 }
 
 func newReliabilityWithSDSFactory(
@@ -92,6 +104,7 @@ func newReliabilityWithSDSFactory(
 	identity *ecdsa.PrivateKey,
 	missingDepsHandler MissingDependenciesHandler,
 	logger *zap.Logger,
+	sdsPersistence sds.PersistenceCallbacks,
 	sdsManagerFactory sdsManagerFactoryFunc,
 ) (*Reliability, error) {
 	if missingDepsHandler == nil {
@@ -104,6 +117,7 @@ func newReliabilityWithSDSFactory(
 	r := &Reliability{
 		identity:              identity,
 		mvdsPersistence:       datasyncPersistence,
+		sdsPersistence:        sdsPersistence,
 		mvdsStatusChangeEvent: make(chan mvdsnode.PeerStatusChangeEvent, 5),
 		logger:                logger,
 		missingDepsHandler:    missingDepsHandler,
@@ -123,6 +137,7 @@ func (r *Reliability) buildSdsManager() error {
 	manager, err := newSdsReliabilityManager(
 		r.sdsManagerFactory,
 		r.logger.Named("sds"),
+		r.sdsPersistence,
 		r.handleSDSMessageSent,
 		r.handleMissingDependencies,
 		r.provideRetrievalHint,

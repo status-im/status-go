@@ -32,7 +32,7 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
     # We cannot do follows since the nim-unwrapped-2_0 doesn't exist in this nixpkgs version above
-    nim-sds.url = "git+https://github.com/logos-messaging/nim-sds?submodules=1&rev=8f7fee08f0256c1788089e756182c8be0a621930";
+    nim-sds.url = "git+https://github.com/logos-messaging/nim-sds?submodules=1&rev=ac613a72ae17402e898f3d996651f8746d8b0baf&ref=fix/sds-corrupt-state-recovery";
     # nimble 0.20.1 in the nixpkgs above cannot resolve nim-sds through the bindings.
     nixpkgs-nimble.url = "github:NixOS/nixpkgs/34ab99075ac4f7e40cf037eef32cb1c360bb85e9";
   };

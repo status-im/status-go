@@ -4055,8 +4055,7 @@ func (m *Manager) SaveRequestToJoinAndCommunity(requestToJoin *RequestToJoin, co
 	return community, requestToJoin, nil
 }
 
-func (m *Manager) CreateRequestToJoin(request *requests.RequestToJoinCommunity, customizationColor multiaccountscommon.CustomizationColor) *RequestToJoin {
-	clock := uint64(time.Now().Unix())
+func (m *Manager) CreateRequestToJoin(request *requests.RequestToJoinCommunity, customizationColor multiaccountscommon.CustomizationColor, clock uint64) *RequestToJoin {
 	requestToJoin := &RequestToJoin{
 		PublicKey:            crypto.PubkeyToHex(&m.identity.PublicKey),
 		Clock:                clock,

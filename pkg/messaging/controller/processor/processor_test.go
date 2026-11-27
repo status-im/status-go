@@ -16,6 +16,7 @@ import (
 	mvdsmigrations "github.com/status-im/mvds/persistenceutil"
 	mvdsproto "github.com/status-im/mvds/protobuf"
 	"github.com/stretchr/testify/suite"
+	"github.com/waku-org/sds-go-bindings/sds"
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/internal/crypto"
@@ -48,7 +49,7 @@ type ProcessorSuite struct {
 	logger      *zap.Logger
 }
 
-func (s *ProcessorSuite) newStandaloneReliability() *reliability.Reliability {
+func (s *ProcessorSuite) newStandaloneReliability(persistence ...sds.PersistenceCallbacks) *reliability.Reliability {
 	db, err := testutils.SetupTestMemorySQLDB(testutils.NewTestDBInitializer(nil))
 	s.Require().NoError(err)
 
@@ -67,12 +68,52 @@ func (s *ProcessorSuite) newStandaloneReliability() *reliability.Reliability {
 		identity,
 		func(string, []string, string) error { return nil },
 		s.logger,
+		persistence...,
 	)
 	s.Require().NoError(err)
 
 	s.T().Cleanup(r.Close)
 
 	return r
+}
+
+type failingSDSLoadPersistence struct {
+	loadError error
+}
+
+func (*failingSDSLoadPersistence) SaveChannelMeta(string, []byte) error { return nil }
+func (*failingSDSLoadPersistence) UpdateHistory(string, sds.HistoryUpdate) error {
+	return nil
+}
+func (p *failingSDSLoadPersistence) LoadChannel(string) (sds.ChannelData, error) {
+	return sds.ChannelData{}, p.loadError
+}
+func (*failingSDSLoadPersistence) DropChannel(string) error { return nil }
+
+func (s *ProcessorSuite) TestSDSLoadFailureStopsProcessingAndAllowsRetry() {
+	sender := s.newStandaloneReliability()
+	wrapped, _, err := sender.WrapPayloadForSDS(s.testPayload, "channel")
+	s.Require().NoError(err)
+	persistence := &failingSDSLoadPersistence{loadError: errors.New("injected read failure")}
+	receiver := s.newStandaloneReliability(persistence)
+	s.Require().NoError(receiver.Start(func(*ecdsa.PublicKey, []byte, [][]byte) error { return nil }))
+	s.processor.stack.Reliability = receiver
+	key, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+	message := &types.ReceivedMessage{
+		Sig:     crypto.FromECDSAPub(&key.PublicKey),
+		Payload: wrapped,
+	}
+	response, err := s.processor.ProcessMessage(message)
+	s.Require().Error(err)
+	s.Require().Nil(response, "failed envelopes must not reach application processing")
+
+	persistence.loadError = nil
+	response, err = s.processor.ProcessMessage(message)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.Messages, 1)
+	s.Require().Equal(s.testPayload, response.Messages[0].EncryptionLayer.Payload)
 }
 
 func (s *ProcessorSuite) SetupTest() {
@@ -498,6 +539,10 @@ func (s *ProcessorSuite) TestSDSWrappedMessages() {
 	err = s.processor.processSDSLayer(&receivedMsg)
 	s.Require().NoError(err)
 	s.Require().Equal(payload, receivedMsg.EncryptionLayer.Payload)
+	s.Require().True(receivedMsg.SDSWrapped)
+	cloned, err := receivedMsg.Clone()
+	s.Require().NoError(err)
+	s.Require().True(cloned.SDSWrapped)
 
 	anotherPayload := []byte("another-message")
 	receivedMsg2 := types.Message{
@@ -508,6 +553,7 @@ func (s *ProcessorSuite) TestSDSWrappedMessages() {
 	err = s.processor.processSDSLayer(&receivedMsg2)
 	s.Require().NoError(err)
 	s.Require().Equal(anotherPayload, receivedMsg2.EncryptionLayer.Payload)
+	s.Require().False(receivedMsg2.SDSWrapped)
 }
 
 func (s *ProcessorSuite) TestSDSMissingDependencyTriggersFetchHintsAndRecoversPayloads() {
