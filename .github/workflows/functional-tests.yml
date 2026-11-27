@@ -16,8 +16,8 @@ concurrency:
   group: functional-tests-${{ github.event.pull_request.number || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 env:
-  # The compose file defaults to the Harbor mirror of this Docker Hub image.
-  WAKU_IMAGE: wakuorg/nwaku:v0.39.2
+  # Same image as the compose file default.
+  WAKU_IMAGE: quay.io/wakuorg/nwaku-pr:v0.41.0
   # The test clients name their containers after it.
   BUILD_ID: ${{ github.run_id }}
   FUNCTIONAL_TESTS_DOCKER_IMAGE: status-backend-under-test
