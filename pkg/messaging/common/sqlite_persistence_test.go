@@ -166,6 +166,9 @@ func TestSaveHashRatchetMessage(t *testing.T) {
 		Timestamp: 2,
 		Payload:   []byte{3},
 		Dst:       []byte{4},
+		ProcessingContext: &types.ReceivedMessageProcessingContext{
+			FromArchive: true,
+		},
 	}
 
 	require.NoError(t, p.SaveMessage(groupID2, keyID, message2))
@@ -174,6 +177,12 @@ func TestSaveHashRatchetMessage(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, fetchedMessages)
 	require.Len(t, fetchedMessages, 2)
+	contextsByHash := make(map[byte]*types.ReceivedMessageProcessingContext)
+	for _, message := range fetchedMessages {
+		contextsByHash[message.Hash[0]] = message.ProcessingContext
+	}
+	require.Equal(t, &types.ReceivedMessageProcessingContext{}, contextsByHash[1])
+	require.Equal(t, message2.ProcessingContext, contextsByHash[2])
 }
 
 func TestDeleteHashRatchetMessage(t *testing.T) {

@@ -13,6 +13,7 @@ func TestSkipSDS(t *testing.T) {
 	for _, messageType := range []protobuf.ApplicationMetadataMessage_Type{
 		protobuf.ApplicationMetadataMessage_COMMUNITY_DESCRIPTION,
 		protobuf.ApplicationMetadataMessage_COMMUNITY_REQUEST_TO_JOIN,
+		protobuf.ApplicationMetadataMessage_COMMUNITY_REQUEST_TO_JOIN_RESPONSE,
 		protobuf.ApplicationMetadataMessage_COMMUNITY_CANCEL_REQUEST_TO_JOIN,
 		protobuf.ApplicationMetadataMessage_COMMUNITY_REQUEST_TO_LEAVE,
 		protobuf.ApplicationMetadataMessage_COMMUNITY_EVENTS_MESSAGE,

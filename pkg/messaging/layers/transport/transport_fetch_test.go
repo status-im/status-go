@@ -36,7 +36,15 @@ func (f *fakeProcessedMessageIDsCache) Hits(ids []string) (map[string]bool, erro
 	return f.hits, f.err
 }
 
+func (f *fakeProcessedMessageIDsCache) DependencyHits(ids []string) (map[string]bool, error) {
+	return f.Hits(ids)
+}
+
 func (f *fakeProcessedMessageIDsCache) Add(ids []string, timestamp uint64) error {
+	return nil
+}
+
+func (f *fakeProcessedMessageIDsCache) AddRejected(ids []string, timestamp uint64) error {
 	return nil
 }
 

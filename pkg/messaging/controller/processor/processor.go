@@ -8,6 +8,7 @@ import (
 
 	"github.com/golang/protobuf/proto"
 	"github.com/pkg/errors"
+	"github.com/waku-org/sds-go-bindings/sds"
 	otelattribute "go.opentelemetry.io/otel/attribute"
 	oteltrace "go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
@@ -20,6 +21,7 @@ import (
 	"github.com/status-im/status-go/pkg/messaging/controller/utils"
 	encryption "github.com/status-im/status-go/pkg/messaging/layers/encryption"
 	"github.com/status-im/status-go/pkg/messaging/layers/encryption/sharedsecret"
+	"github.com/status-im/status-go/pkg/messaging/layers/reliability"
 	"github.com/status-im/status-go/pkg/messaging/layers/segmentation"
 	messagingtypes "github.com/status-im/status-go/pkg/messaging/types"
 	"github.com/status-im/status-go/pkg/pubsub"
@@ -97,12 +99,22 @@ func (r *Processor) ProcessMessage(msg *messagingtypes.ReceivedMessage) (*messag
 		response.messages = append(response.messages, queuedMessagesResponse.messages...)
 		response.ackedMessageIDs = append(response.ackedMessageIDs, queuedMessagesResponse.ackedMessageIDs...)
 		response.consumedEnvelopeHashes = append(response.consumedEnvelopeHashes, queuedMessagesResponse.consumedEnvelopeHashes...)
+		response.rejectedEnvelopeHashes = append(response.rejectedEnvelopeHashes, queuedMessagesResponse.rejectedEnvelopeHashes...)
+		response.retryableMessages = append(response.retryableMessages, queuedMessagesResponse.retryableMessages...)
+	}
+
+	if msg.FromHashRatchetQueue {
+		if err := r.hashRatchetStorage.DeleteMessages([][]byte{msg.Hash}); err != nil {
+			return nil, errors.Wrap(err, "failed to delete retried hash ratchet message")
+		}
 	}
 
 	return &messagingtypes.HandleMessageResponse{
 		Messages:               response.messages,
 		AckedMessageIDs:        response.ackedMessageIDs,
 		ConsumedEnvelopeHashes: response.consumedEnvelopeHashes,
+		RejectedEnvelopeHashes: response.rejectedEnvelopeHashes,
+		RetryableMessages:      response.retryableMessages,
 	}, nil
 }
 
@@ -110,10 +122,12 @@ type processMessageResponse struct {
 	messages               []*messagingtypes.Message
 	ackedMessageIDs        []types.HexBytes
 	consumedEnvelopeHashes [][]byte
+	rejectedEnvelopeHashes [][]byte
+	retryableMessages      []*messagingtypes.ReceivedMessage
 }
 
 type sdsLayerReliability interface {
-	UnwrapPayloadFromSDSWithMetadata([]byte) ([]byte, []byte, string, bool, error)
+	UnwrapPayloadFromSDSWithContext([]byte, []byte) ([]byte, []byte, string, bool, error)
 	RecordSDSMessageReceived(string, []byte) error
 	RecordSDSRetrievalHints(string, []byte, [][]byte) error
 }
@@ -180,8 +194,21 @@ func (r *Processor) processMessage(m *messagingtypes.ReceivedMessage) (*processM
 	// so fail the whole envelope instead: it must be retried, not marked processed.
 	err = r.processSDSLayer(responseMessage)
 	if err != nil {
+		if errors.Is(err, sds.ErrMessageRejected) {
+			if completeErr := r.completeReconstructedMessage(responseMessage); completeErr != nil {
+				return nil, errors.Wrap(completeErr, "failed to complete rejected segmented message")
+			}
+			logger.Debug("discarding unauthorized SDS message", zap.Error(err))
+			response.messages = nil
+			response.consumedEnvelopeHashes = hashes
+			response.rejectedEnvelopeHashes = hashes
+			return response, nil
+		}
 		logger.Error("failed to unwrap payload for SDS", zap.Error(err))
 		return nil, err
+	}
+	if err := r.completeReconstructedMessage(responseMessage); err != nil {
+		return nil, errors.Wrap(err, "failed to complete processed segmented message")
 	}
 	if responseMessage.SDSSync {
 		response.messages = nil
@@ -200,6 +227,13 @@ func (r *Processor) processMessage(m *messagingtypes.ReceivedMessage) (*processM
 	}
 
 	return response, nil
+}
+
+func (r *Processor) completeReconstructedMessage(message *messagingtypes.Message) error {
+	if !message.SegmentationLayer.Segmented || !message.SegmentationLayer.Completed {
+		return nil
+	}
+	return r.stack.Segmentation.CompleteReconstruction(message.TransportLayer.Payload, message.SigPubKey())
 }
 
 func (r *Processor) processQueuedHashRatchetMessages(hashRatchetInfos []*messagingtypes.HashRatchetInfo) (*processMessageResponse, error) {
@@ -221,6 +255,11 @@ func (r *Processor) processQueuedHashRatchetMessages(hashRatchetInfos []*messagi
 
 			r, err := r.processMessage(message)
 			if err != nil {
+				if errors.Is(err, sds.ErrAuthorizationFailed) {
+					retryMessage := *message
+					retryMessage.FromHashRatchetQueue = true
+					response.retryableMessages = append(response.retryableMessages, &retryMessage)
+				}
 				continue
 			}
 			if r == nil {
@@ -234,6 +273,8 @@ func (r *Processor) processQueuedHashRatchetMessages(hashRatchetInfos []*messagi
 			response.messages = append(response.messages, r.messages...)
 			response.ackedMessageIDs = append(response.ackedMessageIDs, r.ackedMessageIDs...)
 			response.consumedEnvelopeHashes = append(response.consumedEnvelopeHashes, r.consumedEnvelopeHashes...)
+			response.rejectedEnvelopeHashes = append(response.rejectedEnvelopeHashes, r.rejectedEnvelopeHashes...)
+			response.retryableMessages = append(response.retryableMessages, r.retryableMessages...)
 		}
 
 		err = r.hashRatchetStorage.DeleteMessages(processedIds)
@@ -269,7 +310,7 @@ func processTransportLayer(m *messagingtypes.Message, receivedMessage *messaging
 }
 
 func (r *Processor) processSegmentationLayer(m *messagingtypes.Message) error {
-	reconstructedPayload, transportIDs, err := r.stack.Segmentation.Reconstruct(
+	reconstructedPayload, transportIDs, err := r.stack.Segmentation.ReconstructForProcessing(
 		m.TransportLayer.Payload,
 		m.TransportLayer.SigPubKey,
 		m.TransportLayer.Hash)
@@ -332,6 +373,7 @@ func (r *Processor) processEncryptionLayer(ctx context.Context, m *messagingtype
 	switch err {
 	case nil:
 		m.EncryptionLayer.Payload = response.DecryptedMessage
+		m.EncryptionLayer.HashRatchetGroupID = response.HashRatchetGroupID
 		m.EncryptionLayer.Installations = adapters.FromEncryptionInstallations(response.Installations)
 		m.EncryptionLayer.HashRatchetInfo = adapters.FromEncryptionHashRatchets(response.HashRatchetInfo)
 
@@ -358,19 +400,21 @@ func (r *Processor) processSDSLayer(msg *messagingtypes.Message) error {
 	return r.processSDSLayerWithReliability(msg, r.stack.Reliability)
 }
 
-func (r *Processor) processSDSLayerWithReliability(msg *messagingtypes.Message, reliability sdsLayerReliability) error {
+func (r *Processor) processSDSLayerWithReliability(msg *messagingtypes.Message, sdsLayer sdsLayerReliability) error {
 	if len(msg.EncryptionLayer.Payload) <= 0 {
 		return nil
 	}
 
-	unwrappedPayload, sdsMessageID, channelID, isSDS, err := reliability.UnwrapPayloadFromSDSWithMetadata(msg.EncryptionLayer.Payload)
+	unwrappedPayload, sdsMessageID, channelID, isSDS, err := sdsLayer.UnwrapPayloadFromSDSWithContext(
+		msg.EncryptionLayer.Payload, reliability.BuildSDSAuthorizationContext(msg.SigPubKey(), msg.EncryptionLayer.HashRatchetGroupID),
+	)
 	if err != nil {
 		return err
 	}
 
 	metadataOnly := isSDS && unwrappedPayload == nil
 	if isSDS && !metadataOnly {
-		if err := reliability.RecordSDSMessageReceived(channelID, sdsMessageID); err != nil {
+		if err := sdsLayer.RecordSDSMessageReceived(channelID, sdsMessageID); err != nil {
 			r.logger.Error("failed to persist received SDS message",
 				zap.String("channelID", channelID),
 				zap.String("messageID", types.EncodeHex(sdsMessageID)),
@@ -381,7 +425,7 @@ func (r *Processor) processSDSLayerWithReliability(msg *messagingtypes.Message, 
 		if msg.SegmentationLayer.Segmented {
 			envelopeHashes = msg.SegmentationLayer.Hashes
 		}
-		if err := reliability.RecordSDSRetrievalHints(channelID, sdsMessageID, envelopeHashes); err != nil {
+		if err := sdsLayer.RecordSDSRetrievalHints(channelID, sdsMessageID, envelopeHashes); err != nil {
 			r.logger.Error("failed to persist received SDS retrieval hints",
 				zap.String("channelID", channelID),
 				zap.String("messageID", types.EncodeHex(sdsMessageID)),

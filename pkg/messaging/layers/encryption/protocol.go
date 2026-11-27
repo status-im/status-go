@@ -667,10 +667,11 @@ type HashRatchetInfo struct {
 	KeyID   []byte
 }
 type DecryptMessageResponse struct {
-	DecryptedMessage []byte
-	Installations    []*multidevice.Installation
-	SharedSecrets    []*sharedsecret.Secret
-	HashRatchetInfo  []*HashRatchetInfo
+	DecryptedMessage   []byte
+	Installations      []*multidevice.Installation
+	SharedSecrets      []*sharedsecret.Secret
+	HashRatchetInfo    []*HashRatchetInfo
+	HashRatchetGroupID []byte
 }
 
 func (p *Protocol) HandleHashRatchetKeysPayload(ctx context.Context, groupID []byte, encodedKeys []byte, myIdentityKey *ecdsa.PrivateKey, theirIdentityKey *ecdsa.PublicKey) ([]*HashRatchetInfo, error) {
@@ -859,6 +860,9 @@ func (p *Protocol) HandleMessage(
 		}
 		if dmProtocol != nil {
 			hrHeader := dmProtocol.HRHeader
+			if hrHeader != nil && hrHeader.SeqNo != 0 && dmProtocol.DRHeader == nil && dmProtocol.DHHeader == nil {
+				response.HashRatchetGroupID = hrHeader.GroupId
+			}
 			if hrHeader != nil && hrHeader.SeqNo == 0 {
 				var hashRatchetKeys []*HashRatchetInfo
 				if hrHeader.Keys != nil {

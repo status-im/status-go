@@ -171,17 +171,17 @@ func TestSendPublicSDSHintSaveFailurePreservesSendCompletion(t *testing.T) {
 	const pubsubTopic = "/waku/2/rs/1/1"
 	ctx := context.Background()
 
-	require.Error(t, sender.SendSDSSync(ctx, syncPayload, pubsubTopic, syncTopic))
+	require.Error(t, sender.SendSDSSync(ctx, syncPayload, pubsubTopic, syncTopic, nil))
 	require.Nil(t, tr.FilterByChatID(syncTopic))
 	require.Len(t, backend.hashes, 1)
 
 	_, err = tr.InitPublicFilters([]transport.FiltersToInitialize{{ChatID: syncTopic, PubsubTopic: pubsubTopic}})
 	require.NoError(t, err)
-	require.Error(t, sender.SendSDSSync(ctx, syncPayload, "/waku/2/rs/1/2", syncTopic))
+	require.Error(t, sender.SendSDSSync(ctx, syncPayload, "/waku/2/rs/1/2", syncTopic, nil))
 	require.Equal(t, pubsubTopic, tr.FilterByChatID(syncTopic).PubsubTopic)
 	require.Len(t, backend.hashes, 1)
 
-	require.NoError(t, sender.SendSDSSync(ctx, syncPayload, pubsubTopic, syncTopic))
+	require.NoError(t, sender.SendSDSSync(ctx, syncPayload, pubsubTopic, syncTopic, nil))
 	require.Len(t, backend.hashes, 2)
 	require.Equal(t, tr.FilterByChatID(syncTopic).ContentTopic.ContentTopic(), backend.contentTopic)
 	require.Equal(t, "/waku/2/rs/1/1", backend.pubsubTopic)
@@ -196,8 +196,16 @@ func TestSendPublicSDSHintSaveFailurePreservesSendCompletion(t *testing.T) {
 	}
 	canceled, cancel := context.WithCancel(ctx)
 	cancel()
-	require.ErrorIs(t, sender.SendSDSSync(canceled, syncPayload, pubsubTopic, syncTopic), context.Canceled)
+	require.ErrorIs(t, sender.SendSDSSync(canceled, syncPayload, pubsubTopic, syncTopic, nil), context.Canceled)
 	require.Len(t, backend.hashes, 2)
+
+	groupID := []byte("encrypted-community")
+	require.Error(t, sender.SendSDSSync(ctx, syncPayload, pubsubTopic, syncTopic, groupID))
+	require.Len(t, backend.hashes, 2, "an unavailable key must never trigger a public send")
+	_, err = sender.stack.Encryption.GenerateHashRatchetKey(groupID)
+	require.NoError(t, err)
+	require.NoError(t, sender.SendSDSSync(ctx, syncPayload, pubsubTopic, syncTopic, groupID))
+	require.Len(t, backend.hashes, 3)
 }
 
 type sdsWrapperStub struct {

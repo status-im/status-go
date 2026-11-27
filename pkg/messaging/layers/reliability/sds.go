@@ -180,6 +180,16 @@ func (r *Reliability) UnwrapPayloadFromSDSWithMetadata(wrappedPayload []byte) (
 	isSDS bool,
 	err error,
 ) {
+	return r.UnwrapPayloadFromSDSWithContext(wrappedPayload, nil)
+}
+
+func (r *Reliability) UnwrapPayloadFromSDSWithContext(wrappedPayload, authorizationContext []byte) (
+	payload []byte,
+	messageID []byte,
+	channelID string,
+	isSDS bool,
+	err error,
+) {
 	r.sdsOpsMu.Lock()
 	defer r.sdsOpsMu.Unlock()
 
@@ -188,7 +198,7 @@ func (r *Reliability) UnwrapPayloadFromSDSWithMetadata(wrappedPayload []byte) (
 		return nil, nil, "", false, ErrSDSManagerUnavailable
 	}
 
-	unwrappedMessage, err := manager.UnwrapReceivedMessage(wrappedPayload)
+	unwrappedMessage, err := manager.UnwrapReceivedMessageWithContext(wrappedPayload, authorizationContext)
 	if err != nil {
 		if errors.Is(err, sds.ErrNotSDS) {
 			// Legacy messages are not necessarily SDS-wrapped.
@@ -197,7 +207,7 @@ func (r *Reliability) UnwrapPayloadFromSDSWithMetadata(wrappedPayload []byte) (
 		if err = r.recoverCorruptSDSChannel(manager, err); err != nil {
 			return nil, nil, "", false, errors.Wrap(err, "failed to unwrap message with SDS")
 		}
-		unwrappedMessage, err = manager.UnwrapReceivedMessage(wrappedPayload)
+		unwrappedMessage, err = manager.UnwrapReceivedMessageWithContext(wrappedPayload, authorizationContext)
 		if err != nil {
 			return nil, nil, "", false, errors.Wrap(err, "failed to unwrap message with SDS after recovery")
 		}

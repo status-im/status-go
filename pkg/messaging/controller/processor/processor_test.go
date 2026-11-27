@@ -9,6 +9,7 @@ import (
 	"math"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/brianvoe/gofakeit/v6"
 	"github.com/golang/protobuf/proto"
@@ -65,7 +66,7 @@ type metadataOnlySDSLayerStub struct {
 	hints     bool
 }
 
-func (s *metadataOnlySDSLayerStub) UnwrapPayloadFromSDSWithMetadata([]byte) ([]byte, []byte, string, bool, error) {
+func (s *metadataOnlySDSLayerStub) UnwrapPayloadFromSDSWithContext([]byte, []byte) ([]byte, []byte, string, bool, error) {
 	return nil, nil, s.channelID, true, nil
 }
 
@@ -141,6 +142,115 @@ func (s *ProcessorSuite) newStandaloneReliability(persistence ...sds.Persistence
 
 type failingSDSLoadPersistence struct {
 	loadError error
+}
+
+type processorSDSAuthorizerFunc func(sds.AuthorizationMessage) (bool, error)
+
+func (f processorSDSAuthorizerFunc) Authorize(message sds.AuthorizationMessage) (bool, error) {
+	return f(message)
+}
+
+func (s *ProcessorSuite) TestSDSAuthorizationStopsBeforeReceivedEvidence() {
+	for _, failure := range []bool{false, true} {
+		s.Run(fmt.Sprintf("authorization-error=%t", failure), func() {
+			sender := s.newStandaloneReliability()
+			wrapped, messageID, err := sender.WrapPayloadForSDS(s.testPayload, "channel")
+			s.Require().NoError(err)
+			receiver := s.newStandaloneReliability()
+			store := &testSDSRetrievalHintPersistence{hints: make(map[string][][]byte)}
+			receiver.SetSDSRetrievalHintPersistence(store)
+			var context []byte
+			s.Require().NoError(receiver.SetSDSAuthorizer(processorSDSAuthorizerFunc(func(message sds.AuthorizationMessage) (bool, error) {
+				context = message.AuthorizationContext
+				if failure {
+					return false, errors.New("permission lookup failed")
+				}
+				return false, nil
+			})))
+			s.processor.stack.Reliability = receiver
+			key, err := crypto.GenerateKey()
+			s.Require().NoError(err)
+			message := &types.ReceivedMessage{
+				Sig:     crypto.FromECDSAPub(&key.PublicKey),
+				Payload: wrapped,
+				Hash:    crypto.Keccak256(wrapped),
+			}
+			response, err := s.processor.ProcessMessage(message)
+			if failure {
+				s.Require().ErrorIs(err, sds.ErrAuthorizationFailed)
+				s.Require().Nil(response)
+			} else {
+				s.Require().NoError(err)
+				s.Require().Empty(response.Messages)
+				s.Require().Equal([][]byte{message.Hash}, response.ConsumedEnvelopeHashes)
+			}
+			s.Require().Equal(message.Sig, context)
+			received, err := store.IsSDSMessageReceived("channel", cryptotypes.EncodeHex(messageID))
+			s.Require().NoError(err)
+			s.Require().False(received)
+			s.Require().Empty(store.hints)
+		})
+	}
+}
+
+func (s *ProcessorSuite) TestSegmentedSDSMessageCanRetryAfterAuthorizationError() {
+	sender := s.newStandaloneReliability()
+	wrapped, messageID, err := sender.WrapPayloadForSDS([]byte("retry segmented SDS message"), "channel")
+	s.Require().NoError(err)
+	segments, err := s.processor.stack.Segmentation.Segment(wrapped, (len(wrapped)+1)/2)
+	s.Require().NoError(err)
+	s.Require().Len(segments, 2)
+
+	receiver := s.newStandaloneReliability()
+	store := &testSDSRetrievalHintPersistence{hints: make(map[string][][]byte)}
+	receiver.SetSDSRetrievalHintPersistence(store)
+	var authorizationCalls int
+	s.Require().NoError(receiver.SetSDSAuthorizer(processorSDSAuthorizerFunc(func(sds.AuthorizationMessage) (bool, error) {
+		authorizationCalls++
+		if authorizationCalls == 1 {
+			return false, errors.New("temporary authorization lookup failure")
+		}
+		return true, nil
+	})))
+	s.processor.stack.Reliability = receiver
+
+	key, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+	lastSegment := segments[len(segments)-1]
+	var lastHash []byte
+	for i, segment := range segments {
+		lastHash = crypto.Keccak256(segment)
+		response, err := s.processor.ProcessMessage(&types.ReceivedMessage{
+			Sig: crypto.FromECDSAPub(&key.PublicKey), Hash: lastHash, Payload: segment,
+		})
+		if i == 0 {
+			s.Require().NoError(err)
+			s.Require().Nil(response)
+			continue
+		}
+		s.Require().ErrorIs(err, sds.ErrAuthorizationFailed)
+		s.Require().Nil(response)
+	}
+
+	received, err := store.IsSDSMessageReceived("channel", cryptotypes.EncodeHex(messageID))
+	s.Require().NoError(err)
+	s.Require().False(received, "failed authorization must not record received evidence")
+
+	response, err := s.processor.ProcessMessage(&types.ReceivedMessage{
+		Sig: crypto.FromECDSAPub(&key.PublicKey), Hash: lastHash, Payload: lastSegment,
+	})
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Equal(2, authorizationCalls)
+	received, err = store.IsSDSMessageReceived("channel", cryptotypes.EncodeHex(messageID))
+	s.Require().NoError(err)
+	s.Require().True(received, "the retained reconstruction must be retryable")
+
+	response, err = s.processor.ProcessMessage(&types.ReceivedMessage{
+		Sig: crypto.FromECDSAPub(&key.PublicKey), Hash: lastHash, Payload: lastSegment,
+	})
+	s.Require().NoError(err)
+	s.Require().Nil(response, "successfully processed segments must still be deduplicated")
 }
 
 func (*failingSDSLoadPersistence) SaveChannelMeta(string, []byte) error { return nil }
@@ -532,6 +642,89 @@ func (s *ProcessorSuite) TestQueuedHashRatchetMessageStillMissingItsKeySurvivesR
 	s.Require().Len(msgs, 1)
 }
 
+func (s *ProcessorSuite) TestQueuedHashRatchetValidationFailureCanBeRetried() {
+	groupID := []byte("validation-retry-group")
+	senderKey, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+
+	senderReliability := s.newStandaloneReliability()
+	s.T().Cleanup(senderReliability.Close)
+	wrapped, _, err := senderReliability.WrapPayloadForSDS(s.testPayload, "channel")
+	s.Require().NoError(err)
+
+	senderDatabase, err := testutils.SetupTestMemorySQLDB(testutils.NewTestDBInitializer([]*bindata.AssetSource{
+		{Names: encryptionmigrations.AssetNames(), AssetFunc: encryptionmigrations.Asset},
+	}))
+	s.Require().NoError(err)
+	s.T().Cleanup(func() { s.Require().NoError(senderDatabase.Close()) })
+	senderEncryptionProtocol := encryption.New(
+		encryption.NewSQLitePersistence(senderDatabase),
+		"installation-2",
+		s.logger,
+		trace.NewNoopTracer(),
+	)
+	ratchet, err := senderEncryptionProtocol.GenerateHashRatchetKey(groupID)
+	s.Require().NoError(err)
+	keyID, err := ratchet.GetKeyID()
+	s.Require().NoError(err)
+
+	keyExchange, err := senderEncryptionProtocol.BuildHashRatchetKeyExchangeMessage(
+		context.Background(), senderKey, &s.processor.identity.PublicKey, groupID,
+		[]*encryption.HashRatchetKeyCompatibility{ratchet},
+	)
+	s.Require().NoError(err)
+	keyExchangePayload, err := proto.Marshal(keyExchange.Message)
+	s.Require().NoError(err)
+
+	dataMessage, err := senderEncryptionProtocol.BuildHashRatchetMessage(groupID, wrapped)
+	s.Require().NoError(err)
+	dataPayload, err := proto.Marshal(dataMessage.Message)
+	s.Require().NoError(err)
+
+	receiver := s.newStandaloneReliability()
+	s.T().Cleanup(receiver.Close)
+	var authorizationCalls int
+	s.Require().NoError(receiver.SetSDSAuthorizer(processorSDSAuthorizerFunc(func(sds.AuthorizationMessage) (bool, error) {
+		authorizationCalls++
+		if authorizationCalls == 1 {
+			return false, errors.New("temporary authorization lookup failure")
+		}
+		return true, nil
+	})))
+	s.processor.stack.Reliability = receiver
+
+	queuedMessage := &types.ReceivedMessage{
+		Sig: crypto.FromECDSAPub(&senderKey.PublicKey), Hash: []byte{0x41}, Payload: dataPayload,
+		ProcessingContext: &types.ReceivedMessageProcessingContext{FromArchive: true},
+	}
+	response, err := s.processor.ProcessMessage(queuedMessage)
+	s.Require().NoError(err)
+	s.Require().Nil(response, "the envelope waits for its hash-ratchet key")
+
+	response, err = s.processor.ProcessMessage(&types.ReceivedMessage{
+		Sig: crypto.FromECDSAPub(&senderKey.PublicKey), Hash: []byte{0x42}, Payload: keyExchangePayload,
+		ProcessingContext: &types.ReceivedMessageProcessingContext{StoreWakuMessages: true},
+	})
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.RetryableMessages, 1)
+	s.Require().True(response.RetryableMessages[0].FromHashRatchetQueue)
+	s.Require().Equal(queuedMessage.ProcessingContext, response.RetryableMessages[0].ProcessingContext)
+	s.Require().Equal(1, authorizationCalls)
+
+	stored, err := s.processor.hashRatchetStorage.GetMessages(keyID)
+	s.Require().NoError(err)
+	s.Require().Len(stored, 1, "failed authorization must retain the stored envelope")
+
+	response, err = s.processor.ProcessMessage(response.RetryableMessages[0])
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Equal(2, authorizationCalls)
+	stored, err = s.processor.hashRatchetStorage.GetMessages(keyID)
+	s.Require().NoError(err)
+	s.Require().Empty(stored, "successful retry must remove the stored copy")
+}
+
 func (s *ProcessorSuite) TestHandleSegmentMessages() {
 	s.T().Skip("flaky test, tracked in https://github.com/status-im/status-go/issues/7791")
 
@@ -616,6 +809,76 @@ func (s *ProcessorSuite) TestSDSWrappedMessages() {
 	s.Require().NoError(err)
 	s.Require().Equal(anotherPayload, receivedMsg2.EncryptionLayer.Payload)
 	s.Require().False(receivedMsg2.SDSWrapped)
+}
+
+func (s *ProcessorSuite) TestEncryptedSDSSyncRetriesAfterKeyArrival() {
+	native, err := sds.NewReliabilityManager(s.logger, nil, sds.WithSyncInterval(time.Millisecond))
+	s.Require().NoError(err)
+	s.T().Cleanup(func() { s.Require().NoError(native.Cleanup()) })
+	const channelID = "encrypted-test-channel"
+	groupID := []byte("community-group")
+	s.Require().NoError(native.EnsureChannel(channelID))
+	var syncPayload []byte
+	s.Require().Eventually(func() bool {
+		events, err := native.Tick()
+		if err == nil && len(events) > 0 {
+			syncPayload = events[0].Payload
+		}
+		return len(syncPayload) > 0
+	}, time.Second, time.Millisecond)
+
+	authorizations := make(chan sds.AuthorizationMessage, 2)
+	s.Require().NoError(s.processor.stack.Reliability.SetSDSAuthorizer(processorSDSAuthorizerFunc(func(msg sds.AuthorizationMessage) (bool, error) {
+		authorizations <- msg
+		sender, decryptedGroup, err := reliability.ParseSDSAuthorizationContext(msg.AuthorizationContext)
+		return err == nil && sender != nil && bytes.Equal(groupID, decryptedGroup), err
+	})))
+
+	db, err := testutils.SetupTestMemorySQLDB(testutils.NewTestDBInitializer([]*bindata.AssetSource{
+		{Names: encryptionmigrations.AssetNames(), AssetFunc: encryptionmigrations.Asset},
+	}))
+	s.Require().NoError(err)
+	s.T().Cleanup(func() { s.Require().NoError(db.Close()) })
+	sender := encryption.New(encryption.NewSQLitePersistence(db), "sync-sender", s.logger, trace.NewNoopTracer())
+	key, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+	ratchet, err := sender.GenerateHashRatchetKey(groupID)
+	s.Require().NoError(err)
+	send := func(spec *encryption.ProtocolMessageSpec, hash byte) *types.HandleMessageResponse {
+		payload, err := proto.Marshal(spec.Message)
+		s.Require().NoError(err)
+		response, err := s.processor.ProcessMessage(&types.ReceivedMessage{
+			Sig: crypto.FromECDSAPub(&key.PublicKey), Hash: []byte{hash}, Payload: payload,
+		})
+		s.Require().NoError(err)
+		return response
+	}
+
+	plaintext, err := sender.BuildPublicMessage(key, syncPayload)
+	s.Require().NoError(err)
+	response := send(plaintext, 1)
+	s.Require().Empty(response.Messages)
+	s.Require().Equal([][]byte{{1}}, response.ConsumedEnvelopeHashes)
+	s.Require().Len(authorizations, 1)
+	senderKey, decryptedGroup, err := reliability.ParseSDSAuthorizationContext((<-authorizations).AuthorizationContext)
+	s.Require().NoError(err)
+	s.Require().True(crypto.IsPubKeyEqual(&key.PublicKey, senderKey))
+	s.Require().Empty(decryptedGroup)
+
+	encryptedSync, err := sender.BuildHashRatchetMessage(groupID, syncPayload)
+	s.Require().NoError(err)
+	s.Require().Nil(send(encryptedSync, 2), "the missing-key sync must be queued")
+	s.Require().Empty(authorizations)
+
+	keyExchange, err := sender.BuildHashRatchetKeyExchangeMessage(s.T().Context(), key, &s.processor.identity.PublicKey, groupID, []*encryption.HashRatchetKeyCompatibility{ratchet})
+	s.Require().NoError(err)
+	response = send(keyExchange, 3)
+	s.Require().Contains(response.ConsumedEnvelopeHashes, []byte{2})
+	s.Require().Len(authorizations, 1)
+	senderKey, decryptedGroup, err = reliability.ParseSDSAuthorizationContext((<-authorizations).AuthorizationContext)
+	s.Require().NoError(err)
+	s.Require().True(crypto.IsPubKeyEqual(&key.PublicKey, senderKey))
+	s.Require().Equal(groupID, decryptedGroup)
 }
 
 func (s *ProcessorSuite) TestSDSSyncConsumedWithoutContentEvidence() {

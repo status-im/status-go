@@ -112,15 +112,31 @@ func (s *MessengerCommunitiesSuite) TestSDSSyncUsesSeparateCommunityTopic() {
 	owner := s.newMessengerWithConfig(testMessengerConfig{
 		messagingOptions: []messaging.Options{messaging.WithSDSSyncInterval(20 * time.Millisecond)},
 	}, "", nil)
-	community, _ := createCommunity(&s.Suite, owner)
+	community, chat := createCommunity(&s.Suite, owner)
 	s.advertiseCommunityTo(community, owner, s.alice)
 	s.advertiseCommunityTo(community, owner, s.bob)
 	s.joinCommunity(community, owner, s.alice)
 	s.joinCommunity(community, owner, s.bob)
+	// Control traffic no longer seeds SDS history; sync a real chat message.
+	message := common.NewMessage()
+	message.ChatId = chat.ID
+	message.Text = "SDS sync history"
+	message.ContentType = protobuf.ChatMessage_TEXT_PLAIN
+	_, err := owner.SendChatMessage(context.Background(), message)
+	s.Require().NoError(err)
+	_, err = WaitOnMessengerResponse(s.alice, func(response *MessengerResponse) bool {
+		for _, received := range response.Messages() {
+			if received.Text == message.Text {
+				return true
+			}
+		}
+		return false
+	}, "authorized SDS chat message was not received")
+	s.Require().NoError(err)
 
 	topic := communitySDSSyncTopic(community.IDString())
 	s.Require().NotNil(s.alice.messaging.ChatFilterByChatID(topic))
-	_, err := s.bob.messaging.RemoveFilterByChatID(topic)
+	_, err = s.bob.messaging.RemoveFilterByChatID(topic)
 	s.Require().NoError(err)
 	s.Require().Nil(s.bob.messaging.ChatFilterByChatID(topic))
 	_, err = s.alice.messaging.RetrieveRawAll()
